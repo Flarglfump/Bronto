@@ -1,5 +1,6 @@
 #include "logger.h"
 #include "asserts.h"
+#include "platform/platform.h"
 
 // TODO: temporary
 #include <stdio.h>
@@ -23,20 +24,25 @@ void shutdown_logging() {
 void log_output(log_level level, const char * message, ...) {
     const char * level_strings[6] = {"[FATAL]: ", "[ERROR]: ", "[WARN]: ", "[INFO]: ", "[DEBUG]: ", "[TRACE]: "};
     // FATAL (0) or ERROR (1) level
-    // b8 is_error = level < 2; 
+    b8 is_error = level < LOG_LEVEL_WARN; 
 
     // NOTE: 32K char limit on messages - probably won't happen...
-    char outmsg[32000];
+    const i32 msg_len = 32000;
+    char outmsg[msg_len];
     memset(outmsg, 0, sizeof(outmsg));
 
     __builtin_va_list arg_ptr;
     va_start(arg_ptr, message);
-    vsnprintf(outmsg, 32000, message, arg_ptr); 
+    vsnprintf(outmsg, msg_len, message, arg_ptr); 
     va_end(arg_ptr);
 
-    char outmsg2[32000];
+    char outmsg2[msg_len];
     sprintf(outmsg2, "%s%s\n", level_strings[level], outmsg);
 
-    // TODO: platform-specific output
-    printf("%s", outmsg2);
+    // Platform-specific output
+    if (is_error) {
+        platform_console_write_error(outmsg2, level);
+    } else {
+        platform_console_write(outmsg2, level);
+    }
 }
