@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "logger.h": "c",
-        "system_error": "c"
+        "system_error": "c",
+        "platform.h": "c"
     }
 }

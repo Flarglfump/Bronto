@@ -6,7 +6,7 @@ typedef struct platform_state {
     void * internal_state;
 } platform_state;
 
-B_API b8 platform_startup(
+b8 platform_startup(
     platform_state * plat_state,
     const char * application_name,
     i32 x,
@@ -15,9 +15,8 @@ B_API b8 platform_startup(
     i32 height
 );
 
-B_API void platform_shutdown(platform_state * plat_state);
-
-B_API b8 platform_pump_messages(platform_state * plat_state);
+void platform_shutdown(platform_state * plat_state);
+b8 platform_pump_messages(platform_state * plat_state);
 
 void * platform_allocate(u64 size, b8 aligned);
 void platform_free(void * block, b8 aligned);
