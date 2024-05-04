@@ -83,7 +83,7 @@ STATIC_ASSERT(sizeof(f64) == 8, "Expected f64 to be 8 bytes.");
 #endif
 
 /* Import/Export API */
-#ifdef KEXPORT
+#ifdef B_EXPORT
 // Exports
     #ifdef _MSC_VER
         #define B_API __declspec(dllexport)
