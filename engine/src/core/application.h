@@ -1,5 +1,8 @@
 #pragma once
+
 #include "defines.h"
+
+struct game; // Forward declare this type for application_create() function
 
 // Application configuration
 typedef struct application_config {
@@ -19,5 +22,5 @@ typedef struct application_config {
     char * name;
 } application_config;
 
-B_API b8 application_create(application_config * config);
+B_API b8 application_create(struct game * game_inst);
 B_API b8 application_run();
