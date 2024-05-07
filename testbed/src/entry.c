@@ -2,8 +2,7 @@
 
 #include <entry.h>
 
-/* TODO: Remove this! */
-#include <platform/platform.h>
+#include <core/bmemory.h>
 
 /* Definition of function to create new game */
 b8 create_game(game * out_game) {
@@ -22,10 +21,10 @@ b8 create_game(game * out_game) {
     out_game->on_resize = game_on_resize;
 
     /* Create game state */
-    out_game->state = platform_allocate(sizeof(game_state), false);
+    out_game->state = b_alloc(sizeof(game_state), MEMORY_TAG_GAME);
     
     /**
-     * Can perform additional initialization here
+     * Perform additional initialization here
     */
 
     return true;

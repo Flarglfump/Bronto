@@ -2,6 +2,7 @@
 
 #include "core/application.h"
 #include "core/logger.h"
+#include "core/bmemory.h"
 #include "game_types.h"
 
 /* Extern function, defined in user code to create a game */
@@ -11,6 +12,8 @@ extern b8 create_game(game * out_game);
  * The main entry point of the application
 */
 int main(void) {
+
+    initialize_memory();
 
     /* Request game instance from application */
     game game_inst;
@@ -24,8 +27,6 @@ int main(void) {
         B_FATAL("The game's function pointers are not assigned!");
         return -2;
     }
-
-
     
     /* Create app */
     if (!application_create(&game_inst)) {
@@ -39,7 +40,7 @@ int main(void) {
         return 2;
     }
 
-    
+    shutdown_memory();
 
     return 0;
 }

@@ -3,6 +3,7 @@
 
 #include "logger.h"
 #include "platform/platform.h"
+#include "core/bmemory.h"
 
 typedef struct application_state {
     game * game_inst;
@@ -64,6 +65,7 @@ b8 application_create(game * game_inst) {
 }
 
 b8 application_run() {   
+    // B_INFO(get_memory_usage_str());
 
     /* Game loop! */
     while (app_state.is_running) {
