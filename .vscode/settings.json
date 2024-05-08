@@ -3,6 +3,9 @@
         "logger.h": "c",
         "system_error": "c",
         "platform.h": "c",
-        "bmemory.h": "c"
+        "bmemory.h": "c",
+        "vector": "cpp",
+        "xstring": "cpp",
+        "array": "cpp"
     }
 }
