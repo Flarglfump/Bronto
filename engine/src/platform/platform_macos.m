@@ -18,7 +18,7 @@
 // For surface creation
 #define VK_USE_PLATFORM_METAL_EXT
 #include <vulkan/vulkan.h>
-#include "renderer/vulkan/vulkan_types.inl"
+// #include "renderer/vulkan/vulkan_types.inl"
 
 @class ApplicationDelegate;
 @class WindowDelegate;

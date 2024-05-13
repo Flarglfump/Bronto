@@ -2,9 +2,12 @@
 #include "game_types.h"
 
 #include "logger.h"
+
 #include "platform/platform.h"
 #include "core/bmemory.h"
 #include "core/event.h"
+#include "core/input.h"
+#include "core/clock.h"
 
 typedef struct application_state {
     game * game_inst;
@@ -13,6 +16,7 @@ typedef struct application_state {
     platform_state platform;
     i16 width;
     i16 height;
+    clock clock;
     f64 last_time;
 } application_state;
 
@@ -72,7 +76,15 @@ b8 application_create(game * game_inst) {
 }
 
 b8 application_run() {   
-    // B_INFO(get_memory_usage_str());
+    clock_start(&app_state.clock);
+    clock_update(&app_state.clock);
+    app_state.last_time = app_state.clock.elapsed;
+    f64 running_time = 0;
+    u8 frame_count = 0;
+    f64 target_frame_seconds = 1.0f / 60; // Target framerate = 60 frames per second
+
+    B_INFO(get_memory_usage_str());
+
 
     /* Game loop! */
     while (app_state.is_running) {
@@ -82,24 +94,55 @@ b8 application_run() {
 
         /* Run this only if game is not suspended */
         if (!app_state.is_suspended) {
+            /* Update clock and get delta time */
+            f64 current_time = app_state.clock.elapsed;
+            f64 delta = (current_time - app_state.last_time);
+            f64 frame_start_time = platform_get_absolute_time();
+
             /* Call game's update function */
-            if (!app_state.game_inst->update(app_state.game_inst, (f32) 0)) {
+            if (!app_state.game_inst->update(app_state.game_inst, (f32) delta)) {
                 B_FATAL("Game update failed, shutting down!");
                 app_state.is_running = false;
                 break;
             }
 
             /* Call game's render function */
-            if (!app_state.game_inst->render(app_state.game_inst, (f32) 0)) {
+            if (!app_state.game_inst->render(app_state.game_inst, (f32) delta)) {
                 B_FATAL("Game render failed, shutting down!");
                 app_state.is_running = false;
                 break;
             }
+
+            /* Determine elapsed time during frame */
+            f64 frame_end_time = platform_get_absolute_time();
+            f64 frame_elapsed_time = frame_end_time - frame_start_time;
+            running_time += frame_elapsed_time;
+            f64 remaining_seconds;
+
+            /* If frame did not use all allotted time, give it back to OS */
+            if (remaining_seconds > 0) {
+                u64 remaining_ms = (remaining_ms * 1000);
+
+                b8 limit_frames = false; // NOTE: may want to handle this later
+                if (remaining_ms > 0 && limit_frames) {
+                    platform_sleep(remaining_ms - 1);
+                }
+
+                frame_count++;
+            }
+
+            /* Send input updates */
+            // NOTE: Input updating should always be handled after any input recording should be performed - so update input as last part of game loop.
+            input_update((f32) delta);
+
+            /* Update last time */
+            app_state.last_time = current_time;
         }
     }
 
     app_state.is_running = false; // Just to be safe
 
+    clock_stop(&app_state.clock);
     event_shutdown();
     platform_shutdown(&app_state.platform);
 

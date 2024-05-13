@@ -3,4 +3,5 @@ obj/engine/src/core/application.c.o: engine/src/core/application.c \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/TargetConditionals.h \
   engine/src/game_types.h engine/src/core/logger.h \
   engine/src/platform/platform.h engine/src/core/bmemory.h \
-  engine/src/core/event.h
+  engine/src/core/event.h engine/src/core/input.h \
+  engine/src/core/clock.h
