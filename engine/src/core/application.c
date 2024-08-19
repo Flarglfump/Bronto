@@ -9,6 +9,8 @@
 #include "core/input.h"
 #include "core/clock.h"
 
+#include "renderer/renderer_frontend.h"
+
 typedef struct application_state {
     game * game_inst;
     b8 is_running;
@@ -33,25 +35,31 @@ b8 application_create(game * game_inst) {
 
     // Initialize subsystems
     initialize_logging();
+    input_initialize();
+    
 
     // TODO: Remove this
-    B_FATAL("A test message: %f", 3.14f);
-    B_ERROR("A test message: %f", 3.14f);
-    B_WARN("A test message: %f", 3.14f);
-    B_INFO("A test message: %f", 3.14f);
-    B_DEBUG("A test message: %f", 3.14f);
-    B_TRACE("A test message: %f", 3.14f);
+    // B_FATAL("A test message: %f", 3.14f);
+    // B_ERROR("A test message: %f", 3.14f);
+    // B_WARN("A test message: %f", 3.14f);
+    // B_INFO("A test message: %f", 3.14f);
+    // B_DEBUG("A test message: %f", 3.14f);
+    // B_TRACE("A test message: %f", 3.14f);
 
     app_state.is_running = true;
     app_state.is_suspended = false;
 
     /* Perform event system initialization */
+    B_INFO("Initializing event subsytem...");
     if (!event_initialize()) {
         B_ERROR("Event system failed to initialize. Application cannot continue!");
         return false;
     }
+    B_INFO("Event subsytem initialized...");
+
 
     /* Perform platform-specific initialization  */
+    B_INFO("Initializing platform layer...");
     if (!platform_startup(&app_state.platform,
             game_inst->app_config.name,
             game_inst->app_config.start_pos_x,
@@ -60,12 +68,24 @@ b8 application_create(game * game_inst) {
             game_inst->app_config.start_height)) {
         return false;
     }
-    
+    B_INFO("Platform layer initialized...");
+
+    /* Initialize renderer */
+    B_INFO("Initializing renderer subsystem...");
+    if (!renderer_initialize(game_inst->app_config.name, &(app_state.platform))) {
+        B_FATAL("Renderer initialization failed")
+        return false;
+    }
+    B_INFO("Renderer subsystem initialized...");
+
     /* Initialize game */
+    B_INFO("Initializing game...");
     if (!app_state.game_inst->initialize(app_state.game_inst)) {
         B_FATAL("Game initialization failed");
         return false;
     }
+
+    B_INFO("Game initialized...");
 
     /* Handle resize event upon initialization */
     app_state.game_inst->on_resize(app_state.game_inst, app_state.width, app_state.height);
@@ -75,7 +95,9 @@ b8 application_create(game * game_inst) {
     return true;
 }
 
-b8 application_run() {   
+b8 application_run() {
+    B_INFO("Running game...");
+
     clock_start(&app_state.clock);
     clock_update(&app_state.clock);
     app_state.last_time = app_state.clock.elapsed;
@@ -113,6 +135,11 @@ b8 application_run() {
                 break;
             }
 
+            // TODO: refactor packet creation
+            render_packet packet;
+            packet.delta_time = delta;
+            renderer_draw_frame(&packet);
+
             /* Determine elapsed time during frame */
             f64 frame_end_time = platform_get_absolute_time();
             f64 frame_elapsed_time = frame_end_time - frame_start_time;
@@ -143,7 +170,14 @@ b8 application_run() {
     app_state.is_running = false; // Just to be safe
 
     clock_stop(&app_state.clock);
+
+    /* Unregister any registered events */
+
+    /* Shut down subsystems */
     event_shutdown();
+    input_shutdown();
+    renderer_shutdown();
+
     platform_shutdown(&app_state.platform);
 
     return true;

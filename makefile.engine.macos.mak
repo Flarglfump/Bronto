@@ -5,7 +5,7 @@ ASSEMBLY := engine
 EXTENSION := .a
 COMPILER_FLAGS := -g -MD -fdeclspec -fPIC -ObjC
 INCLUDE_FLAGS := -Iengine/src
-LINKER_FLAGS := -g -shared -lvulkan -lobjc -framework AppKit -framework QuartzCore
+LINKER_FLAGS := -g -shared -lvulkan -lobjc -framework AppKit -framework QuartzCore -Wl,-rpath,/usr/local/share/vulkan/sdk/macOS/lib
 DEFINES := -D_DEBUG -DKEXPORT
 
 # Make does not offer a recursive wildcard function, so here's one:
@@ -27,7 +27,7 @@ scaffold: # create build directory
 link: scaffold $(OBJ_FILES) # link
 	@echo Linking $(ASSEMBLY)...
 	@mkdir -p $(BUILD_DIR)
-	@clang $(OBJ_FILES) -o $(BUILD_DIR)/lib$(ASSEMBLY)$(EXTENSION) $(LINKER_FLAGS)
+	clang $(OBJ_FILES) -o $(BUILD_DIR)/lib$(ASSEMBLY)$(EXTENSION) $(LINKER_FLAGS)
 
 .PHONY: compile
 compile: #compile .c and .m files
@@ -40,10 +40,10 @@ clean: # clean build directory
 
 $(OBJ_DIR)/%.c.o: %.c # compile .c to .o object
 	@echo   $<...
-	@clang $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
+	clang $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
 
 $(OBJ_DIR)/%.m.o: %.m # compile .m to .o object
 	@echo   $<...
-	@clang $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
+	clang $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
 
 -include $(OBJ_FILES:.o=.d)

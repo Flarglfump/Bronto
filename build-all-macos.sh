@@ -4,7 +4,6 @@ set echo on
 
 echo "Building everything..."
 
-
 make -f Makefile.engine.macos.mak all
 
 ERRORLEVEL=$?

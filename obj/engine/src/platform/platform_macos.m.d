@@ -1335,4 +1335,5 @@ obj/engine/src/platform/platform_macos.m.o: \
   /usr/local/include/vk_video/vulkan_video_codec_h265std_decode.h \
   /usr/local/include/vk_video/vulkan_video_codec_av1std.h \
   /usr/local/include/vk_video/vulkan_video_codec_av1std_decode.h \
-  /usr/local/include/vulkan/vulkan_metal.h
+  /usr/local/include/vulkan/vulkan_metal.h \
+  engine/src/renderer/vulkan/vulkan_types.inl

@@ -6,8 +6,8 @@ ASSEMBLY := testbed
 EXTENSION := 
 COMPILER_FLAGS := -g -MD -fdeclspec -fPIC
 INCLUDE_FLAGS := -Iengine/src -Itestbed\src 
-LINKER_FLAGS := -L./$(BUILD_DIR)/ -lengine -Wl,-rpath,.
-DEFINES := -D_DEBUG -DKIMPORT
+LINKER_FLAGS := -L./$(BUILD_DIR)/ -lengine -lvulkan -Wl,-rpath,. -Wl,-rpath,/usr/local/share/vulkan/sdk/macOS/lib
+DEFINES := -D_DEBUG -DB_IMPORT
 
 # Make does not offer a recursive wildcard function, so here's one:
 #rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))

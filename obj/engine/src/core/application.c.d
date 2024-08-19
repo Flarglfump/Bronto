@@ -4,4 +4,5 @@ obj/engine/src/core/application.c.o: engine/src/core/application.c \
   engine/src/game_types.h engine/src/core/logger.h \
   engine/src/platform/platform.h engine/src/core/bmemory.h \
   engine/src/core/event.h engine/src/core/input.h \
-  engine/src/core/clock.h
+  engine/src/core/clock.h engine/src/renderer/renderer_frontend.h \
+  engine/src/renderer/renderer_types.inl
