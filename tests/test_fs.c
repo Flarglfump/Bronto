@@ -79,7 +79,7 @@ static void test_capture(void) {
     br_stream st;
     bool saw_err = false;
     clock_t start;
-#if defined(__EMSCRIPTEN__)
+#if defined(BR_OS_WEB)
     CHECK(!br_capture_start(false));
     return;
 #endif

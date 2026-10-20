@@ -234,6 +234,10 @@ static void key_tap(br_key k) {
     br_headless_inject(&u);
 }
 
+static void after_frame(br_engine *e) {
+    if (br_key_pressed(&e->input, BR_KEY_F11)) br_window_toggle_fullscreen(e);
+}
+
 int main(int argc, char **argv) {
     br_engine *e = BR_NEW(br_engine);
     br_engine_config cfg = br_engine_default_config();
@@ -278,9 +282,7 @@ int main(int argc, char **argv) {
                "Wrote bounce_title.bmp, bounce_game.bmp, bounce_paused.bmp, bounce_audio.wav\n",
                frame, G.bounces, captured.frames);
     } else {
-        while (br_engine_frame(e)) {
-            if (br_key_pressed(&e->input, BR_KEY_F11)) br_window_toggle_fullscreen(e);
-        }
+        br_engine_loop(e, after_frame);   /* (on the web the browser runs the frames) */
     }
     br_engine_shutdown(e);
     br_free(e);

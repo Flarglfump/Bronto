@@ -1,12 +1,12 @@
 /* Tests: lock-free audio ring buffer (single-threaded semantics and a
  * real two-thread stress test where threads are available). */
-#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#if !defined(_WIN32) && !defined(__wasm__) && !defined(_POSIX_C_SOURCE)
 #  define _POSIX_C_SOURCE 200809L
 #endif
 #include "test.h"
 #include <string.h>
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__wasm__)
 #  include <pthread.h>
 #  define HAVE_THREADS 1
 #endif

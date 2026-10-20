@@ -14,8 +14,9 @@
  *   8. apply pending scene transitions
  *   9. frame limiter (sleep until 1/max_fps has elapsed)
  *
- * br_engine_frame() runs exactly one frame, which lets the web backend hand
- * control of the loop to the browser; br_engine_run() wraps everything.
+ * br_engine_frame() runs exactly one frame. br_engine_loop() runs them until
+ * the game ends - or, on the web, hands them to the browser, which calls for
+ * one per screen refresh; br_engine_run() wraps everything.
  */
 #ifndef BRONTO_ENGINE_H
 #define BRONTO_ENGINE_H
@@ -97,6 +98,7 @@ struct br_engine {
 
     bool running;
     bool initialized;
+    void (*loop_hook)(br_engine *e);   /* br_engine_loop's after_frame */
     void *user;
 };
 
@@ -107,8 +109,19 @@ bool br_engine_frame(br_engine *e);   /* false once the engine should stop */
 void br_engine_shutdown(br_engine *e);
 void br_engine_quit(br_engine *e);
 
-/* Convenience: init, run the loop (or hand it to the platform), shutdown.
- * Returns 0 on success. */
+/* Runs frames until the game quits, then br_engine_shutdown(e) (which may
+ * be called again: it does nothing the second time). `after_frame` (may be
+ * NULL) runs after each frame.
+ *
+ * On desktops this returns when the game ends. On the web the browser owns
+ * the loop: this call never returns - main() ends here, and the page keeps
+ * calling for frames; when the game quits the engine shuts down and the page
+ * says the game has ended. So nothing after the call runs on the web, and
+ * `e` must not live on main()'s stack (use BR_NEW). Only put cleanup after it,
+ * such as br_free(e). */
+void br_engine_loop(br_engine *e, void (*after_frame)(br_engine *e));
+
+/* Convenience: init, br_engine_loop, shutdown. Returns 0 on success. */
 int br_engine_run(const br_engine_config *cfg);
 
 /* Re-query the window size/scale from the platform, resize the framebuffer

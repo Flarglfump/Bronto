@@ -8,17 +8,24 @@
  *   Windows   builds/windows/<Name>.exe          the same
  *   macOS     builds/macos/<Name>.app            a bundle: Contents/MacOS/<Name>, and the
  *                                                pack in Contents/Resources/game.brpak
+ *   Web       builds/web/index.html              one page: the web player (WebAssembly), its
+ *                                                runtime and the pack, all inside it
+ *                                                (tools/web/webpage.c)
  *
  * The player for this computer sits beside the editor. Players for the
  * other systems are built on them and copied into players/ beside the
  * editor, named bronto_player-linux, bronto_player-macos and
  * bronto_player-windows.exe; their Build items work once they are there.
+ * The web player is built on any of them by "make web", into web/ beside
+ * the editor (bronto_player.wasm, bronto.js and shell.html); a copy of
+ * that folder in players/web works too.
  *
  * Before packing, every script in the project is checked (strictly, if the
  * project asks for strict typing); mistakes go to the console, where a
  * double-click opens them.
  */
 #include "editor.h"
+#include "../web/webpage.h"
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -52,7 +59,11 @@ static bool editor_dir(char *out, size_t size) {
 bool ed_find_player(editor *ed, ed_target t, char *out, size_t size) {
     char dir[BP], name[64];
     BR_UNUSED(ed);
-    if (t == ED_TARGET_WEB || !editor_dir(dir, sizeof(dir))) return false;
+    if (!editor_dir(dir, sizeof(dir))) return false;
+    if (t == ED_TARGET_WEB) {                               /* web/ (make web), or players/web/ */
+        char js[BP], shell[BP];
+        return webpage_find_runtime(dir, out, js, shell, size < sizeof(js) ? size : sizeof(js));
+    }
     if (t == ed_host_target()) {
         br_path_join(out, size, dir, t == ED_TARGET_WINDOWS ? "bronto_player.exe" : "bronto_player");
         if (br_fs_exists(out)) return true;
@@ -195,6 +206,50 @@ static bool write_plist(const char *path, const char *name, const char *file_nam
     return br_file_write_all(path, text, strlen(text));
 }
 
+/* Web: one page, index.html, with the web player, its runtime and the pack inside. */
+static bool build_web(editor *ed, const char *root, const char *player, const char *dir, int scripts, char *out, size_t size) {
+    char js[BP], shell[BP], page_path[BP], err[300], key[160];
+    br_pack_stats st;
+    br_image icon;
+    bool have_icon = false, ok;
+    webpage page;
+    size_t wasm_size = 0, pack_size = 0;
+    void *wasm, *pack;
+    br_path_parent(js, sizeof(js), player);                 /* the runtime is beside the player */
+    br_path_join(shell, sizeof(shell), js, "shell.html");
+    br_path_join(page_path, sizeof(page_path), js, "bronto.js");
+    snprintf(js, sizeof(js), "%s", page_path);
+    if (!make_dirs(dir)) { ed_status(ed, "Build: can't make the folder %s", dir); return false; }
+    br_path_join(page_path, sizeof(page_path), dir, "index.html");
+    if (!(pack = webpage_pack_project(root, ed->project.build_dir, &pack_size, &st, err, sizeof(err)))) { ed_status(ed, "Build: %s", err); return false; }
+    if (!(wasm = br_file_read_all(player, &wasm_size))) { br_free(pack); ed_status(ed, "Build: can't read %s", player); return false; }
+    if (ed->project.icon[0]) {                              /* the project's icon, or Bronto's */
+        char icon_path[BP];
+        br_path_join(icon_path, sizeof(icon_path), root, ed->project.icon);
+        have_icon = br_image_load(&icon, icon_path);
+    }
+    if (!have_icon) { ed_make_icon(&icon, 128); have_icon = icon.pixels != NULL; }
+    snprintf(key, sizeof(key), "%s", ed->project.name);    /* where the browser keeps its saved files */
+    memset(&page, 0, sizeof(page));
+    page.title = ed->project.name;
+    page.icon = have_icon ? &icon : NULL;
+    page.storage_key = key;
+    page.wasm = wasm;
+    page.wasm_size = wasm_size;
+    page.pack = pack;
+    page.pack_size = pack_size;
+    ok = webpage_write(&page, js, shell, page_path, err, sizeof(err));
+    if (have_icon) br_image_destroy(&icon);
+    br_free(wasm);
+    br_free(pack);
+    if (!ok) { ed_status(ed, "Build: %s", err); return false; }
+    snprintf(out, size, "%s", page_path);
+    printf("Build: packed %u files (%.1f KB, %d script%s checked) into %s\n", st.files, (double)st.bytes / 1024.0, scripts,
+           scripts == 1 ? "" : "s", out);
+    ed_status(ed, "Built %s for the web: %s (open it in a browser, or put it on a web site)", ed->project.name, out);
+    return true;
+}
+
 bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
     char root[BP], player[BP], dir[BP], name[96], exe[BP], pak[BP], main_scene[BP], err[256];
     br_pack_stats st;
@@ -222,7 +277,7 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
         return false;
     }
     if (!ed_find_player(ed, t, player, sizeof(player))) {
-        if (t == ED_TARGET_WEB) ed_status(ed, "Build: web builds aren't available yet");
+        if (t == ED_TARGET_WEB) ed_status(ed, "Build: no web player beside the editor - build it with \"make web\" (needs LLVM's clang)");
         else if (t == ed_host_target()) ed_status(ed, "Build: bronto_player isn't beside the editor - build it with \"make tools\"");
         else ed_status(ed, "Build: no %s player - build bronto_player on %s and copy it to players/ beside the editor", ed_target_name(t), ed_target_name(t));
         fprintf(stderr, "[ERROR] build: %s\n", ed->status);
@@ -236,6 +291,7 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
         snprintf(dir, sizeof(dir), "%s", sub);
     }
     pc.build_dir = ed->project.build_dir;
+    if (t == ED_TARGET_WEB) return build_web(ed, root, player, dir, scripts, out, size);
     if (t == ED_TARGET_MACOS) {                             /* Name.app/Contents/{MacOS/Name, Resources/game.brpak, Info.plist} */
         char app[BP], macos[BP + 64], res[BP + 64], plist[BP + 64], file[160];
         snprintf(file, sizeof(file), "%s.app", name);
@@ -271,6 +327,11 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
 void ed_cmd_build(editor *ed, ed_target t, bool run) {
     char out[BP], cmd[BP + 32];
     if (!ed_build(ed, t, out, sizeof(out)) || !run) return;
+    if (t == ED_TARGET_WEB) {                               /* the page, in the browser */
+        if (br_open_path(ed->engine, out)) ed_status(ed, "Opened %s in the browser", br_path_name(out));
+        else ed_status(ed, "Built, but couldn't open %s", out);
+        return;
+    }
     if (t != ed_host_target()) { ed_status(ed, "Built for %s - it runs there, not here", ed_target_name(t)); return; }
     if (t == ED_TARGET_MACOS) snprintf(cmd, sizeof(cmd), "open \"%s\"", out);
     else snprintf(cmd, sizeof(cmd), "\"%s\"", out);

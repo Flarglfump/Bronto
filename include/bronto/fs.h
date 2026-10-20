@@ -3,8 +3,9 @@
  *
  * The C standard library can open files but can't list a folder or make
  * one, so these calls are implemented per OS in the platform layer
- * (src/platform/fs_posix.c for Linux, macOS and the web; fs_win32.c for
- * Windows). Paths are UTF-8 and use '/' everywhere; Windows also accepts '\'.
+ * (src/platform/fs_posix.c for Linux and macOS, fs_win32.c for Windows,
+ * fs_web.c for the web, where files live in memory and what a game saves
+ * is kept in the browser's storage). Paths are UTF-8 and use '/' everywhere; Windows also accepts '\'.
  *
  * The br_path_* helpers only work on strings and never touch the disk.
  */

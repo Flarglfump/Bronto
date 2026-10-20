@@ -8,6 +8,7 @@ make editor                          # start with a sample scene
 make editor SCENE=levels/one.scene   # open a scene file
 make editor SCENE=examples/platformer   # open a project folder
 build/editor --headless              # scripted self-test, writes screenshots
+build/editor --write-icon icon.png 256   # save the app icon as a PNG (make vscode-icon uses it)
 ```
 
 ## Using it
@@ -28,7 +29,7 @@ build/editor --headless              # scripted self-test, writes screenshots
 | **The tree** | The hierarchy is a tree. Drag a row onto the middle of another row to make it a child (it stays where it is on screen); drag it between rows to reorder it or move it to another parent; drag it below everything to make it a root. A line or box shows where it will land. The arrows fold subtrees, and double-clicking a row centres the view on it. Children move, turn and scale with their parent, and their Transform is relative to it. **Unparent** in the inspector makes the selection a root. |
 | **Play** | **Play** (F5) runs the scene's systems: Motion and Bounds, physics (RigidBody, Collider), sounds and scripts. While playing, the keyboard belongs to the game; F5 or Esc stops. **Stop** puts every entity back exactly as it was, and edits made while playing are undone too. A script error shows in the status bar and the console, with its file and line. |
 | **Physics** | Add a **Collider** to make an entity solid and a **RigidBody** to make it fall and collide. **Colliders** in the toolbar outlines them: green for solid, yellow for triggers. |
-| **Build** | The toolbar's **Build** menu. **Build for <this computer>** (Ctrl+B) checks every script and writes the game into `builds/<system>/` in the project: one program on Linux and Windows, a `.app` on macOS. **Build and Run** (Ctrl+Shift+B) starts it. **Build for** lists the other systems: each works once its player is in `players/` beside the editor (`bronto_player-windows.exe`, `bronto_player-macos`, `bronto_player-linux`, built on that system with `make tools`). **Check Scripts** checks without building; script mistakes go to the console, where a double-click opens them. |
+| **Build** | The toolbar's **Build** menu. **Build for <this computer>** (Ctrl+B) checks every script and writes the game into `builds/<system>/` in the project: one program on Linux and Windows, a `.app` on macOS. **Build and Run** (Ctrl+Shift+B) starts it. **Build for** lists the other systems: each works once its player is in `players/` beside the editor (`bronto_player-windows.exe`, `bronto_player-macos`, `bronto_player-linux`, built on that system with `make tools`). **Web** writes `builds/web/index.html`, one page holding the game, to open in a browser or put on a web site; **Build and Open in Browser** does both. It needs the web player from `make web` in `web/` beside the editor (or a copy in `players/web/`); see [docs/web.md](../../docs/web.md). **Check Scripts** checks without building; script mistakes go to the console, where a double-click opens them. |
 | **Project Settings** | In the Build menu: the game's name (its window title and program name), the main scene it starts with, its screen size and window scale, **Strict typing** (every script must declare types, as with `@strict`), an icon image, and the builds folder. They are saved in the project's `project.bronto`. |
 | **Settings** | **Script editor**: the program that opens `.bs` files, a command line with `{file}` and `{line}`, with presets for VS Code, Sublime Text, Notepad++ and Zed (empty = the system's default). Saved in your settings folder, so it applies to every project. |
 | **Scripts** | **+ Script** makes a new `.bs` file from a template. Drag a script onto an entity to attach it (it gets a Script component), or into empty space for a new entity. Double-click to edit it in your text editor; Play reads it again. The preview shows the first lines and any mistake. See [docs/scripting.md](../../docs/scripting.md). |
@@ -66,8 +67,9 @@ settings.c    preferences (the script editor) and the Settings dialog
 console.c     the console's lines: captured output cut into lines, log levels,
               repeats; tested by tests/test_editor_doc.c
 menus.c       the right-click menus, component copy / paste / reset
-build.c       the Build menu (the player with the project packed in), Project Settings
-icon.c        the app icon: a little brontosaurus drawn with the renderer
+build.c       the Build menu (the player with the project packed in; for the web, a page from
+              tools/web/webpage.c), Project Settings
+icon.c        the app icon: a little brontosaurus drawn with the renderer (also the VS Code extension's icon)
 main.c        engine setup, window layout, keyboard shortcuts, headless self-test
 ```
 

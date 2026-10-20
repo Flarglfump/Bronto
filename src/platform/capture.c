@@ -52,10 +52,10 @@ static void cap_push(int stream, const char *data, size_t n) {
     cap_unlock();
 }
 
-#if defined(__EMSCRIPTEN__)
+#if defined(__wasm__) || defined(__EMSCRIPTEN__)   /* the web: no pipes or threads */
 static void cap_lock(void) {}
 static void cap_unlock(void) {}
-static bool cap_os_start(bool echo) { BR_UNUSED(echo); return false; }
+static bool cap_os_start(bool echo) { BR_UNUSED(echo); (void)cap_push; return false; }
 static void cap_os_stop(void) {}
 static void cap_os_write_original(int stream, const char *text, size_t n) {
     fwrite(text, 1, n, stream == BR_STREAM_STDERR ? stderr : stdout);

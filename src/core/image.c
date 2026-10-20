@@ -291,6 +291,99 @@ bool br_image_save_tga(const br_image *img, const char *path) {
     return ok;
 }
 
+/* ---- PNG (writing only) -------------------------------------------------------- */
+
+static uint32_t png_crc_table[256];
+
+static uint32_t png_crc(const uint8_t *p, size_t n, uint32_t crc) {
+    size_t i;
+    if (!png_crc_table[1]) {                          /* CRC-32, as PNG and zip use it */
+        uint32_t c, k, b;
+        for (k = 0; k < 256; ++k) {
+            for (c = k, b = 0; b < 8; ++b) c = (c & 1) ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+            png_crc_table[k] = c;
+        }
+    }
+    crc = ~crc;
+    for (i = 0; i < n; ++i) crc = png_crc_table[(crc ^ p[i]) & 0xFF] ^ (crc >> 8);
+    return ~crc;
+}
+
+static void put_u32be(uint8_t *p, uint32_t v) { p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16); p[2] = (uint8_t)(v >> 8); p[3] = (uint8_t)v; }
+
+/* A chunk at `p`: length, type, data (already there, after the 8 header bytes), CRC. */
+static size_t png_chunk(uint8_t *p, const char *type, size_t len) {
+    put_u32be(p, (uint32_t)len);
+    memcpy(p + 4, type, 4);
+    put_u32be(p + 8 + len, png_crc(p + 4, len + 4, 0));
+    return 12 + len;
+}
+
+void *br_image_encode_png(const br_image *img, size_t *out_size) {
+    size_t w, h, row, raw, blocks, zlen, total, at = 0, i, done;
+    uint8_t *buf, *z;
+    uint32_t a = 1, b = 0;                            /* Adler-32 of the raw data */
+    int y;
+    if (out_size) *out_size = 0;
+    if (!img->pixels || img->width < 1 || img->height < 1) return NULL;
+    w = (size_t)img->width;
+    h = (size_t)img->height;
+    row = 1 + w * 4;                                  /* a filter byte (0: none), then RGBA */
+    raw = row * h;
+    blocks = (raw + 65534) / 65535;
+    zlen = 2 + raw + blocks * 5 + 4;
+    total = 8 + (12 + 13) + (12 + zlen) + 12;
+    if (!(buf = (uint8_t *)br_alloc(total))) return NULL;
+    memcpy(buf, "\x89PNG\r\n\x1a\n", 8);
+    at = 8;
+    put_u32be(buf + at + 8, (uint32_t)w);             /* IHDR: 8-bit RGBA, no interlace */
+    put_u32be(buf + at + 12, (uint32_t)h);
+    buf[at + 16] = 8; buf[at + 17] = 6; buf[at + 18] = 0; buf[at + 19] = 0; buf[at + 20] = 0;
+    at += png_chunk(buf + at, "IHDR", 13);
+    z = buf + at + 8;                                 /* IDAT: a zlib stream of stored blocks */
+    z[0] = 0x78; z[1] = 0x01;
+    {
+        size_t zi = 2, left = raw, pos = 0;
+        uint8_t *block = NULL;
+        for (done = 0; done < blocks; ++done) {
+            size_t n = left < 65535 ? left : 65535;
+            z[zi] = (uint8_t)(left <= 65535);           /* the last block */
+            z[zi + 1] = (uint8_t)(n & 0xFF); z[zi + 2] = (uint8_t)(n >> 8);
+            z[zi + 3] = (uint8_t)(~n & 0xFF); z[zi + 4] = (uint8_t)((~n >> 8) & 0xFF);
+            block = z + zi + 5;
+            for (i = 0; i < n; ++i, ++pos) {           /* the image's bytes, row by row */
+                size_t r = pos / row, c = pos % row;
+                uint8_t v;
+                y = (int)r;
+                if (c == 0) v = 0;
+                else {
+                    const br_color px = img->pixels[(size_t)y * w + (c - 1) / 4];
+                    size_t ch = (c - 1) % 4;
+                    v = ch == 0 ? px.r : ch == 1 ? px.g : ch == 2 ? px.b : px.a;
+                }
+                block[i] = v;
+                a = (a + v) % 65521u;
+                b = (b + a) % 65521u;
+            }
+            zi += 5 + n;
+            left -= n;
+        }
+        put_u32be(z + zi, (b << 16) | a);
+    }
+    at += png_chunk(buf + at, "IDAT", zlen);
+    at += png_chunk(buf + at, "IEND", 0);
+    if (out_size) *out_size = at;
+    return buf;
+}
+
+bool br_image_save_png(const br_image *img, const char *path) {
+    size_t size;
+    void *png = br_image_encode_png(img, &size);
+    bool ok = png && br_file_write_all(path, png, size);
+    br_free(png);
+    return ok;
+}
+
 /* ---- by extension ----------------------------------------------------------- */
 static bool ext_is(const char *path, const char *ext) {
     const char *dot = strrchr(path, '.');

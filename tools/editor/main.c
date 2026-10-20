@@ -4,6 +4,7 @@
  *   editor [scene file]        open a scene (or start with a sample one)
  *   editor [project folder]    open a project (its main.scene, if it has one)
  *   editor --headless          scripted self-test with screenshots
+ *   editor --write-icon f.png [size]   save the app icon (the VS Code extension uses it)
  *
  * Shortcuts (Ctrl, or Cmd on a Mac):
  *   Ctrl+Shift+O load project   Ctrl+N new   Ctrl+O open   Ctrl+S save   Ctrl+Z undo   Ctrl+Y / Ctrl+Shift+Z redo
@@ -756,6 +757,17 @@ static int test_build(br_engine *e) {
         if (system(cmd) != 0) { printf("FAIL: the built game didn't run (%s)\n", cmd); ++failures; }
         if (!br_fs_exists("build_game.bmp")) { printf("FAIL: the built game didn't save its screenshot\n"); ++failures; }
     }
+    if (!ed_find_player(ed, ED_TARGET_WEB, player, sizeof(player))) {
+        printf("note: no web player beside the editor, so no web page is built (make web)\n");
+    } else if (!ed_build(ed, ED_TARGET_WEB, out, sizeof(out))) {
+        printf("FAIL: building for the web (%s)\n", ed->status); ++failures;
+    } else {
+        size_t size = 0;
+        char *page = (char *)br_file_read_all(out, &size);
+        if (!page || size < 100000 || !strstr(page, "<title>Test Game</title>") || !strstr(page, "data:image/png;base64,") ||
+            strstr(page, "{{")) { printf("FAIL: the web page %s isn't right (%u bytes)\n", out, (unsigned)size); ++failures; }
+        br_free(page);
+    }
     /* load_scene() and quit() while playing */
     {
         const char sw[] = "func update(dt) {\n    load_scene(\"level2.scene\")\n}\n";
@@ -895,6 +907,17 @@ int main(int argc, char **argv) {
     br_engine *e = BR_NEW(br_engine);
     br_engine_config cfg = br_engine_default_config();
     int i, rc = 0;
+    if (argc >= 3 && strcmp(argv[1], "--write-icon") == 0) {    /* the icon as a PNG, then done */
+        br_image icon;
+        int size = argc > 3 ? atoi(argv[3]) : 256;
+        bool ok;
+        if (size < 16 || size > 1024) size = 256;
+        ed_make_icon(&icon, size);
+        ok = br_image_save_png(&icon, argv[2]);
+        br_image_destroy(&icon);
+        if (!ok) fprintf(stderr, "editor: can't write %s\n", argv[2]);
+        return ok ? 0 : 1;
+    }
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--headless") == 0) ED.headless = true;
         else g_open_path = argv[i];
@@ -915,7 +938,7 @@ int main(int argc, char **argv) {
     if (!br_engine_init(e, &cfg)) { br_capture_stop(); br_free(e); return 1; }
 
     if (ED.headless) rc = run_headless(e);
-    else while (br_engine_frame(e)) { /* the editor scene does the rest */ }
+    else br_engine_loop(e, NULL);       /* the editor scene does the rest */
 
     br_engine_shutdown(e);
     br_capture_stop();

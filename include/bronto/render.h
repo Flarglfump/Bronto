@@ -78,6 +78,10 @@ bool br_image_load_bmp_mem(br_image *img, const void *data, size_t size);
 bool br_image_load_tga_mem(br_image *img, const void *data, size_t size);
 bool br_image_save_bmp(const br_image *img, const char *path);  /* 32-bit, keeps alpha */
 bool br_image_save_tga(const br_image *img, const char *path);  /* 32-bit, keeps alpha */
+/* RGBA PNG, for tools that want one (icons, screenshots to share). Written
+ * without compression (stored deflate blocks): valid everywhere, larger. */
+bool br_image_save_png(const br_image *img, const char *path);
+void *br_image_encode_png(const br_image *img, size_t *out_size);   /* the file's bytes, br_alloc'd */
 
 /* ---- renderer -------------------------------------------------------------- */
 typedef enum br_blend_mode {

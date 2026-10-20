@@ -392,18 +392,32 @@ float br_engine_alpha(const br_engine *e) {
     return (float)(e->accumulator / e->config.fixed_timestep);
 }
 
-static bool run_frame(void *user) { return br_engine_frame((br_engine *)user); }
+static bool loop_frame(void *user) {
+    br_engine *e = (br_engine *)user;
+    if (br_engine_frame(e)) {
+        if (e->loop_hook) e->loop_hook(e);
+        return true;
+    }
+    br_engine_shutdown(e);                 /* (on the web nobody returns to the caller to do it) */
+    return false;
+}
+
+void br_engine_loop(br_engine *e, void (*after_frame)(br_engine *e)) {
+    e->loop_hook = after_frame;
+    if (e->platform->run_loop) {
+        /* The platform owns the loop (web): it may never return. */
+        e->platform->run_loop(loop_frame, e);
+    } else {
+        while (loop_frame(e)) { /* loop */ }
+    }
+    br_engine_shutdown(e);
+}
 
 int br_engine_run(const br_engine_config *cfg) {
     br_engine *e = BR_NEW(br_engine);
     if (!e) return 1;
     if (!br_engine_init(e, cfg)) { br_free(e); return 1; }
-    if (e->platform->run_loop) {
-        /* The platform owns the loop (web): it stops when frame() returns false. */
-        e->platform->run_loop(run_frame, e);
-    } else {
-        while (br_engine_frame(e)) { /* loop */ }
-    }
+    br_engine_loop(e, NULL);
     br_engine_shutdown(e);
     br_free(e);
     return 0;

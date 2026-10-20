@@ -433,10 +433,11 @@ static void build_menu(editor *ed) {
     snprintf(label, sizeof(label), "Build for %s", ed_target_name(host));
     if (item(ed, label, "Ctrl+B", true)) ed_cmd_build(ed, host, false);
     if (item(ed, "Build and Run", "Ctrl+Shift+B", true)) ed_cmd_build(ed, host, true);
+    if (item(ed, "Build and Open in Browser", NULL, ed_find_player(ed, ED_TARGET_WEB, path, sizeof(path)))) ed_cmd_build(ed, ED_TARGET_WEB, true);
     if (br_ui_menu_sub_begin(&ed->ui, "Build for", true)) {
         for (t = ED_TARGET_LINUX; t < ED_TARGET_COUNT; t = (ed_target)(t + 1)) {
             bool have = ed_find_player(ed, t, path, sizeof(path));
-            if (t == ED_TARGET_WEB) snprintf(label, sizeof(label), "Web (not available yet)");
+            if (t == ED_TARGET_WEB) snprintf(label, sizeof(label), have ? "Web" : "Web (run make web first)");
             else if (have || t == host) snprintf(label, sizeof(label), "%s", ed_target_name(t));
             else snprintf(label, sizeof(label), "%s (no player in players/)", ed_target_name(t));
             if (item(ed, label, NULL, have || t == host)) ed_cmd_build(ed, t, false);

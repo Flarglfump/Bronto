@@ -8,10 +8,13 @@
 #   make editor     build and run the scene editor (tools/editor)
 #   make tools      build the editor, bscheck (checks .bs scripts) and bronto_player (runs games)
 #   make vscode     package the VS Code extension (tools/vscode) into build/*.vsix (needs python3)
+#   make vscode-icon  redraw the extension's icon from the editor's app icon (after changing it)
 #   make examples   build the examples (build/examples/*)
 #   make run-examples  run every example headless in build/run (CI smoke test)
 #   make sanitize   run the tests under AddressSanitizer + UBSan
 #   make x11-test / audio-test / evdev-test   Linux backend tests
+#   make web        build for the web: the web player (build/web) and a page for each example
+#   make web-test   run the test suite as WebAssembly (in Node) and check the web C library
 #   make clean
 
 CC      ?= cc
@@ -68,7 +71,7 @@ EDITOR   := $(BUILD)/editor
 BSCHECK  := $(BUILD)/bscheck
 PLAYER   := $(BUILD)/bronto_player
 
-.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player audio-test evdev-test vscode vscode-test
+.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player audio-test evdev-test vscode vscode-test vscode-icon web web-test web-check
 
 all: lib
 
@@ -138,7 +141,7 @@ $(BSCHECK): tools/bscheck/main.c $(LIB)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $< $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
 
-$(EDITOR): $(wildcard tools/editor/*.c) $(wildcard tools/editor/*.h) $(LIB)
+$(EDITOR): $(wildcard tools/editor/*.c) $(wildcard tools/editor/*.h) tools/web/webpage.c tools/web/webpage.h $(LIB)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(filter %.c,$^) $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
 
@@ -148,6 +151,9 @@ editor: $(EDITOR)
 # The VS Code extension for .bs scripts: package it, and test it with node.
 vscode:
 	python3 tools/vscode/package_vsix.py $(BUILD)
+
+vscode-icon: $(EDITOR)
+	$(EDITOR) --write-icon tools/vscode/brontoscript/images/icon.png 256
 
 vscode-test:
 	node tools/vscode/brontoscript/test/language.test.js
@@ -161,6 +167,119 @@ run-examples: examples tools
 
 clean:
 	rm -rf build build-asan
+
+# ---- the web (WebAssembly) -------------------------------------------------
+# Needs clang with its WebAssembly target and wasm-ld (LLVM's linker) - not
+# Emscripten: src/platform/web is the C library, tools/web/bronto.js the
+# browser side. Linux: the clang and lld packages. macOS: Homebrew's llvm and
+# lld (Apple's clang has no WebAssembly target). Windows: the LLVM installer.
+#
+#   build/web/bronto_player.wasm, bronto.js, shell.html   the web player and its page
+#                                    (the editor's Build > Web uses these)
+#   build/bronto_web                 makes a page: bronto_web <project> | --wasm game.wasm
+#   build/web/<example>/index.html   each example as a web page
+WASM_CC ?= $(firstword $(wildcard /opt/homebrew/opt/llvm/bin/clang /usr/local/opt/llvm/bin/clang) clang)
+WEB     := $(BUILD)/web
+WASM_OBJ := $(BUILD)/wasm
+WASM_CFLAGS := --target=wasm32 $(CSTD) $(WARN) -O2 -ffp-contract=off -Iinclude \
+               -nostdlibinc -isystem src/platform/web/include \
+               -mbulk-memory -mnontrapping-fptoint -msign-ext -mexception-handling -mllvm -wasm-enable-sjlj
+WASM_LDFLAGS := --target=wasm32 -nostdlib -Wl,--no-entry -Wl,--stack-first -Wl,-z,stack-size=4194304 -Wl,--strip-debug
+WEB_LIB_SRC := $(CORE_SRC) $(PLAT_SRC) $(wildcard src/platform/web/*.c)
+WEB_LIB_OBJ := $(patsubst src/%.c,$(WASM_OBJ)/%.o,$(WEB_LIB_SRC))
+WEB_PLAYER  := $(WEB)/bronto_player.wasm
+WEB_TOOL    := $(BUILD)/bronto_web
+WEB_RUNTIME := $(WEB)/bronto.js $(WEB)/shell.html
+WEB_C_PAGES := $(patsubst examples/%/main.c,$(WEB)/%/index.html,$(wildcard examples/*/main.c))
+WEB_PROJECT_PAGES := $(patsubst examples/%/project.bronto,$(WEB)/%/index.html,$(wildcard examples/*/project.bronto))
+WEB_PAGES   := $(WEB_C_PAGES) $(WEB_PROJECT_PAGES)
+WEB_TITLE_snake := Bronto Snake
+WEB_TITLE_towerdefense := Pop Defense
+WEB_TITLE_bounce := Bounce
+
+web: $(WEB_PLAYER) $(WEB_RUNTIME) $(WEB_TOOL) $(WEB_PAGES) $(WASM_OBJ)/unity.stamp
+	@echo "Web pages: $(WEB_PAGES)"
+
+# A clear message, rather than a pile of errors, when the compiler can't make WebAssembly.
+$(WASM_OBJ)/toolchain.ok:
+	@mkdir -p $(dir $@)
+	@printf 'int x;\n' > $(WASM_OBJ)/check.c
+	@if $(WASM_CC) --target=wasm32 -nostdlib -Wl,--no-entry -Wl,--export=x $(WASM_OBJ)/check.c -o $(WASM_OBJ)/check.wasm 2>/dev/null; then touch $@; \
+	 else echo "make web: $(WASM_CC) can't build WebAssembly. It needs clang's wasm32 target and wasm-ld:"; \
+	      echo "  Linux: install clang and lld.  macOS: brew install llvm lld.  Windows: the LLVM installer."; \
+	      echo "  Or point WASM_CC at such a clang:  make web WASM_CC=/path/to/clang"; exit 1; fi
+
+web-check: $(WASM_OBJ)/toolchain.ok
+	@echo "$(WASM_CC) builds WebAssembly."
+
+$(WASM_OBJ)/%.o: src/%.c $(wildcard include/bronto/*.h) $(wildcard src/platform/web/*.h) $(wildcard src/platform/web/include/*.h) | $(WASM_OBJ)/toolchain.ok
+	@mkdir -p $(dir $@)
+	$(WASM_CC) $(WASM_CFLAGS) -c $< -o $@
+# The C library itself: -fno-builtin, or the compiler turns the insides of
+# calloc into a call to calloc (and the like).
+$(WASM_OBJ)/platform/web/%.o: WASM_CFLAGS += -fno-builtin
+$(WASM_OBJ)/platform/platform_native.o: src/platform/platform_web.c
+$(WASM_OBJ)/platform/fs.o: src/platform/fs_web.c
+
+# build.bat builds the web player from the single-file build: keep it compiling.
+$(WASM_OBJ)/unity.stamp: src/bronto.c $(LIB_SRC) $(wildcard src/platform/*.c) $(wildcard include/bronto/*.h) | $(WASM_OBJ)/toolchain.ok
+	$(WASM_CC) $(WASM_CFLAGS) -fsyntax-only src/bronto.c
+	@touch $@
+
+$(WEB_PLAYER): tools/player/main.c $(WEB_LIB_OBJ)
+	@mkdir -p $(dir $@)
+	$(WASM_CC) $(WASM_CFLAGS) -c $< -o $(WASM_OBJ)/player.o
+	$(WASM_CC) $(WASM_LDFLAGS) $(WEB_LIB_OBJ) $(WASM_OBJ)/player.o -o $@
+
+$(WEB)/bronto.js: tools/web/bronto.js
+	@mkdir -p $(dir $@)
+	cp $< $@
+$(WEB)/shell.html: tools/web/shell.html
+	@mkdir -p $(dir $@)
+	cp $< $@
+
+$(WEB_TOOL): tools/web/main.c tools/web/webpage.c tools/web/webpage.h $(LIB)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(filter %.c,$^) $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
+
+# The C examples, compiled to WebAssembly, each in a page.
+.PRECIOUS: $(WEB)/%.wasm
+$(WEB)/%.wasm: $$(wildcard examples/%/*.c) $$(wildcard examples/%/*.h) $(WEB_LIB_OBJ)
+	@mkdir -p $(dir $@) $(WASM_OBJ)/examples/$*
+	$(WASM_CC) $(WASM_CFLAGS) $(filter %.c,$^) $(WEB_LIB_OBJ) $(WASM_LDFLAGS) -o $@
+
+$(WEB)/%/index.html: $(WEB)/%.wasm $(WEB_RUNTIME) $(WEB_TOOL)
+	$(WEB_TOOL) --wasm $< --title "$(or $(WEB_TITLE_$*),$*)" --runtime $(WEB) -o $@
+
+# Projects made with the editor: the web player with the project packed in.
+$(WEB_PROJECT_PAGES): $(WEB)/%/index.html: $(WEB_PLAYER) $(WEB_RUNTIME) $(WEB_TOOL) $$(shell find examples/$$* -type f)
+	$(WEB_TOOL) examples/$* --runtime $(WEB) -o $@
+
+# The test suite as WebAssembly, run by Node; then the web C library is
+# checked against this computer's (the same program built both ways must
+# print the same thing); then the player must draw the same frames.
+WEB_TESTS := $(WEB)/bronto_tests.wasm
+$(WEB_TESTS): $(TEST_SRC) $(WEB_LIB_OBJ) tests/test.h
+	@mkdir -p $(dir $@)
+	$(WASM_CC) $(WASM_CFLAGS) -Iexamples/snake -Iexamples/towerdefense -Itools/editor -Wno-missing-prototypes $(TEST_SRC) $(WEB_LIB_OBJ) $(WASM_LDFLAGS) -o $@
+
+$(WEB)/libc_check.wasm: tests/web/libc_check.c $(WEB_LIB_OBJ)
+	$(WASM_CC) $(WASM_CFLAGS) -Wno-format-nonliteral $< $(filter $(WASM_OBJ)/platform/web/%,$(WEB_LIB_OBJ)) $(WASM_LDFLAGS) -o $@
+
+$(WEB)/persist.wasm: tests/web/persist.c $(WEB_LIB_OBJ)
+	$(WASM_CC) $(WASM_CFLAGS) $< $(WEB_LIB_OBJ) $(WASM_LDFLAGS) -o $@
+
+$(BUILD)/libc_check: tests/web/libc_check.c
+	$(CC) $(CSTD) -O2 -w $< -lm -o $@
+
+web-test: $(WEB_TESTS) $(WEB)/libc_check.wasm $(BUILD)/libc_check $(WEB)/persist.wasm $(PLAYER) $(EXAMPLES) web
+	node tools/web/run_node.js $(WEB_TESTS) --mkdir build/test_out --dir examples/platformer=examples/platformer \
+	     --file tools/vscode/brontoscript/lib/builtins.json=tools/vscode/brontoscript/lib/builtins.json -- --out build/test_out
+	@rm -rf $(BUILD)/libc_check.out && mkdir -p $(BUILD)/libc_check.out
+	@$(BUILD)/libc_check $(BUILD)/libc_check.out > $(BUILD)/libc_check.native.txt
+	@node tools/web/run_node.js $(WEB)/libc_check.wasm --mkdir scratch -- scratch > $(BUILD)/libc_check.web.txt
+	@diff $(BUILD)/libc_check.native.txt $(BUILD)/libc_check.web.txt && echo "web C library: same output as this computer's ($$(wc -l < $(BUILD)/libc_check.web.txt) lines)"
+	node tools/web/test/web.test.js $(BUILD)
 
 # X11 backend integration test (Linux; needs libx11-dev for the test driver
 # only, and an X server - falls back to a virtual one via xvfb-run).

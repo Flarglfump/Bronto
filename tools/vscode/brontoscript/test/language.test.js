@@ -203,4 +203,15 @@ test('extension.js activates and its providers answer', () => {
     assert.deepStrictEqual(registered.symbols.provideDocumentSymbols(doc).map(s => s.name), ['speed', 'jump', 'spawn_point', 'grounded', 'start', 'update', 'on_ground']);
 });
 
+test('the extension icon is the editor app icon: a 256x256 PNG', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+    assert.strictEqual(pkg.icon, 'images/icon.png');
+    const png = fs.readFileSync(path.join(root, pkg.icon));
+    assert.strictEqual(png.slice(0, 8).toString('hex'), '89504e470d0a1a0a');
+    assert.strictEqual(png.slice(12, 16).toString('ascii'), 'IHDR');
+    assert.strictEqual(png.readUInt32BE(16), 256);
+    assert.strictEqual(png.readUInt32BE(20), 256);
+    assert.strictEqual(pkg.contributes.languages[0].icon.dark, './images/icon.png');
+});
+
 console.log(passed + ' extension tests passed' + (process.exitCode ? ', some FAILED' : ''));

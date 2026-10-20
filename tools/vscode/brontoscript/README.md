@@ -35,16 +35,22 @@ Editing support for Bronto engine scripts (`.bs` files):
 Either:
 
 - Build the package with `make vscode` (from the engine's folder; it needs Python 3), then
-  in VS Code run **Extensions: Install from VSIX...** and pick `build/brontoscript-0.1.0.vsix`.
-  From a terminal, `code --install-extension build/brontoscript-0.1.0.vsix` does the same.
+  in VS Code run **Extensions: Install from VSIX...** and pick `build/brontoscript-0.2.1.vsix`.
+  From a terminal, `code --install-extension build/brontoscript-0.2.1.vsix` does the same.
 - Or copy this `brontoscript` folder into your extensions folder as
-  `bronto.brontoscript-0.1.0`: `~/.vscode/extensions/` on macOS and Linux,
+  `bronto.brontoscript-0.2.1`: `~/.vscode/extensions/` on macOS and Linux,
   `%USERPROFILE%\.vscode\extensions\` on Windows. Then restart VS Code.
 
 For full error checking, build the checker with `make tools` (it lands in `build/bscheck`).
 The extension looks for it in the workspace's `build/` folders (and up to three folders
 above), then on your `PATH`. You can also set **brontoscript.checker.path** in your
 settings.
+
+## Icon
+
+The extension's icon (`images/icon.png`, also shown next to `.bs` files) is the Bronto
+editor's app icon, saved by the editor itself. If the editor's icon changes, run
+`make vscode-icon` to redraw it, then `make vscode`.
 
 ## Make the Bronto editor open scripts in VS Code
 

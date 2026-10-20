@@ -2,8 +2,9 @@
   "name": "brontoscript",
   "displayName": "BrontoScript",
   "description": "Bronto engine scripts (.bs): highlighting, completion, hover docs, signature help, go to definition, outline and error checking.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "bronto",
+  "icon": "images/icon.png",
   "engines": { "vscode": "^1.60.0" },
   "categories": ["Programming Languages", "Snippets", "Linters"],
   "keywords": ["bronto", "brontoscript", "game engine", "scripting"],
@@ -14,7 +15,8 @@
       "id": "brontoscript",
       "aliases": ["BrontoScript", "brontoscript"],
       "extensions": [".bs"],
-      "configuration": "./language-configuration.json"
+      "configuration": "./language-configuration.json",
+      "icon": { "light": "./images/icon.png", "dark": "./images/icon.png" }
     }],
     "grammars": [{
       "language": "brontoscript",

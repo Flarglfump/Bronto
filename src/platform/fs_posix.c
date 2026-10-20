@@ -1,6 +1,6 @@
 /*
  * Bronto Engine - file system backend for POSIX systems (Linux, macOS,
- * BSD, and Emscripten's virtual file system on the web).
+ * BSD).
  * Included by fs.c.
  */
 #include <dirent.h>
@@ -66,9 +66,6 @@ bool br_fs_executable_path(char *out, size_t size) {
     uint32_t n = (uint32_t)sizeof(buf);
     if (_NSGetExecutablePath(buf, &n) != 0) return false;
     return br_fs_absolute(buf, out, size);
-#elif defined(__EMSCRIPTEN__)
-    BR_UNUSED(out); BR_UNUSED(size);
-    return false;
 #else
     static const char *const links[] = { "/proc/self/exe", "/proc/curproc/file", "/proc/curproc/exe" };   /* Linux, BSDs */
     char buf[BR_PATH_MAX];

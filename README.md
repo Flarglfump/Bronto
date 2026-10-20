@@ -6,8 +6,9 @@ and the math and render APIs are designed so that 3D can be added later.
 
 Status (v0.1):
 - **Done:** the core systems; native windows, sound output and gamepads on Windows,
-  macOS and Linux; two sample games, Snake and Pop Defense; and a visual scene editor.
-- **Not yet:** the web build. See the roadmap below.
+  macOS and Linux; web builds (WebAssembly, with no Emscripten); two sample games, Snake
+  and Pop Defense; and a visual scene editor.
+- **Next:** see the roadmap below.
 
 ## Quick start
 
@@ -19,6 +20,8 @@ make tools         # the editor, bscheck and bronto_player (which the editor's B
 make test          # build libbronto.a and run the test suite
 make examples      # build examples/ into build/examples/
 make sanitize      # tests under AddressSanitizer + UndefinedBehaviorSanitizer
+make web          # web builds: build/web/<example>/index.html, and the web player (needs LLVM's clang)
+make web-test      # the test suite as WebAssembly in Node, and web-specific tests
 make x11-test      # Linux: drives a real X11 window (falls back to Xvfb)
 make audio-test    # Linux: plays a tone through ALSA and checks what reached the device
 make evdev-test    # Linux: feeds kernel gamepad events through the evdev backend
@@ -26,6 +29,7 @@ make evdev-test    # Linux: feeds kernel gamepad events through the evdev backen
 
 On Windows with MSVC, run `build.bat` from a Developer Command Prompt; it builds
 `build\snake.exe`, `build\towerdefense.exe` and `build\editor.exe`. With MinGW, use `make`.
+`build.bat web` makes the web builds (it needs LLVM's clang as well).
 
 With no build system at all, the unity build compiles everything from one file:
 
@@ -187,8 +191,11 @@ The editor's **Build** menu turns a project into a game that runs without the ed
   so there is nothing else to install.
 - **Build for > Windows / macOS / Linux**: a player for another system is built on that
   system and copied into a `players/` folder beside the editor, named
-  `bronto_player-windows.exe`, `bronto_player-macos` or `bronto_player-linux`. Web builds
-  aren't available yet.
+  `bronto_player-windows.exe`, `bronto_player-macos` or `bronto_player-linux`.
+- **Build for > Web** writes `builds/web/index.html`: one file that holds the web player,
+  the project and the page. Open it in a browser, or put it on any web site. **Build and
+  Open in Browser** does both. It uses the web player that `make web` puts beside the
+  editor (see [docs/web.md](docs/web.md)).
 - **Project Settings** (saved in `project.bronto`): the game's name, the scene it starts
   with, its screen size and window scale, strict typing, an icon and the builds folder.
 
@@ -205,7 +212,7 @@ those swap the scene until Stop and stop playing.
 | Windows | Win32 + GDI, per-monitor DPI aware | waveOut (winmm, loaded at run time) | XInput, with rumble | Links user32 + gdi32 | Compiles and links against mingw-w64 headers |
 | macOS | Cocoa from plain C through the Objective-C runtime, presented with Core Animation | Core Audio (AudioQueue) | GameController framework (Xbox, PlayStation, Switch Pro, MFi); no rumble yet | `-framework Cocoa -framework QuartzCore -framework AudioToolbox -framework GameController` | Compiles and links for arm64 and x86_64 against the macOS 14.5 SDK; constants, key codes and GameController selectors checked against the SDK |
 | Any | Headless | Captured in memory | Simulated (`br_headless_set_gamepad`) | Built in | Unit tests and CI |
-| Web | Emscripten + canvas | WebAudio | Gamepad API | Planned | |
+| Web | `<canvas>` (WebAssembly, built with plain clang, with Bronto's own small C library) | WebAudio | Gamepad API, with rumble where the browser has it | `make web` / `build.bat web`: clang `--target=wasm32` and wasm-ld; no Emscripten ([docs/web.md](docs/web.md)) | The whole test suite runs as WebAssembly in Node; the C library's output is compared with glibc's; the examples give picture- and sample-identical results to the desktop builds; the pages are played in Chromium with keyboard, mouse and gamepad |
 
 On Windows, games built as above are console-subsystem programs, so log output shows up
 in a console window. Link with `-mwindows` (or `/SUBSYSTEM:WINDOWS`) to hide it.
@@ -249,7 +256,8 @@ pixel size and copies the framebuffer into the rectangle the engine gives it.
 ```
 include/bronto/      public headers (bronto.h includes everything)
 src/core/            platform-independent engine
-src/platform/        headless + native backends (x11, win32, macos)
+src/platform/        headless + native backends (x11, win32, macos, web)
+src/platform/web/    the web build's C library (no Emscripten)
 src/bronto.c         unity build
 tests/               unit tests; tests/platform/ holds backend checks
 examples/bounce/     every system in a small toy
@@ -260,7 +268,9 @@ tools/editor/        the visual scene editor
 tools/bscheck/       checks .bs scripts from the command line
 tools/player/        bronto_player: runs games (the editor's Build packs projects into it)
 tools/vscode/        the BrontoScript extension for VS Code
+tools/web/           the web runtime (bronto.js), the page template, bronto_web (makes pages)
 docs/scripting.md    the BrontoScript reference
+docs/web.md          web builds
 ```
 
 ## Architecture
@@ -285,9 +295,9 @@ docs/scripting.md    the BrontoScript reference
 | Assets | `assets.h` | Image and sound cache: each file is loaded once, at a stable address, with relative paths resolved against the project folder (the nearest folder holding `project.bronto`, else the scene's own). Forgetting a sound silences it first. Project settings (`br_project`: name, main scene, screen size, strict typing) live in `project.bronto` |
 | Packs | `pack.h` | A project folder in one file, or added to the end of a program (a built game). Once mounted, `br_file_read_all` finds files in it first, so the asset cache, scenes and scripts need no changes |
 | File system | `fs.h` | List folders (folders first, sorted), stat, make folders, rename without overwriting, remove; path string helpers. POSIX and Win32 backends in the platform layer |
-| Output capture | `capture.h` | Redirects the program's own stdout and stderr into a buffer it reads back each frame (the editor's console), optionally still echoing to the terminal. Pipes plus a reader thread, in POSIX and Win32 backends in the platform layer; not available on the web |
+| Output capture | `capture.h` | Redirects the program's own stdout and stderr into a buffer it reads back each frame (the editor's console), optionally still echoing to the terminal. Pipes plus a reader thread, in POSIX and Win32 backends in the platform layer; not available on the web (output goes to the browser's console) |
 | GUI | `ui.h` | Immediate-mode widgets: buttons, checkboxes, number fields you drag or type into, vec2 and colour fields, text fields, drop-downs, list rows, collapsible sections, scrolling panels, clickable custom-drawn areas with double-click, drag and drop, and right-click context menus (submenus, ticks, shortcuts, keyboard navigation). The editor uses it, and so can games |
-| Engine | `engine.h` | Fixed-timestep loop, frame limiter, per-frame arena; `br_engine_frame()` runs one frame at a time so a browser can drive the loop |
+| Engine | `engine.h` | Fixed-timestep loop, frame limiter, per-frame arena; `br_engine_frame()` runs one frame, `br_engine_loop()` runs them until the game ends (on the web it hands them to the browser) |
 
 ## Gamepads
 
@@ -376,8 +386,8 @@ networking and golden-image tests practical. Two rules keep it that way:
 
 ## Roadmap
 
-1. Web backend (Emscripten, canvas, WebAudio, Gamepad API), and Web in the Build menu
-2. PNG decoder, sprite sheets and animation, tilemaps
-3. Joints, one-way platforms and continuous collision for fast bodies; a script debugger
-4. Editor: multi-select, copy/paste between scenes, nested prefabs that update, game-specific components
+1. PNG decoder, sprite sheets and animation, tilemaps
+2. Joints, one-way platforms and continuous collision for fast bodies; a script debugger
+3. Editor: multi-select, copy/paste between scenes, nested prefabs that update, game-specific components
+4. Web: touch controls beyond the mouse, and a smaller page (compressing the pack)
 5. 3D path: depth buffer and perspective-correct triangles on the existing mat4/quat math

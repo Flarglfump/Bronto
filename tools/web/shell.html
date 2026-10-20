@@ -1,0 +1,124 @@
+<!doctype html>
+<!--
+  Bronto web page template. The page builder (tools/web/webpage.c, used by
+  the editor's Build > Web and by bronto_web) fills in the marked parts:
+  the title, the icon, the runtime (bronto.js), the program (WebAssembly)
+  and the game's pack, so the finished index.html is one file that runs
+  from a web server or straight from the disk.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="generator" content="Bronto">
+<title>{{TITLE}}</title>
+<link rel="icon" href="{{ICON}}">
+<style>
+  :root { color-scheme: dark; --bg: #0b0d10; --card: #171b21; --text: #eef1f4; --dim: #9aa4b1; --accent: #5cc46e; --accent-text: #08130b; --bad: #ff8a80; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+               font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #screen { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: #000;
+            outline: none; touch-action: none; -webkit-user-select: none; user-select: none; }
+  #card { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(8, 10, 12, .78); }
+  #card[hidden] { display: none; }
+  .box { width: min(360px, 100%); background: var(--card); border-radius: 14px; padding: 28px 24px 24px; text-align: center;
+         box-shadow: 0 18px 50px rgba(0, 0, 0, .45); }
+  .box img { width: 96px; height: 96px; image-rendering: pixelated; display: block; margin: 0 auto 12px; }
+  .box img[src=""], .box img[src="data:,"] { display: none; }
+  h1 { font-size: 20px; margin: 0 0 18px; font-weight: 650; overflow-wrap: anywhere; }
+  button { font: inherit; font-weight: 650; font-size: 16px; color: var(--accent-text); background: var(--accent); border: 0;
+           border-radius: 10px; padding: 11px 28px; cursor: pointer; min-width: 160px; }
+  button:hover { filter: brightness(1.08); }
+  button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  button[hidden] { display: none; }
+  #status { color: var(--dim); margin: 14px 0 0; min-height: 1.4em; }
+  #status.bad { color: var(--bad); }
+  pre { text-align: left; color: var(--dim); font-size: 12px; max-height: 30vh; overflow: auto; white-space: pre-wrap; margin: 12px 0 0; }
+  pre:empty { display: none; }
+  .made { color: var(--dim); font-size: 12px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<canvas id="screen" tabindex="0" aria-label="{{TITLE}}"></canvas>
+<div id="card">
+  <div class="box">
+    <img src="{{ICON}}" alt="">
+    <h1>{{TITLE}}</h1>
+    <button id="play" type="button">Play</button>
+    <p id="status" role="status"></p>
+    <pre id="log"></pre>
+    <div class="made">Made with Bronto</div>
+  </div>
+</div>
+<noscript><p style="position:fixed;top:40%;width:100%;text-align:center">This game needs JavaScript.</p></noscript>
+
+<script>
+{{RUNTIME}}
+</script>
+<script id="bronto-wasm" type="application/octet-stream">{{WASM}}</script>
+<script id="bronto-pack" type="application/octet-stream">{{PACK}}</script>
+<script>
+(function () {
+    'use strict';
+    var ARGS = {{ARGS}}, STORAGE_KEY = {{STORAGE_KEY}};
+    var canvas = document.getElementById('screen'), card = document.getElementById('card');
+    var play = document.getElementById('play'), status = document.getElementById('status'), log = document.getElementById('log');
+    var errors = [];
+
+    function say(text, bad) { status.textContent = text; status.className = bad ? 'bad' : ''; }
+    function payload(id) {
+        var text = document.getElementById(id).textContent.trim();
+        return text ? Bronto.fromBase64(text) : null;
+    }
+    if (typeof WebAssembly !== 'object') {
+        play.hidden = true;
+        say('This browser can\'t run WebAssembly, which the game needs.', true);
+        return;
+    }
+
+    async function start() {
+        var audioContext = null, AC = window.AudioContext || window.webkitAudioContext;
+        play.hidden = true;
+        say('Loading…');
+        log.textContent = '';
+        errors = [];
+        try { if (AC) audioContext = new AC(); } catch (e) { audioContext = null; }   /* made on the click, so it may play */
+        try {
+            var pack = payload('bronto-pack');
+            var game = await Bronto.start({
+                wasm: payload('bronto-wasm'),
+                canvas: canvas,
+                fullscreenElement: document.documentElement,
+                files: pack ? [{ path: 'game.brpak', data: pack }] : [],
+                args: ARGS,
+                storageKey: STORAGE_KEY,
+                audioContext: audioContext,
+                print: function (stream, line) {
+                    var error = stream === 2 && !/^\[(INFO|DEBUG)/.test(line);
+                    (error ? console.error : console.log)(line);
+                    if (error) { errors.push(line); if (errors.length > 12) errors.shift(); }
+                },
+            });
+            card.hidden = true;
+            canvas.focus();
+            var code = await game.exited;
+            card.hidden = false;
+            play.hidden = false;
+            play.textContent = 'Play again';
+            if (code === 0) say('The game has ended.');
+            else { say('The game stopped because of an error.', true); log.textContent = errors.join('\n'); }
+            if (audioContext) audioContext.close().catch(function () {});
+        } catch (e) {
+            card.hidden = false;
+            play.hidden = false;
+            say('The game couldn\'t start: ' + (e && e.message ? e.message : e), true);
+            log.textContent = errors.join('\n');
+        }
+    }
+    play.addEventListener('click', start);
+    play.focus();
+    if (/[#&]autoplay\b/.test(location.hash)) start();
+})();
+</script>
+</body>
+</html>

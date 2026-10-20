@@ -18,8 +18,8 @@
 /* ---- Compiler / platform detection ------------------------------------ */
 #if defined(_WIN32)
 #  define BR_OS_WINDOWS 1
-#elif defined(__EMSCRIPTEN__)
-#  define BR_OS_WEB 1
+#elif defined(__wasm__) || defined(__EMSCRIPTEN__)
+#  define BR_OS_WEB 1        /* WebAssembly in a browser (src/platform/web) */
 #elif defined(__APPLE__)
 #  define BR_OS_MACOS 1
 #elif defined(__linux__)

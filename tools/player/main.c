@@ -154,8 +154,8 @@ int main(int argc, char **argv) {
             if (errors && top) printf("  last: %s\n", br_script_last_error(&top->world));
         }
     } else {
-        while (br_engine_frame(e)) { /* the scene's systems do everything */ }
-        if (g_failed) rc = 1;
+        br_engine_loop(e, NULL);                         /* the scene's systems do everything (on the web, */
+        if (g_failed) rc = 1;                             /* the browser runs the frames; this isn't reached) */
     }
     br_engine_shutdown(e);
     br_free(e);

@@ -18,7 +18,8 @@
  *              simulated window (resizable, fullscreen...), event injection
  *              and frame/audio capture. Always available. Tests/servers/CI.
  *   native   - Win32+GDI (Windows), Cocoa (macOS), X11 (Linux, loaded at
- *              run time so no X11 headers or -lX11 are needed to build).
+ *              run time so no X11 headers or -lX11 are needed to build),
+ *              or a <canvas> in a web page (WebAssembly; docs/web.md).
  */
 #ifndef BRONTO_PLATFORM_H
 #define BRONTO_PLATFORM_H
@@ -93,7 +94,9 @@ typedef struct br_platform {
     bool   (*set_gamepad_rumble)(int pad, float low_freq, float high_freq);
 
     /* Optional: drive the main loop (the web needs the browser to own the
-     * loop). NULL means the engine runs a plain while-loop. */
+     * loop). It calls frame(user) until that returns false - and may never
+     * return itself (the web: main() ends, the browser calls for frames).
+     * NULL means the engine runs a plain while-loop. */
     void   (*run_loop)(br_frame_fn frame, void *user);
 } br_platform;
 

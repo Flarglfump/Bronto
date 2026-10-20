@@ -548,7 +548,7 @@ int main(int argc, char **argv) {
     if (!br_engine_init(e, &cfg)) { br_free(e); return 1; }
 
     if (G.headless) rc = run_headless(e);
-    else while (br_engine_frame(e)) { /* the scenes do the rest */ }
+    else br_engine_loop(e, NULL);       /* the scenes do the rest (on the web: the browser runs it) */
 
     br_engine_shutdown(e);
     br_free(e);

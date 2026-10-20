@@ -14,12 +14,13 @@ src = os.path.join(here, 'brontoscript')
 out_dir = sys.argv[1] if len(sys.argv) > 1 else 'build'
 pkg = json.load(open(os.path.join(src, 'package.json'), encoding='utf-8'))
 files = ['package.json', 'extension.js', 'README.md', 'language-configuration.json',
-         'lib/language.js', 'lib/builtins.json', 'syntaxes/brontoscript.tmLanguage.json', 'snippets/brontoscript.json']
+         'lib/language.js', 'lib/builtins.json', 'syntaxes/brontoscript.tmLanguage.json', 'snippets/brontoscript.json',
+         'images/icon.png']
 
 content_types = '''<?xml version="1.0" encoding="utf-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension=".json" ContentType="application/json"/><Default Extension=".js" ContentType="application/javascript"/>
-<Default Extension=".md" ContentType="text/markdown"/><Default Extension=".vsixmanifest" ContentType="text/xml"/>
+<Default Extension=".md" ContentType="text/markdown"/><Default Extension=".png" ContentType="image/png"/><Default Extension=".vsixmanifest" ContentType="text/xml"/>
 </Types>'''
 
 manifest = f'''<?xml version="1.0" encoding="utf-8"?>
@@ -44,6 +45,7 @@ manifest = f'''<?xml version="1.0" encoding="utf-8"?>
   <Assets>
     <Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true" />
     <Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/README.md" Addressable="true" />
+    <Asset Type="Microsoft.VisualStudio.Services.Icons.Default" Path="extension/images/icon.png" Addressable="true" />
   </Assets>
 </PackageManifest>'''
 

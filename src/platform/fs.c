@@ -1,15 +1,15 @@
 /*
  * Bronto Engine - file system (see fs.h): the shared part, plus the OS
- * backend for this build (fs_posix.c or fs_win32.c), included below.
+ * backend for this build (fs_posix.c, fs_win32.c or fs_web.c), included below.
  *
  * Each backend provides:
  *   static bool fs_read_dir(const char *dir, bool hidden, br_dir_list *out);   (unsorted)
  *   bool br_fs_stat / br_fs_mkdir / br_fs_rename / br_fs_remove
  */
-#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#if !defined(_WIN32) && !defined(__wasm__) && !defined(_POSIX_C_SOURCE)
 #  define _POSIX_C_SOURCE 200809L
 #endif
-#if !defined(_WIN32) && !defined(_XOPEN_SOURCE)
+#if !defined(_WIN32) && !defined(__wasm__) && !defined(_XOPEN_SOURCE)
 #  define _XOPEN_SOURCE 700                   /* realpath */
 #endif
 #include "bronto/fs.h"
@@ -35,6 +35,8 @@ static br_dir_entry *fs_push(br_dir_list *l, int *cap) {
 
 #if defined(_WIN32)
 #  include "fs_win32.c"
+#elif defined(__wasm__)
+#  include "fs_web.c"
 #else
 #  include "fs_posix.c"
 #endif
@@ -71,7 +73,10 @@ void br_dir_list_free(br_dir_list *list) {
 bool br_fs_config_dir(const char *app, char *out, size_t size) {
     char base[BR_PATH_MAX];
     const char *env;
-#if defined(_WIN32)
+#if defined(__wasm__)
+    BR_UNUSED(env);
+    snprintf(base, sizeof(base), "/config");             /* kept in the browser's storage */
+#elif defined(_WIN32)
     if (!(env = getenv("APPDATA")) || !env[0]) return false;
     snprintf(base, sizeof(base), "%s", env);
 #elif defined(__APPLE__)

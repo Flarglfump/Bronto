@@ -4,10 +4,11 @@
  *   Windows        platform_win32.c  Win32 + GDI
  *   macOS          platform_macos.c  Cocoa (from C via the Objective-C runtime) + Core Animation
  *   Linux / BSD    platform_x11.c    X11, loaded at run time with dlopen
+ *   Web            platform_web.c    a <canvas> in the page, with tools/web/bronto.js
  *
  * Define BR_NO_NATIVE_PLATFORM to build without any (headless only).
  */
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__wasm__)
 #  ifndef _POSIX_C_SOURCE
 #    define _POSIX_C_SOURCE 200809L   /* clock_gettime, nanosleep, dlopen */
 #  endif
@@ -20,6 +21,8 @@
 
 #if defined(BR_NO_NATIVE_PLATFORM)
 const br_platform *br_platform_native(void) { return NULL; }
+#elif defined(__wasm__)
+#  include "platform_web.c"
 #elif defined(_WIN32)
 #  include "platform_win32.c"
 #elif defined(__APPLE__)

@@ -357,6 +357,65 @@ static void test_image_downscale(void) {
     br_image_destroy(&a);
 }
 
+
+/* PNG writing: a standard file (chunks with good CRCs, a zlib stream of
+ * stored blocks) that holds exactly the pixels. Read back here by hand. */
+static uint32_t be32(const uint8_t *p) { return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3]; }
+static uint32_t crc32_of(const uint8_t *p, size_t n) {
+    uint32_t c = 0xFFFFFFFFu;
+    size_t i;
+    int k;
+    for (i = 0; i < n; ++i) { c ^= p[i]; for (k = 0; k < 8; ++k) c = (c & 1) ? 0xEDB88320u ^ (c >> 1) : c >> 1; }
+    return ~c;
+}
+
+static void test_png_writer(void) {
+    br_image img;
+    int x, y, w = 200, h = 400;                       /* over 64 KB of pixels: several stored blocks */
+    size_t size, at = 8, raw_len = 0;
+    uint8_t *file, *raw = (uint8_t *)br_alloc((size_t)h * (size_t)(1 + w * 4));
+    bool ihdr = false, iend = false, crcs = true;
+    br_image_init(&img, w, h);
+    for (y = 0; y < h; ++y)
+        for (x = 0; x < w; ++x) br_image_set(&img, x, y, br_rgba((uint8_t)x, (uint8_t)y, (uint8_t)(x ^ y), (uint8_t)(x + y)));
+    CHECK(br_image_save_png(&img, test_path("writer.png")));
+    file = (uint8_t *)br_file_read_all(test_path("writer.png"), &size);
+    CHECK(file && size > 8 && memcmp(file, "\x89PNG\r\n\x1a\n", 8) == 0);
+    while (file && raw && at + 12 <= size) {
+        uint32_t len = be32(file + at);
+        const uint8_t *type = file + at + 4, *data = file + at + 8;
+        if (crc32_of(type, len + 4) != be32(data + len)) crcs = false;
+        if (memcmp(type, "IHDR", 4) == 0) ihdr = be32(data) == (uint32_t)w && be32(data + 4) == (uint32_t)h && data[8] == 8 && data[9] == 6;
+        if (memcmp(type, "IDAT", 4) == 0) {           /* zlib header, then stored blocks */
+            size_t p = 2;
+            uint32_t a = 1, b = 0, i;
+            CHECK(data[0] == 0x78 && (data[0] * 256 + data[1]) % 31 == 0);
+            for (;;) {
+                bool last = data[p] & 1;
+                uint32_t n = (uint32_t)data[p + 1] | (uint32_t)data[p + 2] << 8;
+                CHECK((data[p] & 6) == 0 && (n ^ ((uint32_t)data[p + 3] | (uint32_t)data[p + 4] << 8)) == 0xFFFF);
+                memcpy(raw + raw_len, data + p + 5, n);
+                raw_len += n;
+                p += 5 + n;
+                if (last) break;
+            }
+            for (i = 0; i < raw_len; ++i) { a = (a + raw[i]) % 65521u; b = (b + a) % 65521u; }
+            CHECK(be32(data + p) == ((b << 16) | a));
+        }
+        if (memcmp(type, "IEND", 4) == 0) iend = true;
+        at += 12 + len;
+    }
+    CHECK(ihdr && iend && crcs && at == size);
+    CHECK(raw_len == (size_t)h * (size_t)(1 + w * 4));
+    if (raw_len == (size_t)h * (size_t)(1 + w * 4)) {
+        const uint8_t *px = raw + 399 * (1 + w * 4) + 1 + 199 * 4;      /* the last pixel */
+        CHECK(raw[0] == 0 && px[0] == 199 && px[1] == (uint8_t)399 && px[2] == (uint8_t)(199 ^ 399) && px[3] == (uint8_t)(199 + 399));
+    }
+    br_free(file);
+    br_free(raw);
+    br_image_destroy(&img);
+}
+
 void suite_render(void) {
     RUN(test_image_downscale);
     RUN(test_rect_coverage_and_clip);
@@ -368,6 +427,7 @@ void suite_render(void) {
     RUN(test_camera);
     RUN(test_text);
     RUN(test_image_codecs);
+    RUN(test_png_writer);
     RUN(test_showcase_image);
 }
 
