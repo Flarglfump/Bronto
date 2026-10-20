@@ -11,6 +11,9 @@
  *                operations, and dragging assets into the scene
  *   icon.c       the app icon, a little brontosaurus drawn in code
  *   settings.c   preferences (the script editor) and the Settings dialog
+ *   console.c    the console's lines: captured stdout / stderr, the log, print()
+ *   menus.c      the right-click menus, and copy / paste of entities
+ *   build.c      the Build menu (games: the player with the project packed in), Project Settings
  *   main.c       engine setup, window layout, shortcuts
  *
  * The scene is an ordinary ECS world with the engine's built-in
@@ -83,6 +86,11 @@ void ed_doc_set_root(ed_doc *d, const char *root);
  * added, or -1 (d->error says why). */
 int  ed_doc_instantiate(ed_doc *d, const char *path, br_vec2 at);
 bool ed_doc_save_entity(ed_doc *d, br_entity e, const char *path);  /* one entity as a prefab */
+/* Copy and paste: an entity and its subtree as scene text (br_free it), and
+ * that text added back - at `at` (NULL: where it was), under `parent`
+ * (NULL: a root), its first entity selected. Returns how many were added, or -1. */
+char *ed_doc_copy(ed_doc *d, br_entity e);
+int  ed_doc_paste(ed_doc *d, const char *text, const br_vec2 *at, br_entity parent);
 int  ed_doc_count_entities(const char *path);                        /* in a scene file; -1 if unreadable */
 /* Undo works on snapshots: call ed_doc_checkpoint() whenever nothing is
  * being dragged or typed. If the scene changed since the last checkpoint,
@@ -94,6 +102,45 @@ bool ed_doc_redo(ed_doc *d);
 void ed_doc_play(ed_doc *d);                      /* remember the scene, start the systems */
 void ed_doc_stop(ed_doc *d);                      /* back to exactly what was remembered */
 void ed_doc_step(ed_doc *d, float dt);            /* one fixed update while playing */
+bool ed_doc_switch_scene(ed_doc *d, const char *path);   /* while playing: a script's load_scene() */
+
+/* ======================= console.c: the console's lines ======================= */
+
+#define ED_CONSOLE_LINES 2000
+#define ED_CONSOLE_TEXT 200
+
+typedef enum ed_con_kind {
+    ED_CON_OUT = 0,      /* stdout */
+    ED_CON_ERR,          /* stderr that isn't a log line */
+    ED_CON_PRINT,        /* print() in a script */
+    ED_CON_INFO, ED_CON_WARN, ED_CON_ERROR    /* the engine's log */
+} ed_con_kind;
+enum { ED_LEVEL_LOG = 0, ED_LEVEL_WARN, ED_LEVEL_ERROR };
+
+typedef struct ed_con_line {
+    char text[ED_CONSOLE_TEXT];
+    uint32_t repeat;             /* the same line, this many times in a row */
+    double time;                 /* engine time of the last one */
+    uint8_t kind, level;
+} ed_con_line;
+
+typedef struct ed_console {
+    ed_con_line lines[ED_CONSOLE_LINES];   /* a ring: the oldest goes when full */
+    uint32_t first, count;
+    uint32_t level_count[3];     /* lines (with repeats) per ED_LEVEL_* */
+    uint64_t added;              /* changes whenever a line comes in */
+    char partial[3][ED_CONSOLE_TEXT];      /* per stream (1 stdout, 2 stderr): a line not finished yet */
+    size_t partial_len[3];
+    double partial_time[3];
+} ed_console;
+
+void ed_console_clear(ed_console *c);
+void ed_console_add(ed_console *c, ed_con_kind kind, const char *text, double now);    /* one line or several */
+void ed_console_feed(ed_console *c, int stream, const char *bytes, size_t n, double now);  /* captured pieces */
+void ed_console_flush(ed_console *c, double now, double max_wait);   /* unfinished lines older than max_wait */
+const ed_con_line *ed_console_line(const ed_console *c, uint32_t i);  /* 0 = the oldest */
+/* A script location ("scripts/player.bs:12") in a line of text. */
+bool ed_console_location(const char *text, char *file, size_t size, int *line);
 
 /* ======================= the editor ======================= */
 
@@ -113,6 +160,9 @@ typedef struct ed_view {
     br_entity hover;
     br_vec2 mouse_world;
     bool mouse_inside;
+    br_mouse_button pan_button;  /* what started the pan: a right click without a drag opens the menu */
+    br_vec2 press_at;
+    bool pan_moved;
 } ed_view;
 
 /* What the asset browser makes of a file. */
@@ -137,7 +187,22 @@ typedef struct ed_assets {
     char script_text[1200];              /* the selected script's first lines */
     char script_error[256];              /* "" = it parses */
     int64_t script_modified;
+    bool focus_name;                     /* Rename: the preview's name box takes the keyboard */
 } ed_assets;
+
+typedef enum ed_bottom_tab { ED_TAB_FILES = 0, ED_TAB_CONSOLE } ed_bottom_tab;
+
+typedef enum ed_target { ED_TARGET_LINUX = 0, ED_TARGET_MACOS, ED_TARGET_WINDOWS, ED_TARGET_WEB, ED_TARGET_COUNT } ed_target;
+
+/* What a right-click menu is about (menus.c). */
+typedef struct ed_menu_target {
+    br_entity entity;                    /* hierarchy row / scene view */
+    br_vec2 world;                       /* where the scene view was clicked */
+    char asset[ED_PATH_MAX];             /* a file or folder ("" = the folder shown) */
+    br_component component;              /* an inspector section */
+    int field;                           /* ... and its field (-1: the whole component) */
+    int line;                            /* a console line (index, -1: none) */
+} ed_menu_target;
 
 typedef enum ed_pending { ED_PENDING_NONE = 0, ED_PENDING_NEW, ED_PENDING_OPEN, ED_PENDING_QUIT, ED_PENDING_PROJECT } ed_pending;
 
@@ -171,6 +236,29 @@ typedef struct editor {
     int collapsed_count;
     uint32_t script_errors_seen;       /* to report new script errors while playing */
     bool show_colliders;
+
+    ed_bottom_tab bottom_tab;          /* Files or Console under the scene view */
+    ed_console console;
+    bool console_capturing;            /* stdout / stderr come to the console */
+    bool console_show[3];              /* the filters, per ED_LEVEL_* */
+    bool console_clear_on_play;
+    char console_search[64];
+    uint64_t console_seen;             /* console.added when the Console tab was last shown */
+    uint32_t console_errors_seen;      /* errors counted then */
+    int console_selected;              /* a line, -1: none */
+
+    ed_menu_target menu;               /* what the open right-click menu is about */
+    char *clipboard;                   /* copied entities, as scene text (also on the system clipboard) */
+    struct {                           /* a copied component's values */
+        char name[32];
+        unsigned char data[1024];
+        bool full;
+    } component_clip;
+    bool focus_name;                   /* Rename: the inspector's Name field takes the keyboard */
+
+    br_project project;                /* project.bronto in the project folder */
+    br_project project_edit;           /* the Project Settings dialog's copy */
+    bool project_visible;
 } editor;
 
 /* commands.c */
@@ -192,6 +280,12 @@ void ed_cmd_add_entity(editor *ed);
 void ed_cmd_add_child(editor *ed);          /* under the selection */
 void ed_cmd_duplicate(editor *ed);
 void ed_cmd_delete(editor *ed);
+void ed_cmd_copy(editor *ed);
+void ed_cmd_cut(editor *ed);
+void ed_cmd_paste(editor *ed, const br_vec2 *at, br_entity parent);   /* at NULL: next to where it was copied */
+void ed_clipboard_refresh(editor *ed);     /* scene text on the system clipboard -> ed->clipboard */
+void ed_cmd_rename(editor *ed);            /* the inspector's Name field */
+void ed_cmd_unparent(editor *ed);
 void ed_cmd_nudge(editor *ed, br_vec2 delta);
 void ed_cmd_frame(editor *ed);             /* centre the view on the selection */
 bool ed_cmd_quit(editor *ed);              /* false: asked about unsaved changes first */
@@ -239,6 +333,38 @@ bool ed_assets_edit(editor *ed, const char *rel);        /* open in the OS's edi
 void ed_assets_panel(editor *ed, br_rect rect);
 void ed_assets_preview(editor *ed, br_rect rect);
 
+/* console.c (the editor's side) */
+void ed_console_poll(editor *ed);           /* every frame: captured output into ed->console */
+
+/* build.c */
+ed_target ed_host_target(void);
+const char *ed_target_name(ed_target t);
+bool ed_find_player(editor *ed, ed_target t, char *out, size_t size);   /* the player program for t */
+void ed_project_reload(editor *ed);         /* reads project.bronto (and applies strict typing) */
+bool ed_project_save(editor *ed, const br_project *p);
+int  ed_check_scripts(editor *ed, int *scripts);   /* mistakes, printed to the console */
+bool ed_build(editor *ed, ed_target t, char *out, size_t size);   /* out: the game made */
+void ed_cmd_build(editor *ed, ed_target t, bool run);
+void ed_open_builds_folder(editor *ed);
+void ed_project_settings_open(editor *ed);
+void ed_project_dialog(editor *ed, br_rect screen);
+
+/* menus.c */
+void ed_menus(editor *ed);                  /* every frame, after the panels: the open menu's items */
+void ed_menu_entity(editor *ed, br_entity e);            /* right-clicked: open its menu */
+void ed_menu_hierarchy(editor *ed);
+void ed_menu_view(editor *ed, br_vec2 world);
+void ed_menu_asset(editor *ed, const char *rel);         /* "" = the folder's empty space */
+void ed_menu_component(editor *ed, br_component c, int field);
+void ed_menu_inspector(editor *ed);
+void ed_menu_console(editor *ed, int line);
+bool ed_open_script_named(editor *ed, const char *name, int line);
+void ed_copy_text(editor *ed, const char *text, const char *what);   /* to the system clipboard */
+void ed_console_copy(editor *ed, int line);                           /* -1: every line shown */   /* "player.bs" from a message */
+void ed_component_reset(editor *ed, br_entity e, br_component c, int field);   /* field -1: all */
+bool ed_component_copy(editor *ed, br_entity e, br_component c);
+bool ed_component_paste(editor *ed, br_entity e, br_component c);  /* c invalid: the copied kind, added */
+
 /* panels.c */
 void ed_toolbar(editor *ed, br_rect rect);
 void ed_hierarchy(editor *ed, br_rect rect);
@@ -246,6 +372,8 @@ bool ed_collapsed(const editor *ed, br_entity e);
 void ed_set_collapsed(editor *ed, br_entity e, bool collapsed);
 void ed_inspector(editor *ed, br_rect rect);
 void ed_statusbar(editor *ed, br_rect rect);
+void ed_bottom_tabs(editor *ed, br_rect rect);
+void ed_console_panel(editor *ed, br_rect rect);
 void ed_dialog(editor *ed, br_rect screen);
 void ed_picker_dialog(editor *ed, br_rect screen);
 void ed_picker_close(editor *ed);

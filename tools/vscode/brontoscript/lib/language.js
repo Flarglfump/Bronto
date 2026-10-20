@@ -9,6 +9,16 @@ const BUILTINS = new Map(data.builtins.map(b => [b.name, b]));
 const CALLBACKS = new Map(data.callbacks.map(c => [c.name, c]));
 const KEYWORDS = data.keywords;
 const COMPONENTS = data.components;
+const TYPES = new Map((data.types || []).map(t => [t.name, t]));
+const TYPE_RE = '[A-Za-z_]\\w*(?:\\s*\\[\\s*[A-Za-z_]\\w*\\s*\\])?';
+
+// "amount: int" -> { name: 'amount', type: 'int' }
+function splitParam(p) {
+    const m = /^\s*([A-Za-z_]\w*)\s*(?::\s*(.+?))?\s*$/.exec(p);
+    return m ? { name: m[1], type: m[2] ? m[2].replace(/\s+/g, '') : '' } : { name: p.trim(), type: '' };
+}
+function paramText(p) { return p.type ? p.name + ': ' + p.type : p.name; }
+function funcHead(f) { return `func ${f.name}(${f.typedParams.map(paramText).join(', ')})` + (f.returns ? ' -> ' + f.returns : ''); }
 
 // ---- the file's own declarations ------------------------------------------
 
@@ -20,13 +30,19 @@ function parseDocument(text) {
     for (let i = 0; i < lines.length; ++i) {
         const line = stripComment(lines[i]);
         if (depth === 0) {
-            let m = /^\s*var\s+([A-Za-z_]\w*)\s*(?:=\s*(.*))?$/.exec(line);
-            if (m) vars.push({ name: m[1], line: i, value: (m[2] || '').trim(), doc: commentAbove(lines, i) || trailingComment(lines[i]) });
-            m = /^\s*func\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/.exec(line);
-            if (m) funcs.push({
-                name: m[1], line: i, doc: commentAbove(lines, i),
-                params: m[2].split(',').map(s => s.trim()).filter(Boolean),
+            let m = new RegExp('^\\s*var\\s+([A-Za-z_]\\w*)\\s*(?::\\s*(' + TYPE_RE + '))?\\s*(?:(:?=)\\s*(.*))?$').exec(line);
+            if (m) vars.push({
+                name: m[1], line: i, value: (m[4] || '').trim(), type: m[2] ? m[2].replace(/\s+/g, '') : '', inferred: m[3] === ':=',
+                doc: commentAbove(lines, i) || trailingComment(lines[i]),
             });
+            m = new RegExp('^\\s*func\\s+([A-Za-z_]\\w*)\\s*\\(([^)]*)\\)\\s*(?:->\\s*(' + TYPE_RE + '))?').exec(line);
+            if (m) {
+                const typed = m[2].split(',').map(s => s.trim()).filter(Boolean).map(splitParam);
+                funcs.push({
+                    name: m[1], line: i, doc: commentAbove(lines, i),
+                    params: typed.map(p => p.name), typedParams: typed, returns: m[3] ? m[3].replace(/\s+/g, '') : '',
+                });
+            }
         }
         for (const ch of stripStrings(line)) {
             if (ch === '{') depth++;
@@ -45,14 +61,15 @@ function localsAt(text, lineNo) {
     if (start < 0) return [];
     const out = [];
     const head = /^\s*func\s+\w+\s*\(([^)]*)\)/.exec(lines[start]);
-    if (head) head[1].split(',').map(s => s.trim()).filter(Boolean).forEach(p => out.push({ name: p, kind: 'parameter', line: start }));
+    if (head) head[1].split(',').map(s => s.trim()).filter(Boolean).map(splitParam)
+        .forEach(p => out.push({ name: p.name, kind: 'parameter', type: p.type, line: start }));
     for (let i = start + 1; i <= lineNo && i < lines.length; ++i) {
         const line = stripComment(lines[i]);
         let m;
-        const re = /\bvar\s+([A-Za-z_]\w*)/g;
-        while ((m = re.exec(line))) out.push({ name: m[1], kind: 'local', line: i });
-        const f = /\bfor\s+([A-Za-z_]\w*)\s+in\b/.exec(line);
-        if (f) out.push({ name: f[1], kind: 'local', line: i });
+        const re = /\bvar\s+([A-Za-z_]\w*)(?:\s*:\s*([A-Za-z_]\w*(?:\[\w+\])?))?/g;
+        while ((m = re.exec(line))) out.push({ name: m[1], kind: 'local', type: m[2] || '', line: i });
+        const f = /\bfor\s+([A-Za-z_]\w*)(?:\s*:\s*([A-Za-z_]\w*))?\s+in\b/.exec(line);
+        if (f) out.push({ name: f[1], kind: 'local', type: f[2] || '', line: i });
     }
     return out;
 }
@@ -91,6 +108,17 @@ function completions(text, line, character, otherScripts) {
     const items = [];
     if (/#/.test(stripStrings(before)) || inString(before)) return items;
 
+    // var x: |   func f(a: |) -> |   for i: |  ->  the types
+    if (/(?:(?:^|[^:]):(?!=)|->)\s*\w*$/.test(before) || /\blist\s*\[\s*\w*$/.test(before)) {
+        const returning = /->\s*\w*$/.test(before);
+        for (const t of TYPES.values()) if (returning || t.name !== 'void') items.push({ label: t.name, kind: 'class', detail: 'type', doc: t.doc });
+        return items;
+    }
+    if (/^\s*@\w*$/.test(before)) {
+        items.push({ label: '@strict', kind: 'keyword', doc: KEYWORDS['@strict'], insert: 'strict', filter: 'strict' });
+        return items;
+    }
+
     // self.Shape.|  ->  the component's fields
     let m = /\.\s*([A-Z]\w*)\s*\.\s*\w*$/.exec(before);
     if (m && COMPONENTS[m[1]]) {
@@ -107,7 +135,7 @@ function completions(text, line, character, otherScripts) {
             for (const v of s.vars) if (!seen.has(v.name)) { seen.add(v.name); items.push({ label: v.name, kind: 'variable', detail: 'var in ' + s.name, doc: v.doc }); }
             for (const f of s.funcs) if (!seen.has(f.name) && !CALLBACKS.has(f.name)) {
                 seen.add(f.name);
-                items.push({ label: f.name, kind: 'method', detail: `${f.name}(${f.params.join(', ')}) in ${s.name}`, doc: f.doc, snippet: `${f.name}(${placeholders(f.params)})` });
+                items.push({ label: f.name, kind: 'method', detail: (f.typedParams ? funcHead(f).slice(5) : `${f.name}(${f.params.join(', ')})`) + ` in ${s.name}`, doc: f.doc, snippet: `${f.name}(${placeholders(f.params)})` });
             }
         }
         return items;
@@ -120,15 +148,26 @@ function completions(text, line, character, otherScripts) {
             if (!doc.funcs.some(f => f.name === c.name))
                 items.push({ label: 'func ' + c.name, kind: 'snippet', detail: c.signature, doc: c.doc, snippet: c.snippet, filter: c.name });
         items.push({ label: 'var', kind: 'keyword', doc: KEYWORDS.var }, { label: 'func', kind: 'keyword', doc: KEYWORDS.func });
+        if (!/@strict/.test(text)) items.push({ label: '@strict', kind: 'keyword', doc: KEYWORDS['@strict'] });
         return items;
     }
-    for (const [k, d] of Object.entries(KEYWORDS)) if (k !== 'func') items.push({ label: k, kind: 'keyword', doc: d });
+    for (const [k, d] of Object.entries(KEYWORDS)) if (k !== 'func' && k[0] !== '@') items.push({ label: k, kind: 'keyword', doc: d });
     for (const b of data.builtins)                 /* the snippet fills in the arguments it needs */
-        items.push({ label: b.name, kind: 'function', detail: b.signature, doc: b.doc, snippet: `${b.name}(${placeholders(b.params.slice(0, b.min))})` });
-    for (const v of doc.vars) items.push({ label: v.name, kind: 'variable', detail: 'var' + (v.value ? ' = ' + v.value : ''), doc: v.doc });
-    for (const f of doc.funcs) items.push({ label: f.name, kind: 'function', detail: `func ${f.name}(${f.params.join(', ')})`, doc: f.doc, snippet: `${f.name}(${placeholders(f.params)})` });
-    for (const l of localsAt(text, line)) if (!items.some(i => i.label === l.name)) items.push({ label: l.name, kind: 'variable', detail: l.kind });
+        items.push({ label: b.name, kind: 'function', detail: builtinSignature(b), doc: b.doc, snippet: `${b.name}(${placeholders(b.params.slice(0, b.min))})` });
+    for (const v of doc.vars) items.push({ label: v.name, kind: 'variable', detail: varHead(v), doc: v.doc });
+    for (const f of doc.funcs) items.push({ label: f.name, kind: 'function', detail: funcHead(f), doc: f.doc, snippet: `${f.name}(${placeholders(f.params)})` });
+    for (const l of localsAt(text, line)) if (!items.some(i => i.label === l.name)) items.push({ label: l.name, kind: 'variable', detail: l.kind + (l.type ? ': ' + l.type : '') });
     return items;
+}
+
+function varHead(v) { return 'var ' + v.name + (v.type ? ': ' + v.type : '') + (v.value ? (v.inferred ? ' := ' : ' = ') + v.value : ''); }
+
+// "distance(a, b)" -> "distance(a: vec2, b: vec2) -> number"
+function builtinSignature(b) {
+    if (!b.param_types) return b.signature;
+    const opt = b.params.map((p, i) => (i >= b.min ? '[' : '') + p + ': ' + b.param_types[i] + (i >= b.min ? ']' : ''));
+    const more = /\.\.\./.test(b.signature) ? ', ...' : '';
+    return `${b.name}(${opt.join(', ')}${more}) -> ${b.returns}`;
 }
 
 function placeholders(params) { return params.map((p, i) => '${' + (i + 1) + ':' + p + '}').join(', '); }
@@ -175,17 +214,20 @@ function hover(text, line, character) {
         const comp = /\.\s*([A-Z]\w*)\s*\.\s*$/.exec(lt.slice(0, w.start));
         if (comp && COMPONENTS[comp[1]]) return '`' + comp[1] + '.' + w.word + '` (a field)';
         const p = data.properties.find(x => x.name === w.word);
-        if (p) return '`.' + p.name + '` *' + p.type + '*  \n' + p.doc;
+        if (p) return '`.' + p.name + ': ' + p.type + '`  \n' + p.doc;
         if (COMPONENTS[w.word]) return '**' + w.word + '** component  \nFields: ' + COMPONENTS[w.word].join(', ') + '  \n(nil if the entity doesn\'t have it)';
     }
+    const before = lt.slice(0, w.start);
+    if (TYPES.has(w.word) && /(?::|->|\[)\s*$/.test(before)) return '**' + w.word + '** (a type)  \n' + TYPES.get(w.word).doc;
+    if (w.word === 'strict' && /@$/.test(before)) return '**@strict**  \n' + KEYWORDS['@strict'];
     const local = localsAt(text, line).find(l => l.name === w.word);
-    if (local && !afterDot) return '`' + w.word + '` (' + local.kind + ')';
+    if (local && !afterDot) return '`' + w.word + (local.type ? ': ' + local.type : '') + '` (' + local.kind + ')';
     const f = doc.funcs.find(x => x.name === w.word);
-    if (f) return '```brontoscript\nfunc ' + f.name + '(' + f.params.join(', ') + ')\n```' + (f.doc ? '\n' + f.doc : '') +
+    if (f) return '```brontoscript\n' + funcHead(f) + '\n```' + (f.doc ? '\n' + f.doc : '') +
         (CALLBACKS.has(f.name) ? '\n\n*Called by the engine:* ' + CALLBACKS.get(f.name).doc : '');
     const v = doc.vars.find(x => x.name === w.word);
-    if (v) return '```brontoscript\nvar ' + v.name + (v.value ? ' = ' + v.value : '') + '\n```' + (v.doc ? '\n' + v.doc : '') + '\n\nOne per entity; Script.vars can set its starting value.';
-    if (BUILTINS.has(w.word)) { const b = BUILTINS.get(w.word); return '```brontoscript\n' + b.signature + '\n```\n' + b.doc; }
+    if (v) return '```brontoscript\n' + varHead(v) + '\n```' + (v.doc ? '\n' + v.doc : '') + '\n\nOne per entity; Script.vars can set its starting value.';
+    if (BUILTINS.has(w.word)) { const b = BUILTINS.get(w.word); return '```brontoscript\n' + builtinSignature(b) + '\n```\n' + b.doc; }
     if (KEYWORDS[w.word]) return '**' + w.word + '**  \n' + KEYWORDS[w.word];
     return null;
 }
@@ -206,9 +248,9 @@ function signatureAt(text, line, character) {
                 if (!m) return null;
                 const doc = parseDocument(text);
                 const f = doc.funcs.find(x => x.name === m[1]);
-                if (f) return { name: f.name, signature: `${f.name}(${f.params.join(', ')})`, params: f.params, active: commas, doc: f.doc };
+                if (f) return { name: f.name, signature: funcHead(f).slice(5), params: f.typedParams.map(paramText), active: commas, doc: f.doc };
                 const b = BUILTINS.get(m[1]);
-                if (b) return { name: b.name, signature: b.signature, params: b.params, active: commas, doc: b.doc };
+                if (b) return { name: b.name, signature: builtinSignature(b), params: b.params.map((p, k) => b.param_types ? p + ': ' + b.param_types[k] : p), active: commas, doc: b.doc };
                 return null;
             }
             depth--;
@@ -258,7 +300,7 @@ function quickCheck(text) {
             if (KEYWORDS[name] || /^\s*func\s+$/.test(code.slice(0, m.index + m[1].length))) continue;
             if (!known.has(name)) problems.push({ line: i, character: m.index + m[1].length, length: name.length, message: `unknown function '${name}'` });
         }
-        const top = /^\s*(?!var\b|func\b|#|$|\}|\{)(\S+)/.exec(lines[i]);
+        const top = /^\s*(?!var\b|func\b|@strict\b|#|$|\}|\{)(\S+)/.exec(lines[i]);
         if (top && depthBefore(lines, i) === 0) problems.push({ line: i, character: lines[i].indexOf(top[1]), length: top[1].length, message: "only 'var' and 'func' can be at the top of a script (put code inside start())" });
     }
     for (const open of stack) problems.push({ line: open.line, character: open.character, length: 1, message: `this '${open.c}' is never closed` });
@@ -278,5 +320,5 @@ function parseCheckerOutput(output) {
 }
 
 module.exports = {
-    data, parseDocument, localsAt, completions, hover, signatureAt, definition, quickCheck, parseCheckerOutput, wordAt,
+    data, builtinSignature, parseDocument, localsAt, completions, hover, signatureAt, definition, quickCheck, parseCheckerOutput, wordAt,
 };

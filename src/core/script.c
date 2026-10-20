@@ -7,7 +7,10 @@
  *                            garbage-collected (mark and sweep) between calls
  *   2. lexer                 source text -> tokens
  *   3. parser                tokens -> a syntax tree per function; local
- *                            variables get slots while parsing
+ *                            variables get slots while parsing. Then the
+ *                            type checker: optional annotations (var x: int,
+ *                            func f(a: vec2) -> bool, :=), checked before the
+ *                            script runs; @strict makes them required
  *   4. interpreter           walks the tree. Runtime errors longjmp back to
  *                            the callback that started the work, which is safe
  *                            because nothing on the C stack owns memory: the
@@ -164,6 +167,7 @@ typedef enum {
     T_PLUS, T_MINUS, T_STAR, T_SLASH, T_PERCENT,
     T_ASSIGN, T_PLUS_EQ, T_MINUS_EQ, T_STAR_EQ, T_SLASH_EQ,
     T_EQ, T_NE, T_LT, T_LE, T_GT, T_GE,
+    T_COLON, T_DECLARE, T_ARROW, T_AT,
     T_ERROR
 } sc_tok;
 
@@ -202,7 +206,7 @@ static sc_token sc_next(sc_lexer *L) {
         tk.len = (int)(end - p);
         L->p = end;
         tk.t = T_NUM;
-        return tk;
+        return tk;                                /* (written with . or e: a float, for the type checker) */
     }
     if (isalpha((unsigned char)*p) || *p == '_') {
         size_t i;
@@ -235,9 +239,15 @@ static sc_token sc_next(sc_lexer *L) {
     case '.': tk.t = T_DOT; return tk;
     case ';': tk.t = T_SEMI; return tk;
     case '%': tk.t = T_PERCENT; return tk;
+    case '@': tk.t = T_AT; return tk;
+    case ':':
+        if (*L->p == '=') { L->p++; tk.len = 2; tk.t = T_DECLARE; return tk; }   /* x := 3 */
+        tk.t = T_COLON;
+        return tk;
     default: break;
     }
     tk.len = 2;
+    if (*p == '-' && *L->p == '>') { L->p++; tk.t = T_ARROW; return tk; }
     if (*L->p == '=') {
         switch (*p) {
         case '+': L->p++; tk.t = T_PLUS_EQ; return tk;
@@ -281,8 +291,15 @@ typedef enum {
 /* what a name refers to, found by the resolver */
 enum { REF_UNRESOLVED = 0, REF_LOCAL, REF_GLOBAL, REF_FUNC, REF_BUILTIN };
 
+/* Static types. TY_NONE: not known until it runs (no annotation). */
+typedef enum {
+    TY_NONE = 0, TY_ANY, TY_NIL, TY_BOOL, TY_INT, TY_NUM, TY_STR, TY_VEC, TY_LIST, TY_ENT, TY_COMP, TY_VOID
+} sc_tyk;
+typedef struct sc_ty { uint8_t t, elem; } sc_ty;         /* elem: a list's items (TY_NONE: any) */
+
 typedef struct sc_node {
-    uint8_t kind, op;              /* op: a T_* operator token */
+    uint8_t kind, op;              /* op: a T_* operator token; N_VAR: 1 for := ; N_NUM: 1 if written as a float */
+    sc_ty ty;                      /* N_VAR / N_FOR: the declared type; N_NAME: the variable's (runtime checks) */
     int line;
     struct sc_node *a, *b, *c;
     struct sc_node **items;
@@ -293,8 +310,15 @@ typedef struct sc_node {
     int ref, index;                /* resolved name */
 } sc_node;
 
-typedef struct sc_func { const char *name; int params, locals, line; sc_node *body; } sc_func;
-typedef struct sc_global { const char *name; sc_node *init; int line; } sc_global;
+typedef struct sc_func {
+    const char *name;
+    int params, locals, line;
+    sc_node *body;
+    sc_ty *param_ty;               /* per parameter (arena) */
+    const char **param_names;
+    sc_ty ret;                     /* TY_NONE: not declared, TY_VOID: returns nothing */
+} sc_func;
+typedef struct sc_global { const char *name; sc_node *init; int line; sc_ty ty; bool infer; } sc_global;
 
 typedef struct sc_chunk { struct sc_chunk *next; size_t used, size; } sc_chunk;
 
@@ -316,6 +340,7 @@ typedef struct sc_program {
     sc_str **pinned;
     int pinned_count, pinned_cap;
     bool ok;
+    bool strict;                   /* @strict, or br_script_set_strict(): every declaration has a type */
     char error[256];
 } sc_program;
 
@@ -327,6 +352,9 @@ typedef struct sc_parser {
     /* the function being parsed: its locals, innermost scope last */
     const char *locals[256];
     int local_count, max_locals;
+    /* the type checker: the function being checked and its slots' types */
+    const sc_func *fn;
+    sc_ty slot_ty[256];
 } sc_parser;
 
 static void *sc_arena_alloc(sc_program *p, size_t size) {
@@ -449,6 +477,61 @@ static sc_str *sc_pin_string(sc_parser *P, const char *s, int len) {
 static sc_node *sc_expression(sc_parser *P);
 static sc_node *sc_block(sc_parser *P);
 
+/* ---- types --------------------------------------------------------------------- */
+
+static sc_ty sc_ty_make(int t, int elem) { sc_ty ty; ty.t = (uint8_t)t; ty.elem = (uint8_t)elem; return ty; }
+
+static const char *sc_tyk_name(int t) {
+    static const char *const names[] = { "untyped", "any", "nil", "bool", "int", "number", "string", "vec2", "list",
+                                         "entity", "component", "void" };
+    return t >= 0 && t <= TY_VOID ? names[t] : "?";
+}
+
+static const char *sc_ty_name(sc_ty ty, char *buf, size_t size) {
+    if (ty.t == TY_LIST && ty.elem != TY_NONE) snprintf(buf, size, "list[%s]", sc_tyk_name(ty.elem));
+    else snprintf(buf, size, "%s", sc_tyk_name(ty.t));
+    return buf;
+}
+
+static int sc_type_word(const char *s, int len) {
+    static const struct { const char *word; int t; } words[] = {
+        { "number", TY_NUM }, { "float", TY_NUM }, { "int", TY_INT }, { "string", TY_STR }, { "bool", TY_BOOL },
+        { "vec2", TY_VEC }, { "list", TY_LIST }, { "entity", TY_ENT }, { "any", TY_ANY }, { "void", TY_VOID },
+    };
+    size_t i;
+    for (i = 0; i < BR_ARRAY_COUNT(words); ++i)
+        if ((int)strlen(words[i].word) == len && strncmp(words[i].word, s, (size_t)len) == 0) return words[i].t;
+    return -1;
+}
+
+/* After ':' or '->': a type name, or list[T]. */
+static sc_ty sc_parse_type(sc_parser *P, bool allow_void) {
+    sc_token t = P->cur;
+    int k = TY_NONE;
+    sc_ty ty;
+    if (t.t != T_NAME || (k = sc_type_word(t.start, t.len)) < 0) {
+        if (t.t == T_NAME || t.t == T_NIL)
+            sc_parse_error(P, t.line, "unknown type '%.*s' (the types: number, int, string, bool, vec2, list, entity, any)", t.len, t.start);
+        sc_parse_error(P, t.line, "expected a type (number, int, string, bool, vec2, list, entity or any)");
+    }
+    if (k == TY_VOID && !allow_void) sc_parse_error(P, t.line, "void is only for what a function returns (-> void)");
+    sc_advance(P);
+    ty = sc_ty_make(k, TY_NONE);
+    if (k == TY_LIST && P->cur.t == T_LBRACKET) {           /* list[number] */
+        sc_token e;
+        int ek = TY_NONE;
+        sc_advance(P);
+        e = P->cur;
+        if (e.t != T_NAME || (ek = sc_type_word(e.start, e.len)) < 0 || ek == TY_VOID)
+            sc_parse_error(P, e.line, "expected the type of the list's items, like list[number]");
+        sc_advance(P);
+        if (ek == TY_LIST && P->cur.t == T_LBRACKET) sc_parse_error(P, e.line, "a list's items can be lists, but not typed lists (use list[list])");
+        sc_expect(P, T_RBRACKET);
+        ty.elem = (uint8_t)(ek == TY_ANY ? TY_NONE : ek);
+    }
+    return ty;
+}
+
 static int sc_find_local(const sc_parser *P, const char *name, int len) {
     int i;
     for (i = P->local_count - 1; i >= 0; --i)
@@ -478,7 +561,14 @@ static sc_node *sc_primary(sc_parser *P) {
     sc_token t = P->cur;
     sc_node *n;
     switch (t.t) {
-    case T_NUM: sc_advance(P); n = sc_node_new(P, N_NUM, t.line); n->num = t.num; return n;
+    case T_NUM: {
+        int k;
+        sc_advance(P);
+        n = sc_node_new(P, N_NUM, t.line);
+        n->num = t.num;
+        for (k = 0; k < t.len; ++k) if (t.start[k] == '.' || t.start[k] == 'e' || t.start[k] == 'E') n->op = 1;
+        return n;
+    }
     case T_STR: sc_advance(P); n = sc_node_new(P, N_STR, t.line); n->str = sc_pin_string(P, t.start, t.len); return n;
     case T_TRUE: sc_advance(P); return sc_node_new(P, N_TRUE, t.line);
     case T_FALSE: sc_advance(P); return sc_node_new(P, N_FALSE, t.line);
@@ -643,8 +733,20 @@ static sc_node *sc_statement(sc_parser *P) {
         name = P->cur;
         sc_expect(P, T_NAME);
         n = sc_node_new(P, N_VAR, t.line);
-        if (sc_accept(P, T_ASSIGN)) n->a = sc_expression(P);   /* the value is evaluated before the name exists */
+        if (sc_accept(P, T_COLON)) n->ty = sc_parse_type(P, false);
+        if (n->ty.t == TY_NONE && sc_accept(P, T_DECLARE)) {     /* var x := 3: the value's type */
+            n->op = 1;
+            n->a = sc_expression(P);
+        } else if (sc_accept(P, T_ASSIGN)) {
+            n->a = sc_expression(P);                          /* the value is evaluated before the name exists */
+        } else if (P->cur.t == T_DECLARE) {
+            sc_parse_error(P, P->cur.line, "':=' takes the value's type, so it can't follow a type: write var %.*s: type = value", name.len, name.start);
+        }
+        if (P->prog->strict && n->ty.t == TY_NONE && !n->op)
+            sc_parse_error(P, name.line, "@strict: give '%.*s' a type (var %.*s: number = 0, or var %.*s := 0)",
+                           name.len, name.start, name.len, name.start, name.len, name.start);
         n->index = sc_add_local(P, sc_intern(P, name.start, name.len), name.line);
+        n->name = P->locals[n->index];
         sc_end_statement(P);
         return n;
     }
@@ -689,8 +791,9 @@ static sc_node *sc_statement(sc_parser *P) {
         sc_advance(P);
         name = P->cur;
         sc_expect(P, T_NAME);
-        sc_expect(P, T_IN);
         n = sc_node_new(P, N_FOR, t.line);
+        if (sc_accept(P, T_COLON)) n->ty = sc_parse_type(P, false);   /* for i: int in 10 */
+        sc_expect(P, T_IN);
         n->a = sc_expression(P);
         n->index = sc_add_local(P, sc_intern(P, name.start, name.len), name.line);
         n->c = sc_node_new(P, N_NIL, t.line);            /* a hidden slot for the loop position */
@@ -774,15 +877,35 @@ static void sc_function(sc_parser *P) {
     if (sc_find_func(P->prog, f.name) >= 0) sc_parse_error(P, line, "there already is a function '%s'", f.name);
     P->local_count = P->max_locals = 0;
     sc_expect(P, T_LPAREN);
-    if (P->cur.t != T_RPAREN) {
-        do {
-            sc_token pn = P->cur;
-            sc_expect(P, T_NAME);
-            sc_add_local(P, sc_intern(P, pn.start, pn.len), pn.line);
-            f.params++;
-        } while (sc_accept(P, T_COMMA));
+    {
+        sc_ty types[64];
+        const char *names[64];
+        if (P->cur.t != T_RPAREN) {
+            do {
+                sc_token pn = P->cur;
+                sc_expect(P, T_NAME);
+                if (f.params == 64) sc_parse_error(P, pn.line, "too many parameters");
+                names[f.params] = sc_intern(P, pn.start, pn.len);
+                sc_add_local(P, names[f.params], pn.line);
+                types[f.params] = sc_ty_make(TY_NONE, TY_NONE);
+                if (sc_accept(P, T_COLON)) types[f.params] = sc_parse_type(P, false);
+                else if (P->prog->strict)
+                    sc_parse_error(P, pn.line, "@strict: give the parameter '%.*s' a type (%.*s: number)", pn.len, pn.start, pn.len, pn.start);
+                f.params++;
+            } while (sc_accept(P, T_COMMA));
+        }
+        sc_expect(P, T_RPAREN);
+        if (f.params) {
+            f.param_ty = (sc_ty *)sc_arena_alloc(P->prog, sizeof(sc_ty) * (size_t)f.params);
+            f.param_names = (const char **)sc_arena_alloc(P->prog, sizeof(char *) * (size_t)f.params);
+            if (!f.param_ty || !f.param_names) sc_parse_error(P, line, "out of memory");
+            memcpy(f.param_ty, types, sizeof(sc_ty) * (size_t)f.params);
+            memcpy((void *)f.param_names, names, sizeof(char *) * (size_t)f.params);
+        }
     }
-    sc_expect(P, T_RPAREN);
+    if (sc_accept(P, T_ARROW)) f.ret = sc_parse_type(P, true);
+    else if (P->prog->strict)
+        sc_parse_error(P, P->cur.line, "@strict: say what %s() returns (-> void if nothing)", f.name);
     f.body = sc_block(P);
     f.locals = P->max_locals;
     if (P->prog->func_count == P->prog->func_cap) {
@@ -807,7 +930,12 @@ static void sc_global_var(sc_parser *P) {
     g.line = line;
     if (sc_find_global(P->prog, g.name) >= 0) sc_parse_error(P, line, "there already is a variable '%s'", g.name);
     P->local_count = P->max_locals = 0;
-    if (sc_accept(P, T_ASSIGN)) g.init = sc_expression(P);
+    if (sc_accept(P, T_COLON)) g.ty = sc_parse_type(P, false);
+    if (g.ty.t == TY_NONE && sc_accept(P, T_DECLARE)) { g.infer = true; g.init = sc_expression(P); }
+    else if (sc_accept(P, T_ASSIGN)) g.init = sc_expression(P);
+    else if (P->cur.t == T_DECLARE) sc_parse_error(P, P->cur.line, "':=' takes the value's type, so it can't follow a type: write var %s: type = value", g.name);
+    if (P->prog->strict && g.ty.t == TY_NONE && !g.infer)
+        sc_parse_error(P, line, "@strict: give '%s' a type (var %s: number = 0, or var %s := 0)", g.name, g.name, g.name);
     sc_end_statement(P);
     if (P->prog->global_count == P->prog->global_cap) {
         int cap = P->prog->global_cap ? P->prog->global_cap * 2 : 16;
@@ -823,7 +951,8 @@ static void sc_global_var(sc_parser *P) {
 
 typedef struct sc_vm sc_vm;
 typedef sc_value (*sc_native)(sc_vm *vm, sc_value *args, int argc, int line);
-typedef struct sc_builtin { const char *name; int min_args, max_args; sc_native fn; } sc_builtin;
+/* sig: the parameters' types, '>', the result's (see sc_sig_type), for the type checker */
+typedef struct sc_builtin { const char *name; int min_args, max_args; sc_native fn; const char *sig; } sc_builtin;
 static int sc_find_builtin(const char *name);              /* the table is in part 5 */
 static const sc_builtin *sc_builtin_at(int index);
 
@@ -858,6 +987,396 @@ static void sc_resolve(sc_parser *P, sc_node *n) {
     for (i = 0; i < n->count; ++i) sc_resolve(P, n->items[i]);
 }
 
+
+/* ---- the type checker ---------------------------------------------------------------
+ * Runs over the resolved program before it can run. Types come from
+ * annotations, literals, built-in functions' signatures and the entity
+ * properties; anything else is TY_NONE ("not known until it runs"), which
+ * fits everywhere: annotated variables, parameters and results are checked
+ * again when the script runs. */
+
+static bool sc_numeric(int t) { return t == TY_INT || t == TY_NUM; }
+static bool sc_known(sc_ty ty) { return ty.t != TY_NONE && ty.t != TY_ANY; }
+
+/* Can a value of type `from` be stored where `to` is declared? */
+static bool sc_fits(sc_ty to, sc_ty from) {
+    if (!sc_known(to) || !sc_known(from)) return from.t != TY_VOID;
+    if (to.t == from.t) {
+        if (to.t != TY_LIST || to.elem == TY_NONE || from.elem == TY_NONE) return true;
+        return to.elem == from.elem || (to.elem == TY_NUM && from.elem == TY_INT);
+    }
+    if (to.t == TY_NUM && from.t == TY_INT) return true;
+    if ((to.t == TY_ENT || to.t == TY_COMP) && from.t == TY_NIL) return true;   /* entities may be nil */
+    return false;
+}
+
+static void sc_need_fit(sc_parser *P, int line, sc_ty to, sc_ty from, const char *what) {
+    char a[32], b[32];
+    if (sc_fits(to, from)) return;
+    if (from.t == TY_VOID) sc_parse_error(P, line, "%s: that call returns nothing (-> void)", what);
+    if (to.t == TY_INT && from.t == TY_NUM)
+        sc_parse_error(P, line, "%s is an int, and this number may have a fraction (floor() or round() make it whole)", what);
+    sc_parse_error(P, line, "%s is %s %s, so it can't hold %s %s", what, to.t == TY_INT || to.t == TY_ENT || to.t == TY_ANY ? "an" : "a",
+                   sc_ty_name(to, a, sizeof(a)), from.t == TY_INT || from.t == TY_ENT ? "an" : "a", sc_ty_name(from, b, sizeof(b)));
+}
+
+/* The type a built-in signature letter stands for. */
+static sc_ty sc_sig_type(char c) {
+    switch (c) {
+    case 'n': return sc_ty_make(TY_NUM, 0);  case 'i': return sc_ty_make(TY_INT, 0);
+    case 's': return sc_ty_make(TY_STR, 0);  case 'b': return sc_ty_make(TY_BOOL, 0);
+    case 'v': return sc_ty_make(TY_VEC, 0);  case 'l': return sc_ty_make(TY_LIST, 0);
+    case 'e': return sc_ty_make(TY_ENT, 0);  case 'c': return sc_ty_make(TY_COMP, 0);
+    case 'L': return sc_ty_make(TY_LIST, TY_ENT);
+    case 'R': return sc_ty_make(TY_LIST, TY_INT);
+    case '-': return sc_ty_make(TY_VOID, 0);
+    default:  return sc_ty_make(TY_NONE, 0);   /* a (any), x / t / p / q: checked below */
+    }
+}
+
+static sc_ty sc_expr_type(sc_parser *P, sc_node *n);
+
+static const char *sc_article(int t) { return t == TY_INT || t == TY_ENT || t == TY_ANY ? "an" : "a"; }
+
+static void sc_check_arg(sc_parser *P, const sc_node *call, int i, char code, sc_ty got) {
+    char want[48], tmp[32], have[32];
+    sc_ty need;
+    if (!sc_known(got) || code == 'a') return;
+    switch (code) {
+    case 'x': if (sc_numeric(got.t) || got.t == TY_VEC) return; snprintf(want, sizeof(want), "a number or a vec2"); break;
+    case 't': if (got.t == TY_LIST || got.t == TY_STR) return; snprintf(want, sizeof(want), "a list or a string"); break;
+    case 'p': if (got.t == TY_VEC || got.t == TY_NIL) return; snprintf(want, sizeof(want), "a vec2 (or nil)"); break;
+    case 'q': if (got.t == TY_ENT || got.t == TY_NIL) return; snprintf(want, sizeof(want), "an entity (or nil)"); break;
+    default:
+        need = sc_sig_type(code);
+        if (sc_fits(need, got) && !(code == 'e' && got.t == TY_NIL)) return;
+        snprintf(want, sizeof(want), "%s %s", sc_article(need.t), sc_ty_name(need, tmp, sizeof(tmp)));
+        break;
+    }
+    sc_parse_error(P, call->items[i]->line, "%s() wants %s for argument %d, not %s %s", call->name, want, i + 1,
+                   sc_article(got.t), sc_ty_name(got, have, sizeof(have)));
+}
+
+static sc_ty sc_builtin_type(sc_parser *P, sc_node *n) {
+    const sc_builtin *b = sc_builtin_at(n->index);
+    const char *sig = b->sig ? b->sig : "a*>a", *ret = strchr(sig, '>'), *q;
+    sc_ty args[16], r;
+    char codes[16], rest = 0;
+    int i, nc = 0;
+    for (q = sig; ret && q < ret; ++q) {                  /* "esa*>a": e, s, then any number of a */
+        if (*q == '*') rest = nc ? codes[nc - 1] : 'a';
+        else if (nc < 16) codes[nc++] = *q;
+    }
+    for (i = 0; i < n->count && i < 16; ++i) {
+        args[i] = sc_expr_type(P, n->items[i]);
+        sc_check_arg(P, n, i, i < nc ? codes[i] : rest ? rest : 'a', args[i]);
+    }
+    if (strcmp(n->name, "push") == 0 && n->count == 2 && args[0].t == TY_LIST && args[0].elem != TY_NONE) {
+        char a[32], bb[32];
+        if (!sc_fits(sc_ty_make(args[0].elem, 0), args[1]))
+            sc_parse_error(P, n->line, "push(): the list holds %s, not %s", sc_ty_name(sc_ty_make(args[0].elem, 0), a, sizeof(a)), sc_ty_name(args[1], bb, sizeof(bb)));
+    }
+    if (!ret) return sc_ty_make(TY_NONE, 0);
+    switch (ret[1]) {
+    case 'S': {                                  /* like the arguments: abs, min, max, clamp, lerp, push */
+        if (n->count == 0) return sc_ty_make(TY_NONE, 0);
+        if (strcmp(n->name, "push") == 0) return args[0];
+        if (args[0].t == TY_VEC) return args[0];
+        for (i = 0, r = sc_ty_make(TY_INT, 0); i < n->count && i < 16; ++i) {
+            if (strcmp(n->name, "lerp") == 0 && i == 2) break;
+            if (!sc_known(args[i])) return sc_ty_make(TY_NONE, 0);
+            if (args[i].t != TY_INT) r.t = TY_NUM;
+        }
+        if (strcmp(n->name, "lerp") == 0) r.t = TY_NUM;
+        return r;
+    }
+    case 'E':                                    /* an item of the list: pop, remove */
+        return n->count && args[0].t == TY_LIST ? sc_ty_make(args[0].elem, 0) : sc_ty_make(TY_NONE, 0);
+    default:
+        return sc_sig_type(ret[1]);
+    }
+}
+
+/* Entity properties: their types, and what setting them takes. */
+static const struct { const char *name; uint8_t t; bool settable; } k_props[] = {
+    { "name", TY_STR, true }, { "id", TY_INT, false }, { "alive", TY_BOOL, false },
+    { "position", TY_VEC, true }, { "x", TY_NUM, true }, { "y", TY_NUM, true }, { "rotation", TY_NUM, true },
+    { "scale", TY_VEC, true }, { "global_position", TY_VEC, true }, { "global_rotation", TY_NUM, true },
+    { "parent", TY_ENT, true }, { "velocity", TY_VEC, true }, { "angular_velocity", TY_NUM, true },
+};
+
+static sc_ty sc_member_type(sc_parser *P, sc_node *n, bool setting) {
+    sc_ty obj = sc_expr_type(P, n->a);
+    char a[32];
+    size_t i;
+    if (obj.t == TY_VEC) {
+        if (strcmp(n->name, "x") == 0 || strcmp(n->name, "y") == 0) return sc_ty_make(TY_NUM, 0);
+        if (strcmp(n->name, "length") == 0 && !setting) return sc_ty_make(TY_NUM, 0);
+        sc_parse_error(P, n->line, "a vec2 has x, y and length, not '%s'", n->name);
+    }
+    if (obj.t == TY_ENT) {
+        if (isupper((unsigned char)n->name[0])) return sc_ty_make(TY_COMP, 0);
+        for (i = 0; i < BR_ARRAY_COUNT(k_props); ++i)
+            if (strcmp(k_props[i].name, n->name) == 0) {
+                if (setting && !k_props[i].settable) sc_parse_error(P, n->line, "%s can't be changed", n->name);
+                return sc_ty_make(k_props[i].t, 0);
+            }
+        if (n->a->kind == N_SELF) {                    /* self.speed: this script's own variable */
+            int g = sc_find_global(P->prog, n->name);
+            if (g >= 0) return P->prog->globals[g].ty;
+        }
+        return sc_ty_make(TY_NONE, 0);
+    }
+    if (sc_known(obj) && obj.t != TY_COMP)
+        sc_parse_error(P, n->line, "%s %s has no property '%s'", sc_article(obj.t), sc_ty_name(obj, a, sizeof(a)), n->name);
+    return sc_ty_make(TY_NONE, 0);
+}
+
+static sc_ty sc_binary_type(sc_parser *P, int op, sc_ty a, sc_ty b, int line) {
+    const char *sym = op == T_PLUS ? "+" : op == T_MINUS ? "-" : op == T_STAR ? "*" : op == T_SLASH ? "/" : op == T_PERCENT ? "%"
+                    : op == T_LT ? "<" : op == T_LE ? "<=" : op == T_GT ? ">" : ">=";
+    char an[32], bn[32];
+    if (op == T_EQ || op == T_NE) return sc_ty_make(TY_BOOL, 0);
+    if (op >= T_LT && op <= T_GE) {
+        if (!sc_known(a) || !sc_known(b) || (sc_numeric(a.t) && sc_numeric(b.t)) || (a.t == TY_STR && b.t == TY_STR))
+            return sc_ty_make(TY_BOOL, 0);
+        sc_parse_error(P, line, "can't compare %s %s with %s %s", sc_article(a.t), sc_ty_name(a, an, sizeof(an)), sc_article(b.t), sc_ty_name(b, bn, sizeof(bn)));
+    }
+    if (op == T_PLUS && (a.t == TY_STR || b.t == TY_STR)) return sc_ty_make(TY_STR, 0);    /* "score: " + 5 */
+    if (!sc_known(a) || !sc_known(b)) return sc_ty_make(TY_NONE, 0);
+    if (sc_numeric(a.t) && sc_numeric(b.t)) {
+        if (op == T_SLASH) return sc_ty_make(TY_NUM, 0);
+        return sc_ty_make(a.t == TY_INT && b.t == TY_INT ? TY_INT : TY_NUM, 0);
+    }
+    if (a.t == TY_VEC && b.t == TY_VEC && (op == T_PLUS || op == T_MINUS || op == T_STAR)) return a;
+    if (a.t == TY_VEC && sc_numeric(b.t) && (op == T_STAR || op == T_SLASH)) return a;
+    if (sc_numeric(a.t) && b.t == TY_VEC && op == T_STAR) return b;
+    if (a.t == TY_LIST && b.t == TY_LIST && op == T_PLUS) return sc_ty_make(TY_LIST, a.elem == b.elem ? a.elem : TY_NONE);
+    sc_parse_error(P, line, "can't use %s on %s %s and %s %s", sym, sc_article(a.t), sc_ty_name(a, an, sizeof(an)), sc_article(b.t), sc_ty_name(b, bn, sizeof(bn)));
+    return sc_ty_make(TY_NONE, 0);
+}
+
+static sc_ty sc_expr_type(sc_parser *P, sc_node *n) {
+    sc_ty a, b;
+    char an[32];
+    int i;
+    switch (n->kind) {
+    case N_NUM: return sc_ty_make(!n->op && n->num == floor(n->num) && fabs(n->num) < 9e15 ? TY_INT : TY_NUM, 0);
+    case N_STR: return sc_ty_make(TY_STR, 0);
+    case N_TRUE: case N_FALSE: return sc_ty_make(TY_BOOL, 0);
+    case N_NIL: return sc_ty_make(TY_NIL, 0);
+    case N_SELF: return sc_ty_make(TY_ENT, 0);
+    case N_NAME:
+        n->ty = n->ref == REF_LOCAL ? P->slot_ty[n->index] : P->prog->globals[n->index].ty;
+        return n->ty;
+    case N_LIST: {
+        int elem = -1;
+        for (i = 0; i < n->count; ++i) {
+            sc_ty it = sc_expr_type(P, n->items[i]);
+            if (!sc_known(it) || it.t == TY_NIL || it.t == TY_LIST) elem = TY_NONE;
+            else if (elem < 0) elem = it.t;
+            else if (elem != it.t) elem = sc_numeric(elem) && sc_numeric(it.t) ? TY_NUM : TY_NONE;
+        }
+        return sc_ty_make(TY_LIST, elem < 0 ? TY_NONE : elem);
+    }
+    case N_NEG:
+        a = sc_expr_type(P, n->a);
+        if (!sc_known(a) || sc_numeric(a.t) || a.t == TY_VEC) return a;
+        sc_parse_error(P, n->line, "can't negate %s %s", sc_article(a.t), sc_ty_name(a, an, sizeof(an)));
+        return a;
+    case N_NOT: sc_expr_type(P, n->a); return sc_ty_make(TY_BOOL, 0);
+    case N_AND: case N_OR:                       /* one of the two */
+        a = sc_expr_type(P, n->a);
+        b = sc_expr_type(P, n->b);
+        return a.t == b.t && a.elem == b.elem ? a : sc_ty_make(TY_NONE, 0);
+    case N_BINARY:
+        a = sc_expr_type(P, n->a);
+        b = sc_expr_type(P, n->b);
+        return sc_binary_type(P, n->op, a, b, n->line);
+    case N_CALL:
+        if (n->ref == REF_BUILTIN) return sc_builtin_type(P, n);
+        {
+            const sc_func *f = &P->prog->funcs[n->index];
+            for (i = 0; i < n->count; ++i) {
+                sc_ty got = sc_expr_type(P, n->items[i]);
+                if (i < f->params && !sc_fits(f->param_ty[i], got)) {
+                    char what[96];
+                    snprintf(what, sizeof(what), "%s()'s parameter '%s'", f->name, f->param_names[i]);
+                    sc_need_fit(P, n->items[i]->line, f->param_ty[i], got, what);
+                }
+            }
+            return f->ret;
+        }
+    case N_METHOD:
+        a = sc_expr_type(P, n->a);
+        if (sc_known(a) && a.t != TY_ENT)
+            sc_parse_error(P, n->line, "%s %s has no function %s()", sc_article(a.t), sc_ty_name(a, an, sizeof(an)), n->name);
+        for (i = 0; i < n->count; ++i) sc_expr_type(P, n->items[i]);
+        return sc_ty_make(TY_NONE, 0);
+    case N_MEMBER: return sc_member_type(P, n, false);
+    case N_INDEX:
+        a = sc_expr_type(P, n->a);
+        b = sc_expr_type(P, n->b);
+        if (sc_known(b) && !sc_numeric(b.t)) sc_parse_error(P, n->b->line, "an index is a number, not %s %s", sc_article(b.t), sc_ty_name(b, an, sizeof(an)));
+        if (a.t == TY_LIST) return sc_ty_make(a.elem, 0);
+        if (a.t == TY_STR) return a;
+        if (sc_known(a)) sc_parse_error(P, n->line, "can't index %s %s with []", sc_article(a.t), sc_ty_name(a, an, sizeof(an)));
+        return sc_ty_make(TY_NONE, 0);
+    default: return sc_ty_make(TY_NONE, 0);
+    }
+}
+
+/* The declared type of what an assignment stores into. */
+static sc_ty sc_target_type(sc_parser *P, sc_node *t) {
+    if (t->kind == N_NAME) return sc_expr_type(P, t);
+    if (t->kind == N_MEMBER) {
+        sc_ty ty = sc_member_type(P, t, true);
+        if (ty.t == TY_COMP) sc_parse_error(P, t->line, "set a component's fields, like self.%s.color", t->name);
+        return ty;
+    }
+    if (t->kind == N_INDEX) {
+        sc_ty list = sc_expr_type(P, t->a);
+        sc_expr_type(P, t->b);
+        if (list.t == TY_STR) sc_parse_error(P, t->line, "strings can't be changed (build a new one with +)");
+        return list.t == TY_LIST ? sc_ty_make(list.elem, 0) : sc_ty_make(TY_NONE, 0);
+    }
+    return sc_ty_make(TY_NONE, 0);
+}
+
+static bool sc_always_returns(const sc_node *n) {
+    int i;
+    if (!n) return false;
+    switch (n->kind) {
+    case N_RETURN: return true;
+    case N_BLOCK:
+        for (i = 0; i < n->count; ++i) if (sc_always_returns(n->items[i])) return true;
+        return false;
+    case N_IF: return sc_always_returns(n->b) && sc_always_returns(n->c);
+    default: return false;
+    }
+}
+
+static void sc_check_stmt(sc_parser *P, sc_node *n) {
+    sc_ty a, b;
+    char what[96], an[32];
+    int i;
+    if (!n) return;
+    switch (n->kind) {
+    case N_BLOCK: for (i = 0; i < n->count; ++i) sc_check_stmt(P, n->items[i]); return;
+    case N_EXPR: sc_expr_type(P, n->a); return;
+    case N_VAR:
+        a = n->a ? sc_expr_type(P, n->a) : sc_ty_make(TY_NONE, 0);
+        if (n->op) {                                       /* := */
+            if (a.t == TY_VOID) sc_parse_error(P, n->line, "that call returns nothing (-> void), so there is no type to take");
+            if (!sc_known(a) || a.t == TY_NIL)
+                sc_parse_error(P, n->line, "can't tell the type of %s's value before it runs: write var %s: type = ...", n->name, n->name);
+            n->ty = a.t == TY_LIST ? sc_ty_make(TY_LIST, TY_NONE) : a;
+        } else if (n->ty.t && n->a) {
+            sc_need_fit(P, n->line, n->ty, a, n->name);
+        }
+        P->slot_ty[n->index] = n->ty;
+        return;
+    case N_ASSIGN:
+        a = sc_target_type(P, n->a);
+        b = sc_expr_type(P, n->b);
+        if (n->op != T_ASSIGN) {
+            int op = n->op == T_PLUS_EQ ? T_PLUS : n->op == T_MINUS_EQ ? T_MINUS : n->op == T_STAR_EQ ? T_STAR : T_SLASH;
+            b = sc_binary_type(P, op, sc_expr_type(P, n->a), b, n->line);
+        }
+        if (n->a->kind == N_MEMBER && strcmp(n->a->name, "scale") == 0 && sc_numeric(b.t)) return;   /* scale = 2 */
+        snprintf(what, sizeof(what), "%s", n->a->kind == N_NAME || n->a->kind == N_MEMBER ? n->a->name : "this list's item");
+        if (a.t == TY_VOID) a.t = TY_NONE;
+        sc_need_fit(P, n->line, a, b, what);
+        return;
+    case N_IF:
+        sc_expr_type(P, n->a);
+        sc_check_stmt(P, n->b);
+        sc_check_stmt(P, n->c);
+        return;
+    case N_WHILE:
+        sc_expr_type(P, n->a);
+        sc_check_stmt(P, n->b);
+        return;
+    case N_FOR: {
+        sc_ty item;
+        a = sc_expr_type(P, n->a);
+        if (sc_numeric(a.t)) item = sc_ty_make(TY_INT, 0);
+        else if (a.t == TY_LIST) item = sc_ty_make(a.elem, 0);
+        else if (!sc_known(a)) item = sc_ty_make(TY_NONE, 0);
+        else { sc_parse_error(P, n->a->line, "for ... in needs a list or a number, not %s %s", sc_article(a.t), sc_ty_name(a, an, sizeof(an))); item = a; }
+        if (n->ty.t) sc_need_fit(P, n->line, n->ty, item, "the loop variable");
+        P->slot_ty[n->index] = n->ty.t ? n->ty : item;
+        P->slot_ty[n->c->index] = sc_ty_make(TY_NONE, 0);
+        sc_check_stmt(P, n->b);
+        return;
+    }
+    case N_RETURN: {
+        sc_ty ret = P->fn ? P->fn->ret : sc_ty_make(TY_NONE, 0);
+        a = n->a ? sc_expr_type(P, n->a) : sc_ty_make(TY_NIL, 0);
+        if (ret.t == TY_VOID && n->a) sc_parse_error(P, n->line, "%s() returns nothing (-> void), so return can't have a value", P->fn->name);
+        if (sc_known(ret) && ret.t != TY_VOID) {
+            if (!n->a && ret.t != TY_ENT) sc_parse_error(P, n->line, "%s() must return %s %s", P->fn->name, sc_article(ret.t), sc_ty_name(ret, an, sizeof(an)));
+            snprintf(what, sizeof(what), "what %s() returns", P->fn->name);
+            sc_need_fit(P, n->line, ret, a, what);
+        }
+        return;
+    }
+    default: return;
+    }
+}
+
+/* What the engine passes to each callback. */
+static const char *const k_callback_sig[CB_COUNT] = { "", "n", "evn", "e", "e", "e" };
+
+#if defined(__GNUC__) || defined(__clang__)
+#  define SC_NOINLINE __attribute__((noinline))       /* (kept out of sc_compile's setjmp frame) */
+#else
+#  define SC_NOINLINE
+#endif
+static SC_NOINLINE void sc_typecheck(sc_parser *P) {
+    sc_program *prog = P->prog;
+    int i, k;
+    P->fn = NULL;
+    for (i = 0; i < prog->global_count; ++i) {               /* in order: a := may use the ones above it */
+        sc_global *g = &prog->globals[i];
+        sc_ty t;
+        memset(P->slot_ty, 0, sizeof(P->slot_ty));
+        if (!g->init) continue;
+        t = sc_expr_type(P, g->init);
+        if (g->infer) {
+            if (t.t == TY_VOID) sc_parse_error(P, g->line, "that call returns nothing (-> void), so there is no type to take");
+            if (!sc_known(t) || t.t == TY_NIL) sc_parse_error(P, g->line, "can't tell the type of %s's value before it runs: write var %s: type = ...", g->name, g->name);
+            g->ty = t.t == TY_LIST ? sc_ty_make(TY_LIST, TY_NONE) : t;
+        } else if (g->ty.t) {
+            sc_need_fit(P, g->line, g->ty, t, g->name);
+        }
+    }
+    for (i = 0; i < prog->func_count; ++i) {
+        sc_func *f = &prog->funcs[i];
+        int cb;
+        memset(P->slot_ty, 0, sizeof(P->slot_ty));
+        for (k = 0; k < f->params; ++k) P->slot_ty[k] = f->param_ty[k];
+        for (cb = 0; cb < CB_COUNT; ++cb) {                   /* the engine calls these: their types are fixed */
+            if (strcmp(f->name, k_callbacks[cb]) != 0) continue;
+            for (k = 0; k < f->params; ++k) {
+                char want[32], have[32];
+                sc_ty need = k < (int)strlen(k_callback_sig[cb]) ? sc_sig_type(k_callback_sig[cb][k]) : sc_ty_make(TY_NIL, 0);
+                if (sc_known(f->param_ty[k]) && !sc_fits(f->param_ty[k], need))
+                    sc_parse_error(P, f->line, "the engine passes %s %s as %s()'s parameter '%s', not %s %s", sc_article(need.t),
+                                   sc_ty_name(need, want, sizeof(want)), f->name, f->param_names[k], sc_article(f->param_ty[k].t),
+                                   sc_ty_name(f->param_ty[k], have, sizeof(have)));
+            }
+            if (sc_known(f->ret) && f->ret.t != TY_VOID) sc_parse_error(P, f->line, "the engine ignores what %s() returns: use -> void", f->name);
+        }
+        P->fn = f;
+        sc_check_stmt(P, f->body);
+        if (sc_known(f->ret) && f->ret.t != TY_VOID && f->ret.t != TY_ENT && !sc_always_returns(f->body))
+            sc_parse_error(P, f->line, "not every way through %s() ends with a return (it must return %s %s)", f->name,
+                           sc_article(f->ret.t), sc_tyk_name(f->ret.t));
+        P->fn = NULL;
+    }
+}
+
 static void sc_program_free(sc_program *p) {
     int i;
     if (!p) return;
@@ -868,6 +1387,8 @@ static void sc_program_free(sc_program *p) {
     br_free(p->globals);
     br_free(p);
 }
+
+static bool g_strict_default;                 /* br_script_set_strict */
 
 /* Parses `source`. Always returns a program; ok == false with `error` set if it has a mistake. */
 static sc_program *sc_compile(const char *source, const char *path) {
@@ -886,7 +1407,19 @@ static sc_program *sc_compile(const char *source, const char *path) {
     if (setjmp(P.fail)) { prog->ok = false; return prog; }
     sc_advance(&P);
     sc_skip_newlines(&P);
+    prog->strict = g_strict_default;
     while (P.cur.t != T_EOF) {
+        if (P.cur.t == T_AT) {                                   /* @strict */
+            int line = P.cur.line;
+            sc_advance(&P);
+            if (P.cur.t != T_NAME || P.cur.len != 6 || strncmp(P.cur.start, "strict", 6) != 0)
+                sc_parse_error(&P, line, "unknown annotation '@%.*s' (there is @strict)", P.cur.len, P.cur.start);
+            if (prog->func_count || prog->global_count) sc_parse_error(&P, line, "@strict goes at the top of the file, before any var or func");
+            sc_advance(&P);
+            prog->strict = true;
+            sc_end_statement(&P);
+            continue;
+        }
         if (P.cur.t == T_FUNC) sc_function(&P);
         else if (P.cur.t == T_VAR) sc_global_var(&P);
         else sc_parse_error(&P, P.cur.line, "only 'var' and 'func' can be at the top of a script (put code inside start())");
@@ -898,6 +1431,7 @@ static sc_program *sc_compile(const char *source, const char *path) {
     }
     for (i = 0; i < prog->func_count; ++i) sc_resolve(&P, prog->funcs[i].body);
     for (i = 0; i < CB_COUNT; ++i) prog->callbacks[i] = sc_find_func(prog, k_callbacks[i]);
+    sc_typecheck(&P);
     prog->ok = true;
     return prog;
 }
@@ -937,6 +1471,8 @@ struct sc_runtime {
     br_component body_id, collider_id;
     char last_error[300];
     uint32_t error_count;
+    char scene_request[BR_PATH_MAX];  /* load_scene(), for the game to act on */
+    bool quit_request;                /* quit() */
     br_rng rng;
     int busy;                       /* calls in progress: no collecting */
 };
@@ -957,7 +1493,7 @@ enum { FLOW_NORMAL = 0, FLOW_BREAK, FLOW_CONTINUE, FLOW_RETURN };
 static void sc_report(sc_runtime *rt, const char *msg) {
     snprintf(rt->last_error, sizeof(rt->last_error), "%s", msg);
     rt->error_count++;
-    BR_WARN("script: %s", msg);
+    BR_ERROR("script: %s", msg);
 }
 
 static void sc_fail(sc_vm *vm, int line, const char *fmt, ...) {
@@ -1052,6 +1588,41 @@ static bool sc_equal(const sc_value *a, const sc_value *b) {
     }
 }
 
+/* ---- declared types, when it runs ---- */
+
+static bool sc_value_is(const sc_value *v, sc_ty ty) {
+    uint32_t i;
+    switch (ty.t) {
+    case TY_NONE: case TY_ANY: return true;
+    case TY_NIL: return v->t == V_NIL;
+    case TY_BOOL: return v->t == V_BOOL;
+    case TY_INT: return v->t == V_NUM && v->as.n == floor(v->as.n);
+    case TY_NUM: return v->t == V_NUM;
+    case TY_STR: return v->t == V_STR;
+    case TY_VEC: return v->t == V_VEC;
+    case TY_ENT: return v->t == V_ENT || v->t == V_NIL;
+    case TY_COMP: return v->t == V_COMP || v->t == V_NIL;
+    case TY_LIST:
+        if (v->t != V_LIST) return false;
+        if (ty.elem == TY_NONE) return true;
+        for (i = 0; i < v->as.l->count; ++i) if (!sc_value_is(&v->as.l->items[i], sc_ty_make(ty.elem, 0))) return false;
+        return true;
+    default: return false;
+    }
+}
+
+/* Where a typed variable starts without a value: GDScript-like defaults. */
+static sc_value sc_default(sc_vm *vm, sc_ty ty, int line);
+
+static void sc_check_value(sc_vm *vm, sc_ty ty, const sc_value *v, int line, const char *what) {
+    char tn[32];
+    if (sc_value_is(v, ty)) return;
+    if (ty.t == TY_INT && v->t == V_NUM) sc_fail(vm, line, "%s is an int, and %g isn't a whole number", what, v->as.n);
+    if (ty.t == TY_LIST && v->t == V_LIST) sc_fail(vm, line, "%s is a %s, and this list holds something else", what, sc_ty_name(ty, tn, sizeof(tn)));
+    sc_fail(vm, line, "%s is %s %s, so it can't hold %s", what, ty.t == TY_INT || ty.t == TY_ENT || ty.t == TY_ANY ? "an" : "a",
+            sc_ty_name(ty, tn, sizeof(tn)), sc_type_name(v));
+}
+
 static double sc_need_num(sc_vm *vm, const sc_value *v, int line, const char *what) {
     if (v->t != V_NUM) sc_fail(vm, line, "%s needs a number, not %s", what, sc_type_name(v));
     return v->as.n;
@@ -1133,6 +1704,19 @@ static sc_value sc_compare(sc_vm *vm, int op, sc_value a, sc_value b, int line) 
 
 static sc_value *sc_local(sc_vm *vm, int slot) { return &vm->stack[vm->base + slot]; }
 
+static sc_value sc_new_list(sc_vm *vm, int line);
+
+static sc_value sc_default(sc_vm *vm, sc_ty ty, int line) {
+    switch (ty.t) {
+    case TY_INT: case TY_NUM: return sc_num(0);
+    case TY_BOOL: return sc_bool(false);
+    case TY_STR: return sc_string(vm, "", 0);
+    case TY_VEC: return sc_vec(0, 0);
+    case TY_LIST: return sc_new_list(vm, line);
+    default: return sc_nil();
+    }
+}
+
 static sc_value sc_index_get(sc_vm *vm, sc_value obj, sc_value ix, int line) {
     double i;
     if (obj.t == V_LIST) {
@@ -1155,6 +1739,7 @@ static sc_value sc_index_get(sc_vm *vm, sc_value obj, sc_value ix, int line) {
 static void sc_assign(sc_vm *vm, sc_node *target, sc_value val) {
     switch (target->kind) {
     case N_NAME:
+        if (target->ty.t) sc_check_value(vm, target->ty, &val, target->line, target->name);
         if (target->ref == REF_LOCAL) *sc_local(vm, target->index) = val;
         else vm->inst->globals[target->index] = val;
         return;
@@ -1275,7 +1860,8 @@ static int sc_exec(sc_vm *vm, sc_node *n) {
     case N_BLOCK: return sc_exec_block(vm, n);
     case N_EXPR: sc_eval(vm, n->a); return FLOW_NORMAL;
     case N_VAR: {
-        sc_value v = n->a ? sc_eval(vm, n->a) : sc_nil();   /* first: a call may move the stack */
+        sc_value v = n->a ? sc_eval(vm, n->a) : sc_default(vm, n->ty, n->line);   /* first: a call may move the stack */
+        if (n->ty.t && n->a) sc_check_value(vm, n->ty, &v, n->line, n->name);
         *sc_local(vm, n->index) = v;
         return FLOW_NORMAL;
     }
@@ -1320,6 +1906,7 @@ static int sc_exec(sc_vm *vm, sc_node *n) {
         *sc_local(vm, n->c->index) = seq;                         /* keeps the list alive */
         for (i = 0; i < seq.as.l->count; ++i) {
             int flow;
+            if (n->ty.t) sc_check_value(vm, n->ty, &seq.as.l->items[i], n->line, "the loop variable");
             *sc_local(vm, n->index) = seq.as.l->items[i];
             flow = sc_exec(vm, n->b);
             if (flow == FLOW_BREAK) break;
@@ -1353,9 +1940,24 @@ static sc_value sc_call_func(sc_vm *vm, sc_instance *inst, int fn, const sc_valu
     vm->top += f->locals;
     for (i = 0; i < f->locals; ++i) vm->stack[vm->base + i] = i < argc && i < f->params ? args[i] : sc_nil();
     vm->inst = inst;
+    for (i = 0; i < f->params; ++i) {                          /* typed parameters */
+        sc_ty ty = f->param_ty[i];
+        if (!ty.t) continue;
+        if (i >= argc) { sc_value d = sc_default(vm, ty, line); vm->stack[vm->base + i] = d; continue; }
+        {
+            char what[96];
+            snprintf(what, sizeof(what), "%s()'s parameter '%s'", f->name, f->param_names[i]);
+            sc_check_value(vm, ty, &args[i], line, what);
+        }
+    }
     vm->depth++;
     vm->ret = sc_nil();
     result = sc_exec(vm, f->body) == FLOW_RETURN ? vm->ret : sc_nil();
+    if (f->ret.t && f->ret.t != TY_VOID) {
+        char what[96];
+        snprintf(what, sizeof(what), "what %s() returns", f->name);
+        sc_check_value(vm, f->ret, &result, f->line, what);
+    }
     vm->depth--;
     vm->inst = saved_inst;
     vm->base = saved_base;
@@ -1585,7 +2187,11 @@ static void sc_set_member(sc_vm *vm, const sc_value *obj, const char *name, cons
         other = sc_instance_of(rt, e);
         if (other && other->prog && other->started) {
             int g = sc_find_global(other->prog, name);
-            if (g >= 0) { other->globals[g] = *val; return; }
+            if (g >= 0) {
+                if (other->prog->globals[g].ty.t) sc_check_value(vm, other->prog->globals[g].ty, val, line, name);
+                other->globals[g] = *val;
+                return;
+            }
         }
         sc_fail(vm, line, "%s has no property '%s'", sc_entity_name(rt, e)[0] ? sc_entity_name(rt, e) : "the entity", name);
     }
@@ -1936,6 +2542,12 @@ static sc_value bi_play_sound(ARGS) {
     br_play(&e->mixer, s, &pp);
     return sc_nil();
 }
+static sc_value bi_load_scene(ARGS) {
+    BR_UNUSED(n);
+    snprintf(vm->rt->scene_request, sizeof(vm->rt->scene_request), "%s", sc_need_str(vm, &a[0], line, "load_scene()"));
+    return sc_nil();
+}
+static sc_value bi_quit(ARGS) { UNUSED_ARGS; vm->rt->quit_request = true; return sc_nil(); }
 static sc_value bi_send(ARGS) {
     sc_instance *target;
     const char *fn_name;
@@ -1947,26 +2559,36 @@ static sc_value bi_send(ARGS) {
     return sc_call_func(vm, target, fn, a + 2, n - 2, line);
 }
 
+/* Signatures (for the type checker): a letter per parameter, '*' repeats the
+ * last for the rest, then '>' and the result. n number, i int, s string,
+ * b bool, v vec2, l list, e entity, a anything, x number or vec2, t list or
+ * string, p vec2 or nil, q entity or nil; results also: - nothing, c a
+ * component, L list[entity], R list[int], S like the arguments, E an item of
+ * the list argument. */
 static const sc_builtin k_builtin_table[] = {
-    { "print", 0, 16, bi_print }, { "str", 1, 1, bi_str }, { "num", 1, 1, bi_num },
-    { "floor", 1, 1, bi_floor }, { "ceil", 1, 1, bi_ceil }, { "round", 1, 1, bi_round }, { "abs", 1, 1, bi_abs },
-    { "sqrt", 1, 1, bi_sqrt }, { "sin", 1, 1, bi_sin }, { "cos", 1, 1, bi_cos }, { "atan2", 2, 2, bi_atan2 },
-    { "pow", 2, 2, bi_pow }, { "sign", 1, 1, bi_sign }, { "min", 1, 16, bi_min }, { "max", 1, 16, bi_max },
-    { "clamp", 3, 3, bi_clamp }, { "lerp", 3, 3, bi_lerp }, { "random", 0, 2, bi_random },
-    { "vec2", 2, 2, bi_vec2 }, { "length", 1, 1, bi_length }, { "normalize", 1, 1, bi_normalize },
-    { "dot", 2, 2, bi_dot }, { "distance", 2, 2, bi_distance }, { "angle", 1, 1, bi_angle },
-    { "from_angle", 1, 2, bi_from_angle }, { "rgb", 3, 4, bi_rgb },
-    { "len", 1, 1, bi_len }, { "push", 2, 2, bi_push }, { "pop", 1, 1, bi_pop }, { "remove", 2, 2, bi_remove },
-    { "contains", 2, 2, bi_contains }, { "range", 1, 3, bi_range },
-    { "key_down", 1, 1, bi_key_down }, { "key_pressed", 1, 1, bi_key_pressed }, { "key_released", 1, 1, bi_key_released },
-    { "mouse_down", 0, 1, bi_mouse_down }, { "mouse_pressed", 0, 1, bi_mouse_pressed },
-    { "mouse_position", 0, 0, bi_mouse_position }, { "time", 0, 0, bi_time },
-    { "find", 1, 1, bi_find }, { "find_all", 1, 1, bi_find_all }, { "destroy", 1, 1, bi_destroy },
-    { "spawn", 1, 3, bi_spawn }, { "children", 1, 1, bi_children }, { "child", 2, 2, bi_child }, { "has", 2, 2, bi_has }, { "add", 2, 2, bi_add },
-    { "remove_component", 2, 2, bi_remove_component },
-    { "apply_force", 2, 3, bi_apply_force }, { "apply_impulse", 2, 3, bi_apply_impulse },
-    { "raycast", 2, 3, bi_raycast }, { "entity_at", 1, 1, bi_entity_at },
-    { "play_sound", 1, 2, bi_play_sound }, { "send", 2, 16, bi_send },
+    { "print", 0, 16, bi_print, "a*>-" }, { "str", 1, 1, bi_str, "a>s" }, { "num", 1, 1, bi_num, "a>a" },
+    { "floor", 1, 1, bi_floor, "n>i" }, { "ceil", 1, 1, bi_ceil, "n>i" }, { "round", 1, 1, bi_round, "n>i" },
+    { "abs", 1, 1, bi_abs, "n>S" }, { "sqrt", 1, 1, bi_sqrt, "n>n" }, { "sin", 1, 1, bi_sin, "n>n" },
+    { "cos", 1, 1, bi_cos, "n>n" }, { "atan2", 2, 2, bi_atan2, "nn>n" }, { "pow", 2, 2, bi_pow, "nn>n" },
+    { "sign", 1, 1, bi_sign, "n>i" }, { "min", 1, 16, bi_min, "n*>S" }, { "max", 1, 16, bi_max, "n*>S" },
+    { "clamp", 3, 3, bi_clamp, "nnn>S" }, { "lerp", 3, 3, bi_lerp, "xxn>S" }, { "random", 0, 2, bi_random, "nn>n" },
+    { "vec2", 2, 2, bi_vec2, "nn>v" }, { "length", 1, 1, bi_length, "v>n" }, { "normalize", 1, 1, bi_normalize, "v>v" },
+    { "dot", 2, 2, bi_dot, "vv>n" }, { "distance", 2, 2, bi_distance, "vv>n" }, { "angle", 1, 1, bi_angle, "v>n" },
+    { "from_angle", 1, 2, bi_from_angle, "nn>v" }, { "rgb", 3, 4, bi_rgb, "nnnn>s" },
+    { "len", 1, 1, bi_len, "t>i" }, { "push", 2, 2, bi_push, "la>S" }, { "pop", 1, 1, bi_pop, "l>E" },
+    { "remove", 2, 2, bi_remove, "ln>E" }, { "contains", 2, 2, bi_contains, "la>b" }, { "range", 1, 3, bi_range, "nnn>R" },
+    { "key_down", 1, 1, bi_key_down, "s>b" }, { "key_pressed", 1, 1, bi_key_pressed, "s>b" },
+    { "key_released", 1, 1, bi_key_released, "s>b" },
+    { "mouse_down", 0, 1, bi_mouse_down, "n>b" }, { "mouse_pressed", 0, 1, bi_mouse_pressed, "n>b" },
+    { "mouse_position", 0, 0, bi_mouse_position, ">v" }, { "time", 0, 0, bi_time, ">n" },
+    { "find", 1, 1, bi_find, "s>e" }, { "find_all", 1, 1, bi_find_all, "s>L" }, { "destroy", 1, 1, bi_destroy, "e>-" },
+    { "spawn", 1, 3, bi_spawn, "spq>e" }, { "children", 1, 1, bi_children, "e>L" }, { "child", 2, 2, bi_child, "es>e" },
+    { "has", 2, 2, bi_has, "es>b" }, { "add", 2, 2, bi_add, "es>c" },
+    { "remove_component", 2, 2, bi_remove_component, "es>-" },
+    { "apply_force", 2, 3, bi_apply_force, "evv>-" }, { "apply_impulse", 2, 3, bi_apply_impulse, "evv>-" },
+    { "raycast", 2, 3, bi_raycast, "vvq>a" }, { "entity_at", 1, 1, bi_entity_at, "v>e" },
+    { "play_sound", 1, 2, bi_play_sound, "sn>-" }, { "send", 2, 16, bi_send, "esa*>a" },
+    { "load_scene", 1, 1, bi_load_scene, "s>-" }, { "quit", 0, 0, bi_quit, ">-" },
 };
 
 static int sc_find_builtin(const char *name) {
@@ -2172,6 +2794,12 @@ static void sc_apply_vars(sc_runtime *rt, sc_instance *inst, const char *vars) {
             if ((g = sc_find_global(inst->prog, key)) < 0) {
                 snprintf(msg, sizeof(msg), "%s: Script.vars sets '%s', but the script has no var by that name", inst->prog->name, key);
                 sc_report(rt, msg);
+            } else if (!sc_value_is(&v, inst->prog->globals[g].ty)) {
+                char tn[32];
+                snprintf(msg, sizeof(msg), "%s: Script.vars sets '%s', but it is %s %s", inst->prog->name, key,
+                         inst->prog->globals[g].ty.t == TY_INT || inst->prog->globals[g].ty.t == TY_ENT ? "an" : "a",
+                         sc_ty_name(inst->prog->globals[g].ty, tn, sizeof(tn)));
+                sc_report(rt, msg);
             } else {
                 inst->globals[g] = v;
             }
@@ -2197,7 +2825,9 @@ static bool sc_run(sc_runtime *rt, sc_instance *inst, int fn, const sc_value *ar
             int i;
             for (i = 0; i < inst->prog->global_count; ++i) {
                 const sc_global *g = &inst->prog->globals[i];
-                inst->globals[i] = g->init ? sc_eval(&vm, g->init) : sc_nil();
+                sc_value v = g->init ? sc_eval(&vm, g->init) : sc_default(&vm, g->ty, g->line);
+                if (g->ty.t && g->init) sc_check_value(&vm, g->ty, &v, g->line, g->name);
+                inst->globals[i] = v;
             }
         } else {
             sc_value r = sc_call_func(&vm, inst, fn, args, argc, inst->prog->funcs[fn].line);
@@ -2360,10 +2990,14 @@ bool br_script_get_number(br_world *w, br_entity e, const char *var, double *out
 bool br_script_set_number(br_world *w, br_entity e, const char *var, double value) {
     sc_instance *inst = sc_running(w, e);
     int g = inst ? sc_find_global(inst->prog, var) : -1;
-    if (g < 0) return false;
-    inst->globals[g] = sc_num(value);
+    sc_value v = sc_num(value);
+    if (g < 0 || !sc_value_is(&v, inst->prog->globals[g].ty)) return false;   /* (a typed var keeps its type) */
+    inst->globals[g] = v;
     return true;
 }
+
+void br_script_set_strict(bool strict) { g_strict_default = strict; }
+bool br_script_strict(void) { return g_strict_default; }
 
 bool br_script_get_string(br_world *w, br_entity e, const char *var, char *out, size_t size) {
     sc_instance *inst = sc_running(w, e);
@@ -2391,6 +3025,21 @@ bool br_script_check(const char *source, const char *name, char *err, size_t err
 const char *br_script_last_error(const br_world *w) {
     const sc_runtime *rt = (const sc_runtime *)br_world_attached(w, &k_runtime_key);
     return rt ? rt->last_error : "";
+}
+
+bool br_script_scene_request(br_world *w, char *path, size_t size) {
+    sc_runtime *rt = (sc_runtime *)br_world_attached(w, &k_runtime_key);
+    if (!rt || !rt->scene_request[0]) return false;
+    snprintf(path, size, "%s", rt->scene_request);
+    rt->scene_request[0] = 0;
+    return true;
+}
+
+bool br_script_quit_request(br_world *w) {
+    sc_runtime *rt = (sc_runtime *)br_world_attached(w, &k_runtime_key);
+    bool q = rt && rt->quit_request;
+    if (rt) rt->quit_request = false;
+    return q;
 }
 
 uint32_t br_script_error_count(const br_world *w) {

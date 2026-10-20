@@ -380,18 +380,13 @@ int ed_doc_count_entities(const char *path) {
     return n;
 }
 
-int ed_doc_instantiate(ed_doc *d, const char *path, br_vec2 at) {
-    size_t size;
-    char *text;
+int ed_doc_paste(ed_doc *d, const char *text, const br_vec2 *at, br_entity parent) {
     br_entity *made;
     br_vec2 sum = br_v2(0, 0);
     int n, i, placed = 0;
     if (d->playing) { snprintf(d->error, sizeof(d->error), "stop playing first"); return -1; }
-    if (!(text = (char *)br_file_read_all(path, &size))) {
-        snprintf(d->error, sizeof(d->error), "can't read '%s'", path);
-        return -1;
-    }
-    {   /* room for every entity the file could hold */
+    if (parent != BR_ENTITY_NULL && !br_entity_alive(&d->world, parent)) parent = BR_ENTITY_NULL;
+    {   /* room for every entity the text could hold */
         const char *p = text;
         uint32_t guess = 1;
         while ((p = strstr(p, "entity")) != NULL) { guess++; p += 6; }
@@ -399,19 +394,21 @@ int ed_doc_instantiate(ed_doc *d, const char *path, br_vec2 at) {
         n = made && reserve(d, d->count + guess)
           ? br_world_from_text(&d->world, text, made, guess, d->error, sizeof(d->error)) : -1;
     }
-    br_free(text);
     if (n < 0) { br_free(made); return -1; }
-    for (i = 0; i < n; ++i) {                         /* the prefab's roots; children ride along */
+    for (i = 0; i < n; ++i) {                         /* the roots; children ride along */
         const br_transform *t = (const br_transform *)br_get(&d->world, made[i], d->ids.transform);
         if (t && br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL) { sum = br_v2_add(sum, t->position); ++placed; }
     }
-    if (placed) {
-        br_vec2 shift = br_v2_sub(at, br_v2_scale(sum, 1.0f / (float)placed));
+    if (placed && at) {                               /* their average position lands on `at` */
+        br_vec2 shift = br_v2_sub(*at, br_v2_scale(sum, 1.0f / (float)placed));
         for (i = 0; i < n; ++i) {
             br_transform *t = (br_transform *)br_get(&d->world, made[i], d->ids.transform);
             if (t && br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL) t->position = br_v2_add(t->position, shift);
         }
     }
+    if (parent != BR_ENTITY_NULL)                     /* under a parent, staying where they are */
+        for (i = 0; i < n; ++i)
+            if (br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL) br_set_parent(&d->world, made[i], parent, true);
     for (i = 0; i < n; ++i) insert_at(d, d->count, made[i]);
     ed_doc_normalize(d);
     if (n > 0) d->selected = made[0];
@@ -419,19 +416,44 @@ int ed_doc_instantiate(ed_doc *d, const char *path, br_vec2 at) {
     return n;
 }
 
-bool ed_doc_save_entity(ed_doc *d, br_entity e, const char *path) {
+int ed_doc_instantiate(ed_doc *d, const char *path, br_vec2 at) {
+    size_t size;
+    char *text;
+    int n;
+    if (d->playing) { snprintf(d->error, sizeof(d->error), "stop playing first"); return -1; }
+    if (!(text = (char *)br_file_read_all(path, &size))) {
+        snprintf(d->error, sizeof(d->error), "can't read '%s'", path);
+        return -1;
+    }
+    n = ed_doc_paste(d, text, &at, BR_ENTITY_NULL);
+    br_free(text);
+    return n;
+}
+
+/* The entity and its subtree as scene text, the entity saved as a root where it is. */
+char *ed_doc_copy(ed_doc *d, br_entity e) {
     int at = ed_doc_index(d, e);
     br_entity parent;
     br_transform *t, local;
-    bool ok;
-    if (at < 0) { snprintf(d->error, sizeof(d->error), "nothing selected"); return false; }
+    char *text;
+    if (at < 0) { snprintf(d->error, sizeof(d->error), "nothing selected"); return NULL; }
     parent = br_parent_of(&d->world, e);
     t = (br_transform *)br_get(&d->world, e, d->ids.transform);
     if (t) local = *t;
-    if (parent != BR_ENTITY_NULL) br_set_parent(&d->world, e, BR_ENTITY_NULL, true);   /* saved as a root, where it is */
-    ok = br_world_save_file(&d->world, d->order + at, block_len(d, (uint32_t)at), path);   /* with its subtree */
+    if (parent != BR_ENTITY_NULL) br_set_parent(&d->world, e, BR_ENTITY_NULL, true);
+    text = br_world_to_text(&d->world, d->order + at, block_len(d, (uint32_t)at), NULL);
     if (parent != BR_ENTITY_NULL) br_set_parent(&d->world, e, parent, false);
     if (t) *(br_transform *)br_get(&d->world, e, d->ids.transform) = local;
+    if (!text) snprintf(d->error, sizeof(d->error), "out of memory");
+    return text;
+}
+
+bool ed_doc_save_entity(ed_doc *d, br_entity e, const char *path) {
+    char *text = ed_doc_copy(d, e);
+    bool ok;
+    if (!text) return false;
+    ok = br_file_write_all(path, text, strlen(text));
+    br_free(text);
     if (!ok) snprintf(d->error, sizeof(d->error), "can't write '%s'", path);
     return ok;
 }
@@ -479,6 +501,17 @@ void ed_doc_stop(ed_doc *d) {
     restore(d, d->play_snapshot, d->play_selected);
     set_text(&d->play_snapshot, NULL);
     d->playing = false;
+}
+
+bool ed_doc_switch_scene(ed_doc *d, const char *path) {
+    size_t size;
+    char *text;
+    bool ok;
+    if (!d->playing) return false;                    /* (Stop still goes back to the edited scene) */
+    if (!(text = (char *)br_file_read_all(path, &size))) { snprintf(d->error, sizeof(d->error), "can't read '%s'", path); return false; }
+    ok = restore(d, text, -1);
+    br_free(text);
+    return ok;
 }
 
 void ed_doc_step(ed_doc *d, float dt) {

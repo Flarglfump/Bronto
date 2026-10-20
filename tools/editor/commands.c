@@ -191,6 +191,7 @@ void ed_cmd_play(editor *ed) {
         ed_doc_stop(&ed->doc);
         ed_status(ed, "Stopped: the scene is back as it was");
     } else {
+        if (ed->console_clear_on_play) ed_console_clear(&ed->console);
         ed_doc_play(&ed->doc);
         ed_status(ed, "Playing. Changes made now are undone by Stop (F5)");
     }
@@ -236,6 +237,63 @@ void ed_cmd_delete(editor *ed) {
     ed_status(ed, "Deleted %s (Ctrl+Z brings it back)", name);
 }
 
+/* Scene text on the system clipboard (copied here or in another editor)
+ * becomes what Paste adds. */
+void ed_clipboard_refresh(editor *ed) {
+    char *text = br_clipboard_get(ed->engine);
+    if (text && (strncmp(text, "# Bronto scene", 14) == 0 || strncmp(text, "bronto_scene", 12) == 0) &&
+        (!ed->clipboard || strcmp(text, ed->clipboard) != 0)) {
+        br_free(ed->clipboard);
+        ed->clipboard = text;
+        return;
+    }
+    br_free(text);
+}
+
+void ed_cmd_copy(editor *ed) {
+    char name[64], *text;
+    if (!br_entity_alive(&ed->doc.world, ed->doc.selected)) { ed_status(ed, "Select an entity to copy"); return; }
+    if (!(text = ed_doc_copy(&ed->doc, ed->doc.selected))) { ed_status(ed, "Couldn't copy: %s", ed->doc.error); return; }
+    br_free(ed->clipboard);
+    ed->clipboard = text;
+    br_clipboard_set(ed->engine, text);               /* as text: pastes into another editor, or a text file */
+    ed_status(ed, "Copied %s", ed_doc_name(&ed->doc, ed->doc.selected, name, sizeof(name)));
+}
+
+void ed_cmd_cut(editor *ed) {
+    char name[64];
+    if (!br_entity_alive(&ed->doc.world, ed->doc.selected) || ed->doc.playing) return;
+    ed_cmd_copy(ed);
+    ed_doc_name(&ed->doc, ed->doc.selected, name, sizeof(name));
+    ed_doc_delete(&ed->doc, ed->doc.selected);
+    ed_status(ed, "Cut %s - paste it with Ctrl+V", name);
+}
+
+void ed_cmd_paste(editor *ed, const br_vec2 *at, br_entity parent) {
+    int n;
+    ed_clipboard_refresh(ed);
+    if (!ed->clipboard) { ed_status(ed, "Nothing to paste: copy an entity first"); return; }
+    if (ed->doc.playing) { ed_status(ed, "Stop playing to paste"); return; }
+    n = ed_doc_paste(&ed->doc, ed->clipboard, at, parent);
+    if (n < 0) { ed_status(ed, "Couldn't paste: %s", ed->doc.error); return; }
+    if (!at && n > 0) {                               /* next to the original, so both show */
+        br_vec2 p = br_world_transform(&ed->doc.world, ed->doc.selected).position;
+        br_set_world_position(&ed->doc.world, ed->doc.selected, br_v2_add(p, br_v2(8, 8)));
+    }
+    if (parent != BR_ENTITY_NULL) ed_set_collapsed(ed, parent, false);
+    ed_status(ed, "Pasted %d entit%s", n, n == 1 ? "y" : "ies");
+}
+
+void ed_cmd_rename(editor *ed) {
+    if (!br_entity_alive(&ed->doc.world, ed->doc.selected)) return;
+    ed->focus_name = true;                            /* the inspector's Name field, all selected */
+}
+
+void ed_cmd_unparent(editor *ed) {
+    if (br_parent_of(&ed->doc.world, ed->doc.selected) == BR_ENTITY_NULL) return;
+    ed_doc_place(&ed->doc, ed->doc.selected, BR_ENTITY_NULL, BR_ENTITY_NULL);
+    ed_status(ed, "Made it a root");
+}
 
 void ed_cmd_nudge(editor *ed, br_vec2 delta) {
     br_transform *t = selected_transform(ed);   /* delta is on screen: turn it into the parent's space */

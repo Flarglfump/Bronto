@@ -3,17 +3,24 @@
  *
  * Runs the engine with the real X11 backend and drives it from a second
  * X connection: synthetic keyboard/mouse/close events, external resizes,
- * fullscreen, and pixel checks on what actually reached the window.
+ * fullscreen, pixel checks on what actually reached the window, and the
+ * clipboard both ways (another "program" is a forked child with its own
+ * connection).
  *
  * Needs an X server and the Xlib headers (for the *driver* side only):
  *   make x11-test                     (uses xvfb-run if DISPLAY is unset)
  */
+#define _POSIX_C_SOURCE 200809L
 #include "bronto/bronto.h"
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 
 unsigned long br_x11_window_id(void);
 
@@ -124,6 +131,101 @@ static void save_window(Window w, int ww, int wh, const char *path) {
 
 #define RED  0xFF0000ul
 #define BLUE 0x0000FFul
+
+/* ---- another program that has copied some text --------------------------------- */
+#define OTHER_TEXT "from another app \xe2\x9c\x93"
+
+static void other_program(int ready_fd) {
+    Display *d = XOpenDisplay(NULL);
+    Window win;
+    Atom clip, utf8;
+    if (!d) _exit(1);
+    win = XCreateSimpleWindow(d, DefaultRootWindow(d), 0, 0, 1, 1, 0, 0, 0);
+    clip = XInternAtom(d, "CLIPBOARD", False);
+    utf8 = XInternAtom(d, "UTF8_STRING", False);
+    XSetSelectionOwner(d, clip, win, CurrentTime);
+    XSync(d, False);
+    if (write(ready_fd, "r", 1) != 1) _exit(1);
+    for (;;) {                                   /* serve it until someone else copies */
+        XEvent ev, re;
+        XNextEvent(d, &ev);
+        if (ev.type == SelectionClear) break;
+        if (ev.type != SelectionRequest) continue;
+        memset(&re, 0, sizeof(re));
+        re.xselection.type = SelectionNotify;
+        re.xselection.requestor = ev.xselectionrequest.requestor;
+        re.xselection.selection = ev.xselectionrequest.selection;
+        re.xselection.target = ev.xselectionrequest.target;
+        re.xselection.time = ev.xselectionrequest.time;
+        re.xselection.property = None;
+        if (ev.xselectionrequest.target == utf8) {
+            XChangeProperty(d, ev.xselectionrequest.requestor, ev.xselectionrequest.property, utf8, 8, PropModeReplace,
+                            (const unsigned char *)OTHER_TEXT, (int)strlen(OTHER_TEXT));
+            re.xselection.property = ev.xselectionrequest.property;
+        }
+        XSendEvent(d, ev.xselectionrequest.requestor, False, 0, &re);
+        XFlush(d);
+    }
+    XCloseDisplay(d);
+    _exit(0);
+}
+
+static void test_clipboard(br_engine *e) {
+    Window dw = XCreateSimpleWindow(drv, DefaultRootWindow(drv), 0, 0, 1, 1, 0, 0, 0);
+    Atom clip = XInternAtom(drv, "CLIPBOARD", False), utf8 = XInternAtom(drv, "UTF8_STRING", False);
+    Atom prop = XInternAtom(drv, "DRIVER_PASTE", False);
+    XEvent ev;
+    bool answered = false;
+    char *text;
+    int i, fds[2], status = 0;
+    pid_t child;
+
+    /* copied in the engine, pasted elsewhere: served from the engine's event loop */
+    CHECK(br_clipboard_set(e, "copied \xc3\xa9\nline 2"));
+    CHECK(XGetSelectionOwner(drv, clip) == (Window)br_x11_window_id());
+    XConvertSelection(drv, clip, utf8, prop, dw, CurrentTime);
+    for (i = 0; i < 200 && !answered; ++i) {
+        pump(e, 1);
+        answered = XCheckTypedWindowEvent(drv, dw, SelectionNotify, &ev);
+    }
+    CHECK(answered && ev.xselection.property == prop);
+    if (answered && ev.xselection.property == prop) {
+        Atom type;
+        int format;
+        unsigned long n, after;
+        unsigned char *data = NULL;
+        XGetWindowProperty(drv, dw, prop, 0, 1024, True, AnyPropertyType, &type, &format, &n, &after, &data);
+        CHECK(type == utf8 && format == 8 && n == 16 && data && memcmp(data, "copied \xc3\xa9\nline 2", 16) == 0);
+        if (data) XFree(data);
+    }
+    text = br_clipboard_get(e);                  /* our own: straight from memory */
+    CHECK(text && strcmp(text, "copied \xc3\xa9\nline 2") == 0);
+    br_free(text);
+
+    /* copied in another program, pasted in the engine */
+    if (pipe(fds) != 0) { CHECK(!"pipe"); return; }
+    child = fork();
+    if (child == 0) { close(fds[0]); other_program(fds[1]); }
+    close(fds[1]);
+    {
+        char r = 0;
+        CHECK(read(fds[0], &r, 1) == 1 && r == 'r');
+        close(fds[0]);
+    }
+    text = br_clipboard_get(e);
+    CHECK(text && strcmp(text, OTHER_TEXT) == 0);
+    br_free(text);
+    CHECK(br_clipboard_set(e, "mine again"));   /* the other program loses it, and ends */
+    for (i = 0; i < 200 && waitpid(child, &status, WNOHANG) == 0; ++i) {
+        struct timespec ts = { 0, 10000000 };
+        nanosleep(&ts, NULL);
+    }
+    if (i == 200) { kill(child, SIGKILL); waitpid(child, &status, 0); CHECK(!"the other program didn't see the copy"); }
+    text = br_clipboard_get(e);
+    CHECK(text && strcmp(text, "mine again") == 0);
+    br_free(text);
+    XDestroyWindow(drv, dw);
+}
 
 int main(int argc, char **argv) {
     br_engine *e = BR_NEW(br_engine);
@@ -239,6 +341,8 @@ int main(int argc, char **argv) {
     pump(e, 1);
     CHECK(XFetchName(drv, w, &name) && name && strncmp(name, "Renamed", 7) == 0);
     if (name) XFree(name);
+
+    test_clipboard(e);
 
     /* close button: vetoed once, then quits */
     S.veto = true;

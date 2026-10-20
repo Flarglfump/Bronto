@@ -96,6 +96,12 @@ bool  br_open_path(struct br_engine *e, const char *path);
 /* Starts another program, e.g. "code -g \"/path/a.bs:12\"", without waiting
  * for it (Windows runs it through cmd.exe, others through /bin/sh). */
 bool  br_launch(struct br_engine *e, const char *command_line);
+/* The system clipboard, as UTF-8 text. br_clipboard_get returns a copy
+ * (br_free it), with line endings as \n, or NULL when it holds no text.
+ * Where there is no system clipboard (headless, the web) the program gets a
+ * private one, so copy and paste still work inside it. */
+bool  br_clipboard_set(struct br_engine *e, const char *text);
+char *br_clipboard_get(struct br_engine *e);
 void  br_window_set_scale_mode(struct br_engine *e, br_scale_mode mode);
 float br_window_scale(const struct br_engine *e);
 bool  br_window_is_focused(const struct br_engine *e);

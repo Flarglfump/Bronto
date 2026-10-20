@@ -29,6 +29,7 @@
 
 #include "bronto/platform.h"
 #include "bronto/log.h"
+#include "bronto/memory.h"
 #include "bronto/audio.h"
 
 #include "audio_coreaudio.c"
@@ -728,11 +729,42 @@ static float mac_get_window_scale(void) { return (float)mac_scale(); }
 /* Rumble needs Core Haptics on macOS - not implemented yet. */
 static bool mac_set_gamepad_rumble(int pad, float lo, float hi) { BR_UNUSED(pad); BR_UNUSED(lo); BR_UNUSED(hi); return false; }
 
+/* ---- clipboard (NSPasteboard) ------------------------------------------------------ */
+
+#define MAC_PASTEBOARD_TEXT "public.utf8-plain-text"     /* NSPasteboardTypeString */
+
+static bool mac_clipboard_set(const char *text) {
+    void *pool = objc_autoreleasePoolPush();
+    id pb = msg_id(cls("NSPasteboard"), "generalPasteboard");
+    BOOL ok = NO;
+    if (pb) {
+        msg_long(pb, "clearContents");
+        ok = ((BOOL (*)(id, SEL, id, id))objc_msgSend)(pb, SEL_("setString:forType:"), nsstring(text), nsstring(MAC_PASTEBOARD_TEXT));
+    }
+    objc_autoreleasePoolPop(pool);
+    return ok ? true : false;
+}
+
+static char *mac_clipboard_get(void) {
+    void *pool = objc_autoreleasePoolPush();
+    id pb = msg_id(cls("NSPasteboard"), "generalPasteboard");
+    id str = pb ? msg_id_id(pb, "stringForType:", nsstring(MAC_PASTEBOARD_TEXT)) : NULL;
+    const char *utf8 = str ? msg_cstr(str, "UTF8String") : NULL;
+    char *out = NULL;
+    if (utf8) {
+        size_t n = strlen(utf8);
+        if ((out = (char *)br_alloc(n + 1)) != NULL) memcpy(out, utf8, n + 1);
+    }
+    objc_autoreleasePoolPop(pool);                       /* (utf8 belongs to the pool: copied first) */
+    return out;
+}
+
 static const br_platform k_macos = {
     "cocoa", mac_init, mac_shutdown, mac_poll, mac_present, mac_time, mac_sleep,
     mac_audio_wanted, mac_audio_submit,
     mac_get_window_size, mac_get_window_scale, mac_set_title, mac_set_window_size,
     mac_set_fullscreen, mac_set_cursor_visible, mac_set_icon, mac_pick_folder, mac_open_path, mac_launch,
+    mac_clipboard_set, mac_clipboard_get,
     mac_set_gamepad_rumble,
     NULL
 };

@@ -87,5 +87,15 @@ bool br_fs_config_dir(const char *app, char *out, size_t size) {
     return br_fs_mkdir(out);
 }
 
+bool br_fs_copy_file(const char *from, const char *to) {
+    size_t size;
+    void *data = br_file_read_all(from, &size);
+    bool ok;
+    if (!data) return false;
+    ok = br_file_write_all(to, data, size);
+    br_free(data);
+    return ok;
+}
+
 bool br_fs_exists(const char *path) { br_dir_entry e; return br_fs_stat(path, &e); }
 bool br_fs_is_dir(const char *path) { br_dir_entry e; return br_fs_stat(path, &e) && e.is_dir; }

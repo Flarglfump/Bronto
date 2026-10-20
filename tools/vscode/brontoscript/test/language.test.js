@@ -58,11 +58,11 @@ test('completion at the top level offers the missing callbacks', () => {
 
 test('hover: builtins, file functions, vars, properties, components', () => {
     let p = at('raycast(');
-    assert.match(lang.hover(player, p.line, p.character + 2), /raycast\(from, to, ignore\)/);
+    assert.match(lang.hover(player, p.line, p.character + 2), /raycast\(from: vec2, to: vec2, \[ignore: entity \| nil\]\) -> any/);
     p = at('grounded = on_ground()', 12);
     assert.match(lang.hover(player, p.line, p.character + 2), /func on_ground\(\)[\s\S]*short ray/);
     p = at('var speed');
-    assert.match(lang.hover(player, p.line, p.character + 5), /var speed = 90/);
+    assert.match(lang.hover(player, p.line, p.character + 5), /var speed: number = 90/);
     assert.match(lang.hover('func f() {\n    self.global_position\n}', 1, 12), /after its parents/);
     assert.match(lang.hover('func f() {\n    self.Shape.color\n}', 1, 11), /Shape\*\* component/);
     p = at('func start');
@@ -85,7 +85,7 @@ test('go to definition: functions, vars, locals', () => {
     p = at('dir * speed', 7);
     assert.strictEqual(lang.definition(player, p.line, p.character + 1).line, lines.findIndex(l => l.startsWith('var speed')));
     p = at('dir * speed');
-    assert.strictEqual(lang.definition(player, p.line, p.character + 1).line, lines.findIndex(l => l.includes('var dir = 0')));
+    assert.strictEqual(lang.definition(player, p.line, p.character + 1).line, lines.findIndex(l => l.includes('var dir := 0')));
 });
 
 test('quick check: no false alarms on real scripts, catches slips', () => {
@@ -104,6 +104,33 @@ test('quick check: no false alarms on real scripts, catches slips', () => {
     assert.ok(bad.some(p => /never closed/.test(p.message)));
     assert.ok(lang.quickCheck('func f() {\n}\nprint(1)\n').some(p => p.line === 2 && /top of a script/.test(p.message)));
     assert.deepStrictEqual(lang.quickCheck('func f() {\n    print("jmup()") # nope()\n    self.hit(1)\n}\n'), []);
+});
+
+test('types: declarations, completion after : and ->, hover, signatures', () => {
+    const src = '@strict\n# hit points\nvar hp: int = 3\nvar spot := vec2(1, 2)\nvar bag: list[number]\n' +
+        'func hit(amount: int, from: entity) -> bool {\n    var left: int = hp - amount\n    for i: int in 3 { }\n    return left <= 0\n}\n';
+    const d = lang.parseDocument(src);
+    assert.deepStrictEqual(d.vars.map(v => [v.name, v.type, v.inferred]), [['hp', 'int', false], ['spot', '', true], ['bag', 'list[number]', false]]);
+    assert.deepStrictEqual(d.funcs[0].params, ['amount', 'from']);
+    assert.strictEqual(d.funcs[0].returns, 'bool');
+    assert.deepStrictEqual(lang.quickCheck(src), []);                       /* @strict and types are fine */
+    let labels = lang.completions('var x: ', 0, 7, []).map(i => i.label);
+    assert.ok(labels.includes('int') && labels.includes('vec2') && !labels.includes('void') && !labels.includes('raycast'));
+    labels = lang.completions('func f() -> ', 0, 12, []).map(i => i.label);
+    assert.ok(labels.includes('void'));
+    assert.ok(lang.completions('var bag: list[', 0, 14, []).some(i => i.label === 'number'));
+    assert.ok(!lang.completions('func f() {\n    var x := ', 1, 13, []).some(i => i.label === 'int'));   /* := takes a value */
+    assert.ok(lang.completions('@', 0, 1, []).some(i => i.label === '@strict'));
+    assert.match(lang.hover(src, 2, 5), /var hp: int = 3/);
+    assert.match(lang.hover(src, 5, 7), /func hit\(amount: int, from: entity\) -> bool/);
+    assert.match(lang.hover(src, 2, 9), /\*\*int\*\* \(a type\)/);
+    assert.match(lang.hover(src, 6, 10), /left: int/);
+    const s = lang.signatureAt(src + 'func g() {\n    hit(1, \n}\n', 11, 11);
+    assert.strictEqual(s.signature, 'hit(amount: int, from: entity) -> bool');
+    assert.deepStrictEqual(s.params, ['amount: int', 'from: entity']);
+    assert.strictEqual(s.active, 1);
+    const cb = lang.completions('', 0, 0, []).find(i => i.label === 'func update');
+    assert.strictEqual(cb.snippet, 'func update(dt: number) -> void {\n\t$0\n}');
 });
 
 test('checker output is read into problems', () => {

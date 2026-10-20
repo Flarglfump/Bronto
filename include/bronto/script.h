@@ -101,6 +101,16 @@ const char *br_script_builtin_name(int index);
 
 /* Checks a script file without running it: true if it parses. */
 bool br_script_check(const char *source, const char *name, char *err, size_t err_size);
+/* Strict typing for every script compiled from now on (as if each started
+ * with @strict): every var, parameter and function result needs a type.
+ * Games and the editor set it from the project's strict_typing setting. */
+void br_script_set_strict(bool strict);
+/* What scripts asked for during the last steps: load_scene("levels/2.scene")
+ * and quit(). The game (the player, the editor's Play) acts on them; each
+ * request is returned once. */
+bool br_script_scene_request(br_world *w, char *path, size_t size);
+bool br_script_quit_request(br_world *w);
+bool br_script_strict(void);
 
 /* The most recent script error ("player.bs:12: unknown function 'jmup'"),
  * "" if none; and how many there have been in this world. */

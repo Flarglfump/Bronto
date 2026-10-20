@@ -170,14 +170,14 @@ static void test_entities_and_vars(void) {
 static void test_runtime_errors(void) {
     br_entity bad, good, loop;
     setup();
-    write_script("bad.bs", "var n = 0\nfunc update(dt) {\n    n += 1\n    if n == 3 { var x = nil + 1 }\n}\n");
+    write_script("bad.bs", "var n = 0\nvar gone\nfunc update(dt) {\n    n += 1\n    if n == 3 { var x = gone + 1 }\n}\n");   /* (nil + 1 itself: caught before it runs) */
     write_script("good.bs", "var n = 0\nfunc update(dt) { n += 1 }\n");
     write_script("loop.bs", "func start() {\n    while true { }\n}\n");
     bad = scripted("bad", "bad.bs", NULL, br_v2(0, 0));
     good = scripted("good", "good.bs", NULL, br_v2(0, 0));
     loop = scripted("loop", "loop.bs", NULL, br_v2(0, 0));
     QUIET(steps(5));
-    CHECK(strstr(br_script_last_error(&W), "bad.bs:4: can't use + on nil and a number") != NULL);
+    CHECK(strstr(br_script_last_error(&W), "bad.bs:5: can't use + on nil and a number") != NULL);
     CHECK_EQ_INT(br_script_error_count(&W), 2);            /* each reported once (loop.bs: too long) */
     {
         double v;
@@ -452,11 +452,134 @@ static void test_extension_knows_builtins(void) {
     br_free(json);
 }
 
+
+/* Static typing: annotations are checked before a script runs. */
+static void test_types_checked(void) {
+    static const struct { const char *src, *err; } cases[] = {
+        /* accepted */
+        { "var speed: number = 90\nvar lives: int = 3\nvar name: string\nvar alive: bool = true\nvar at: vec2 = vec2(1, 2)\n"
+          "var items: list[number] = [1, 2.5]\nvar target: entity\nvar anything: any = \"x\"\nvar count := 0\n"
+          "func hit(amount: int, from: entity) -> bool {\n    lives -= amount\n    return lives <= 0\n}\n"
+          "func update(dt: number) -> void {\n    speed += dt * 2\n    var d := distance(at, self.position)\n    count += floor(d)\n"
+          "    for i: int in 3 { count += i }\n    for v in items { speed += v }\n    if hit(1, nil) { print(\"out\") }\n}\n", NULL },
+        { "@strict\nvar a: int = 1\nfunc f(x: number) -> number {\n    var y := x * 2\n    return y\n}\n", NULL },
+        { "func f() -> int {\n    if true { return 1 } else { return 2 }\n}\n", NULL },
+        { "func start() -> void {\n    self.scale = 2\n    self.parent = nil\n    var e: entity = find(\"x\")\n}\n", NULL },
+        /* rejected */
+        { "var speed: number = \"fast\"\n", "t.bs:1: speed is a number, so it can't hold a string" },
+        { "var lives: int = 2.5\n", "lives is an int, and this number may have a fraction" },
+        { "var n := nil\n", "can't tell the type of n's value" },
+        { "var c := 1\nfunc f() {\n    c = \"two\"\n}\n", "t.bs:3: c is an int, so it can't hold a string" },
+        { "func f(a: vec2) {\n}\nfunc g() {\n    f(3)\n}\n", "t.bs:4: f()'s parameter 'a' is a vec2, so it can't hold an int" },
+        { "func f() -> int {\n    return \"x\"\n}\n", "what f() returns is an int, so it can't hold a string" },
+        { "func f() -> int {\n    if true { return 1 }\n}\n", "not every way through f() ends with a return" },
+        { "func f() -> void {\n    return 3\n}\n", "returns nothing (-> void), so return can't have a value" },
+        { "func f() {\n    var s: string = \"a\" - 1\n}\n", "can't use - on a string and an int" },
+        { "func f() {\n    key_down(3)\n}\n", "key_down() wants a string for argument 1, not an int" },
+        { "func f() {\n    destroy(nil)\n}\n", "destroy() wants an entity for argument 1, not a nil" },
+        { "func f() {\n    var v := vec2(1, 2)\n    v.z = 1\n}\n", "a vec2 has x, y and length, not 'z'" },
+        { "func f() {\n    var xs: list[int] = [1, 2]\n    push(xs, \"three\")\n}\n", "push(): the list holds int, not string" },
+        { "func f() {\n    var n := 3\n    for x in \"abc\" { }\n}\n", "for ... in needs a list or a number, not a string" },
+        { "func update(dt: string) {\n}\n", "the engine passes a number as update()'s parameter 'dt', not a string" },
+        { "var x: flaot = 1\n", "unknown type 'flaot'" },
+        { "func f() {\n    var s := print(\"x\")\n}\n", "returns nothing" },
+        { "func f() {\n    self.id = 3\n}\n", "id can't be changed" },
+        { "@strict\nvar a = 1\n", "t.bs:2: @strict: give 'a' a type" },
+        { "@strict\nfunc f(x) -> void {\n}\n", "@strict: give the parameter 'x' a type" },
+        { "@strict\nfunc f() {\n}\n", "@strict: say what f() returns" },
+        { "@strict\nfunc f() -> void {\n    var y = 2\n}\n", "@strict: give 'y' a type" },
+        { "var a = 1\n@strict\n", "@strict goes at the top of the file" },
+        { "@tool\n", "unknown annotation '@tool'" },
+    };
+    size_t i;
+    char err[256];
+    for (i = 0; i < BR_ARRAY_COUNT(cases); ++i) {
+        bool ok = br_script_check(cases[i].src, "t.bs", err, sizeof(err));
+        if (cases[i].err == NULL) { CHECK(ok); if (!ok) fprintf(stderr, "      case %u: %s\n", (unsigned)i, err); }
+        else {
+            CHECK(!ok && strstr(err, cases[i].err));
+            if (ok || !strstr(err, cases[i].err)) fprintf(stderr, "      case %u: got \"%s\"\n", (unsigned)i, ok ? "(accepted)" : err);
+        }
+    }
+    br_script_set_strict(true);                              /* the project's setting: every script strict */
+    CHECK(!br_script_check("var a = 1\n", "t.bs", err, sizeof(err)) && strstr(err, "@strict: give 'a' a type"));
+    CHECK(br_script_check("var a: int = 1\n", "t.bs", err, sizeof(err)));
+    br_script_set_strict(false);
+    CHECK(br_script_check("var a = 1\n", "t.bs", err, sizeof(err)));
+}
+
+/* ... and again when it runs: values from untyped code, other scripts and C. */
+static void test_types_at_run_time(void) {
+    br_entity e, f;
+    double v;
+    char s[64];
+    setup();
+    write_script("typed.bs",
+        "var hp: int\nvar label: string\nvar spot: vec2\nvar bag: list[int]\nvar who: entity\nvar loose\n"
+        "var ok := false\n"
+        "func start() -> void {\n"
+        "    ok = hp == 0 and label == \"\" and spot.x == 0 and len(bag) == 0 and who == nil\n"
+        "    push(bag, 1)\n"
+        "}\n"
+        "func set_hp(v) -> void { hp = v }\n"
+        "func add(a: int, b: int) -> int { return a + b }\n"
+        "func half(n) -> int { return n / 2 }\n"
+        "func update(dt: number) -> void { }\n");
+    write_script("poke.bs",
+        "var which = 0\n"
+        "func update(dt) {\n"
+        "    var t = find(\"typed\")\n"
+        "    if which == 1 { t.set_hp(2.5) }\n"
+        "    if which == 2 { t.hp = \"lots\" }\n"
+        "    if which == 3 { t.half(3) }\n"
+        "    if which == 4 { var x: int = t.add(2, 3); t.hp = x }\n"
+        "}\n");
+    e = scripted("typed", "typed.bs", NULL, br_v2(0, 0));
+    f = scripted("poke", "poke.bs", NULL, br_v2(0, 0));
+    steps(1);
+    CHECK(br_script_get_number(&W, e, "ok", &v) && v == 1);          /* the defaults */
+    CHECK(br_script_get_string(&W, e, "label", s, sizeof(s)) && s[0] == 0);
+    CHECK(!br_script_set_number(&W, e, "label", 3));                  /* a string stays a string */
+    CHECK(!br_script_set_number(&W, e, "hp", 1.5) && br_script_set_number(&W, e, "hp", 4));
+    br_script_set_number(&W, f, "which", 4);
+    steps(1);
+    CHECK(br_script_get_number(&W, e, "hp", &v) && v == 5);
+    br_script_set_number(&W, f, "which", 1);
+    QUIET(steps(1));
+    CHECK(strstr(br_script_last_error(&W), "typed.bs") && strstr(br_script_last_error(&W), "hp is an int, and 2.5 isn't a whole number"));
+    teardown();
+
+    setup();
+    write_script("typed.bs", "var hp: int\nfunc update(dt) { }\n");
+    write_script("poke.bs", "func update(dt) {\n    find(\"typed\").hp = \"lots\"\n}\n");
+    scripted("typed", "typed.bs", NULL, br_v2(0, 0));
+    scripted("poke", "poke.bs", NULL, br_v2(0, 0));
+    QUIET(steps(2));
+    CHECK(strstr(br_script_last_error(&W), "poke.bs:2: hp is an int, so it can't hold a string"));
+    teardown();
+
+    setup();
+    write_script("ret.bs", "func half(n) -> int { return n / 2 }\nfunc start() { var r = half(3) }\n");
+    scripted("r", "ret.bs", NULL, br_v2(0, 0));
+    QUIET(steps(1));
+    CHECK(strstr(br_script_last_error(&W), "what half() returns is an int, and 1.5 isn't a whole number"));
+    teardown();
+
+    setup();                                                   /* Script.vars must fit too */
+    write_script("vars.bs", "var speed: number = 1\nfunc update(dt) { }\n");
+    scripted("v", "vars.bs", "speed = \"fast\"", br_v2(0, 0));
+    QUIET(steps(1));
+    CHECK(strstr(br_script_last_error(&W), "Script.vars sets 'speed', but it is a number"));
+    teardown();
+}
+
 void suite_script(void) {
     RUN(test_extension_knows_builtins);
     RUN(test_tree_from_scripts);
     RUN(test_platformer_example);
     RUN(test_check_and_errors);
+    RUN(test_types_checked);
+    RUN(test_types_at_run_time);
     RUN(test_language);
     RUN(test_entities_and_vars);
     RUN(test_runtime_errors);

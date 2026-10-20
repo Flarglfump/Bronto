@@ -164,3 +164,33 @@ bool br_open_path(br_engine *e, const char *path) {
 bool br_launch(br_engine *e, const char *command_line) {
     return command_line && command_line[0] && e->platform && e->platform->launch && e->platform->launch(command_line);
 }
+
+static char *wn_strdup(const char *s) {
+    size_t n = strlen(s);
+    char *c = (char *)br_alloc(n + 1);
+    if (c) memcpy(c, s, n + 1);
+    return c;
+}
+
+bool br_clipboard_set(br_engine *e, const char *text) {
+    if (!text) text = "";
+    if (!e) return false;
+    if (e->platform && e->platform->clipboard_set) return e->platform->clipboard_set(text);
+    br_free(e->clipboard);                        /* no system clipboard: a private one */
+    e->clipboard = wn_strdup(text);
+    return e->clipboard != NULL;
+}
+
+char *br_clipboard_get(br_engine *e) {
+    char *text, *r, *w;
+    if (!e) return NULL;
+    if (e->platform && e->platform->clipboard_get) text = e->platform->clipboard_get();
+    else text = e->clipboard ? wn_strdup(e->clipboard) : NULL;
+    if (!text) return NULL;
+    for (r = w = text; *r; ++r) {                 /* \r\n and a lone \r become \n */
+        if (*r == '\r') { *w++ = '\n'; if (r[1] == '\n') ++r; }
+        else *w++ = *r;
+    }
+    *w = 0;
+    return text;
+}

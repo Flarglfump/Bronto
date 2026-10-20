@@ -15,6 +15,7 @@ Status (v0.1):
 make snake         # build and play Snake
 make towerdefense  # build and play Pop Defense (tower defense)
 make editor        # build and run the scene editor (make editor SCENE=level.scene)
+make tools         # the editor, bscheck and bronto_player (which the editor's Build menu needs)
 make test          # build libbronto.a and run the test suite
 make examples      # build examples/ into build/examples/
 make sanitize      # tests under AddressSanitizer + UndefinedBehaviorSanitizer
@@ -108,8 +109,22 @@ the rules.
   selected entity. Scripts (`.bs`) show their first lines and any mistake; drag one onto an
   entity to attach it, double-click to edit it in your text editor, or **+ Script** for a
   new one.
+- **Build menu:** a game for this computer (or others, given their players) in one file,
+  after checking every script; **Project Settings** for the game's name, first scene, screen
+  size and strict typing. See [Building games](#building-games).
 - **Physics and scripts** run when you press Play. **Colliders** outlines every collider,
-  and script errors appear in the status bar.
+  and script errors appear in the status bar and the console.
+- **Right-click menus** everywhere: hierarchy rows and empty space, objects and empty
+  space in the view, files and folders, inspector sections and fields, console lines.
+  They hold the actions for that thing (rename, add child, cut / copy / paste, add
+  component, reset, open, show in the file manager, ...).
+- **Console:** a tab next to the file browser. Everything the editor writes to stdout and
+  stderr is captured there (and still reaches the terminal), along with the engine's
+  log and `print()` from scripts, coloured by level with filters, search and repeat
+  counts. Double-click a script error to open the script at that line.
+- **Clipboard:** text fields take Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+A (Cmd on a Mac) with the
+  system clipboard. Copied entities go on it as scene text, so they paste into another
+  editor window; menus copy console lines and file paths.
 - **Undo / redo**, and a prompt to save before unsaved changes are lost.
 
 Scenes are saved as readable text files that games load with one call; see
@@ -133,8 +148,8 @@ make it move: gravity, bouncing, friction, tumbling and stacking. A collider mar
 BrontoScript file, a small language built into the engine:
 
 ```
-var speed = 90
-func update(dt) {
+var speed: number = 90                # types are optional, and checked before it runs
+func update(dt: number) -> void {
     if key_down("right") { self.velocity.x = speed }
     if key_pressed("space") and raycast(self.position, self.position + vec2(0, 12), self) != nil {
         self.velocity.y = -280
@@ -153,6 +168,34 @@ with presets for VS Code, Sublime Text, Notepad++ and Zed. `tools/vscode` is a V
 extension for `.bs` files with highlighting, completion, hover docs, signature help, go to
 definition and checking as you type (`make vscode` packages it). `bscheck` (`make tools`)
 checks scripts from the command line.
+
+Scripts can be typed, like GDScript: `var hp: int = 3`, `var spot := vec2(1, 2)`,
+`func hit(amount: int) -> bool`, `list[vec2]`. Types are checked before a script runs and
+again when values arrive from untyped code. `@strict` at the top of a file, or **Strict
+typing** in the project's settings, makes them required everywhere.
+
+## Building games
+
+The editor's **Build** menu turns a project into a game that runs without the editor:
+
+- **Build for <this computer>** (Ctrl+B) checks every script (strictly, if the project asks
+  for it; mistakes go to the console), then writes the game to `builds/<system>/` in the
+  project: on Linux and Windows one program file, on macOS a `.app`. **Build and Run**
+  (Ctrl+Shift+B) starts it too.
+- A game is `bronto_player` (`tools/player`, built by `make tools` next to the editor) with
+  the project packed into it (`pack.h`: every scene, script, image and sound in one file),
+  so there is nothing else to install.
+- **Build for > Windows / macOS / Linux**: a player for another system is built on that
+  system and copied into a `players/` folder beside the editor, named
+  `bronto_player-windows.exe`, `bronto_player-macos` or `bronto_player-linux`. Web builds
+  aren't available yet.
+- **Project Settings** (saved in `project.bronto`): the game's name, the scene it starts
+  with, its screen size and window scale, strict typing, an icon and the builds folder.
+
+`bronto_player <project folder>` also runs a project straight from its files, and
+`--headless --frames N` runs it with no window (for tests). Scripts move between scenes
+with `load_scene("levels/2.scene")` and end the game with `quit()`; in the editor's Play,
+those swap the scene until Stop and stop playing.
 
 ## Platforms
 
@@ -215,6 +258,7 @@ examples/towerdefense/  sample game: Pop Defense (tower defense)
 examples/platformer/    a level built only from the editor: physics + scripts, no C
 tools/editor/        the visual scene editor
 tools/bscheck/       checks .bs scripts from the command line
+tools/player/        bronto_player: runs games (the editor's Build packs projects into it)
 tools/vscode/        the BrontoScript extension for VS Code
 docs/scripting.md    the BrontoScript reference
 ```
@@ -231,16 +275,18 @@ docs/scripting.md    the BrontoScript reference
 | Scenes | `scene.h` | Scene stack where each scene has its own ECS world. `transparent` and `update_below` flags handle overlays and modals. Push/pop/switch requests are deferred to a safe point |
 | Render | `render.h` | Software rasterizer: shapes, triangles (including per-vertex colour; rasterised in fixed point so shared edges have no cracks or double pixels), affine sprites, 4 blend modes, 2D camera, 8x8 font, BMP/TGA |
 | Audio | `audio.h` | 32-voice mixer with volume, pan, pitch, looping, ramps, buses and resampling; WAV loader; tone generator; lock-free ring for audio threads |
-| Window | `window.h` | Viewport and scale modes, mouse mapping, window state and control, and the app icon (`br_window_set_icon`: window, taskbar and Dock) |
+| Window | `window.h` | Viewport and scale modes, mouse mapping, window state and control, the app icon (`br_window_set_icon`: window, taskbar and Dock), and the system clipboard (`br_clipboard_set` / `br_clipboard_get`: Win32 `CF_UNICODETEXT`, macOS `NSPasteboard`, X11 `CLIPBOARD` selection; a private one in headless and web builds) |
 | Platform | `platform.h` | Table of function pointers that each OS backend implements |
 | Scene files | `serialize.h` | Saves and loads worlds as readable text. Every *described* component (a list of its fields with names and types, `ecs.h`) is saved field by field. Loading skips unknown components and fields with a warning, and is all-or-nothing on errors |
 | Built-in components | `components.h` | Name, Transform, Shape, Sprite, Label, Motion, Bounds and Sound, with motion, audio and layered draw systems: enough to make and play simple scenes |
 | Scene tree | `hierarchy.h` | Parent component, local and world transforms, reparenting that keeps the on-screen position, children, subtrees and cascading destruction. Scene files store entity references (`BR_FIELD_ENTITY`) as positions in the file, reconnected on load |
 | Physics | `physics.h` | RigidBody (dynamic, static, kinematic), Collider (box or circle; friction, bounce, trigger, layers) and PhysicsWorld (gravity). Sort-and-sweep broad phase; circle and oriented-box contacts with clipping; a sequential-impulse solver, warm-started so stacks settle. Contact and trigger events, raycasts and point queries |
 | Scripts | `script.h` | The Script component. BrontoScript is interpreted from `.bs` files, re-read when they change, with a garbage-collected heap. Errors give a file and line and stop only that script. C behaviours can be registered by name |
-| Assets | `assets.h` | Image and sound cache: each file is loaded once, at a stable address, with relative paths resolved against the project folder (the nearest folder holding `project.bronto`, else the scene's own). Forgetting a sound silences it first |
+| Assets | `assets.h` | Image and sound cache: each file is loaded once, at a stable address, with relative paths resolved against the project folder (the nearest folder holding `project.bronto`, else the scene's own). Forgetting a sound silences it first. Project settings (`br_project`: name, main scene, screen size, strict typing) live in `project.bronto` |
+| Packs | `pack.h` | A project folder in one file, or added to the end of a program (a built game). Once mounted, `br_file_read_all` finds files in it first, so the asset cache, scenes and scripts need no changes |
 | File system | `fs.h` | List folders (folders first, sorted), stat, make folders, rename without overwriting, remove; path string helpers. POSIX and Win32 backends in the platform layer |
-| GUI | `ui.h` | Immediate-mode widgets: buttons, checkboxes, number fields you drag or type into, vec2 and colour fields, text fields, drop-downs, list rows, collapsible sections, scrolling panels, clickable custom-drawn areas with double-click, and drag and drop. The editor uses it, and so can games |
+| Output capture | `capture.h` | Redirects the program's own stdout and stderr into a buffer it reads back each frame (the editor's console), optionally still echoing to the terminal. Pipes plus a reader thread, in POSIX and Win32 backends in the platform layer; not available on the web |
+| GUI | `ui.h` | Immediate-mode widgets: buttons, checkboxes, number fields you drag or type into, vec2 and colour fields, text fields, drop-downs, list rows, collapsible sections, scrolling panels, clickable custom-drawn areas with double-click, drag and drop, and right-click context menus (submenus, ticks, shortcuts, keyboard navigation). The editor uses it, and so can games |
 | Engine | `engine.h` | Fixed-timestep loop, frame limiter, per-frame arena; `br_engine_frame()` runs one frame at a time so a browser can drive the loop |
 
 ## Gamepads
@@ -330,7 +376,7 @@ networking and golden-image tests practical. Two rules keep it that way:
 
 ## Roadmap
 
-1. Web backend (Emscripten, canvas, WebAudio, Gamepad API)
+1. Web backend (Emscripten, canvas, WebAudio, Gamepad API), and Web in the Build menu
 2. PNG decoder, sprite sheets and animation, tilemaps
 3. Joints, one-way platforms and continuous collision for fast bodies; a script debugger
 4. Editor: multi-select, copy/paste between scenes, nested prefabs that update, game-specific components

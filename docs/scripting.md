@@ -31,6 +31,7 @@ Only two things can appear at the top level of a file:
   starting values for one entity, for example `speed = 120, name = "Rex", wrap = true`
   (only literal values: numbers, strings, `true`/`false`/`nil`, `vec2(x, y)`).
 - `func name(a, b) { ... }` declares a function.
+- `@strict`, on the first line only, makes types required (see [Types](#types)).
 
 `#` starts a comment. Statements end at the end of the line, or at a `;`.
 
@@ -119,7 +120,7 @@ lerp(a, b, t)` (numbers or vec2s), `sin cos` (degrees), `atan2(y, x)` (degrees),
 (degrees), `from_angle(degrees, length)`.
 
 **Text:** `str(v)`, `num("12")` (nil if it isn't a number), `print(...)` (to the log, and the
-editor's status bar), `rgb(r, g, b[, a])` (a colour string).
+editor's console and status bar), `rgb(r, g, b[, a])` (a colour string).
 
 **Lists:** `len(x) push(list, v) pop(list) remove(list, index) contains(list, v)
 range(n) range(a, b[, step])`.
@@ -140,6 +141,9 @@ range(n) range(a, b[, step])`.
 - `send(e, "function", args...)` calls a function on another entity's script if it has one,
   and quietly does nothing if not.
 - `play_sound("sfx/jump.wav"[, volume])`.
+- `load_scene("levels/2.scene")` ends this scene and starts that one (after this step).
+  `quit()` ends the game. In the editor's Play, load_scene shows the other scene until Stop,
+  and quit stops playing.
 
 **Physics:**
 - `apply_force(e, force[, point])` pushes over the next step. `apply_impulse(e, impulse[, point])`
@@ -148,12 +152,64 @@ range(n) range(a, b[, step])`.
   on the line, or nil.
 - `entity_at(point)` returns the collider at a point, or nil.
 
+## Types
+
+Types are optional. Write them, and the script is checked before it runs:
+
+```
+var speed: number = 90        # a number
+var lives: int = 3            # a whole number
+var name: string              # no value: it starts as "" (see below)
+var spot := vec2(1, 2)        # := takes the value's type: spot is a vec2
+var path: list[vec2]          # a list of vec2s
+
+func hit(amount: int, from: entity) -> bool { ... }
+func update(dt: number) -> void { ... }     # -> void: returns nothing
+for i: int in 10 { ... }
+```
+
+| Type | Holds | Starts as |
+|---|---|---|
+| `number` (or `float`) | any number | `0` |
+| `int` | a whole number | `0` |
+| `string` | text | `""` |
+| `bool` | `true` or `false` | `false` |
+| `vec2` | a vector | `vec2(0, 0)` |
+| `list`, `list[T]` | a list (of T) | `[]` |
+| `entity` | an entity, or nil | `nil` |
+| `any` | anything (checked only when it runs) | `nil` |
+| `void` | only after `->`: the function returns nothing | |
+
+`3` is an int and `3.0` or `1.5` a number. `+ - * %` of ints give an int, `/` always gives a
+number, and `floor ceil round len sign` give ints. An int fits where a number is wanted, but
+not the other way round (`floor()` or `round()` make a number whole). `nil` fits only an
+entity (or `any`).
+
+Before the script runs, the checker finds: values that don't fit a variable, parameter or
+result (`speed is a number, so it can't hold a string`), functions that don't always return,
+`return` with a value from a `-> void` function, operators on the wrong types (`"a" - 1`),
+wrong argument types for the built-in functions (`key_down(3)`) and the engine's callbacks
+(`update(dt: string)`), and properties that don't exist (`v.z` on a vec2). It knows the types
+of literals, of typed names, of the built-in functions' results and of entity properties
+(`self.position` is a vec2, `self.x` a number).
+
+What isn't known until the game runs - an untyped variable, another script's variable, a
+component's field - is checked when it is stored into a typed variable, parameter or
+result: `hp is an int, and 2.5 isn't a whole number`. Untyped code works as it always did.
+
+**Strict typing:** `@strict` on the first line of a file makes types required: every `var`
+needs a type or `:=`, every parameter a type, and every function a `->` result (`-> void`
+when it returns nothing). Loop variables take their type from what they loop over. To make
+every script in a project strict, set **Strict typing** in the editor's **Build > Project
+Settings** (`strict_typing = true` in `project.bronto`); `bscheck --strict` does the same
+from the command line.
+
 ## Errors
 
 A mistake stops only the script that made it. The rest of the game keeps running, and
 the error is reported once with the file and line, for example
 `player.bs:12: unknown name 'speeed' (declare it with var)`. The editor shows it in the
-status bar while playing. Mistakes the parser can find (unknown names and functions,
+status bar and the console while playing (double-click it there to open the script at that line). Mistakes the parser can find (unknown names and functions,
 wrong argument counts, missing braces) are reported before the script runs, and the
 editor's asset preview shows them as soon as you save the file. A loop that never ends
 is stopped after a few million steps.

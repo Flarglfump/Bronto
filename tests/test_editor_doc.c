@@ -1,4 +1,4 @@
-/* Tests: the editor's document model (tools/editor/doc.c). */
+/* Tests: the editor's document model (tools/editor/doc.c) and console lines (console.c). */
 #include "test.h"
 #include "editor.h"
 #include <string.h>
@@ -230,8 +230,93 @@ static void test_doc_tree(void) {
     ed_doc_destroy(&D);
 }
 
+
+/* Copy and paste: a subtree as text, back at a point or under a parent. */
+static void test_doc_copy_paste(void) {
+    br_entity a, kid, b;
+    char *text, name[64];
+    int n;
+    ed_doc_init(&D);
+    a = ed_doc_create(&D, "A", br_v2(100, 50));
+    kid = ed_doc_create_child(&D, a, "Kid", br_v2(10, 0));
+    b = ed_doc_create(&D, "B", br_v2(0, 0));
+    text = ed_doc_copy(&D, kid);                              /* a child: copied as a root, where it is */
+    CHECK(text && strstr(text, "Kid") && !strstr(text, "\"A\""));
+    n = ed_doc_paste(&D, text, NULL, BR_ENTITY_NULL);
+    CHECK_EQ_INT(n, 1);
+    CHECK(br_parent_of(&D.world, D.selected) == BR_ENTITY_NULL);
+    CHECK_NEAR(br_world_transform(&D.world, D.selected).position.x, 110, 1e-3);
+    br_free(text);
+    text = ed_doc_copy(&D, a);                                /* with its subtree */
+    n = ed_doc_paste(&D, text, &(br_vec2){ 0, 200 }, b);      /* at a point, under B */
+    CHECK_EQ_INT(n, 2);
+    CHECK(br_parent_of(&D.world, D.selected) == b && strcmp(ed_doc_name(&D, D.selected, name, sizeof(name)), "A") == 0);
+    CHECK_NEAR(br_world_transform(&D.world, D.selected).position.y, 200, 1e-3);
+    CHECK_EQ_INT(D.count, 6);
+    CHECK(br_world_transform(&D.world, D.order[ed_doc_index(&D, D.selected) + 1]).position.x - br_world_transform(&D.world, D.selected).position.x > 9.9f);
+    CHECK(ed_doc_paste(&D, "this is not a scene", NULL, BR_ENTITY_NULL) < 0 && D.error[0]);
+    br_free(text);
+    ed_doc_destroy(&D);
+}
+
+/* The console's lines (console.c). */
+static ed_console CON;
+
+static void test_console_lines(void) {
+    const ed_con_line *l;
+    char file[64];
+    int line = 0, i;
+    memset(&CON, 0, sizeof(CON));
+    ed_console_feed(&CON, BR_STREAM_STDOUT, "hel", 3, 0);
+    CHECK_EQ_INT(CON.count, 0);                               /* not a whole line yet */
+    ed_console_feed(&CON, BR_STREAM_STDOUT, "lo\nwor", 6, 0.1);
+    CHECK_EQ_INT(CON.count, 1);
+    CHECK(strcmp(ed_console_line(&CON, 0)->text, "hello") == 0 && ed_console_line(&CON, 0)->kind == ED_CON_OUT);
+    ed_console_flush(&CON, 0.2, 0.25);
+    CHECK_EQ_INT(CON.count, 1);                               /* "wor" waits a little... */
+    ed_console_flush(&CON, 0.5, 0.25);
+    CHECK(CON.count == 2 && strcmp(ed_console_line(&CON, 1)->text, "wor") == 0);   /* ...then shows */
+
+    ed_console_feed(&CON, BR_STREAM_STDERR, "[ERROR] script.c:960: script: scripts/player.bs:12: oops\r\n", 58, 1);
+    l = ed_console_line(&CON, 2);
+    CHECK(l && l->kind == ED_CON_ERROR && l->level == ED_LEVEL_ERROR && strcmp(l->text, "scripts/player.bs:12: oops") == 0);
+    CHECK(l && ed_console_location(l->text, file, sizeof(file), &line) && strcmp(file, "scripts/player.bs") == 0 && line == 12);
+    CHECK(ed_console_location("error in (enemy.bs:3) here", file, sizeof(file), &line) && strcmp(file, "enemy.bs") == 0 && line == 3);
+    CHECK(!ed_console_location("no.bsx:3 or a.bs: here", file, sizeof(file), &line));
+    ed_console_feed(&CON, BR_STREAM_STDERR, "[INFO ] engine.c:1: ready\n", 26, 1);
+    CHECK(ed_console_line(&CON, 3)->kind == ED_CON_INFO && strcmp(ed_console_line(&CON, 3)->text, "ready") == 0);
+    ed_console_add(&CON, ED_CON_ERR, "the device failed to open", 1);
+    ed_console_add(&CON, ED_CON_ERR, "Warning: slow disk\nplain stderr", 1);
+    CHECK(ed_console_line(&CON, 4)->level == ED_LEVEL_ERROR && ed_console_line(&CON, 5)->level == ED_LEVEL_WARN &&
+          ed_console_line(&CON, 6)->level == ED_LEVEL_LOG);
+    for (i = 0; i < 3; ++i) ed_console_add(&CON, ED_CON_PRINT, "tick", 2);   /* the same again: counted */
+    CHECK(CON.count == 8 && ed_console_line(&CON, 7)->repeat == 3);
+    CHECK_EQ_INT(CON.level_count[ED_LEVEL_ERROR], 2);
+    CHECK_EQ_INT(CON.level_count[ED_LEVEL_LOG], 2 + 1 + 1 + 3);    /* hello, wor, ready, plain, tick x3 */
+    for (i = 0; i < ED_CONSOLE_LINES + 5; ++i) {             /* full: the oldest go */
+        char t[32];
+        snprintf(t, sizeof(t), "line %d", i);
+        ed_console_add(&CON, ED_CON_OUT, t, 3);
+    }
+    CHECK_EQ_INT(CON.count, ED_CONSOLE_LINES);
+    CHECK(strcmp(ed_console_line(&CON, 0)->text, "line 5") == 0);
+    CHECK_EQ_INT(CON.level_count[ED_LEVEL_ERROR] + CON.level_count[ED_LEVEL_WARN] + CON.level_count[ED_LEVEL_LOG], ED_CONSOLE_LINES);
+    {
+        char longer[600];                                     /* a very long line is broken up */
+        for (i = 0; i < (int)sizeof(longer) - 1; ++i) longer[i] = (char)('a' + i % 26);
+        longer[sizeof(longer) - 1] = '\n';
+        ed_console_clear(&CON);
+        ed_console_feed(&CON, BR_STREAM_STDOUT, longer, sizeof(longer), 4);
+        CHECK(CON.count == 4 && strlen(ed_console_line(&CON, 0)->text) == ED_CONSOLE_TEXT - 1);
+    }
+    ed_console_clear(&CON);
+    CHECK(CON.count == 0 && CON.level_count[0] == 0 && ed_console_line(&CON, 0) == NULL);
+}
+
 void suite_editor_doc(void) {
     RUN(test_doc_tree);
+    RUN(test_doc_copy_paste);
+    RUN(test_console_lines);
     RUN(test_doc_prefabs);
     RUN(test_doc_project_root);
     RUN(test_doc_create_order_delete);

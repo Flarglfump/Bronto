@@ -9,6 +9,8 @@
 #include "types.h"
 #include "memory.h"
 #include "fs.h"
+#include "capture.h"
+#include "pack.h"
 #include "log.h"
 #include "bmath.h"
 #include "event.h"

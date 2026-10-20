@@ -713,11 +713,65 @@ static bool w32_launch(const char *command_line) {
     return true;
 }
 
+/* ---- clipboard ------------------------------------------------------------------- */
+
+/* Another program may have the clipboard open for a moment: try a few times. */
+static bool w32_open_clipboard(void) {
+    int i;
+    for (i = 0; i < 10; ++i) {
+        if (OpenClipboard(W.hwnd)) return true;
+        Sleep(5);
+    }
+    return false;
+}
+
+static bool w32_clipboard_set(const char *text) {
+    size_t len = strlen(text), extra = 0, i, j = 0;
+    char *crlf;
+    int n;
+    HGLOBAL mem;
+    wchar_t *wide;
+    for (i = 0; i < len; ++i) if (text[i] == '\n' && (i == 0 || text[i - 1] != '\r')) ++extra;
+    if (!(crlf = (char *)br_alloc(len + extra + 1))) return false;
+    for (i = 0; i < len; ++i) {                          /* Windows text has \r\n line ends */
+        if (text[i] == '\n' && (i == 0 || text[i - 1] != '\r')) crlf[j++] = '\r';
+        crlf[j++] = text[i];
+    }
+    crlf[j] = 0;
+    n = MultiByteToWideChar(CP_UTF8, 0, crlf, -1, NULL, 0);
+    mem = n > 0 ? GlobalAlloc(GMEM_MOVEABLE, (SIZE_T)n * sizeof(wchar_t)) : NULL;
+    if (!mem || !(wide = (wchar_t *)GlobalLock(mem))) { if (mem) GlobalFree(mem); br_free(crlf); return false; }
+    MultiByteToWideChar(CP_UTF8, 0, crlf, -1, wide, n);
+    GlobalUnlock(mem);
+    br_free(crlf);
+    if (!w32_open_clipboard()) { GlobalFree(mem); return false; }
+    EmptyClipboard();
+    if (!SetClipboardData(CF_UNICODETEXT, mem)) { GlobalFree(mem); CloseClipboard(); return false; }
+    CloseClipboard();                                    /* the clipboard owns `mem` now */
+    return true;
+}
+
+static char *w32_clipboard_get(void) {
+    HANDLE h;
+    const wchar_t *wide;
+    char *out = NULL;
+    if (!IsClipboardFormatAvailable(CF_UNICODETEXT) || !w32_open_clipboard()) return NULL;
+    h = GetClipboardData(CF_UNICODETEXT);
+    if (h && (wide = (const wchar_t *)GlobalLock(h)) != NULL) {
+        int n = WideCharToMultiByte(CP_UTF8, 0, wide, -1, NULL, 0, NULL, NULL);
+        if (n > 0 && (out = (char *)br_alloc((size_t)n)) != NULL) WideCharToMultiByte(CP_UTF8, 0, wide, -1, out, n, NULL, NULL);
+        GlobalUnlock(h);
+    }
+    CloseClipboard();
+    return out;                                          /* (br_clipboard_get turns \r\n into \n) */
+}
+
 static const br_platform k_win32 = {
     "win32", w32_init, w32_shutdown, w32_poll, w32_present, w32_time, w32_sleep,
     w32_audio_wanted, w32_audio_submit,
     w32_get_window_size, w32_get_window_scale, w32_set_title, w32_set_window_size,
     w32_set_fullscreen, w32_set_cursor_visible, w32_set_icon, w32_pick_folder, w32_open_path, w32_launch,
+    w32_clipboard_set, w32_clipboard_get,
     w32_set_gamepad_rumble,
     NULL
 };

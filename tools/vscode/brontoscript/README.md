@@ -11,15 +11,21 @@ Editing support for Bronto engine scripts (`.bs` files):
   - after a `.`: entity properties (`position`, `global_position`, `velocity`, `parent`...),
     components, and other scripts' variables and functions,
   - after `self.Collider.`: that component's fields,
-  - at the top of a file: the callbacks the script doesn't define yet.
-- **Hover** documentation for built-ins, keywords, properties and your own functions and
-  variables (the `#` comment above a declaration is its documentation).
+  - at the top of a file: the callbacks the script doesn't define yet (typed:
+    `func update(dt: number) -> void`),
+  - after `:` and `->`: the types (`number`, `int`, `string`, `bool`, `vec2`, `list`,
+    `list[T]`, `entity`, `any`, `void`), and `@strict`.
+- **Hover** documentation for built-ins (with their parameter and result types), keywords,
+  types, properties and your own functions and variables, with their declared types (the `#`
+  comment above a declaration is its documentation).
 - **Signature help** while you type a function's arguments.
 - **Go to definition** for functions and variables, including functions in other scripts
   in the workspace, plus an **outline** of the file.
 - **Error checking as you type.** The checker is `bscheck`, built with the engine, so it
   finds exactly what Bronto finds before running a script: syntax errors, unknown names and
-  functions, and wrong argument counts. Without it, quick checks still catch unknown
+  functions, wrong argument counts and type mistakes (`speed is a number, so it can't hold
+  a string`). In a project whose `project.bronto` has `strict_typing = true`, every script is
+  checked as strict, like the engine does. Without it, quick checks still catch unknown
   functions, unbalanced brackets and code outside functions.
 - **Snippets:** `func`, `var`, `if`, `ifelse`, `for`, `forn`, `while`, each callback,
   `move` and `onground`.

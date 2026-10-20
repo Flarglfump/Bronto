@@ -8,7 +8,14 @@
  * Shortcuts (Ctrl, or Cmd on a Mac):
  *   Ctrl+Shift+O load project   Ctrl+N new   Ctrl+O open   Ctrl+S save   Ctrl+Z undo   Ctrl+Y / Ctrl+Shift+Z redo
  *   Ctrl+D duplicate   Delete remove   F5 / Ctrl+P play / stop   F frame selection
+ *   Ctrl+B build the game for this computer   Ctrl+Shift+B build and run it
+ *   Ctrl+C / Ctrl+X / Ctrl+V copy, cut, paste entities (as scene text on the
+ *   system clipboard, so they paste into another editor too)   F2 rename
  *   G grid   arrows nudge (Shift: one grid step)   Esc deselect / stop
+ *   Right-click anything for a menu of what can be done with it (menus.c).
+ *
+ * stdout and stderr are captured into the Console tab (and still reach the
+ * terminal the editor was started from).
  *
  * The editor is one engine scene. Its own UI is drawn with br_ui; the
  * edited scene is a separate ECS world owned by the document (doc.c).
@@ -16,6 +23,7 @@
 #include "editor.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define TOOLBAR_H 28.0f
@@ -23,6 +31,7 @@
 #define HIERARCHY_W 200.0f
 #define INSPECTOR_W 300.0f
 #define ASSETS_H 196.0f
+#define TABS_H 22.0f
 #define PREVIEW_W 230.0f
 
 static editor ED;
@@ -30,19 +39,21 @@ static const char *g_open_path;
 
 /* ---- layout ---------------------------------------------------------------- */
 
-typedef struct layout { br_rect screen, toolbar, hierarchy, view, assets, preview, inspector, status; } layout;
+typedef struct layout { br_rect screen, toolbar, hierarchy, view, tabs, assets, preview, console, inspector, status; } layout;
 
 static layout make_layout(const br_engine *e) {
     layout l;
     float w = (float)e->framebuffer.width, h = (float)e->framebuffer.height, mid = h - TOOLBAR_H - STATUS_H;
-    float centre_w = w - HIERARCHY_W - INSPECTOR_W, view_h = mid - ASSETS_H;
+    float centre_w = w - HIERARCHY_W - INSPECTOR_W, view_h = mid - ASSETS_H - TABS_H, bottom = TOOLBAR_H + view_h + TABS_H;
     l.screen = br_rect_make(0, 0, w, h);
     l.toolbar = br_rect_make(0, 0, w, TOOLBAR_H);
     l.hierarchy = br_rect_make(0, TOOLBAR_H, HIERARCHY_W, mid);
     l.inspector = br_rect_make(w - INSPECTOR_W, TOOLBAR_H, INSPECTOR_W, mid);
     l.view = br_rect_make(HIERARCHY_W + 1, TOOLBAR_H + 1, centre_w - 2, view_h - 2);
-    l.assets = br_rect_make(HIERARCHY_W, TOOLBAR_H + view_h, centre_w - PREVIEW_W - 1, ASSETS_H);
-    l.preview = br_rect_make(HIERARCHY_W + centre_w - PREVIEW_W, TOOLBAR_H + view_h, PREVIEW_W, ASSETS_H);
+    l.tabs = br_rect_make(HIERARCHY_W, TOOLBAR_H + view_h, centre_w, TABS_H);
+    l.assets = br_rect_make(HIERARCHY_W, bottom, centre_w - PREVIEW_W - 1, ASSETS_H);
+    l.preview = br_rect_make(HIERARCHY_W + centre_w - PREVIEW_W, bottom, PREVIEW_W, ASSETS_H);
+    l.console = br_rect_make(HIERARCHY_W, bottom, centre_w, ASSETS_H);
     l.status = br_rect_make(0, h - STATUS_H, w, STATUS_H);
     return l;
 }
@@ -53,17 +64,32 @@ static void shortcuts(editor *ed) {
     const br_input *in = &ed->engine->input;
     bool cmd = (in->mods & (BR_MOD_CONTROL | BR_MOD_SUPER)) != 0, shift = (in->mods & BR_MOD_SHIFT) != 0;
     float step;
-    if (br_ui_wants_keyboard(&ed->ui) || ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible) return;   /* typing, or a dialog */
+    if (br_ui_wants_keyboard(&ed->ui) || br_ui_menu_active(&ed->ui) ||                /* typing, a menu, or a dialog */
+        ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible) return;
     if (ed->doc.playing) {                         /* the game has the keyboard: only Stop */
         if (br_key_pressed(in, BR_KEY_F5) || br_key_pressed(in, BR_KEY_ESCAPE) || (cmd && br_key_pressed(in, BR_KEY_P))) ed_cmd_play(ed);
         return;
     }
     if (cmd && br_key_pressed(in, BR_KEY_N)) ed_cmd_new(ed);
+    if (cmd && br_key_pressed(in, BR_KEY_B)) ed_cmd_build(ed, ed_host_target(), shift);
     if (cmd && br_key_pressed(in, BR_KEY_O)) { if (shift) ed_cmd_load_project(ed); else ed_cmd_open(ed); }
     if (cmd && br_key_pressed(in, BR_KEY_S)) ed_cmd_save(ed);
     if (cmd && br_key_pressed(in, BR_KEY_Z)) { if (shift) ed_cmd_redo(ed); else ed_cmd_undo(ed); }
     if (cmd && br_key_pressed(in, BR_KEY_Y)) ed_cmd_redo(ed);
     if (cmd && br_key_pressed(in, BR_KEY_D)) ed_cmd_duplicate(ed);
+    if (cmd && br_key_pressed(in, BR_KEY_C)) {
+        layout l = make_layout(ed->engine);                 /* over the console: its selected line */
+        br_vec2 m = br_v2(in->mouse_x, in->mouse_y);
+        if (ed->bottom_tab == ED_TAB_CONSOLE && ed->console_selected >= 0 && m.x >= l.console.x && m.y >= l.console.y &&
+            m.x < l.console.x + l.console.w && m.y < l.console.y + l.console.h) ed_console_copy(ed, ed->console_selected);
+        else ed_cmd_copy(ed);
+    }
+    if (cmd && br_key_pressed(in, BR_KEY_X)) ed_cmd_cut(ed);
+    if (cmd && br_key_pressed(in, BR_KEY_V)) {                 /* next to the selection, as its sibling */
+        br_entity sel = ed->doc.selected;
+        ed_cmd_paste(ed, NULL, br_entity_alive(&ed->doc.world, sel) ? br_parent_of(&ed->doc.world, sel) : BR_ENTITY_NULL);
+    }
+    if (br_key_pressed(in, BR_KEY_F2)) ed_cmd_rename(ed);
     if (br_key_pressed(in, BR_KEY_F5) || (cmd && br_key_pressed(in, BR_KEY_P))) ed_cmd_play(ed);
     if (br_key_pressed(in, BR_KEY_DELETE) || (!cmd && br_key_pressed(in, BR_KEY_BACKSPACE))) ed_cmd_delete(ed);
     if (!cmd && br_key_pressed(in, BR_KEY_F)) ed_cmd_frame(ed);
@@ -92,12 +118,26 @@ static void update_title(editor *ed) {
 
 /* ---- the editor scene ---------------------------------------------------------- */
 
+static bool ui_clip_set(void *engine, const char *text) { return br_clipboard_set((br_engine *)engine, text); }
+static char *ui_clip_get(void *engine) { return br_clipboard_get((br_engine *)engine); }
+
 static bool editor_enter(br_scene *s) {
     editor *ed = &ED;
     ed->engine = s->engine;
     br_ui_init(&ed->ui);
     ed_view_init(&ed->view);
+    {   /* text fields copy and paste with the system clipboard */
+        br_ui_clipboard cb;
+        cb.set = ui_clip_set;
+        cb.get = ui_clip_get;
+        cb.user = ed->engine;
+        br_ui_set_clipboard(&ed->ui, &cb);
+    }
     ed->show_colliders = true;
+    ed->console_show[ED_LEVEL_LOG] = ed->console_show[ED_LEVEL_WARN] = ed->console_show[ED_LEVEL_ERROR] = true;
+    ed->console_selected = -1;
+    if (!ed->console_capturing)
+        ed_console_add(&ed->console, ED_CON_INFO, "Output capture isn't available here: only script print() shows up.", 0);
     ed_prefs_load(ed);
     ed_doc_init(&ed->doc);
     ed->doc.world.context = ed->engine;              /* Sound components play while playing */
@@ -130,6 +170,8 @@ static void editor_exit(br_scene *s) {
     ed_picker_close(&ED);
     ed_doc_destroy(&ED.doc);
     br_image_destroy(&ED.badge);
+    br_free(ED.clipboard);
+    ED.clipboard = NULL;
 }
 
 static void editor_fixed(br_scene *s, float dt) {
@@ -144,8 +186,20 @@ static void editor_update(br_scene *s, float dt) {
     /* Between interactions, record an undo step if anything changed. */
     if (ed->ui.active == 0 && !br_ui_wants_keyboard(&ed->ui) && ed->view.drag == ED_DRAG_NONE)
         ed_doc_checkpoint(&ed->doc);
+    ed_console_poll(ed);
     shortcuts(ed);
     update_title(ed);
+    if (ed->doc.playing) {                          /* what the game's scripts asked for */
+        char next[ED_PATH_MAX], full[ED_PATH_MAX * 2];
+        if (br_script_quit_request(&ed->doc.world)) {
+            ed_cmd_play(ed);
+            ed_status(ed, "The game called quit(): stopped playing");
+        } else if (br_script_scene_request(&ed->doc.world, next, sizeof(next))) {
+            snprintf(full, sizeof(full), "%s%s", br_assets_root(), next);
+            if (ed_doc_switch_scene(&ed->doc, full)) ed_status(ed, "load_scene(\"%s\") - Stop goes back to the scene you were editing", next);
+            else ed_status(ed, "load_scene(\"%s\"): %s", next, ed->doc.error);
+        }
+    }
     if (ed->doc.playing && br_script_error_count(&ed->doc.world) != ed->script_errors_seen) {   /* a script broke */
         ed->script_errors_seen = br_script_error_count(&ed->doc.world);
         ed_status(ed, "Script error: %s", br_script_last_error(&ed->doc.world));
@@ -158,17 +212,25 @@ static void editor_render(br_scene *s) {
     br_engine *e = s->engine;
     layout l = make_layout(e);
     br_ui_begin(&ed->ui, &e->renderer, &e->input, e->time);
-    br_ui_set_disabled(&ed->ui, ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible);
+    br_ui_set_disabled(&ed->ui, ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible);
     ed_view_frame(ed, l.view);
     ed_toolbar(ed, l.toolbar);
     ed_hierarchy(ed, l.hierarchy);
     ed_inspector(ed, l.inspector);
-    ed_assets_panel(ed, l.assets);
-    ed_assets_preview(ed, l.preview);
+    ed_bottom_tabs(ed, l.tabs);
+    if (ed->bottom_tab == ED_TAB_CONSOLE) {
+        ed_console_panel(ed, l.console);
+    } else {
+        ed_assets_panel(ed, l.assets);
+        ed_assets_preview(ed, l.preview);
+    }
     ed_statusbar(ed, l.status);
+    if (ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible) br_ui_menu_close(&ed->ui);
+    else ed_menus(ed);                                      /* the open right-click menu (drawn on top) */
     ed_dialog(ed, l.screen);
     ed_picker_dialog(ed, l.screen);
     ed_settings_dialog(ed, l.screen);
+    ed_project_dialog(ed, l.screen);
     br_ui_set_disabled(&ed->ui, false);
     br_ui_end(&ed->ui);
 }
@@ -226,6 +288,196 @@ static void inject_move(float x, float y) { br_event m = br_event_mouse_move(x, 
 static void inject_button(bool down, float x, float y) {
     br_event b = br_event_mouse_button(down ? BR_EVENT_MOUSE_BUTTON_DOWN : BR_EVENT_MOUSE_BUTTON_UP, BR_MOUSE_LEFT, x, y);
     br_headless_inject(&b);
+}
+
+static void inject_right_click(float x, float y) {
+    br_event m = br_event_mouse_move(x, y, 1, 1);
+    br_event d = br_event_mouse_button(BR_EVENT_MOUSE_BUTTON_DOWN, BR_MOUSE_RIGHT, x, y);
+    br_event u = br_event_mouse_button(BR_EVENT_MOUSE_BUTTON_UP, BR_MOUSE_RIGHT, x, y);
+    br_headless_inject(&m);
+    br_headless_inject(&d);
+    br_headless_inject(&u);
+}
+
+/* Clicks the open menu's item called `label` (items are a row + 2 high, separators 7). */
+static bool menu_click(br_engine *e, const char *label) {
+    const br_ui *ui = &ED.ui;
+    float y = ui->menu.rect.y + 1;
+    int k;
+    for (k = 0; k < ui->menu.count; ++k) {
+        const br_ui_menu_entry *it = &ui->menu.items[k];
+        float h = it->label[0] ? ui->style.row + 2 : 7.0f;
+        if (it->parent != -1) continue;
+        if (strcmp(it->label, label) == 0) {
+            inject_click(ui->menu.rect.x + 30, y + h / 2);
+            frames(e, 3);
+            return true;
+        }
+        y += h;
+    }
+    return false;
+}
+
+/* Right-click menus, copy and paste, the console. */
+static int test_menus_console(br_engine *e) {
+    editor *ed = &ED;
+    int failures = 0, i;
+    uint32_t before = ed->doc.count;
+    br_entity ball = ed->doc.order[3];
+    /* a hierarchy row: its menu, then Duplicate */
+    ed->doc.selected = BR_ENTITY_NULL;
+    inject_right_click(60, HIER_ROW_Y(3));
+    frames(e, 2);
+    if (!br_ui_menu_is_open(&ed->ui, "entity") || ed->doc.selected != ball) { printf("FAIL: right-clicking a row didn't open its menu\n"); ++failures; }
+    br_image_save_bmp(&e->framebuffer, "editor_menu.bmp");
+    if (!menu_click(e, "Duplicate") || ed->doc.count != before + 1 || br_ui_menu_active(&ed->ui))
+        { printf("FAIL: Duplicate from the menu (%u entities)\n", ed->doc.count); ++failures; }
+    ed_cmd_undo(ed);
+    frames(e, 2);
+    /* Add Component, from its submenu */
+    ball = ed->doc.order[3];                                  /* (undo rebuilt the entities) */
+    inject_right_click(60, HIER_ROW_Y(3));
+    frames(e, 2);
+    {
+        int k, sub = -1, item = -1;
+        for (k = 0; k < ed->ui.menu.count; ++k) {
+            if (strcmp(ed->ui.menu.items[k].label, "Add Component") == 0) sub = k;
+            if (sub >= 0 && ed->ui.menu.items[k].parent == sub && strcmp(ed->ui.menu.items[k].label, "Label") == 0) item = k;
+        }
+        if (sub < 0 || item < 0) { printf("FAIL: no Add Component > Label in the menu\n"); ++failures; }
+        else {
+            float y = ed->ui.menu.rect.y + 1;
+            for (k = 0; k < sub; ++k) if (ed->ui.menu.items[k].parent == -1) y += ed->ui.menu.items[k].label[0] ? 18.0f : 7.0f;
+            inject_move(ed->ui.menu.rect.x + 30, y + 9);         /* hover: the submenu opens */
+            frames(e, 2);
+            y = ed->ui.menu.sub_rect.y + 1;
+            for (k = sub + 1; k < item; ++k) if (ed->ui.menu.items[k].parent == sub) y += 18.0f;
+            inject_move(ed->ui.menu.sub_rect.x + 30, y + 9);
+            frames(e, 1);
+            br_image_save_bmp(&e->framebuffer, "editor_submenu.bmp");
+            inject_click(ed->ui.menu.sub_rect.x + 30, y + 9);
+            frames(e, 3);
+            if (!br_has(&ed->doc.world, ball, ed->doc.ids.label)) { printf("FAIL: Add Component from the submenu\n"); ++failures; }
+        }
+    }
+    ed_cmd_undo(ed);
+    frames(e, 2);
+    ball = ed->doc.order[3];
+    /* copy, then paste into empty space in the scene view */
+    ed->doc.selected = ball;
+    ed_cmd_copy(ed);
+    {   /* copied entities are scene text on the system clipboard */
+        char *text = br_clipboard_get(e);
+        if (!text || strncmp(text, "# Bronto scene", 14) != 0 || !strstr(text, "Ball")) { printf("FAIL: copying an entity didn't put it on the clipboard\n"); ++failures; }
+        br_free(text);
+    }
+    {
+        br_vec2 at = br_v2(ed->view.rect.x + 14, ed->view.rect.y + 40), world = ed_view_to_world(&ed->view, at);
+        if (ed_doc_pick(&ed->doc, world) != BR_ENTITY_NULL) { printf("FAIL: (test) the view's corner isn't empty\n"); ++failures; }
+        before = ed->doc.count;
+        inject_right_click(at.x, at.y);
+        frames(e, 2);
+        if (!br_ui_menu_is_open(&ed->ui, "view")) { printf("FAIL: right-clicking empty space didn't open the view menu\n"); ++failures; }
+        if (!menu_click(e, "Paste Here") || ed->doc.count != before + 1 ||
+            br_v2_dist(br_world_transform(&ed->doc.world, ed->doc.selected).position, world) > 0.5f)
+            { printf("FAIL: Paste Here\n"); ++failures; }
+        ed_cmd_paste(ed, NULL, ball);                         /* as a child */
+        if (br_parent_of(&ed->doc.world, ed->doc.selected) != ball) { printf("FAIL: paste as a child\n"); ++failures; }
+        frames(e, 2);
+        ed_cmd_undo(ed);
+        ed_cmd_undo(ed);
+        frames(e, 2);
+    }
+    /* components: copy values from one, paste them on another, reset */
+    {
+        br_entity a = ed->doc.order[3], b = ed->doc.order[4];
+        br_shape *sa = (br_shape *)br_get(&ed->doc.world, a, ed->doc.ids.shape), *sb = (br_shape *)br_get(&ed->doc.world, b, ed->doc.ids.shape);
+        if (!sa || !sb || !ed_component_copy(ed, a, ed->doc.ids.shape) || !ed_component_paste(ed, b, ed->doc.ids.shape) ||
+            sb->kind != sa->kind || sb->color.r != sa->color.r || sb->size.x != sa->size.x) { printf("FAIL: component copy / paste\n"); ++failures; }
+        if (sb) {
+            const br_shape *def = (const br_shape *)br_component_get_desc(&ed->doc.world, ed->doc.ids.shape)->defaults;
+            ed_component_reset(ed, b, ed->doc.ids.shape, -1);
+            if (def && (sb->size.x != def->size.x || sb->kind != def->kind)) { printf("FAIL: component reset\n"); ++failures; }
+        }
+        frames(e, 2);
+        ed_cmd_undo(ed);
+        frames(e, 2);
+    }
+    {   /* scene text copied elsewhere (another editor) pastes as entities */
+        char *text = ed_doc_copy(&ed->doc, ed->doc.order[2]), *at, renamed[8192];
+        char name[64];
+        if (text && (at = strstr(text, "Title")) != NULL && strlen(text) < sizeof(renamed) - 8) {
+            snprintf(renamed, sizeof(renamed), "%.*sFromAfar%s", (int)(at - text), text, at + 5);
+            br_clipboard_set(e, renamed);
+            before = ed->doc.count;
+            ed_cmd_paste(ed, NULL, BR_ENTITY_NULL);
+            if (ed->doc.count != before + 1 || strcmp(ed_doc_name(&ed->doc, ed->doc.selected, name, sizeof(name)), "FromAfar") != 0)
+                { printf("FAIL: pasting scene text from the clipboard\n"); ++failures; }
+            frames(e, 2);
+            ed_cmd_undo(ed);
+            frames(e, 2);
+        } else { printf("FAIL: (test) copying Title\n"); ++failures; }
+        br_free(text);
+    }
+    {   /* text fields paste from the clipboard: rename by pasting a name */
+        br_event k;
+        char name[64];
+        ed->doc.selected = ed->doc.order[3];
+        ed_cmd_rename(ed);
+        frames(e, 2);
+        br_clipboard_set(e, "Pasted Name\nignored");
+        k = br_event_key(BR_EVENT_KEY_DOWN, BR_KEY_V, BR_MOD_CONTROL, false); br_headless_inject(&k);
+        k = br_event_key(BR_EVENT_KEY_UP, BR_KEY_V, BR_MOD_CONTROL, false); br_headless_inject(&k);
+        frames(e, 1);
+        k = br_event_key(BR_EVENT_KEY_DOWN, BR_KEY_ENTER, 0, false); br_headless_inject(&k);
+        k = br_event_key(BR_EVENT_KEY_UP, BR_KEY_ENTER, 0, false); br_headless_inject(&k);
+        frames(e, 2);
+        if (strcmp(ed_doc_name(&ed->doc, ed->doc.order[3], name, sizeof(name)), "Pasted Name") != 0)
+            { printf("FAIL: pasting into the Name field (%s)\n", name); ++failures; }
+        ed_cmd_undo(ed);
+        frames(e, 2);
+    }
+    if (ed->doc.count != 7) { printf("FAIL: the menu tests left %u entities\n", ed->doc.count); ++failures; }
+    /* the console: what goes to stdout and stderr shows up, sorted by level */
+    ed_console_clear(&ed->console);
+    printf("hello from stdout\n");
+    fprintf(stderr, "[WARN ] fake.c:12: careful now\n");
+    {   /* (the reader thread is quick, but not instant: look for a while) */
+        const ed_con_line *out = NULL, *warn = NULL;
+        uint32_t k;
+        for (i = 0; i < 400 && (!out || !warn) && ed->console_capturing; ++i) {
+            frames(e, 1);
+            for (k = 0; k < ed->console.count; ++k) {
+                const ed_con_line *l = ed_console_line(&ed->console, k);
+                if (strcmp(l->text, "hello from stdout") == 0 && l->kind == ED_CON_OUT) out = l;
+                if (strcmp(l->text, "careful now") == 0 && l->level == ED_LEVEL_WARN) warn = l;
+            }
+        }
+        if (!ed->console_capturing) printf("note: output capture isn't available here\n");
+        else if (!out || !warn) { printf("FAIL: the console didn't get stdout and stderr (%u lines)\n", ed->console.count); ++failures; }
+    }
+    ed->bottom_tab = ED_TAB_CONSOLE;
+    frames(e, 2);
+    {
+        layout l = make_layout(e);
+        inject_right_click(l.console.x + 100, l.console.y + 24 + 6 + 6);   /* the first line */
+        frames(e, 2);
+        if (!br_ui_menu_is_open(&ed->ui, "console") || (ed->console.count && ed->console_selected < 0))
+            { printf("FAIL: the console's menu\n"); ++failures; }
+        br_image_save_bmp(&e->framebuffer, "editor_console.bmp");
+        if (ed->console.count && ed->console_selected >= 0) {         /* Copy Line */
+            const ed_con_line *first = ed_console_line(&ed->console, (uint32_t)ed->console_selected);
+            char *text;
+            menu_click(e, "Copy Line");
+            text = br_clipboard_get(e);
+            if (!text || strcmp(text, first->text) != 0) { printf("FAIL: copying a console line (%s)\n", text ? text : "nothing"); ++failures; }
+            br_free(text);
+        }
+        br_ui_menu_close(&ed->ui);
+    }
+    ed->bottom_tab = ED_TAB_FILES;
+    frames(e, 2);
+    return failures;
 }
 
 /* The middle of tile `i` in the asset browser (toolbar row, breadcrumb row, then tiles). */
@@ -352,6 +604,28 @@ static int test_assets(br_engine *e) {
         ed_cmd_play(ed);
         frames(e, 3);
         if (!strstr(ed->status, "broken.bs:2: unknown name 'speeed'")) { printf("FAIL: a script error wasn't shown (%s)\n", ed->status); ++failures; }
+        {   /* ... and it's in the console, as an error that leads to the script */
+            uint32_t k;
+            char file[ED_PATH_MAX];
+            int line = 0;
+            bool found = false;
+            for (i = 0; i < 300 && !found; ++i) {
+                frames(e, 1);
+                for (k = 0; k < ed->console.count && !found; ++k) {
+                    const ed_con_line *l = ed_console_line(&ed->console, k);
+                    found = l->level == ED_LEVEL_ERROR && strstr(l->text, "unknown name 'speeed'") &&
+                            ed_console_location(l->text, file, sizeof(file), &line) && line == 2;
+                }
+            }
+            if (ed->console_capturing && !found) { printf("FAIL: the script error isn't in the console\n"); ++failures; }
+            ed->prefs.script_editor[0] = 0;
+            if (!ed_open_script_named(ed, "broken.bs", 2) || !strstr(br_headless_last_opened(), "broken.bs"))
+                { printf("FAIL: opening a script named in a message (%s)\n", br_headless_last_opened()); ++failures; }
+            ed->bottom_tab = ED_TAB_CONSOLE;
+            frames(e, 2);
+            br_image_save_bmp(&e->framebuffer, "editor_console_error.bmp");
+            ed->bottom_tab = ED_TAB_FILES;
+        }
         br_image_save_bmp(&e->framebuffer, "editor_script_error.bmp");
         {   /* the chosen script editor is run with the file and the line of the mistake */
             ed_assets_select(ed, "scripts/broken.bs");
@@ -370,6 +644,14 @@ static int test_assets(br_engine *e) {
         }
         ed_cmd_play(ed);
         frames(e, 2);
+    }
+    {   /* a file's menu */
+        p = tile_center(e, 0);
+        inject_right_click(p.x, p.y);
+        frames(e, 2);
+        if (!br_ui_menu_is_open(&ed->ui, "asset") || !ed->assets.selected[0]) { printf("FAIL: right-clicking a file\n"); ++failures; }
+        br_ui_menu_close(&ed->ui);
+        frames(e, 1);
     }
     ed_assets_select(ed, "art/hero.tga");
     ed->doc.selected = ed->doc.order[0];
@@ -408,6 +690,98 @@ static int test_assets(br_engine *e) {
     ed_asset_path(ed, prefab, full, sizeof(full));
     if (ed->doc.count != 1 || strcmp(ed->doc.path, full) != 0) { printf("FAIL: opening a scene from the browser\n"); ++failures; }
     frames(e, 2);
+    return failures;
+}
+
+/* The Build menu: script checks, a game built from the test project, run headless; load_scene and quit in Play. */
+static int test_build(br_engine *e) {
+    editor *ed = &ED;
+    int failures = 0, scripts = 0, errors, i;
+    char out[1024], cmd[1200], player[1024];
+    br_project p;
+    uint32_t k;
+    bool found = false;
+    const char scene[] =
+        "bronto_scene 1\nentity\n  Name\n    text = \"Mover\"\n  Transform\n    position = 40 40\n"
+        "  Shape\n    size = 10 10\n  Script\n    file = \"scripts/mover.bs\"\n";
+    const char level2[] =
+        "bronto_scene 1\nentity\n  Name\n    text = \"A\"\nentity\n  Name\n    text = \"B\"\nentity\n  Name\n    text = \"C\"\n";
+    br_file_write_all("editor_project/main.scene", scene, sizeof(scene) - 1);
+    br_file_write_all("editor_project/level2.scene", level2, sizeof(level2) - 1);
+    p = ed->project;
+    snprintf(p.name, sizeof(p.name), "Test Game");
+    snprintf(p.main_scene, sizeof(p.main_scene), "main.scene");
+    if (!ed_project_save(ed, &p) || strcmp(ed->project.name, "Test Game") != 0) { printf("FAIL: saving project settings\n"); ++failures; }
+    /* the toolbar's Build menu */
+    inject_click(872, TOOLBAR_H / 2);
+    frames(e, 2);
+    if (!br_ui_menu_is_open(&ed->ui, "build")) { printf("FAIL: the Build button didn't open its menu\n"); ++failures; }
+    br_image_save_bmp(&e->framebuffer, "editor_build_menu.bmp");
+    br_ui_menu_close(&ed->ui);
+    frames(e, 1);
+    ed_project_settings_open(ed);
+    frames(e, 2);
+    br_image_save_bmp(&e->framebuffer, "editor_project_settings.bmp");
+    ed->project_visible = false;
+    /* broken.bs stops the build, and the console says where */
+    ed_console_clear(&ed->console);
+    if (ed_build(ed, ed_host_target(), out, sizeof(out))) { printf("FAIL: a project with a broken script built\n"); ++failures; }
+    for (i = 0; i < 300 && !found; ++i) {
+        frames(e, 1);
+        for (k = 0; k < ed->console.count && !found; ++k) found = strstr(ed_console_line(&ed->console, k)->text, "scripts/broken.bs:2") != NULL;
+    }
+    if (ed->console_capturing && !found) { printf("FAIL: the build's script error isn't in the console\n"); ++failures; }
+    {
+        const char fixed[] = "var speed: number = 2\nfunc update(dt: number) -> void {\n    self.x += speed\n}\n";
+        br_file_write_all("editor_project/scripts/broken.bs", fixed, sizeof(fixed) - 1);
+    }
+    errors = ed_check_scripts(ed, &scripts);
+    if (errors || scripts < 2) { printf("FAIL: Check Scripts (%d errors in %d)\n", errors, scripts); ++failures; }   /* (a rerun has more) */
+    p.strict_typing = true;                                      /* strict: mover.bs has no types */
+    ed_project_save(ed, &p);
+    if (ed_check_scripts(ed, NULL) < 1) { printf("FAIL: strict typing in Check Scripts\n"); ++failures; }
+    p.strict_typing = false;
+    ed_project_save(ed, &p);
+    if (!ed_find_player(ed, ed_host_target(), player, sizeof(player))) {
+        printf("note: no bronto_player beside the editor, so no game is built (make tools)\n");
+    } else if (!ed_build(ed, ed_host_target(), out, sizeof(out))) {
+        printf("FAIL: building the game (%s)\n", ed->status); ++failures;
+    } else {
+        char run[1100];
+        if (ed_host_target() == ED_TARGET_MACOS) snprintf(run, sizeof(run), "%s/Contents/MacOS/Test Game", out);
+        else snprintf(run, sizeof(run), "%s", out);
+        if (!br_fs_exists(run)) { printf("FAIL: the built game isn't at %s\n", run); ++failures; }
+        snprintf(cmd, sizeof(cmd), "\"%s\" --headless --frames 30 --screenshot build_game.bmp", run);
+        fflush(stdout);
+        if (system(cmd) != 0) { printf("FAIL: the built game didn't run (%s)\n", cmd); ++failures; }
+        if (!br_fs_exists("build_game.bmp")) { printf("FAIL: the built game didn't save its screenshot\n"); ++failures; }
+    }
+    /* load_scene() and quit() while playing */
+    {
+        const char sw[] = "func update(dt) {\n    load_scene(\"level2.scene\")\n}\n";
+        const char q[] = "var n = 0\nfunc update(dt) {\n    n += 1\n    if n == 3 { quit() }\n}\n";
+        br_entity s;
+        br_file_write_all("editor_project/scripts/switch.bs", sw, sizeof(sw) - 1);
+        br_file_write_all("editor_project/scripts/quit.bs", q, sizeof(q) - 1);
+        ed_cmd_new(ed);
+        if (ed->pending != ED_PENDING_NONE) ed_cmd_answer(ed, 1);
+        s = ed_doc_create(&ed->doc, "Switcher", br_v2(0, 0));
+        snprintf(((br_script *)br_add(&ed->doc.world, s, br_component_find(&ed->doc.world, "Script"), NULL))->file, 64, "scripts/switch.bs");
+        frames(e, 2);
+        ed_cmd_play(ed);
+        frames(e, 4);
+        if (!ed->doc.playing || ed->doc.count != 3) { printf("FAIL: load_scene() while playing (%u entities)\n", ed->doc.count); ++failures; }
+        ed_cmd_play(ed);
+        frames(e, 2);
+        if (ed->doc.count != 1) { printf("FAIL: Stop after load_scene() (%u entities)\n", ed->doc.count); ++failures; }
+        snprintf(((br_script *)br_get(&ed->doc.world, ed->doc.order[0], br_component_find(&ed->doc.world, "Script")))->file, 64, "scripts/quit.bs");
+        frames(e, 2);
+        ed_cmd_play(ed);
+        frames(e, 10);
+        if (ed->doc.playing) { printf("FAIL: quit() didn't stop playing\n"); ++failures; ed_cmd_play(ed); }
+        ed_cmd_new(ed);
+        if (ed->pending != ED_PENDING_NONE) ed_cmd_answer(ed, 1);
+    }
     return failures;
 }
 
@@ -486,7 +860,9 @@ static int run_headless(br_engine *e) {
     if (ed->doc.count != 7) { printf("FAIL: reopening gave %u entities\n", ed->doc.count); ++failures; }
     frames(e, 2);
     br_image_save_bmp(&e->framebuffer, "editor_reopened.bmp");
+    failures += test_menus_console(e);
     failures += test_assets(e);
+    failures += test_build(e);
     printf("editor (headless): %s - wrote editor*.bmp, editor_demo.scene, editor_project/\n",
            failures ? "FAILED" : "all checks passed");
     return failures ? 1 : 0;
@@ -494,8 +870,11 @@ static int run_headless(br_engine *e) {
 
 /* ---- main --------------------------------------------------------------------------- */
 
-static void script_print(const char *text, void *user) {   /* print() in a script: the status bar */
+static void script_print(const char *text, void *user) {   /* print() in a script: the console and the status bar */
     BR_UNUSED(user);
+    ed_console_add(&ED.console, ED_CON_PRINT, text, ED.engine ? ED.engine->time : 0);
+    br_capture_write_original(BR_STREAM_STDOUT, text, strlen(text));     /* and the terminal */
+    br_capture_write_original(BR_STREAM_STDOUT, "\n", 1);
     ed_status(&ED, "print: %s", text);
 }
 
@@ -532,12 +911,14 @@ int main(int argc, char **argv) {
     cfg.initial_scene = &k_editor;
     cfg.on_init = on_init;
     if (ED.headless) cfg.platform = br_platform_headless();
-    if (!br_engine_init(e, &cfg)) { br_free(e); return 1; }
+    ED.console_capturing = br_capture_start(true);        /* the Console tab; the terminal still gets it all */
+    if (!br_engine_init(e, &cfg)) { br_capture_stop(); br_free(e); return 1; }
 
     if (ED.headless) rc = run_headless(e);
     else while (br_engine_frame(e)) { /* the editor scene does the rest */ }
 
     br_engine_shutdown(e);
+    br_capture_stop();
     br_free(e);
     return rc;
 }

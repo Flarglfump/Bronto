@@ -10,7 +10,8 @@
  *     positions in window *pixels* (the engine maps them to the framebuffer),
  *   - provides a monotonic clock and a sleep,
  *   - accepts interleaved stereo int16 audio pushed from the main thread,
- *   - reads game controllers (XInput, evdev, GameController framework).
+ *   - reads game controllers (XInput, evdev, GameController framework),
+ *   - reads and writes the system clipboard (text).
  *
  * Backends:
  *   headless - no window/audio device; deterministic virtual clock and a
@@ -76,6 +77,14 @@ typedef struct br_platform {
     /* Starts a program from a command line (as a shell would read it) and
      * returns without waiting for it. */
     bool   (*launch)(const char *command_line);
+
+    /* ---- clipboard ----
+     * clipboard_set puts UTF-8 text on the system clipboard (lines end in
+     * \n; backends convert as their OS expects). clipboard_get returns a copy
+     * of the clipboard's text (br_alloc'd; the caller br_frees it), or NULL
+     * when it holds none. Either may be NULL. */
+    bool   (*clipboard_set)(const char *utf8);
+    char  *(*clipboard_get)(void);
 
     /* ---- gamepads ----
      * Controllers are polled inside poll_events and reported as GAMEPAD_*

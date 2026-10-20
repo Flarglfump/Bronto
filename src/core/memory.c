@@ -206,11 +206,19 @@ void br_pool_free(br_pool *p, void *block) {
 
 /* ---- Files ------------------------------------------------------------ */
 
+static br_file_reader g_reader;
+
+void br_file_set_reader(br_file_reader reader) { g_reader = reader; }
+
 void *br_file_read_all(const char *path, size_t *out_size) {
     FILE *f;
     long len;
     char *buf;
     if (out_size) *out_size = 0;
+    if (g_reader) {
+        void *found = g_reader(path, out_size);
+        if (found) return found;
+    }
     f = fopen(path, "rb");
     if (!f) return NULL;
     if (fseek(f, 0, SEEK_END) != 0 || (len = ftell(f)) < 0 || fseek(f, 0, SEEK_SET) != 0) {

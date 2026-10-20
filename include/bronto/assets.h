@@ -49,4 +49,26 @@ void br_assets_forget(const char *path);
 void br_assets_clear(void);
 uint32_t br_assets_count(void);
 
+/* ---- project settings (BR_PROJECT_FILE) ----------------------------------
+ * The project file holds `key = value` lines after its first line
+ * ("bronto_project 1"); '#' starts a comment. The editor's Project
+ * Settings edit them, and the player reads them to run the game. */
+typedef struct br_project {
+    char name[64];                 /* the game's name: window title, built program's name */
+    char main_scene[256];          /* the scene the game starts with (default main.scene) */
+    int width, height;             /* the game's screen, pixels (default 320 x 180) */
+    int window_scale;              /* the window starts at width x height times this (default 3) */
+    bool strict_typing;            /* every script as if it started with @strict */
+    char icon[256];                /* an image for the window and taskbar ("" = the default) */
+    char build_dir[256];           /* where Build puts games, in the project (default builds) */
+} br_project;
+
+void br_project_defaults(br_project *p, const char *name);
+/* Reads settings from the file's text over what *p already holds. */
+bool br_project_parse(const char *text, br_project *p);
+/* <folder>/project.bronto (folder "" = the current one, or the mounted
+ * pack's). Fills in defaults first; false if there is no project file. */
+bool br_project_load(const char *folder, br_project *p);
+bool br_project_save(const char *folder, const br_project *p);
+
 #endif /* BRONTO_ASSETS_H */

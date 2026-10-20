@@ -89,6 +89,18 @@ bool br_fs_absolute(const char *path, char *out, size_t size) {
     return true;
 }
 
+bool br_fs_executable_path(char *out, size_t size) {
+    wchar_t w[BR_PATH_MAX];
+    char *p;
+    DWORD n = GetModuleFileNameW(NULL, w, BR_PATH_MAX);
+    if (n == 0 || n >= BR_PATH_MAX) return false;
+    fs_to_utf8(w, out, (int)size);
+    for (p = out; *p; ++p) if (*p == '\\') *p = '/';
+    return true;
+}
+
+bool br_fs_make_executable(const char *path) { return br_fs_exists(path); }   /* .exe files just run */
+
 bool br_fs_remove(const char *path) {
     wchar_t w[BR_PATH_MAX];
     if (!fs_to_wide(path, w, BR_PATH_MAX)) return false;

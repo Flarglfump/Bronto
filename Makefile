@@ -6,7 +6,7 @@
 #   make snake      build and play the Snake sample
 #   make towerdefense  build and play the Pop Defense sample
 #   make editor     build and run the scene editor (tools/editor)
-#   make tools      build the editor and bscheck (checks .bs scripts)
+#   make tools      build the editor, bscheck (checks .bs scripts) and bronto_player (runs games)
 #   make vscode     package the VS Code extension (tools/vscode) into build/*.vsix (needs python3)
 #   make examples   build the examples (build/examples/*)
 #   make run-examples  run every example headless in build/run (CI smoke test)
@@ -27,7 +27,8 @@ CFLAGS  += $(CSTD) $(WARN) $(OPT) -ffp-contract=off -Iinclude
 LDLIBS  += -lm
 
 # Platform detection: system libraries for the native window backend.
-#   Linux: libX11 is loaded at run time (dlopen) - only -ldl is needed.
+#   Linux: libX11 is loaded at run time (dlopen) - only -ldl is needed (and
+#   -pthread: the output capture's reader thread).
 #   macOS: system frameworks.  Windows (MinGW): user32 + gdi32.
 UNAME_S := $(shell uname -s 2>/dev/null || echo Windows)
 #   Audio: ALSA is dlopen'ed too; Core Audio / waveOut are system libraries.
@@ -37,10 +38,11 @@ ifeq ($(UNAME_S),Darwin)
   TEST_LDLIBS := -pthread
 else ifeq ($(UNAME_S),Linux)
   PLATFORM := linux
-  LDLIBS   += -ldl
+  LDLIBS   += -ldl -pthread
   TEST_LDLIBS := -pthread
 else ifneq (,$(findstring BSD,$(UNAME_S)))
   PLATFORM := bsd
+  LDLIBS   += -pthread
   TEST_LDLIBS := -pthread
 else
   PLATFORM := windows
@@ -48,7 +50,7 @@ else
 endif
 
 CORE_SRC := $(wildcard src/core/*.c)
-PLAT_SRC := src/platform/platform_headless.c src/platform/platform_native.c src/platform/fs.c
+PLAT_SRC := src/platform/platform_headless.c src/platform/platform_native.c src/platform/fs.c src/platform/capture.c
 LIB_SRC  := $(CORE_SRC) $(PLAT_SRC)
 LIB_OBJ  := $(patsubst src/%.c,$(BUILD)/obj/%.o,$(LIB_SRC))
 LIB      := $(BUILD)/libbronto.a
@@ -56,7 +58,7 @@ LIB      := $(BUILD)/libbronto.a
 # The rules of the sample games are unit-tested too.
 SNAKE_RULES := $(wildcard examples/snake/snake_*.c)
 TD_RULES := $(wildcard examples/towerdefense/td_*.c)
-TEST_SRC := $(wildcard tests/*.c) $(SNAKE_RULES) $(TD_RULES) tools/editor/doc.c
+TEST_SRC := $(wildcard tests/*.c) $(SNAKE_RULES) $(TD_RULES) tools/editor/doc.c tools/editor/console.c
 TEST_BIN := $(BUILD)/bronto_tests
 
 # Each examples/<name>/ directory becomes $(BUILD)/examples/<name>, built
@@ -64,8 +66,9 @@ TEST_BIN := $(BUILD)/bronto_tests
 EXAMPLES := $(patsubst examples/%/main.c,$(BUILD)/examples/%,$(wildcard examples/*/main.c))
 EDITOR   := $(BUILD)/editor
 BSCHECK  := $(BUILD)/bscheck
+PLAYER   := $(BUILD)/bronto_player
 
-.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools audio-test evdev-test vscode vscode-test
+.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player audio-test evdev-test vscode vscode-test
 
 all: lib
 
@@ -81,6 +84,7 @@ $(BUILD)/obj/%.o: src/%.c $(wildcard include/bronto/*.h)
 # platform_native.c #includes the OS backend files.
 $(BUILD)/obj/platform/platform_native.o: $(wildcard src/platform/platform_*.c) $(wildcard src/platform/desktop_*.c) $(wildcard src/platform/audio_*.c) $(wildcard src/platform/gamepad_*.c)
 $(BUILD)/obj/platform/fs.o: $(wildcard src/platform/fs_*.c)
+$(BUILD)/obj/platform/capture.o: $(wildcard src/platform/capture_*.c)
 
 $(LIB): $(LIB_OBJ)
 	$(AR) rcs $@ $^
@@ -121,7 +125,14 @@ td: $(BUILD)/examples/towerdefense
 	$(BUILD)/examples/towerdefense
 
 # The editor: every .c file in tools/editor. bscheck: the script checker.
-tools: $(EDITOR) $(BSCHECK)
+# bronto_player: runs games; the editor's Build menu packs projects into copies of it.
+tools: $(EDITOR) $(BSCHECK) $(PLAYER)
+
+player: $(PLAYER)
+
+$(PLAYER): tools/player/main.c $(LIB)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $< $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
 
 $(BSCHECK): tools/bscheck/main.c $(LIB)
 	@mkdir -p $(dir $@)
@@ -146,7 +157,7 @@ vscode-test:
 run-examples: examples tools
 	@mkdir -p $(BUILD)/run
 	@cd $(BUILD)/run && for e in $(abspath $(EXAMPLES) $(EDITOR)); do echo "== $$e --headless"; $$e --headless || exit 1; done
-	@if [ -x $(BUILD)/examples/sceneplayer ]; then cd $(BUILD)/run && $(abspath $(BUILD)/examples/sceneplayer) $(abspath examples/platformer/main.scene) --headless; fi
+	@echo "== $(abspath $(PLAYER)) examples/platformer --headless"; $(PLAYER) examples/platformer --headless --frames 180
 
 clean:
 	rm -rf build build-asan

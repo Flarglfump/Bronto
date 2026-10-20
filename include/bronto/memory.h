@@ -80,5 +80,9 @@ void  br_pool_free(br_pool *p, void *block);
  * excludes the terminator) or NULL. Free with br_free. */
 void *br_file_read_all(const char *path, size_t *out_size);
 bool  br_file_write_all(const char *path, const void *data, size_t size);
+/* A place br_file_read_all looks first (a mounted pack, pack.h); it
+ * returns NULL for files it doesn't have. NULL: only the disk. */
+typedef void *(*br_file_reader)(const char *path, size_t *out_size);
+void  br_file_set_reader(br_file_reader reader);
 
 #endif /* BRONTO_MEMORY_H */

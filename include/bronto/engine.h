@@ -78,6 +78,7 @@ struct br_engine {
     br_mixer mixer;
     br_scene_manager scenes;
     br_window_state window;
+    char *clipboard;                 /* the private clipboard, where the platform has none */
     br_arena frame_arena;          /* reset at the start of every frame */
     br_rng rng;
 

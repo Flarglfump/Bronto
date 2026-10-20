@@ -110,6 +110,7 @@ void ed_assets_init(editor *ed, const char *root) {
     snprintf(a->root, sizeof(a->root), "%s", root ? root : "");
     ed_doc_set_root(&ed->doc, a->root);
     a->scene_entities = -1;
+    ed_project_reload(ed);                         /* its project.bronto: Build and strict typing */
 }
 
 void ed_assets_destroy(editor *ed) {
@@ -501,6 +502,7 @@ static bool tile(editor *ed, const br_dir_entry *ent, br_rect box) {
         br_draw_text(ui->r, shown, floorf(box.x + (box.w - w) / 2), box.y + ICON + 9, 1, selected ? BR_WHITE : ui->style.text);
     }
     if (f & BR_UI_PRESSED) ed_assets_select(ed, rel);
+    if (f & BR_UI_RIGHT_CLICKED) ed_menu_asset(ed, rel);
     if (k != ED_ASSET_FOLDER && k != ED_ASSET_OTHER)       /* (scripts too: drop onto an entity) */
         br_ui_drag_source(ui, ED_ASSET_DRAG, rel, ent->name);
     return (f & BR_UI_DOUBLE_CLICKED) != 0;
@@ -541,6 +543,7 @@ void ed_assets_panel(editor *ed, br_rect rect) {
         ed_assets_activate(ed, rel);
     }
     if (n == 0) br_ui_label_colored(ui, "This folder is empty. Copy images (.bmp .tga), sounds (.wav) or scenes here.", ui->style.text_dim);
+    if (br_ui_context_area(ui, rect)) ed_menu_asset(ed, "");
     br_ui_panel_end(ui);
 }
 
@@ -604,6 +607,7 @@ void ed_assets_preview(editor *ed, br_rect rect) {
     ed_asset_path(ed, a->selected, full, sizeof(full));
     if (!br_fs_stat(full, &info)) { a->selected[0] = 0; br_ui_panel_end(ui); return; }
     k = ed_asset_kind_of(a->selected, info.is_dir);
+    if (a->focus_name) { br_ui_focus_next(ui); a->focus_name = false; }   /* Rename */
     if (br_ui_text_field(ui, "Name##asset", a->name_field, sizeof(a->name_field))) {
         if (!ed_assets_rename(ed, a->name_field)) name_of(a->selected, a->name_field, sizeof(a->name_field));
         snprintf(a->name_for, sizeof(a->name_for), "%s", a->selected);

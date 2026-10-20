@@ -102,6 +102,17 @@ typedef struct {
 typedef struct {
     int type; unsigned long serial; Bool send_event; Display *display; Window window; Atom atom; Time time; int state;
 } XPropertyEvent;
+typedef struct {
+    int type; unsigned long serial; Bool send_event; Display *display; Window owner, requestor;
+    Atom selection, target, property; Time time;
+} XSelectionRequestEvent;
+typedef struct {
+    int type; unsigned long serial; Bool send_event; Display *display; Window requestor;
+    Atom selection, target, property; Time time;
+} XSelectionEvent;
+typedef struct {
+    int type; unsigned long serial; Bool send_event; Display *display; Window window; Atom selection; Time time;
+} XSelectionClearEvent;
 typedef union _XEvent {
     int type;
     XAnyEvent xany;
@@ -113,6 +124,9 @@ typedef union _XEvent {
     XConfigureEvent xconfigure;
     XClientMessageEvent xclient;
     XPropertyEvent xproperty;
+    XSelectionRequestEvent xselectionrequest;
+    XSelectionEvent xselection;
+    XSelectionClearEvent xselectionclear;
     long pad[24];
 } XEvent;
 
@@ -143,6 +157,9 @@ typedef struct { int type; Display *display; XID resourceid; unsigned long seria
 #define X_MapNotify 19
 #define X_ConfigureNotify 22
 #define X_PropertyNotify 28
+#define X_SelectionClear 29
+#define X_SelectionRequest 30
+#define X_SelectionNotify 31
 #define X_ClientMessage 33
 
 #define X_KeyPressMask (1L << 0)
@@ -214,7 +231,12 @@ typedef struct { int type; Display *display; XID resourceid; unsigned long seria
     F(int, XDefineCursor, (Display *, Window, Cursor)) \
     F(int, XUndefineCursor, (Display *, Window)) \
     F(int, XFreeCursor, (Display *, Cursor)) \
-    F(void *, XSetErrorHandler, (int (*)(Display *, XErrorEvent *)))
+    F(void *, XSetErrorHandler, (int (*)(Display *, XErrorEvent *))) \
+    F(int, XSetSelectionOwner, (Display *, Atom, Window, Time)) \
+    F(Window, XGetSelectionOwner, (Display *, Atom)) \
+    F(int, XConvertSelection, (Display *, Atom, Atom, Atom, Window, Time)) \
+    F(Bool, XCheckTypedWindowEvent, (Display *, Window, int, XEvent *)) \
+    F(int, XDeleteProperty, (Display *, Window, Atom))
 
 #define X11_DECLARE(ret, name, args) typedef ret (*name##_fn) args; static name##_fn p##name;
 X11_FUNCS(X11_DECLARE)
@@ -234,7 +256,10 @@ static struct {
     uint32_t *pixels;
     int rshift, gshift, bshift;
     Atom wm_delete, wm_protocols, net_wm_state, net_wm_state_fullscreen, net_wm_state_hidden,
-         net_wm_state_max_v, net_wm_state_max_h, net_wm_name, utf8_string;
+         net_wm_state_max_v, net_wm_state_max_h, net_wm_name, utf8_string,
+         clipboard, targets, text_atom, incr, paste_property;
+    char *clip_text;              /* what we put on the clipboard (we serve it while we own it) */
+    size_t clip_len;
     bool has_wm;
     int width, height;            /* client size, pixels */
     int saved_x, saved_y, saved_w, saved_h;
@@ -600,6 +625,11 @@ static bool x11_init(const br_platform_config *cfg) {
     X.net_wm_state_max_h = pXInternAtom(X.dpy, "_NET_WM_STATE_MAXIMIZED_HORZ", 0);
     X.net_wm_name = pXInternAtom(X.dpy, "_NET_WM_NAME", 0);
     X.utf8_string = pXInternAtom(X.dpy, "UTF8_STRING", 0);
+    X.clipboard = pXInternAtom(X.dpy, "CLIPBOARD", 0);
+    X.targets = pXInternAtom(X.dpy, "TARGETS", 0);
+    X.text_atom = pXInternAtom(X.dpy, "TEXT", 0);
+    X.incr = pXInternAtom(X.dpy, "INCR", 0);
+    X.paste_property = pXInternAtom(X.dpy, "BRONTO_PASTE", 0);
     protocols[0] = X.wm_delete;
     pXSetWMProtocols(X.dpy, X.win, protocols, 1);
     pXChangeProperty(X.dpy, X.win, pXInternAtom(X.dpy, "WM_CLASS", 0), X_XA_STRING, 8, X_PropModeReplace,
@@ -636,6 +666,8 @@ static void x11_shutdown(void) {
     evdev_shutdown();
     if (!X.dpy) return;
     destroy_image();
+    br_free(X.clip_text);
+    X.clip_text = NULL;
     if (X.blank_cursor) pXFreeCursor(X.dpy, X.blank_cursor);
     if (X.gc) pXFreeGC(X.dpy, X.gc);
     pXDestroyWindow(X.dpy, X.win);
@@ -643,6 +675,110 @@ static void x11_shutdown(void) {
     X.dpy = NULL;
     /* libX11 stays loaded: unloading it is unsafe with some Xlib
      * extensions registered (and cheap to keep). */
+}
+
+/* ==== clipboard ===============================================================
+ * X11 has no clipboard storage: the program that copied owns the CLIPBOARD
+ * selection and hands the text to whoever asks (SelectionRequest), so it is
+ * served from x11_poll. Pasting asks the owner to convert it into a property
+ * of our window and waits briefly for the answer. (Text copied here is gone
+ * when the program exits, unless a clipboard manager keeps it.) */
+static void x11_serve_selection(const XSelectionRequestEvent *r) {
+    XEvent reply;
+    Atom prop = r->property ? r->property : r->target;     /* (old clients leave it out) */
+    memset(&reply, 0, sizeof(reply));
+    reply.xselection.type = X_SelectionNotify;
+    reply.xselection.display = r->display;
+    reply.xselection.requestor = r->requestor;
+    reply.xselection.selection = r->selection;
+    reply.xselection.target = r->target;
+    reply.xselection.time = r->time;
+    reply.xselection.property = 0;                          /* None: refused */
+    if (r->selection == X.clipboard && X.clip_text) {
+        if (r->target == X.targets) {
+            Atom list[4];
+            list[0] = X.targets; list[1] = X.utf8_string; list[2] = X_XA_STRING; list[3] = X.text_atom;
+            pXChangeProperty(X.dpy, r->requestor, prop, X_XA_ATOM, 32, X_PropModeReplace, (const unsigned char *)list, 4);
+            reply.xselection.property = prop;
+        } else if (r->target == X.utf8_string || r->target == X_XA_STRING || r->target == X.text_atom) {
+            pXChangeProperty(X.dpy, r->requestor, prop, r->target == X_XA_STRING ? X_XA_STRING : X.utf8_string, 8,
+                             X_PropModeReplace, (const unsigned char *)X.clip_text, (int)X.clip_len);
+            reply.xselection.property = prop;
+        }
+    }
+    pXSendEvent(X.dpy, r->requestor, 0, 0, &reply);
+    pXFlush(X.dpy);
+}
+
+static bool x11_clipboard_set(const char *text) {
+    size_t n = strlen(text);
+    char *copy = (char *)br_alloc(n + 1);
+    if (!copy || !X.dpy) { br_free(copy); return false; }
+    memcpy(copy, text, n + 1);
+    br_free(X.clip_text);
+    X.clip_text = copy;
+    X.clip_len = n;
+    pXSetSelectionOwner(X.dpy, X.clipboard, X.win, 0 /* CurrentTime */);
+    return pXGetSelectionOwner(X.dpy, X.clipboard) == X.win;
+}
+
+static double x11_time(void);
+static void x11_sleep(double s);
+
+static char *x11_clipboard_get(void) {
+    Atom ask[2];
+    int attempt;
+    Window owner;
+    if (!X.dpy) return NULL;
+    owner = pXGetSelectionOwner(X.dpy, X.clipboard);
+    if (owner == 0) return NULL;                            /* nobody has copied anything */
+    if (owner == X.win) {
+        char *copy;
+        if (!X.clip_text || !(copy = (char *)br_alloc(X.clip_len + 1))) return NULL;
+        memcpy(copy, X.clip_text, X.clip_len + 1);
+        return copy;
+    }
+    ask[0] = X.utf8_string;
+    ask[1] = X_XA_STRING;
+    for (attempt = 0; attempt < 2; ++attempt) {
+        double give_up = x11_time() + 0.5;
+        XEvent ev;
+        bool answered = false;
+        pXDeleteProperty(X.dpy, X.win, X.paste_property);
+        pXConvertSelection(X.dpy, X.clipboard, ask[attempt], X.paste_property, X.win, 0);
+        pXFlush(X.dpy);
+        while (x11_time() < give_up) {
+            if (pXCheckTypedWindowEvent(X.dpy, X.win, X_SelectionNotify, &ev)) { answered = true; break; }
+            x11_sleep(0.002);
+        }
+        if (!answered) return NULL;                         /* the owner didn't answer */
+        if (ev.xselection.property != 0) {
+            Atom type = 0;
+            int format = 0;
+            unsigned long count = 0, after = 0;
+            unsigned char *data = NULL;
+            char *out = NULL;
+            if (pXGetWindowProperty(X.dpy, X.win, X.paste_property, 0, 0x1FFFFFFF, 1, 0 /* AnyPropertyType */,
+                                    &type, &format, &count, &after, &data) == 0 && data) {
+                if (type != X.incr && format == 8 && (out = (char *)br_alloc(count * 2 + 1)) != NULL) {
+                    unsigned long i, n = 0;                 /* (INCR: too big to be sent in one go) */
+                    for (i = 0; i < count; ++i) {
+                        unsigned char c = data[i];
+                        if (type == X_XA_STRING && c >= 0x80) {   /* STRING is Latin-1 */
+                            out[n++] = (char)(0xC0 | (c >> 6));
+                            out[n++] = (char)(0x80 | (c & 0x3F));
+                        } else {
+                            out[n++] = (char)c;
+                        }
+                    }
+                    out[n] = 0;
+                }
+                pXFree(data);
+            }
+            return out;
+        }
+    }
+    return NULL;
 }
 
 static void x11_poll(br_events *events) {
@@ -719,6 +855,10 @@ static void x11_poll(br_events *events) {
             if (ev.xclient.message_type == X.wm_protocols && (Atom)ev.xclient.data.l[0] == X.wm_delete)
                 x11_post_simple(BR_EVENT_WINDOW_CLOSE_REQUESTED);
             break;
+        case X_SelectionRequest: x11_serve_selection(&ev.xselectionrequest); break;
+        case X_SelectionClear:                     /* another program owns the clipboard now */
+            if (ev.xselectionclear.selection == X.clipboard) { br_free(X.clip_text); X.clip_text = NULL; }
+            break;
         default:
             break;
         }
@@ -770,6 +910,7 @@ static const br_platform k_x11 = {
     x11_audio_wanted, x11_audio_submit,
     x11_get_window_size, x11_get_window_scale, x11_set_title, x11_set_window_size,
     x11_set_fullscreen, x11_set_cursor_visible, x11_set_icon, du_pick_folder, du_open_path, du_launch,
+    x11_clipboard_set, x11_clipboard_get,
     x11_set_gamepad_rumble,
     NULL
 };

@@ -8,6 +8,7 @@
  * panel scroll positions.
  */
 #include "bronto/ui.h"
+#include "bronto/memory.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -107,9 +108,13 @@ static br_recti current_clip(br_ui *ui) { br_ui_panel *p = top(ui); return p ? p
 static void restore_clip(br_ui *ui) { br_set_clip(ui->r, current_clip(ui)); }
 
 static bool popup_covers(const br_ui *ui, br_vec2 p) { return ui->popup_id && in_rect(ui->popup_rect, p); }
+static bool in_menu(const br_ui *ui, br_vec2 p) {
+    return ui->menu.id && (in_rect(ui->menu.rect, p) || (ui->menu.sub >= 0 && in_rect(ui->menu.sub_rect, p)));
+}
 
 static bool hovering(br_ui *ui, br_rect r) {
-    if (ui->disabled || !in_rect(r, ui->mouse) || popup_covers(ui, ui->mouse)) return false;
+    /* an open menu takes the mouse: nothing else reacts until it closes */
+    if (ui->disabled || ui->menu.id || !in_rect(r, ui->mouse) || popup_covers(ui, ui->mouse)) return false;
     return in_clip(current_clip(ui), ui->mouse);
 }
 
@@ -124,6 +129,7 @@ static int behave(br_ui *ui, br_ui_id id, br_rect r) {
         ui->dragging = false;
         f |= B_PRESS;
     }
+    if (over && ui->right_pressed && ui->active == 0) f |= BR_UI_RIGHT_CLICKED;
     if (ui->active == id) {
         ui->active_seen = true;
         if (ui->down) f |= B_HELD;
@@ -233,6 +239,8 @@ void br_ui_begin(br_ui *ui, br_renderer *r, const br_input *in, double time) {
     ui->down = br_mouse_down(in, BR_MOUSE_LEFT);
     ui->pressed = br_mouse_pressed(in, BR_MOUSE_LEFT);
     ui->released = br_mouse_released(in, BR_MOUSE_LEFT);
+    ui->right_pressed = br_mouse_pressed(in, BR_MOUSE_RIGHT);
+    ui->right_used = false;
     ui->wheel = in->wheel_y;
     ui->wheel_used = false;
     ui->screen_clip = r->clip;
@@ -245,6 +253,12 @@ void br_ui_begin(br_ui *ui, br_renderer *r, const br_input *in, double time) {
     ui->last_rect = br_rect_make(0, 0, 0, 0);
     ui->last_flags = 0;
     if (ui->drag.active && br_key_pressed(in, BR_KEY_ESCAPE)) br_ui_drag_cancel(ui);
+    /* A click outside the open menu closes it. A left click is used up doing
+     * that; a right click goes on, so it can open another menu right there. */
+    if (ui->menu.id && (ui->pressed || ui->right_pressed) && !in_menu(ui, ui->mouse)) {
+        br_ui_menu_close(ui);
+        ui->pressed = false;
+    }
     /* Clicking anywhere else commits the field being edited. */
     if (ui->edit_id && ui->pressed && !in_rect(ui->edit_rect, ui->mouse)) commit_edit(ui);
 }
@@ -278,8 +292,12 @@ static void draw_drag(br_ui *ui) {
     text_in(ui, text, strlen(text), box, 0, 4, ui->style.text);
 }
 
+static void menu_frame(br_ui *ui);
+
 void br_ui_end(br_ui *ui) {
     if (ui->popup_id) draw_popup(ui);
+    if (ui->menu.id) menu_frame(ui);
+    ui->focus_next = false;
     if (ui->drag.active) {
         if (ui->released || !ui->down) {
             ui->drag.active = false;                 /* dropped (targets saw it this frame) */
@@ -298,7 +316,7 @@ void br_ui_end(br_ui *ui) {
 
 bool br_ui_wants_mouse(const br_ui *ui, br_vec2 p) {
     int i;
-    if (ui->active || popup_covers(ui, p)) return true;
+    if (ui->active || ui->menu.id || popup_covers(ui, p)) return true;
     for (i = 0; i < ui->area_count_prev; ++i) if (in_rect(ui->areas_prev[i], p)) return true;
     for (i = 0; i < ui->area_count; ++i) if (in_rect(ui->areas[i], p)) return true;
     return false;
@@ -342,6 +360,7 @@ void br_ui_panel_begin(br_ui *ui, const char *name, br_rect rect) {
     p->x = rect.x + ui->style.padding;
     p->y = rect.y + ui->style.padding - p->scroll;
     p->bottom = p->y;
+    p->was_at_end = p->scroll_slot < 0 || ui->scrolls[p->scroll_slot].scroll >= ui->scrolls[p->scroll_slot].content - rect.h - 1;
     if (ui->area_count < BR_UI_MAX_PANELS) ui->areas[ui->area_count++] = rect;
     br_set_clip(ui->r, p->clip);
     br_fill_rect(ui->r, rect, ui->style.panel);
@@ -354,10 +373,12 @@ void br_ui_panel_end(br_ui *ui) {
     if (!p) return;
     content = p->bottom - (p->rect.y - p->scroll) + ui->style.padding;
     max_scroll = content > p->rect.h ? content - p->rect.h : 0;
-    if (ui->wheel != 0 && !ui->wheel_used && !ui->disabled && in_rect(p->rect, ui->mouse) && !popup_covers(ui, ui->mouse)) {
+    if (ui->wheel != 0 && !ui->wheel_used && !ui->disabled && !ui->menu.id && in_rect(p->rect, ui->mouse) && !popup_covers(ui, ui->mouse)) {
         p->scroll -= ui->wheel * ui->style.row * 3;
         ui->wheel_used = true;
+        p->was_at_end = false;                    /* the user scrolled: stop following */
     }
+    if (p->stick && p->was_at_end) p->scroll = max_scroll;
     p->scroll = p->scroll < 0 ? 0 : p->scroll > max_scroll ? max_scroll : p->scroll;
     if (p->scroll_slot >= 0) {
         ui->scrolls[p->scroll_slot].scroll = p->scroll;
@@ -537,17 +558,52 @@ static void edit_erase(br_ui *ui, int at) {   /* remove the character at `at` */
     if (ui->cursor > at) ui->cursor--;
 }
 
+void br_ui_set_clipboard(br_ui *ui, const br_ui_clipboard *clipboard) {
+    if (clipboard) ui->clipboard = *clipboard;
+    else memset(&ui->clipboard, 0, sizeof(ui->clipboard));
+}
+
+static void clip_put(br_ui *ui, const char *text) {
+    if (ui->clipboard.set) ui->clipboard.set(ui->clipboard.user, text);
+    else snprintf(ui->own_clip, sizeof(ui->own_clip), "%s", text);
+}
+
+/* Pastes the clipboard's first line at the caret (characters the font has). */
+static void clip_paste(br_ui *ui) {
+    char *text = ui->clipboard.get ? ui->clipboard.get(ui->clipboard.user) : NULL;
+    const char *p = ui->clipboard.get ? text : ui->own_clip;
+    if (p) {
+        if (ui->select_all) { ui->edit_len = ui->cursor = 0; ui->edit[0] = 0; ui->select_all = false; }
+        for (; *p && *p != '\n' && *p != '\r'; ++p) {
+            if (*p == '\t') edit_insert(ui, ' ');
+            else if ((unsigned char)*p >= 32 && (unsigned char)*p < 127) edit_insert(ui, *p);
+        }
+    }
+    br_free(text);
+}
+
 /* The field being typed into. Returns true when it was committed. */
 static bool edit_box(br_ui *ui, br_rect box) {
     const br_input *in = ui->in;
+    bool cmd = (in->mods & (BR_MOD_CONTROL | BR_MOD_SUPER)) != 0;
     int i;
     br_vec2 before;
     char tmp[BR_UI_TEXT_MAX];
     float x, text_y, caret_x;
     ui->edit_seen = true;
     ui->edit_rect = box;
-    for (i = 0; i < in->text_count; ++i)
-        if (in->text[i] >= 32 && in->text[i] < 127) edit_insert(ui, (char)in->text[i]);
+    if (cmd) {                                            /* (text typed with Ctrl / Cmd held isn't text) */
+        ui->edit[ui->edit_len] = 0;
+        if (br_key_pressed(in, BR_KEY_A)) ui->select_all = ui->edit_len > 0;
+        if (br_key_pressed(in, BR_KEY_C) || br_key_pressed(in, BR_KEY_X)) {
+            clip_put(ui, ui->edit);                       /* the whole text: there's no partial selection */
+            if (br_key_pressed(in, BR_KEY_X)) { ui->edit_len = ui->cursor = 0; ui->edit[0] = 0; ui->select_all = false; }
+        }
+        if (br_key_pressed(in, BR_KEY_V)) clip_paste(ui);
+    } else {
+        for (i = 0; i < in->text_count; ++i)
+            if (in->text[i] >= 32 && in->text[i] < 127) edit_insert(ui, (char)in->text[i]);
+    }
     if (br_key_repeated(in, BR_KEY_BACKSPACE)) {
         if (ui->select_all) { ui->edit_len = ui->cursor = 0; ui->edit[0] = 0; ui->select_all = false; }
         else edit_erase(ui, ui->cursor - 1);
@@ -588,6 +644,10 @@ bool br_ui_text_field(br_ui *ui, const char *label, char *buffer, size_t size) {
     br_rect v = field_value(ui, label, br_ui_row(ui, 0));
     int f;
     if (size == 0) return false;
+    if (ui->focus_next && ui->edit_id != id && !ui->disabled) {
+        ui->focus_next = false;
+        begin_edit(ui, id, v, buffer, EDIT_TEXT, size, 0, 0, buffer);
+    }
     if (ui->edit_id == id) { ui->last_id = id; ui->last_rect = v; ui->last_flags = 0; return edit_box(ui, v); }
     f = behave(ui, id, v);
     box_fill(ui, v, (f & B_HOVER) ? br_color_lerp(ui->style.field, ui->style.button, 0.5f) : ui->style.field, ui->style.border);
@@ -770,4 +830,258 @@ void br_ui_drag_cancel(br_ui *ui) {
     if (!ui->drag.active) return;
     ui->drag.active = false;
     ui->active = 0;
+}
+
+/* ---- context menus ----------------------------------------------------------------- */
+
+enum { MI_SEP = 1, MI_DISABLED = 2, MI_CHECK = 4, MI_CHECKED = 8, MI_SUB = 16 };
+#define MENU_SEP_H 7.0f
+
+static br_ui_id menu_id(const char *name) { return hash_str(2166136261u, name); }
+
+bool br_ui_context_area(br_ui *ui, br_rect rect) {
+    return ui->right_pressed && !ui->right_used && hovering(ui, rect);
+}
+
+void br_ui_menu_open(br_ui *ui, const char *name) {
+    if (ui->disabled) return;
+    if (ui->edit_id) commit_edit(ui);
+    ui->popup_id = 0;
+    ui->menu.id = menu_id(name);
+    ui->menu.pos = ui->mouse;
+    ui->menu.last_mouse = ui->mouse;
+    ui->menu.begun = false;
+    ui->menu.opened_now = true;
+    ui->menu.result = -1;
+    ui->menu.hot = -1;
+    ui->menu.sub = -1;
+    ui->menu.count = 0;
+    ui->menu.parent = -1;
+    ui->menu.rect = ui->menu.sub_rect = br_rect_make(0, 0, 0, 0);
+    ui->right_used = true;
+}
+
+void br_ui_menu_open_at(br_ui *ui, const char *name, br_vec2 pos) {
+    br_ui_menu_open(ui, name);
+    if (ui->menu.id) ui->menu.pos = br_v2(pos.x - 1, pos.y - 1);    /* (drawn one pixel further on) */
+}
+
+void br_ui_menu_close(br_ui *ui) {
+    ui->menu.id = 0;
+    ui->menu.result = -1;
+    ui->menu.sub = -1;
+    ui->menu.rect = ui->menu.sub_rect = br_rect_make(0, 0, 0, 0);
+}
+
+bool br_ui_menu_is_open(const br_ui *ui, const char *name) { return ui->menu.id != 0 && ui->menu.id == menu_id(name); }
+bool br_ui_menu_active(const br_ui *ui) { return ui->menu.id != 0; }
+
+bool br_ui_menu_begin(br_ui *ui, const char *name) {
+    if (!br_ui_menu_is_open(ui, name)) return false;
+    ui->menu.begun = true;
+    ui->menu.count = 0;
+    ui->menu.parent = -1;
+    return true;
+}
+
+static int menu_add(br_ui *ui, const char *label, const char *shortcut, uint8_t flags) {
+    br_ui_menu_entry *it;
+    int i = ui->menu.count;
+    if (i >= BR_UI_MENU_ITEMS) return -1;
+    it = &ui->menu.items[i];
+    snprintf(it->label, sizeof(it->label), "%.*s", (int)visible_len(label ? label : ""), label ? label : "");
+    snprintf(it->shortcut, sizeof(it->shortcut), "%s", shortcut ? shortcut : "");
+    it->parent = (int8_t)ui->menu.parent;
+    it->flags = flags;
+    ui->menu.count++;
+    return i;
+}
+
+bool br_ui_menu_item(br_ui *ui, const char *label, const char *shortcut, bool enabled) {
+    int i = menu_add(ui, label, shortcut, enabled ? 0 : MI_DISABLED);
+    return i >= 0 && i == ui->menu.result;
+}
+
+bool br_ui_menu_check(br_ui *ui, const char *label, bool checked) {
+    int i = menu_add(ui, label, NULL, (uint8_t)(MI_CHECK | (checked ? MI_CHECKED : 0)));
+    return i >= 0 && i == ui->menu.result;
+}
+
+void br_ui_menu_separator(br_ui *ui) { menu_add(ui, "", NULL, MI_SEP | MI_DISABLED); }
+
+bool br_ui_menu_sub_begin(br_ui *ui, const char *label, bool enabled) {
+    int i;
+    if (ui->menu.parent >= 0) return true;               /* one level of submenus: nested items join it */
+    i = menu_add(ui, label, NULL, (uint8_t)(MI_SUB | (enabled ? 0 : MI_DISABLED)));
+    if (i >= 0) ui->menu.parent = i;
+    return true;
+}
+
+void br_ui_menu_sub_end(br_ui *ui) { ui->menu.parent = -1; }
+
+void br_ui_menu_end(br_ui *ui) {
+    if (ui->menu.result >= 0) br_ui_menu_close(ui);       /* the choice was reported: done */
+}
+
+void br_ui_focus_next(br_ui *ui) { ui->focus_next = true; }
+
+void br_ui_stick_to_bottom(br_ui *ui) { br_ui_panel *p = top(ui); if (p) p->stick = true; }
+
+static bool usable(const br_ui_menu_entry *it) { return !(it->flags & (MI_SEP | MI_DISABLED)); }
+
+/* Lays out the items of one level (`parent`) at `at`, moved to fit on the
+ * screen (or to the left of `flip_x` when it doesn't fit on the right). */
+static br_rect menu_layout(br_ui *ui, int parent, br_vec2 at, float flip_x, br_rect *rects) {
+    float label_w = 0, short_w = 0, h = 2, w, x, y, x1, y1;
+    bool arrows = false;
+    int i;
+    for (i = 0; i < ui->menu.count; ++i) {
+        const br_ui_menu_entry *it = &ui->menu.items[i];
+        if (it->parent != parent) continue;
+        label_w = BR_MAX(label_w, br_measure_text(it->label, ui->style.font).x);
+        if (it->shortcut[0]) short_w = BR_MAX(short_w, br_measure_text(it->shortcut, ui->style.font).x);
+        if (it->flags & MI_SUB) arrows = true;
+        h += (it->flags & MI_SEP) ? MENU_SEP_H : ui->style.row + 2;
+    }
+    w = floorf(20 + label_w + (short_w > 0 ? 24 + short_w : 0) + (arrows ? 14 : 0) + 8);
+    if (w < 120) w = 120;
+    x1 = (float)(ui->screen_clip.x + ui->screen_clip.w);
+    y1 = (float)(ui->screen_clip.y + ui->screen_clip.h);
+    x = at.x;
+    y = at.y;
+    if (x + w > x1) x = flip_x >= 0 ? flip_x - w : x1 - w;
+    if (y + h > y1) y = y1 - h;
+    if (x < (float)ui->screen_clip.x) x = (float)ui->screen_clip.x;
+    if (y < (float)ui->screen_clip.y) y = (float)ui->screen_clip.y;
+    x = floorf(x);
+    y = floorf(y);
+    {
+        float iy = y + 1;
+        for (i = 0; i < ui->menu.count; ++i) {
+            const br_ui_menu_entry *it = &ui->menu.items[i];
+            float ih;
+            if (it->parent != parent) continue;
+            ih = (it->flags & MI_SEP) ? MENU_SEP_H : ui->style.row + 2;
+            rects[i] = br_rect_make(x + 1, iy, w - 2, ih);
+            iy += ih;
+        }
+    }
+    return br_rect_make(x, y, w, h);
+}
+
+/* The next usable item on the same level as `from`, stepping `dir` (wraps). */
+static int menu_step(const br_ui *ui, int from, int level, int dir) {
+    int n = ui->menu.count, i, k;
+    if (n == 0) return -1;
+    i = from < 0 ? (dir > 0 ? -1 : n) : from;
+    for (k = 0; k < n; ++k) {
+        i = (i + dir + n) % n;
+        if (ui->menu.items[i].parent == level && usable(&ui->menu.items[i])) return i;
+    }
+    return from;
+}
+
+static void menu_draw_level(br_ui *ui, int parent, br_rect box, const br_rect *rects) {
+    int i;
+    br_fill_rect(ui->r, br_rect_make(box.x + 3, box.y + 3, box.w, box.h), br_rgba(0, 0, 0, 80));   /* shadow */
+    box_fill(ui, box, ui->style.popup, ui->style.border);
+    for (i = 0; i < ui->menu.count; ++i) {
+        const br_ui_menu_entry *it = &ui->menu.items[i];
+        br_rect r = rects[i];
+        bool off = (it->flags & MI_DISABLED) != 0;
+        bool lit = i == ui->menu.hot || (it->flags & MI_SUB && i == ui->menu.sub);
+        br_color tc;
+        if (it->parent != parent) continue;
+        if (it->flags & MI_SEP) {
+            br_fill_rect(ui->r, br_rect_make(r.x + 6, r.y + 3, r.w - 12, 1), ui->style.header);
+            continue;
+        }
+        if (lit && !off) br_fill_rect(ui->r, r, ui->style.selection);
+        tc = off ? br_rgba(ui->style.text_dim.r, ui->style.text_dim.g, ui->style.text_dim.b, 150) : (lit ? BR_WHITE : ui->style.text);
+        if (it->flags & MI_CHECK) {
+            br_rect b = br_rect_make(r.x + 4, r.y + (r.h - 10) / 2, 10, 10);
+            br_draw_rect(ui->r, b, ui->style.text_dim);
+            if (it->flags & MI_CHECKED) br_fill_rect(ui->r, inset(b, 2), ui->style.accent);
+        }
+        text_in(ui, it->label, strlen(it->label), br_rect_make(r.x + 18, r.y, r.w - 18, r.h), 0, 0, tc);
+        if (it->shortcut[0]) {
+            float sw = br_measure_text(it->shortcut, ui->style.font).x;
+            text_in(ui, it->shortcut, strlen(it->shortcut), br_rect_make(r.x + r.w - sw - 10, r.y, sw + 2, r.h), 0, 0, ui->style.text_dim);
+        }
+        if (it->flags & MI_SUB) {
+            float cx = r.x + r.w - 8, cy = r.y + r.h / 2;
+            br_fill_triangle(ui->r, br_v2(cx - 2, cy - 4), br_v2(cx + 3, cy), br_v2(cx - 2, cy + 4), tc);
+        }
+    }
+}
+
+/* At br_ui_end: lay out, take the mouse and keys, draw. */
+static void menu_frame(br_ui *ui) {
+    static br_rect rects[BR_UI_MENU_ITEMS];
+    const br_input *in = ui->in;
+    br_rect box, sub_box = br_rect_make(0, 0, 0, 0);
+    int i, hovered = -1, level;
+    bool moved;
+    if (!ui->menu.begun) {                       /* nobody listed it this frame */
+        if (!ui->menu.opened_now) br_ui_menu_close(ui);
+        ui->menu.opened_now = false;
+        return;
+    }
+    ui->menu.begun = false;
+    if (ui->menu.result >= 0 || ui->menu.count == 0) { br_ui_menu_close(ui); return; }
+    br_set_clip(ui->r, ui->screen_clip);
+    box = menu_layout(ui, -1, br_v2(ui->menu.pos.x + 1, ui->menu.pos.y + 1), -1, rects);
+    if (ui->menu.sub >= 0 && ui->menu.sub < ui->menu.count && (ui->menu.items[ui->menu.sub].flags & MI_SUB))
+        sub_box = menu_layout(ui, ui->menu.sub, br_v2(box.x + box.w - 2, rects[ui->menu.sub].y - 1), box.x + 2, rects);
+    else ui->menu.sub = -1;
+
+    /* the mouse */
+    for (i = 0; i < ui->menu.count; ++i) {
+        int parent = ui->menu.items[i].parent;
+        if ((parent == -1 || (parent == ui->menu.sub && ui->menu.sub >= 0)) && in_rect(rects[i], ui->mouse)) hovered = i;
+    }
+    moved = ui->mouse.x != ui->menu.last_mouse.x || ui->mouse.y != ui->menu.last_mouse.y;
+    ui->menu.last_mouse = ui->mouse;
+    if (hovered >= 0 && (moved || ui->pressed)) {
+        const br_ui_menu_entry *it = &ui->menu.items[hovered];
+        ui->menu.hot = usable(it) || (it->flags & MI_SUB) ? hovered : -1;
+        if (it->parent == -1) ui->menu.sub = (it->flags & MI_SUB) && !(it->flags & MI_DISABLED) ? hovered : -1;
+    }
+    if (ui->pressed && !ui->menu.opened_now && hovered >= 0) {
+        const br_ui_menu_entry *it = &ui->menu.items[hovered];
+        if (usable(it) && !(it->flags & MI_SUB)) ui->menu.result = hovered;
+    }
+
+    /* the keys */
+    if (!ui->menu.opened_now && in) {
+        int hot = ui->menu.hot;
+        level = hot >= 0 ? ui->menu.items[hot].parent : -1;
+        if (br_key_repeated(in, BR_KEY_DOWN)) ui->menu.hot = menu_step(ui, hot, level, 1);
+        if (br_key_repeated(in, BR_KEY_UP)) ui->menu.hot = menu_step(ui, hot, level, -1);
+        if (hot >= 0 && (br_key_pressed(in, BR_KEY_RIGHT) || br_key_pressed(in, BR_KEY_ENTER) || br_key_pressed(in, BR_KEY_KP_ENTER)) &&
+            (ui->menu.items[hot].flags & MI_SUB) && !(ui->menu.items[hot].flags & MI_DISABLED)) {
+            ui->menu.sub = hot;
+            ui->menu.hot = menu_step(ui, -1, hot, 1);
+        } else if (hot >= 0 && (br_key_pressed(in, BR_KEY_ENTER) || br_key_pressed(in, BR_KEY_KP_ENTER)) && usable(&ui->menu.items[hot])) {
+            ui->menu.result = hot;
+        } else if (level >= 0 && (br_key_pressed(in, BR_KEY_LEFT) || br_key_pressed(in, BR_KEY_ESCAPE))) {
+            ui->menu.hot = level;                         /* back out of the submenu */
+            ui->menu.sub = -1;
+        } else if (br_key_pressed(in, BR_KEY_ESCAPE)) {
+            br_ui_menu_close(ui);
+            return;
+        }
+    }
+
+    menu_draw_level(ui, -1, box, rects);
+    if (ui->menu.sub >= 0) {
+        if (sub_box.w <= 0)                               /* opened just now: lay it out */
+            sub_box = menu_layout(ui, ui->menu.sub, br_v2(box.x + box.w - 2, rects[ui->menu.sub].y - 1), box.x + 2, rects);
+        menu_draw_level(ui, ui->menu.sub, sub_box, rects);
+    } else {
+        sub_box = br_rect_make(0, 0, 0, 0);
+    }
+    ui->menu.rect = box;
+    ui->menu.sub_rect = sub_box;
+    ui->menu.opened_now = false;
 }

@@ -222,6 +222,23 @@ static void test_title_cursor_hidpi(void) {
     stop(e);
 }
 
+/* Without a system clipboard (headless) the engine keeps a private one; line ends come back as \n. */
+static void test_clipboard(void) {
+    br_engine_config c = br_engine_default_config();
+    br_engine *e = start(&c);
+    char *got;
+    CHECK(br_clipboard_get(e) == NULL);
+    CHECK(br_clipboard_set(e, "one\r\ntwo\rthree\n"));
+    got = br_clipboard_get(e);
+    CHECK(got && strcmp(got, "one\ntwo\nthree\n") == 0);
+    br_free(got);
+    CHECK(br_clipboard_set(e, ""));
+    got = br_clipboard_get(e);
+    CHECK(got && got[0] == 0);
+    br_free(got);
+    stop(e);                                    /* (frees it: no leak) */
+}
+
 void suite_window(void) {
     RUN(test_viewport_modes);
     RUN(test_engine_window_resize_and_mouse);
@@ -230,4 +247,5 @@ void suite_window(void) {
     RUN(test_fullscreen_toggle);
     RUN(test_minimize_focus_and_limiter);
     RUN(test_title_cursor_hidpi);
+    RUN(test_clipboard);
 }

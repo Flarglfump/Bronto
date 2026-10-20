@@ -201,6 +201,7 @@ static const br_platform k_headless = {
     hl_audio_wanted, hl_audio_submit,
     hl_get_window_size, hl_get_window_scale, hl_set_title, hl_set_window_size,
     hl_set_fullscreen, hl_set_cursor_visible, hl_set_icon, hl_pick_folder, hl_open_path, hl_launch,
+    NULL, NULL,                                   /* clipboard: the engine keeps a private one */
     hl_set_gamepad_rumble,
     NULL
 };

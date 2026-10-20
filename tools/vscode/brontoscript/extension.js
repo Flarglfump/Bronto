@@ -155,6 +155,19 @@ function findChecker() {
     return exe;                                                  // let the system's PATH find it
 }
 
+// The project folder a script belongs to (the nearest project.bronto above it): its
+// strict_typing setting decides whether the checker requires types.
+function projectOf(file) {
+    let dir = path.dirname(file);
+    for (let up = 0; up < 12; ++up) {
+        if (fs.existsSync(path.join(dir, 'project.bronto'))) return dir;
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    return null;
+}
+
 function check(doc) {
     if (doc.isClosed) return;
     const text = doc.getText();
@@ -164,7 +177,9 @@ function check(doc) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bscheck-'));
     const tmp = path.join(tmpDir, path.basename(doc.fileName) || 'script.bs');
     fs.writeFileSync(tmp, text);
-    cp.execFile(findChecker(), [tmp], { timeout: 5000 }, (err, stdout) => {
+    const project = doc.fileName ? projectOf(doc.fileName) : null;
+    const args = project ? ['--project', project, tmp] : [tmp];
+    cp.execFile(findChecker(), args, { timeout: 5000 }, (err, stdout) => {
         fs.rm(tmpDir, { recursive: true, force: true }, () => {});
         if (err && err.code === 'ENOENT') {
             diagnostics.set(doc.uri, quick);                      // no checker: the quick checks alone

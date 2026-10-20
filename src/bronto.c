@@ -6,7 +6,7 @@
  *
  * This is the simplest way to build on any compiler/OS with no build
  * system at all. The Makefile builds the files separately instead.
- * Link flags: Linux -ldl (glibc < 2.34), macOS -framework Cocoa
+ * Link flags: Linux -ldl -pthread (glibc < 2.34), macOS -framework Cocoa
  * -framework QuartzCore -framework AudioToolbox -framework GameController,
  * Windows -luser32 -lgdi32
  * (MSVC: automatic).
@@ -37,6 +37,7 @@
 #include "core/components.c"
 #include "core/ui.c"
 #include "core/path.c"
+#include "core/pack.c"
 #include "core/hierarchy.c"
 #include "core/physics.c"
 #include "core/script.c"
@@ -46,3 +47,4 @@
 #include "platform/platform_headless.c"
 #include "platform/platform_native.c"
 #include "platform/fs.c"
+#include "platform/capture.c"

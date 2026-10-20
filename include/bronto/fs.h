@@ -47,6 +47,12 @@ bool br_fs_absolute(const char *path, char *out, size_t size);
  *   Windows %APPDATA%/<app>, macOS ~/Library/Application Support/<app>,
  *   others $XDG_CONFIG_HOME/<app> or ~/.config/<app>. */
 bool br_fs_config_dir(const char *app, char *out, size_t size);
+/* The running program's own file (absolute). False where there is none (the web). */
+bool br_fs_executable_path(char *out, size_t size);
+/* Copies a file, replacing `to` if it exists. */
+bool br_fs_copy_file(const char *from, const char *to);
+/* Lets a file be run as a program (chmod +x); nothing to do on Windows. */
+bool br_fs_make_executable(const char *path);
 
 /* ---- path strings ----------------------------------------------------------- */
 void br_path_join(char *out, size_t size, const char *a, const char *b);   /* "a/b"; "" + b = b */

@@ -3,11 +3,15 @@
   {
    "name": "print",
    "signature": "print(value, ...)",
-   "doc": "Writes the values to the log (and the editor's status bar), separated by spaces.",
+   "doc": "Writes the values to the log (and the editor's console and status bar), separated by spaces.",
    "params": [
     "value"
    ],
-   "min": 0
+   "min": 0,
+   "param_types": [
+    "any"
+   ],
+   "returns": "void"
   },
   {
    "name": "str",
@@ -16,7 +20,11 @@
    "params": [
     "value"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "any"
+   ],
+   "returns": "string"
   },
   {
    "name": "num",
@@ -25,7 +33,11 @@
    "params": [
     "text"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "any"
+   ],
+   "returns": "any"
   },
   {
    "name": "floor",
@@ -34,7 +46,11 @@
    "params": [
     "x"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "int"
   },
   {
    "name": "ceil",
@@ -43,7 +59,11 @@
    "params": [
     "x"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "int"
   },
   {
    "name": "round",
@@ -52,7 +72,11 @@
    "params": [
     "x"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "int"
   },
   {
    "name": "abs",
@@ -61,7 +85,11 @@
    "params": [
     "x"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "(like its arguments)"
   },
   {
    "name": "sqrt",
@@ -70,7 +98,11 @@
    "params": [
     "x"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "number"
   },
   {
    "name": "sin",
@@ -79,7 +111,11 @@
    "params": [
     "degrees"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "number"
   },
   {
    "name": "cos",
@@ -88,7 +124,11 @@
    "params": [
     "degrees"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "number"
   },
   {
    "name": "atan2",
@@ -98,7 +138,12 @@
     "y",
     "x"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "number"
   },
   {
    "name": "pow",
@@ -108,7 +153,12 @@
     "x",
     "y"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "number"
   },
   {
    "name": "sign",
@@ -117,7 +167,11 @@
    "params": [
     "x"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "int"
   },
   {
    "name": "min",
@@ -127,7 +181,12 @@
     "a",
     "b"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "(like its arguments)"
   },
   {
    "name": "max",
@@ -137,7 +196,12 @@
     "a",
     "b"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "(like its arguments)"
   },
   {
    "name": "clamp",
@@ -148,7 +212,13 @@
     "lo",
     "hi"
    ],
-   "min": 3
+   "min": 3,
+   "param_types": [
+    "number",
+    "number",
+    "number"
+   ],
+   "returns": "(like its arguments)"
   },
   {
    "name": "lerp",
@@ -159,7 +229,13 @@
     "b",
     "t"
    ],
-   "min": 3
+   "min": 3,
+   "param_types": [
+    "number | vec2",
+    "number | vec2",
+    "number"
+   ],
+   "returns": "(like its arguments)"
   },
   {
    "name": "random",
@@ -169,7 +245,12 @@
     "a",
     "b"
    ],
-   "min": 0
+   "min": 0,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "number"
   },
   {
    "name": "vec2",
@@ -179,7 +260,12 @@
     "x",
     "y"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "vec2"
   },
   {
    "name": "length",
@@ -188,7 +274,11 @@
    "params": [
     "v"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "vec2"
+   ],
+   "returns": "number"
   },
   {
    "name": "normalize",
@@ -197,7 +287,11 @@
    "params": [
     "v"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "vec2"
+   ],
+   "returns": "vec2"
   },
   {
    "name": "dot",
@@ -207,7 +301,12 @@
     "a",
     "b"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "vec2",
+    "vec2"
+   ],
+   "returns": "number"
   },
   {
    "name": "distance",
@@ -217,7 +316,12 @@
     "a",
     "b"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "vec2",
+    "vec2"
+   ],
+   "returns": "number"
   },
   {
    "name": "angle",
@@ -226,7 +330,11 @@
    "params": [
     "v"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "vec2"
+   ],
+   "returns": "number"
   },
   {
    "name": "from_angle",
@@ -236,7 +344,12 @@
     "degrees",
     "length"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "vec2"
   },
   {
    "name": "rgb",
@@ -248,7 +361,14 @@
     "b",
     "a"
    ],
-   "min": 3
+   "min": 3,
+   "param_types": [
+    "number",
+    "number",
+    "number",
+    "number"
+   ],
+   "returns": "string"
   },
   {
    "name": "len",
@@ -257,7 +377,11 @@
    "params": [
     "list"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "list | string"
+   ],
+   "returns": "int"
   },
   {
    "name": "push",
@@ -267,7 +391,12 @@
     "list",
     "value"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "list",
+    "any"
+   ],
+   "returns": "(like its arguments)"
   },
   {
    "name": "pop",
@@ -276,7 +405,11 @@
    "params": [
     "list"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "list"
+   ],
+   "returns": "(an item of the list)"
   },
   {
    "name": "remove",
@@ -286,7 +419,12 @@
     "list",
     "index"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "list",
+    "number"
+   ],
+   "returns": "(an item of the list)"
   },
   {
    "name": "contains",
@@ -296,7 +434,12 @@
     "list",
     "value"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "list",
+    "any"
+   ],
+   "returns": "bool"
   },
   {
    "name": "range",
@@ -307,7 +450,13 @@
     "b",
     "step"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "number",
+    "number",
+    "number"
+   ],
+   "returns": "list[int]"
   },
   {
    "name": "key_down",
@@ -316,7 +465,11 @@
    "params": [
     "name"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
   },
   {
    "name": "key_pressed",
@@ -325,7 +478,11 @@
    "params": [
     "name"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
   },
   {
    "name": "key_released",
@@ -334,7 +491,11 @@
    "params": [
     "name"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
   },
   {
    "name": "mouse_down",
@@ -343,7 +504,11 @@
    "params": [
     "button"
    ],
-   "min": 0
+   "min": 0,
+   "param_types": [
+    "number"
+   ],
+   "returns": "bool"
   },
   {
    "name": "mouse_pressed",
@@ -352,21 +517,29 @@
    "params": [
     "button"
    ],
-   "min": 0
+   "min": 0,
+   "param_types": [
+    "number"
+   ],
+   "returns": "bool"
   },
   {
    "name": "mouse_position",
    "signature": "mouse_position()",
    "doc": "Where the mouse is, in game pixels.",
    "params": [],
-   "min": 0
+   "min": 0,
+   "param_types": [],
+   "returns": "vec2"
   },
   {
    "name": "time",
    "signature": "time()",
    "doc": "Seconds since the game started.",
    "params": [],
-   "min": 0
+   "min": 0,
+   "param_types": [],
+   "returns": "number"
   },
   {
    "name": "find",
@@ -375,7 +548,11 @@
    "params": [
     "name"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "entity"
   },
   {
    "name": "find_all",
@@ -384,7 +561,11 @@
    "params": [
     "name"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "list[entity]"
   },
   {
    "name": "destroy",
@@ -393,7 +574,11 @@
    "params": [
     "entity"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "entity"
+   ],
+   "returns": "void"
   },
   {
    "name": "spawn",
@@ -404,7 +589,13 @@
     "position",
     "parent"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "string",
+    "vec2 | nil",
+    "entity | nil"
+   ],
+   "returns": "entity"
   },
   {
    "name": "children",
@@ -413,7 +604,11 @@
    "params": [
     "entity"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "entity"
+   ],
+   "returns": "list[entity]"
   },
   {
    "name": "child",
@@ -423,7 +618,12 @@
     "entity",
     "name"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string"
+   ],
+   "returns": "entity"
   },
   {
    "name": "has",
@@ -433,7 +633,12 @@
     "entity",
     "component"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string"
+   ],
+   "returns": "bool"
   },
   {
    "name": "add",
@@ -443,7 +648,12 @@
     "entity",
     "component"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string"
+   ],
+   "returns": "component"
   },
   {
    "name": "remove_component",
@@ -453,7 +663,12 @@
     "entity",
     "component"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string"
+   ],
+   "returns": "void"
   },
   {
    "name": "apply_force",
@@ -464,7 +679,13 @@
     "force",
     "point"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "entity",
+    "vec2",
+    "vec2"
+   ],
+   "returns": "void"
   },
   {
    "name": "apply_impulse",
@@ -475,7 +696,13 @@
     "impulse",
     "point"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "entity",
+    "vec2",
+    "vec2"
+   ],
+   "returns": "void"
   },
   {
    "name": "raycast",
@@ -486,7 +713,13 @@
     "to",
     "ignore"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "vec2",
+    "vec2",
+    "entity | nil"
+   ],
+   "returns": "any"
   },
   {
    "name": "entity_at",
@@ -495,7 +728,11 @@
    "params": [
     "point"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "vec2"
+   ],
+   "returns": "entity"
   },
   {
    "name": "play_sound",
@@ -505,7 +742,12 @@
     "path",
     "volume"
    ],
-   "min": 1
+   "min": 1,
+   "param_types": [
+    "string",
+    "number"
+   ],
+   "returns": "void"
   },
   {
    "name": "send",
@@ -516,7 +758,35 @@
     "function",
     "args"
    ],
-   "min": 2
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string",
+    "any"
+   ],
+   "returns": "any"
+  },
+  {
+   "name": "load_scene",
+   "signature": "load_scene(path)",
+   "doc": "Ends this scene and starts the scene file at `path` (after this step). In the editor's Play, the scene is swapped in until Stop.",
+   "params": [
+    "path"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "quit",
+   "signature": "quit()",
+   "doc": "Ends the game. In the editor, it stops playing.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "void"
   }
  ],
  "properties": [
@@ -678,39 +948,39 @@
  "callbacks": [
   {
    "name": "start",
-   "signature": "start()",
+   "signature": "start() -> void",
    "doc": "Runs once, before the entity's first update.",
-   "snippet": "func start() {\n\t$0\n}"
+   "snippet": "func start() -> void {\n\t$0\n}"
   },
   {
    "name": "update",
-   "signature": "update(dt)",
+   "signature": "update(dt: number) -> void",
    "doc": "Runs every fixed step; dt is the step in seconds.",
-   "snippet": "func update(dt) {\n\t$0\n}"
+   "snippet": "func update(dt: number) -> void {\n\t$0\n}"
   },
   {
    "name": "on_collision",
-   "signature": "on_collision(other, normal, speed)",
+   "signature": "on_collision(other: entity, normal: vec2, speed: number) -> void",
    "doc": "This collider started touching other's.",
-   "snippet": "func on_collision(other, normal, speed) {\n\t$0\n}"
+   "snippet": "func on_collision(other: entity, normal: vec2, speed: number) -> void {\n\t$0\n}"
   },
   {
    "name": "on_collision_end",
-   "signature": "on_collision_end(other)",
+   "signature": "on_collision_end(other: entity) -> void",
    "doc": "They stopped touching.",
-   "snippet": "func on_collision_end(other) {\n\t$0\n}"
+   "snippet": "func on_collision_end(other: entity) -> void {\n\t$0\n}"
   },
   {
    "name": "on_trigger",
-   "signature": "on_trigger(other)",
+   "signature": "on_trigger(other: entity) -> void",
    "doc": "other entered a trigger (this entity's or its own).",
-   "snippet": "func on_trigger(other) {\n\t$0\n}"
+   "snippet": "func on_trigger(other: entity) -> void {\n\t$0\n}"
   },
   {
    "name": "on_trigger_exit",
-   "signature": "on_trigger_exit(other)",
+   "signature": "on_trigger_exit(other: entity) -> void",
    "doc": "other left the trigger.",
-   "snippet": "func on_trigger_exit(other) {\n\t$0\n}"
+   "snippet": "func on_trigger_exit(other: entity) -> void {\n\t$0\n}"
   }
  ],
  "keywords": {
@@ -731,6 +1001,49 @@
   "true": "true",
   "false": "false",
   "nil": "Nothing. nil, false and 0 count as false.",
-  "self": "The entity running this script."
- }
+  "self": "The entity running this script.",
+  "@strict": "At the top of a file: every var, parameter and function result must have a type (`var hp: int = 3`, `var hp := 3`, `func f(a: vec2) -> bool`)."
+ },
+ "types": [
+  {
+   "name": "number",
+   "doc": "Any number (all numbers are floating point). `float` means the same."
+  },
+  {
+   "name": "int",
+   "doc": "A whole number. Literals like `3` are ints; `/` gives a number, and `floor()` / `round()` make one whole again."
+  },
+  {
+   "name": "string",
+   "doc": "Text."
+  },
+  {
+   "name": "bool",
+   "doc": "`true` or `false`."
+  },
+  {
+   "name": "vec2",
+   "doc": "A 2D vector: `.x`, `.y`, `.length`."
+  },
+  {
+   "name": "list",
+   "doc": "A list. `list[number]` says what its items are."
+  },
+  {
+   "name": "entity",
+   "doc": "An entity, or nil."
+  },
+  {
+   "name": "any",
+   "doc": "Anything: checked only when it runs."
+  },
+  {
+   "name": "void",
+   "doc": "After `->`: the function returns nothing."
+  },
+  {
+   "name": "float",
+   "doc": "The same as `number`."
+  }
+ ]
 }

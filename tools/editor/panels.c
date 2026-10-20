@@ -6,9 +6,11 @@
  *   inspector   the selected entity's components, generated from their
  *               descriptions, so any described component is editable
  *   status bar  what just happened, and a few numbers
+ *   console     captured output, the log and print(), with filters (Files | Console tabs)
  *   dialog      "save your changes?" before New, Open or Quit
  */
 #include "editor.h"
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,6 +61,14 @@ void ed_toolbar(editor *ed, br_rect rect) {
     if (strip_button(&s, "Snap", 40, ed->view.snap)) ed->view.snap = !ed->view.snap;
     if (strip_button(&s, "Colliders", 76, ed->show_colliders)) ed->show_colliders = !ed->show_colliders;
     s.x += 8;
+    {   /* Build: a menu under the button */
+        br_rect b = strip_next(&s, 56);
+        br_ui_place(ui, b);
+        if (br_ui_toggle(ui, "Build", br_ui_menu_is_open(ui, "build"))) {
+            if (br_ui_menu_is_open(ui, "build")) br_ui_menu_close(ui);
+            else br_ui_menu_open_at(ui, "build", br_v2(b.x, b.y + b.h + 1));
+        }
+    }
     if (strip_button(&s, "Settings", 68, ed->settings_visible)) ed_settings_open(ed);
     {
         const char *title = "BRONTO EDITOR";
@@ -224,6 +234,7 @@ void ed_hierarchy(editor *ed, br_rect rect) {
         br_ui_place(ui, label);
         if (br_ui_selectable(ui, ed_doc_name(d, e, name, sizeof(name)), e == d->selected)) d->selected = e;
         if (br_ui_last_flags(ui) & BR_UI_DOUBLE_CLICKED) ed_cmd_frame(ed);
+        if (br_ui_last_flags(ui) & BR_UI_RIGHT_CLICKED) ed_menu_entity(ed, e);
         snprintf(handle, sizeof(handle), "%u", (unsigned)e);
         br_ui_drag_source(ui, ED_ENTITY_DRAG, handle, name);
         br_ui_pop_id(ui);
@@ -244,7 +255,9 @@ void ed_hierarchy(editor *ed, br_rect rect) {
         br_ui_spacing(ui, 6);
         br_ui_label_colored(ui, "Drag onto a row: child", ui->style.text_dim);
         br_ui_label_colored(ui, "Drag between rows: order", ui->style.text_dim);
+        br_ui_label_colored(ui, "Right-click: more", ui->style.text_dim);
     }
+    if (br_ui_context_area(ui, rect)) ed_menu_hierarchy(ed);
     br_ui_panel_end(ui);
 }
 
@@ -346,14 +359,17 @@ void ed_inspector(editor *ed, br_rect rect) {
         return;
     }
     br_ui_push_id_int(ui, (int)e);         /* edits never leak from one entity to another */
-    if ((name = (br_name *)br_get(w, e, d->ids.name)) != NULL)
+    if ((name = (br_name *)br_get(w, e, d->ids.name)) != NULL) {
+        if (ed->focus_name) br_ui_focus_next(ui);          /* Rename */
         br_ui_text_field(ui, "Name", name->text, sizeof(name->text));
+    }
+    ed->focus_name = false;
     if (br_parent_of(w, e) != BR_ENTITY_NULL) {
         char pn[64], line[96];
         snprintf(line, sizeof(line), "Child of %s", ed_doc_name(d, br_parent_of(w, e), pn, sizeof(pn)));
         br_ui_columns(ui, 2);
         br_ui_label_colored(ui, line, ui->style.text_dim);
-        if (br_ui_button(ui, "Unparent")) { ed_doc_place(d, e, BR_ENTITY_NULL, BR_ENTITY_NULL); ed_status(ed, "Made it a root"); }
+        if (br_ui_button(ui, "Unparent")) ed_cmd_unparent(ed);
     }
     br_ui_spacing(ui, 4);
     for (c = 0; c < br_component_type_count(w); ++c) {
@@ -364,9 +380,16 @@ void ed_inspector(editor *ed, br_rect rect) {
         if (!desc || c == d->ids.name || c == parent_id || !(data = br_get(w, e, c))) continue;   /* the tree is edited in the hierarchy */
         open = !ed->section_closed[c];
         br_ui_push_id(ui, desc->name);
-        if (br_ui_header(ui, desc->name, &open, &remove)) {
+        br_ui_header(ui, desc->name, &open, &remove);
+        if (br_ui_last_flags(ui) & BR_UI_RIGHT_CLICKED) ed_menu_component(ed, c, -1);
+        if (open) {
             br_ui_indent(ui, 6);
-            for (i = 0; i < desc->field_count; ++i) edit_field(ed, desc, &desc->fields[i], br_get(w, e, c));
+            for (i = 0; i < desc->field_count; ++i) {
+                br_rect last;
+                edit_field(ed, desc, &desc->fields[i], br_get(w, e, c));
+                last = br_ui_last_rect(ui);                   /* right-click anywhere on the field's row */
+                if (br_ui_context_area(ui, br_rect_make(rect.x, last.y, rect.w, last.h))) ed_menu_component(ed, c, i);
+            }
             br_ui_indent(ui, -6);
             br_ui_spacing(ui, 4);
         }
@@ -380,6 +403,7 @@ void ed_inspector(editor *ed, br_rect rect) {
     br_ui_spacing(ui, 4);
     add_component_menu(ed, e);
     br_ui_pop_id(ui);
+    if (br_ui_context_area(ui, rect)) ed_menu_inspector(ed);
     br_ui_panel_end(ui);
 }
 
@@ -391,7 +415,7 @@ void ed_statusbar(editor *ed, br_rect rect) {
     bool fresh = ed->engine->time - ed->status_time < 6.0 && ed->status[0];
     br_vec2 size;
     br_ui_panel_begin(ui, "status", rect);
-    br_draw_text(ui->r, fresh ? ed->status : "Wheel: zoom   Right-drag: pan   F5: play   F: frame selection",
+    br_draw_text(ui->r, fresh ? ed->status : "Wheel: zoom   Right-drag: pan   Right-click: menu   F5: play   F: frame selection",
                  rect.x + 8, rect.y + (rect.h - 8) / 2, 1, fresh ? ui->style.text : ui->style.text_dim);
     snprintf(file, sizeof(file), "%s%s", ed->doc.path[0] ? ed->doc.path : "untitled", ed_doc_dirty(&ed->doc) ? " *" : "");
     snprintf(info, sizeof(info), "%s   %u entities   %d%%   x %.0f  y %.0f   %.0f fps", file, ed->doc.count,
@@ -478,4 +502,152 @@ void ed_picker_dialog(editor *ed, br_rect screen) {
     br_ui_panel_end(ui);
     if (go[0]) picker_go(ed, go);
     if (br_key_pressed(&ed->engine->input, BR_KEY_ESCAPE)) ed_picker_close(ed);
+}
+
+/* ---- under the scene view: Files | Console ------------------------------------------------ */
+
+void ed_bottom_tabs(editor *ed, br_rect rect) {
+    br_ui *ui = &ed->ui;
+    strip s;
+    char label[64];
+    uint32_t errors = ed->console.level_count[ED_LEVEL_ERROR];
+    uint32_t fresh = errors > ed->console_errors_seen ? errors - ed->console_errors_seen : 0;
+    br_ui_panel_begin(ui, "tabs", rect);
+    br_fill_rect(ui->r, rect, ui->style.background);
+    s.ui = ui;
+    s.x = rect.x + 4;
+    s.y = rect.y + (rect.h - ui->style.row) / 2;
+    s.h = ui->style.row;
+    if (strip_button(&s, "Files", 60, ed->bottom_tab == ED_TAB_FILES)) ed->bottom_tab = ED_TAB_FILES;
+    if (fresh && ed->bottom_tab != ED_TAB_CONSOLE) snprintf(label, sizeof(label), "Console (%u error%s)##tab", fresh, fresh == 1 ? "" : "s");
+    else snprintf(label, sizeof(label), "Console##tab");
+    if (strip_button(&s, label, fresh && ed->bottom_tab != ED_TAB_CONSOLE ? 150 : 76, ed->bottom_tab == ED_TAB_CONSOLE)) ed->bottom_tab = ED_TAB_CONSOLE;
+    if (fresh && ed->bottom_tab != ED_TAB_CONSOLE)                 /* a red mark on the tab */
+        br_fill_rect(ui->r, br_rect_make(s.x - 4 - 150 + 3, s.y + 3, 3, s.h - 6), br_rgb(255, 110, 100));
+    br_ui_panel_end(ui);
+    if (ed->bottom_tab == ED_TAB_CONSOLE) {
+        ed->console_seen = ed->console.added;
+        ed->console_errors_seen = errors;
+    } else if (ed->console_errors_seen > errors) {
+        ed->console_errors_seen = errors;                          /* cleared meanwhile */
+    }
+}
+
+#define CONSOLE_LINE_H 13.0f
+
+static br_color line_color(const ed_con_line *l) {
+    if (l->level == ED_LEVEL_ERROR) return br_rgb(255, 125, 115);
+    if (l->level == ED_LEVEL_WARN) return br_rgb(240, 205, 95);
+    switch (l->kind) {
+    case ED_CON_PRINT: return br_rgb(150, 205, 255);
+    case ED_CON_ERR:   return br_rgb(240, 170, 120);
+    case ED_CON_INFO:  return br_rgb(154, 163, 178);
+    default:           return br_rgb(230, 233, 239);
+    }
+}
+
+static bool matches(const char *text, const char *search) {
+    size_t n = strlen(search);
+    if (!n) return true;
+    for (; *text; ++text) {
+        size_t i;
+        for (i = 0; i < n && text[i] && tolower((unsigned char)text[i]) == tolower((unsigned char)search[i]); ++i) {}
+        if (i == n) return true;
+    }
+    return false;
+}
+
+static void open_line(editor *ed, uint32_t index) {
+    const ed_con_line *l = ed_console_line(&ed->console, index);
+    char file[ED_PATH_MAX];
+    int line;
+    if (l && ed_console_location(l->text, file, sizeof(file), &line)) ed_open_script_named(ed, file, line);
+}
+
+void ed_console_panel(editor *ed, br_rect rect) {
+    static uint32_t shown[ED_CONSOLE_LINES];
+    br_ui *ui = &ed->ui;
+    ed_console *c = &ed->console;
+    br_rect bar = br_rect_make(rect.x, rect.y, rect.w, 24), list = br_rect_make(rect.x, rect.y + 24, rect.w, rect.h - 24), rows;
+    char label[48];
+    uint32_t i, n = 0;
+    int f;
+    strip s;
+    /* the bar: clear, the three filters with their counts, search */
+    br_ui_panel_begin(ui, "console_bar", bar);
+    s.ui = ui;
+    s.x = bar.x + 6;
+    s.y = bar.y + 4;
+    s.h = ui->style.row;
+    if (strip_button(&s, "Clear##console", 50, false)) { ed_console_clear(c); ed->console_selected = -1; }
+    s.x += 6;
+    snprintf(label, sizeof(label), "Messages %u##f0", c->level_count[ED_LEVEL_LOG]);
+    if (strip_button(&s, label, 104, ed->console_show[ED_LEVEL_LOG])) ed->console_show[ED_LEVEL_LOG] = !ed->console_show[ED_LEVEL_LOG];
+    snprintf(label, sizeof(label), "Warnings %u##f1", c->level_count[ED_LEVEL_WARN]);
+    if (strip_button(&s, label, 104, ed->console_show[ED_LEVEL_WARN])) ed->console_show[ED_LEVEL_WARN] = !ed->console_show[ED_LEVEL_WARN];
+    snprintf(label, sizeof(label), "Errors %u##f2", c->level_count[ED_LEVEL_ERROR]);
+    if (strip_button(&s, label, 88, ed->console_show[ED_LEVEL_ERROR])) ed->console_show[ED_LEVEL_ERROR] = !ed->console_show[ED_LEVEL_ERROR];
+    s.x += 6;
+    if (strip_button(&s, "Clear on Play", 108, ed->console_clear_on_play)) ed->console_clear_on_play = !ed->console_clear_on_play;
+    {
+        float w = bar.x + bar.w - 6 - s.x;
+        if (w > 220) { s.x = bar.x + bar.w - 6 - 220; w = 220; }
+        if (w > 60) {
+            br_rect box = strip_next(&s, w);
+            br_ui_place(ui, box);
+            br_ui_text_field(ui, "##search", ed->console_search, sizeof(ed->console_search));
+            if (!ed->console_search[0] && !br_ui_wants_keyboard(ui))
+                br_draw_text(ui->r, "search", box.x + 4, box.y + 4, 1, ui->style.text_dim);
+        }
+    }
+    br_ui_panel_end(ui);
+
+    /* the lines: only the visible ones are drawn; one area takes the clicks */
+    for (i = 0; i < c->count; ++i) {
+        const ed_con_line *l = ed_console_line(c, i);
+        if (ed->console_show[l->level] && matches(l->text, ed->console_search)) shown[n++] = i;
+    }
+    br_ui_panel_begin(ui, "console_list", list);
+    br_fill_rect(ui->r, list, ui->style.field);
+    br_ui_stick_to_bottom(ui);
+    if (n == 0) {
+        br_ui_label_colored(ui, c->count ? "No lines match the filters." :
+                            ed->console_capturing ? "Nothing yet. What the editor and your scripts print shows up here."
+                                                  : "Nothing yet. Script print() shows up here.", ui->style.text_dim);
+    } else {
+        int hit;
+        rows = br_ui_row(ui, CONSOLE_LINE_H * (float)n);
+        br_ui_place(ui, rows);
+        f = br_ui_area(ui, "##lines", 0);
+        hit = (int)floorf((ui->mouse.y - rows.y) / CONSOLE_LINE_H);
+        if (hit >= 0 && (uint32_t)hit < n && (f & (BR_UI_PRESSED | BR_UI_RIGHT_CLICKED | BR_UI_DOUBLE_CLICKED))) {
+            ed->console_selected = (int)shown[hit];
+            if (f & BR_UI_DOUBLE_CLICKED) open_line(ed, shown[hit]);
+            if (f & BR_UI_RIGHT_CLICKED) ed_menu_console(ed, (int)shown[hit]);
+        }
+        {
+            int from = (int)floorf((list.y - rows.y) / CONSOLE_LINE_H), to = (int)ceilf((list.y + list.h - rows.y) / CONSOLE_LINE_H);
+            int k;
+            if (from < 0) from = 0;
+            if (to > (int)n) to = (int)n;
+            for (k = from; k < to; ++k) {
+                const ed_con_line *l = ed_console_line(c, shown[k]);
+                float y = rows.y + (float)k * CONSOLE_LINE_H;
+                br_color col = line_color(l);
+                if ((int)shown[k] == ed->console_selected) br_fill_rect(ui->r, br_rect_make(rows.x - 2, y, rows.w + 4, CONSOLE_LINE_H), ui->style.selection);
+                br_fill_rect(ui->r, br_rect_make(rows.x, y + 4, 4, 5), l->level == ED_LEVEL_LOG ? br_rgba(col.r, col.g, col.b, 110) : col);
+                br_draw_text(ui->r, l->text, rows.x + 10, y + 3, 1, col);
+                if (l->repeat > 1) {                               /* the same line again and again */
+                    char times[16];
+                    br_vec2 m;
+                    snprintf(times, sizeof(times), "x%u", l->repeat);
+                    m = br_measure_text(times, 1);
+                    br_fill_rect(ui->r, br_rect_make(rows.x + rows.w - m.x - 8, y + 1, m.x + 6, CONSOLE_LINE_H - 2), ui->style.header);
+                    br_draw_text(ui->r, times, rows.x + rows.w - m.x - 5, y + 3, 1, ui->style.text);
+                }
+            }
+        }
+    }
+    if (br_ui_context_area(ui, list)) ed_menu_console(ed, -1);
+    br_ui_panel_end(ui);
 }

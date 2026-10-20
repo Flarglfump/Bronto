@@ -21,10 +21,15 @@ build/editor --headless              # scripted self-test, writes screenshots
 | **View** | Scroll to zoom around the cursor. Right-drag, middle-drag or Space+drag pans. **F** centres the selection. **G** toggles the grid. |
 | **Edit values** | In the inspector, drag a number left or right, or click it and type. Text fields commit on Enter. Colours are R G B A. |
 | **Components** | Add them from **+ Add component** at the bottom of the inspector, and remove one with the x on its header. |
-| **Entities** | **+ New** adds a root, **+ Child** a child of the selection. **Copy** (Ctrl+D) and **Delete** (Del) take the whole subtree. |
+| **Entities** | **+ New** adds a root, **+ Child** a child of the selection. **Copy** (Ctrl+D) and **Delete** (Del) take the whole subtree. Ctrl+C, Ctrl+X and Ctrl+V copy, cut and paste an entity with its subtree (pasted next to the original, as a sibling of the selection). They use the system clipboard, as scene text, so entities copied in one editor window paste into another (and into a text file). F2 renames the selection. |
+| **Clipboard** | In any text field, Ctrl+C / Ctrl+X copy or cut its text, Ctrl+V pastes (the first line) and Ctrl+A selects it all. The console's menu has **Copy Line** and **Copy All** (Ctrl+C copies the selected line while the mouse is over the console), and a file's menu **Copy Path** and **Copy Full Path**. On Linux, text copied from the editor stays on the clipboard while the editor is open (X11 keeps no copy itself unless a clipboard manager runs). |
+| **Right-click** | Every panel has a menu for what is under the mouse. **Hierarchy row or object in the view:** Rename, Add Child, Duplicate, Cut / Copy / Paste, Paste as Child, Add Component (a submenu), Unparent, Expand / Collapse, Frame in View, Save as Prefab, Delete. **Empty space in the hierarchy:** New Entity, Paste, Expand All, Collapse All. **Empty space in the view:** New Entity Here, New Label Here, Paste Here, Frame Selection, Reset View, Grid, Snap to Grid, Show Colliders, Play. **A file:** what double-clicking does (Open, Play, Edit Script...), Place in Scene / Attach to Selected, Open with System App, Rename, Delete, Show in File Manager. **Empty space among the files:** New Folder, New Script, Save Selected as Prefab, Up, Refresh, Show in File Manager. **An inspector section or field:** Reset the field or the whole component to its defaults, Copy Values, Paste Values (onto the same kind of component), Edit Script, Remove. **Empty space in the inspector:** Add Component, Paste a copied component. Menus work with the mouse or the arrow keys and Enter; Esc closes them. |
+| **Console** | The **Console** tab beside **Files** shows everything the editor writes to stdout and stderr (it is captured; the terminal still gets it too), the engine's log and `print()` from scripts. Errors are red and warnings yellow; **Messages**, **Warnings** and **Errors** filter them, the box on the right searches, and a line repeated in a row shows a count instead. While the tab is hidden, new errors show on it. Double-click a line naming a script (`player.bs:12`) to open the script at that line. **Clear on Play** empties it each time Play starts. |
 | **The tree** | The hierarchy is a tree. Drag a row onto the middle of another row to make it a child (it stays where it is on screen); drag it between rows to reorder it or move it to another parent; drag it below everything to make it a root. A line or box shows where it will land. The arrows fold subtrees, and double-clicking a row centres the view on it. Children move, turn and scale with their parent, and their Transform is relative to it. **Unparent** in the inspector makes the selection a root. |
-| **Play** | **Play** (F5) runs the scene's systems: Motion and Bounds, physics (RigidBody, Collider), sounds and scripts. While playing, the keyboard belongs to the game; F5 or Esc stops. **Stop** puts every entity back exactly as it was, and edits made while playing are undone too. A script error shows in the status bar, with its file and line. |
+| **Play** | **Play** (F5) runs the scene's systems: Motion and Bounds, physics (RigidBody, Collider), sounds and scripts. While playing, the keyboard belongs to the game; F5 or Esc stops. **Stop** puts every entity back exactly as it was, and edits made while playing are undone too. A script error shows in the status bar and the console, with its file and line. |
 | **Physics** | Add a **Collider** to make an entity solid and a **RigidBody** to make it fall and collide. **Colliders** in the toolbar outlines them: green for solid, yellow for triggers. |
+| **Build** | The toolbar's **Build** menu. **Build for <this computer>** (Ctrl+B) checks every script and writes the game into `builds/<system>/` in the project: one program on Linux and Windows, a `.app` on macOS. **Build and Run** (Ctrl+Shift+B) starts it. **Build for** lists the other systems: each works once its player is in `players/` beside the editor (`bronto_player-windows.exe`, `bronto_player-macos`, `bronto_player-linux`, built on that system with `make tools`). **Check Scripts** checks without building; script mistakes go to the console, where a double-click opens them. |
+| **Project Settings** | In the Build menu: the game's name (its window title and program name), the main scene it starts with, its screen size and window scale, **Strict typing** (every script must declare types, as with `@strict`), an icon image, and the builds folder. They are saved in the project's `project.bronto`. |
 | **Settings** | **Script editor**: the program that opens `.bs` files, a command line with `{file}` and `{line}`, with presets for VS Code, Sublime Text, Notepad++ and Zed (empty = the system's default). Saved in your settings folder, so it applies to every project. |
 | **Scripts** | **+ Script** makes a new `.bs` file from a template. Drag a script onto an entity to attach it (it gets a Script component), or into empty space for a new entity. Double-click to edit it in your text editor; Play reads it again. The preview shows the first lines and any mistake. See [docs/scripting.md](../../docs/scripting.md). |
 | **Undo** | Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z). Every finished drag or edit is one step. |
@@ -55,9 +60,13 @@ doc.c         the DOCUMENT: entities in order, selection, undo/redo, play/stop,
 commands.c    every user action (New, Save, Delete, Play...). Buttons and
               shortcuts both call these.
 viewport.c    the scene view: camera, grid, picking, move/rotate/scale handles
-panels.c      toolbar, hierarchy, inspector, status bar, the unsaved-changes dialog
+panels.c      toolbar, hierarchy, inspector, status bar, console, the unsaved-changes dialog
 assets.c      the asset browser and preview, file operations, drops into the scene
 settings.c    preferences (the script editor) and the Settings dialog
+console.c     the console's lines: captured output cut into lines, log levels,
+              repeats; tested by tests/test_editor_doc.c
+menus.c       the right-click menus, component copy / paste / reset
+build.c       the Build menu (the player with the project packed in), Project Settings
 icon.c        the app icon: a little brontosaurus drawn with the renderer
 main.c        engine setup, window layout, keyboard shortcuts, headless self-test
 ```
@@ -70,6 +79,13 @@ main.c        engine setup, window layout, keyboard shortcuts, headless self-tes
   string or enum.
 - **Drag and drop** is part of `br_ui`: a tile calls `br_ui_drag_source` with the
   asset's path, and the view and inspector fields call `br_ui_drop_target`.
+- **Right-click menus** are part of `br_ui` too. A panel that sees a right-click
+  (`BR_UI_RIGHT_CLICKED`, or `br_ui_context_area` for empty space) calls `ed_menu_*`,
+  which remembers what was clicked and opens a menu by name; `ed_menus()` lists the
+  open menu's items once a frame and runs the chosen one through the same commands
+  as the buttons and shortcuts.
+- **The console** reads what `br_capture` (the engine's `capture.h`) caught each frame.
+  Lines in the log's format (`[WARN ] file.c:12: ...`) become entries with a level.
 - **Prefabs** are ordinary scene files; placing one loads its entities into the open
   scene (`ed_doc_instantiate`), so they can be edited and saved like anything else.
 - **The viewport** draws the scene with `br_builtin_draw`, the same call a game's render

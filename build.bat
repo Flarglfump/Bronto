@@ -9,12 +9,13 @@ if not exist build mkdir build
 if not exist build\obj mkdir build\obj
 if not exist build\test_out mkdir build\test_out
 
-cl %CFLAGS% /Iexamples\snake /Iexamples\towerdefense /Itools\editor /Fobuild\obj\ /Fdbuild\ /Fe:build\bronto_tests.exe src\bronto.c tests\*.c examples\snake\snake_*.c examples\towerdefense\td_*.c tools\editor\doc.c || goto :error
+cl %CFLAGS% /Iexamples\snake /Iexamples\towerdefense /Itools\editor /Fobuild\obj\ /Fdbuild\ /Fe:build\bronto_tests.exe src\bronto.c tests\*.c examples\snake\snake_*.c examples\towerdefense\td_*.c tools\editor\doc.c tools\editor\console.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bounce.exe src\bronto.c examples\bounce\main.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\snake.exe src\bronto.c examples\snake\*.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\towerdefense.exe src\bronto.c examples\towerdefense\*.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\editor.exe src\bronto.c tools\editor\*.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bscheck.exe src\bronto.c tools\bscheck\main.c || goto :error
+cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bronto_player.exe src\bronto.c tools\player\main.c || goto :error
 
 build\bronto_tests.exe --out build\test_out || goto :error
 echo.

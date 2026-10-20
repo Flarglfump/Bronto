@@ -32,7 +32,39 @@
  *
  * Number fields: drag left or right to change the value, or click to type
  * one in. Text fields commit on Enter, Tab or a click elsewhere, and Escape
- * cancels.
+ * cancels. While typing, Ctrl+A selects everything and Ctrl+C / Ctrl+X /
+ * Ctrl+V copy, cut and paste (Cmd on a Mac). They use the clipboard given to
+ * br_ui_set_clipboard - the system's, for example:
+ *
+ *   static bool set(void *e, const char *t) { return br_clipboard_set(e, t); }
+ *   static char *get(void *e) { return br_clipboard_get(e); }
+ *   br_ui_clipboard cb = { set, get, engine };
+ *   br_ui_set_clipboard(&ui, &cb);
+ *
+ * and otherwise one of their own.
+ *
+ * Context menus: a right-click on a widget sets BR_UI_RIGHT_CLICKED in
+ * br_ui_last_flags(); br_ui_context_area() catches right-clicks on empty
+ * space. Either opens a menu by name, and the menu's items are listed every
+ * frame while it is open, anywhere in the frame (it is drawn on top at
+ * br_ui_end):
+ *
+ *   if (br_ui_last_flags(&ui) & BR_UI_RIGHT_CLICKED) br_ui_menu_open(&ui, "row");
+ *   ...
+ *   if (br_ui_menu_begin(&ui, "row")) {
+ *       if (br_ui_menu_item(&ui, "Delete", "Del", true)) delete_it();
+ *       br_ui_menu_separator(&ui);
+ *       if (br_ui_menu_sub_begin(&ui, "Add", true)) {        (a submenu)
+ *           if (br_ui_menu_item(&ui, "Box", NULL, true)) add_box();
+ *           br_ui_menu_sub_end(&ui);
+ *       }
+ *       br_ui_menu_end(&ui);
+ *   }
+ *
+ * An item returns true once, on the frame after it was chosen; then the
+ * menu closes. Clicking elsewhere or Escape closes it too; the arrow keys
+ * and Enter work as well. While a menu is open the rest of the UI ignores
+ * the mouse (br_ui_wants_mouse is true everywhere).
  */
 #ifndef BRONTO_UI_H
 #define BRONTO_UI_H
@@ -42,11 +74,28 @@
 
 typedef uint32_t br_ui_id;
 
+/* Where text fields copy to and paste from. get returns br_alloc'd text (or NULL). */
+typedef struct br_ui_clipboard {
+    bool (*set)(void *user, const char *text);
+    char *(*get)(void *user);
+    void *user;
+} br_ui_clipboard;
+
 /* What happened to a widget this frame (br_ui_area, br_ui_last_flags). */
 enum {
     BR_UI_HOVERED = 1, BR_UI_PRESSED = 2, BR_UI_HELD = 4, BR_UI_CLICKED = 8,
-    BR_UI_RELEASED = 16, BR_UI_DOUBLE_CLICKED = 32
+    BR_UI_RELEASED = 16, BR_UI_DOUBLE_CLICKED = 32, BR_UI_RIGHT_CLICKED = 64
 };
+
+#define BR_UI_MENU_ITEMS 64
+
+/* A menu item as listed this frame (internal to br_ui). */
+typedef struct br_ui_menu_entry {
+    char label[64];
+    char shortcut[24];
+    int8_t parent;                    /* the submenu it is in, -1: the menu itself */
+    uint8_t flags;
+} br_ui_menu_entry;
 
 #define BR_UI_DRAG_TYPE 16
 #define BR_UI_DOUBLE_CLICK_TIME 0.4
@@ -82,6 +131,7 @@ typedef struct br_ui_panel {
     int scroll_slot;
     bool placed;                      /* br_ui_place: the next row is `place` */
     br_rect place;
+    bool stick, was_at_end;           /* br_ui_stick_to_bottom */
 } br_ui_panel;
 
 typedef struct br_ui {
@@ -92,6 +142,8 @@ typedef struct br_ui {
 
     br_vec2 mouse;
     bool down, pressed, released;
+    bool right_pressed, right_used;   /* right_used: a menu was opened by it this frame */
+    bool focus_next;                  /* br_ui_focus_next */
     float wheel;
     bool wheel_used;
 
@@ -145,6 +197,23 @@ typedef struct br_ui {
         char payload[BR_UI_TEXT_MAX];
         char label[64];
     } drag;
+
+    /* the open context menu: its items are listed each frame, drawn at br_ui_end */
+    struct {
+        br_ui_id id;                  /* 0: none open */
+        br_vec2 pos;
+        bool begun, opened_now;
+        int result;                   /* the item chosen last frame, reported this frame */
+        int hot;                      /* highlighted item (mouse or keys) */
+        int sub;                      /* the open submenu's item, -1: none */
+        int count, parent;            /* while listing */
+        br_ui_menu_entry items[BR_UI_MENU_ITEMS];
+        br_rect rect, sub_rect;       /* where it was drawn */
+        br_vec2 last_mouse;           /* the mouse moved: it picks the item, not the keys */
+    } menu;
+
+    br_ui_clipboard clipboard;        /* (set: NULL = own_clip) */
+    char own_clip[BR_UI_TEXT_MAX];
 
     bool disabled;                    /* widgets draw but don't react (behind a dialog) */
     uint32_t edits_committed;         /* counts commits (for undo / dirty tracking) */
@@ -216,5 +285,29 @@ const char *br_ui_dragging(const br_ui *ui, const char *type);
  * current panel's visible area), else NULL. Highlights the rect while hovered. */
 const char *br_ui_drop_target(br_ui *ui, br_rect rect, const char *type);
 void br_ui_drag_cancel(br_ui *ui);
+
+/* ---- context menus (see the top of this file) --------------------------- */
+/* A right-click on `rect` this frame that no widget or menu took (empty space). */
+bool br_ui_context_area(br_ui *ui, br_rect rect);
+void br_ui_menu_open(br_ui *ui, const char *name);      /* at the mouse */
+void br_ui_menu_open_at(br_ui *ui, const char *name, br_vec2 pos);   /* e.g. under a toolbar button */
+void br_ui_menu_close(br_ui *ui);
+bool br_ui_menu_is_open(const br_ui *ui, const char *name);
+bool br_ui_menu_active(const br_ui *ui);                /* any menu open: keys belong to it */
+bool br_ui_menu_begin(br_ui *ui, const char *name);     /* true while it is open: list the items */
+bool br_ui_menu_item(br_ui *ui, const char *label, const char *shortcut, bool enabled);
+bool br_ui_menu_check(br_ui *ui, const char *label, bool checked);   /* an item with a tick */
+void br_ui_menu_separator(br_ui *ui);
+bool br_ui_menu_sub_begin(br_ui *ui, const char *label, bool enabled);   /* always true: list its items */
+void br_ui_menu_sub_end(br_ui *ui);
+void br_ui_menu_end(br_ui *ui);
+
+/* ---- odds and ends ---------------------------------------------------------- */
+/* The next text field drawn starts editing, all selected (a Rename command). */
+void br_ui_focus_next(br_ui *ui);
+/* The clipboard for Ctrl+C / Ctrl+X / Ctrl+V in text fields (NULL: the GUI's own). */
+void br_ui_set_clipboard(br_ui *ui, const br_ui_clipboard *clipboard);
+/* In a panel: if it was scrolled to the end, keep it there as it grows (logs). */
+void br_ui_stick_to_bottom(br_ui *ui);
 
 #endif /* BRONTO_UI_H */

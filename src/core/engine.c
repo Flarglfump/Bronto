@@ -379,6 +379,8 @@ void br_engine_shutdown(br_engine *e) {
     br_mixer_stop_all(&e->mixer);
     if (e->platform) e->platform->shutdown();
     br_free(e->audio_buffer);
+    br_free(e->clipboard);
+    e->clipboard = NULL;
     br_arena_destroy(&e->frame_arena);
     br_image_destroy(&e->framebuffer);
     br_events_destroy(&e->events);

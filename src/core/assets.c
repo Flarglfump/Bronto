@@ -6,7 +6,9 @@
 #include "bronto/log.h"
 #include "bronto/fs.h"
 
+#include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define ASSET_PATH_MAX 512
@@ -131,3 +133,80 @@ void br_assets_clear(void) {
 }
 
 uint32_t br_assets_count(void) { return S.count; }
+
+/* ---- project settings ---------------------------------------------------------- */
+
+void br_project_defaults(br_project *p, const char *name) {
+    memset(p, 0, sizeof(*p));
+    snprintf(p->name, sizeof(p->name), "%s", name && name[0] ? name : "Game");
+    snprintf(p->main_scene, sizeof(p->main_scene), "main.scene");
+    p->width = 320;
+    p->height = 180;
+    p->window_scale = 3;
+    snprintf(p->build_dir, sizeof(p->build_dir), "builds");
+}
+
+static void pj_trim(char *s) {
+    size_t n = strlen(s), i = 0;
+    while (n > 0 && isspace((unsigned char)s[n - 1])) s[--n] = 0;
+    while (s[i] && isspace((unsigned char)s[i])) ++i;
+    if (i) memmove(s, s + i, n - i + 1);
+}
+
+bool br_project_parse(const char *text, br_project *p) {
+    const char *line = text;
+    bool header = false;
+    while (line && *line) {
+        const char *end = strchr(line, '\n');
+        size_t len = end ? (size_t)(end - line) : strlen(line);
+        char buf[512], *eq;
+        if (len >= sizeof(buf)) len = sizeof(buf) - 1;
+        memcpy(buf, line, len);
+        buf[len] = 0;
+        line = end ? end + 1 : NULL;
+        pj_trim(buf);
+        if (!buf[0] || buf[0] == '#') continue;
+        if (!header) { header = strncmp(buf, "bronto_project", 14) == 0; if (header) continue; return false; }
+        if (!(eq = strchr(buf, '='))) continue;
+        *eq = 0;
+        pj_trim(buf);
+        pj_trim(eq + 1);
+        {
+            const char *key = buf, *v = eq + 1;
+            if (strcmp(key, "name") == 0) snprintf(p->name, sizeof(p->name), "%s", v);
+            else if (strcmp(key, "main_scene") == 0) snprintf(p->main_scene, sizeof(p->main_scene), "%s", v);
+            else if (strcmp(key, "width") == 0) p->width = atoi(v) > 0 ? atoi(v) : p->width;
+            else if (strcmp(key, "height") == 0) p->height = atoi(v) > 0 ? atoi(v) : p->height;
+            else if (strcmp(key, "window_scale") == 0) p->window_scale = atoi(v) > 0 ? atoi(v) : p->window_scale;
+            else if (strcmp(key, "strict_typing") == 0) p->strict_typing = strcmp(v, "true") == 0 || strcmp(v, "1") == 0;
+            else if (strcmp(key, "icon") == 0) snprintf(p->icon, sizeof(p->icon), "%s", v);
+            else if (strcmp(key, "build_dir") == 0) snprintf(p->build_dir, sizeof(p->build_dir), "%s", v[0] ? v : "builds");
+        }
+    }
+    return header;
+}
+
+bool br_project_load(const char *folder, br_project *p) {
+    char path[ASSET_PATH_MAX], abs[ASSET_PATH_MAX];
+    size_t size;
+    char *text;
+    bool ok;
+    br_project_defaults(p, br_fs_absolute(folder && folder[0] ? folder : ".", abs, sizeof(abs)) ? br_path_name(abs) : "Game");
+    br_path_join(path, sizeof(path), folder ? folder : "", BR_PROJECT_FILE);
+    if (!(text = (char *)br_file_read_all(path, &size))) return false;
+    ok = br_project_parse(text, p);
+    br_free(text);
+    return ok;
+}
+
+bool br_project_save(const char *folder, const br_project *p) {
+    char path[ASSET_PATH_MAX], text[2048];
+    int n = snprintf(text, sizeof(text),
+        "bronto_project 1\n"
+        "# Asset paths in this project's scenes are relative to this folder.\n"
+        "# Project settings (the editor's Build > Project Settings):\n"
+        "name = %s\nmain_scene = %s\nwidth = %d\nheight = %d\nwindow_scale = %d\nstrict_typing = %s\nicon = %s\nbuild_dir = %s\n",
+        p->name, p->main_scene, p->width, p->height, p->window_scale, p->strict_typing ? "true" : "false", p->icon, p->build_dir);
+    br_path_join(path, sizeof(path), folder ? folder : "", BR_PROJECT_FILE);
+    return n > 0 && (size_t)n < sizeof(text) && br_file_write_all(path, text, (size_t)n);
+}

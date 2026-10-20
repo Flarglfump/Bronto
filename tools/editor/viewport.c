@@ -3,6 +3,7 @@
  *
  *   wheel                  zoom around the cursor
  *   right / middle drag    pan (or hold Space and drag)
+ *   right click            the menu for what's under the cursor (menus.c)
  *   click                  select what's under the cursor
  *   drag                   move it (snaps to the grid when Snap is on)
  *   round handle           rotate (15 degree steps with Snap)
@@ -103,6 +104,9 @@ static void handle_input(editor *ed) {
             (br_mouse_pressed(in, BR_MOUSE_LEFT) && br_key_down(in, BR_KEY_SPACE))) {
             v->drag = ED_DRAG_PAN;
             v->drag_mouse = m;
+            v->press_at = m;
+            v->pan_moved = false;
+            v->pan_button = br_mouse_pressed(in, BR_MOUSE_RIGHT) ? BR_MOUSE_RIGHT : BR_MOUSE_MIDDLE;
         } else if (br_mouse_pressed(in, BR_MOUSE_LEFT)) {
             handles h = selection_handles(ed);
             if (h.ok && br_v2_dist(m, h.rotate) <= HANDLE_REACH) start_drag(ed, ED_DRAG_ROTATE, t);
@@ -119,8 +123,11 @@ static void handle_input(editor *ed) {
         if (panning) {
             v->center = br_v2_sub(v->center, br_v2_scale(br_v2_sub(m, v->drag_mouse), 1.0f / v->zoom));
             v->drag_mouse = m;
+            if (br_v2_dist(m, v->press_at) > 3) v->pan_moved = true;
         } else {
             v->drag = ED_DRAG_NONE;
+            if (v->pan_button == BR_MOUSE_RIGHT && !v->pan_moved)   /* a click, not a drag */
+                ed_menu_view(ed, ed_view_to_world(v, m));
         }
     } else if (v->drag != ED_DRAG_NONE) {
         if (!t || !br_mouse_down(in, BR_MOUSE_LEFT)) {

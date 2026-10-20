@@ -300,8 +300,193 @@ static void test_ui_drag_drop(void) {
     ui_teardown();
 }
 
+
+/* ---- context menus ---- */
+
+static void rpress(void) { IN.mouse[BR_MOUSE_RIGHT] = true; IN.mouse_pressed[BR_MOUSE_RIGHT] = true; }
+static void rrelease(void) { IN.mouse[BR_MOUSE_RIGHT] = false; IN.mouse_released[BR_MOUSE_RIGHT] = true; }
+static bool g_row_clicked;
+
+/* One frame: a button with a menu, empty space with another. Returns the item chosen. */
+static int menu_frame(void) {
+    int chosen = -1;
+    begin();
+    g_row_clicked = br_ui_button(&UI, "Row");
+    if (br_ui_last_flags(&UI) & BR_UI_RIGHT_CLICKED) br_ui_menu_open(&UI, "m");
+    if (br_ui_context_area(&UI, br_rect_make(0, 0, 200, 200))) br_ui_menu_open(&UI, "blank");
+    if (br_ui_menu_begin(&UI, "m")) {
+        if (br_ui_menu_item(&UI, "Copy", "Ctrl+C", true)) chosen = 0;
+        if (br_ui_menu_item(&UI, "Paste", NULL, false)) chosen = 1;
+        br_ui_menu_separator(&UI);
+        if (br_ui_menu_sub_begin(&UI, "More", true)) {
+            if (br_ui_menu_item(&UI, "Deep", NULL, true)) chosen = 2;
+            br_ui_menu_sub_end(&UI);
+        }
+        if (br_ui_menu_check(&UI, "Tick", true)) chosen = 3;
+        br_ui_menu_end(&UI);
+    }
+    if (br_ui_menu_begin(&UI, "blank")) {
+        if (br_ui_menu_item(&UI, "New", NULL, true)) chosen = 10;
+        br_ui_menu_end(&UI);
+    }
+    end();
+    return chosen;
+}
+
+static br_vec2 item_center(int i) {        /* items are 18 high, from the menu's top + 1 (separator: 7) */
+    br_rect m = UI.menu.rect;
+    float y = m.y + 1;
+    int k;
+    for (k = 0; k < i; ++k) y += k == 2 ? 7.0f : 18.0f;
+    return br_v2(m.x + 30, y + (i == 2 ? 3.0f : 9.0f));
+}
+
+static void test_ui_context_menu(void) {
+    br_vec2 p;
+    int got;
+    ui_setup();
+    move(50, ROW_Y(0)); rpress();
+    CHECK(menu_frame() == -1 && br_ui_menu_is_open(&UI, "m") && !br_ui_menu_is_open(&UI, "blank"));
+    rrelease();
+    CHECK(menu_frame() == -1 && UI.menu.rect.w >= 120 && br_ui_wants_mouse(&UI, br_v2(300, 230)));
+    p = item_center(1); move(p.x, p.y); click();             /* Paste is disabled */
+    CHECK(menu_frame() == -1 && br_ui_menu_active(&UI));
+    p = item_center(0); move(p.x, p.y); click();             /* Copy: reported the frame after */
+    got = menu_frame();
+    CHECK(got == -1);
+    CHECK(menu_frame() == 0 && !br_ui_menu_active(&UI));
+    CHECK(menu_frame() == -1);
+
+    /* a submenu opens on hover */
+    move(50, ROW_Y(0)); rpress(); menu_frame(); rrelease(); menu_frame();
+    p = item_center(3); move(p.x, p.y);
+    menu_frame();
+    CHECK(UI.menu.sub == 3 && UI.menu.sub_rect.w > 0);
+    move(UI.menu.sub_rect.x + 20, UI.menu.sub_rect.y + 10); menu_frame();
+    click(); menu_frame();
+    CHECK(menu_frame() == 2 && !br_ui_menu_active(&UI));
+
+    /* keys: Down picks the first usable item, Enter chooses it; Escape closes */
+    move(50, ROW_Y(0)); rpress(); menu_frame(); rrelease(); menu_frame();
+    key(BR_KEY_DOWN); menu_frame();
+    key(BR_KEY_DOWN); menu_frame();                          /* skips Paste and the separator */
+    CHECK(UI.menu.hot == 3);
+    key(BR_KEY_RIGHT); menu_frame();                         /* into More */
+    CHECK(UI.menu.sub == 3 && UI.menu.hot == 4);
+    key(BR_KEY_ESCAPE); menu_frame();                        /* back out */
+    CHECK(br_ui_menu_active(&UI) && UI.menu.sub == -1 && UI.menu.hot == 3);
+    key(BR_KEY_ESCAPE); menu_frame();
+    CHECK(!br_ui_menu_active(&UI));
+
+    /* a click outside closes it and is used up: the button under it isn't clicked */
+    move(50, ROW_Y(0)); rpress(); menu_frame(); rrelease(); menu_frame();
+    move(20, ROW_Y(0)); click();
+    CHECK(menu_frame() == -1 && !br_ui_menu_active(&UI) && !g_row_clicked);
+
+    /* empty space has its own menu; a right-click elsewhere moves the menu there */
+    move(50, ROW_Y(6)); rpress();
+    menu_frame(); rrelease();
+    CHECK(br_ui_menu_is_open(&UI, "blank"));
+    move(50, ROW_Y(0)); rpress();
+    menu_frame(); rrelease();
+    CHECK(br_ui_menu_is_open(&UI, "m"));
+    /* a menu nobody lists any more closes */
+    begin(); end(); begin(); end();
+    CHECK(!br_ui_menu_active(&UI));
+    ui_teardown();
+}
+
+/* Ctrl+A / Ctrl+C / Ctrl+X / Ctrl+V in a text field, with the GUI's own clipboard and a given one. */
+static char *g_clip;
+static bool fake_set(void *user, const char *t) {
+    size_t n = strlen(t);
+    BR_UNUSED(user);
+    br_free(g_clip);
+    g_clip = (char *)br_alloc(n + 1);
+    memcpy(g_clip, t, n + 1);
+    return true;
+}
+static char *fake_get(void *user) {
+    char *c;
+    BR_UNUSED(user);
+    if (!g_clip) return NULL;
+    c = (char *)br_alloc(strlen(g_clip) + 1);
+    strcpy(c, g_clip);
+    return c;
+}
+static void cmd_key(br_key k) { IN.mods = BR_MOD_CONTROL; key(k); IN.text[IN.text_count++] = 'x'; }   /* (the stray text is ignored) */
+
+static void field_frame(char *buf, size_t size) { begin(); br_ui_text_field(&UI, "Name", buf, size); end(); IN.mods = 0; }
+
+static void test_ui_clipboard(void) {
+    char a[32] = "Ball", b[32] = "";
+    br_ui_clipboard cb;
+    ui_setup();
+    move(150, ROW_Y(0)); click();
+    field_frame(a, sizeof(a));                               /* editing, all selected */
+    cmd_key(BR_KEY_C); field_frame(a, sizeof(a));
+    CHECK(strcmp(UI.own_clip, "Ball") == 0);
+    key(BR_KEY_END); field_frame(a, sizeof(a));
+    cmd_key(BR_KEY_V); field_frame(a, sizeof(a));            /* at the caret */
+    key(BR_KEY_ENTER); field_frame(a, sizeof(a));
+    CHECK(strcmp(a, "BallBall") == 0);
+
+    cb.set = fake_set; cb.get = fake_get; cb.user = NULL;
+    br_ui_set_clipboard(&UI, &cb);
+    fake_set(NULL, "Rock\tSolid\nsecond line");
+    move(150, ROW_Y(0)); click(); field_frame(b, sizeof(b));
+    cmd_key(BR_KEY_V); field_frame(b, sizeof(b));            /* the first line, tabs as spaces */
+    key(BR_KEY_ENTER); field_frame(b, sizeof(b));
+    CHECK(strcmp(b, "Rock Solid") == 0);
+    move(150, ROW_Y(0)); click(); field_frame(b, sizeof(b));
+    cmd_key(BR_KEY_X); field_frame(b, sizeof(b));            /* cut: copied, and the field empties */
+    key(BR_KEY_ENTER); field_frame(b, sizeof(b));
+    CHECK(strcmp(b, "") == 0 && g_clip && strcmp(g_clip, "Rock Solid") == 0);
+    move(150, ROW_Y(0)); click(); field_frame(a, sizeof(a));
+    key(BR_KEY_END); field_frame(a, sizeof(a));
+    type("!"); field_frame(a, sizeof(a));
+    cmd_key(BR_KEY_A); field_frame(a, sizeof(a));            /* select all, then paste over it */
+    cmd_key(BR_KEY_V); field_frame(a, sizeof(a));
+    key(BR_KEY_ENTER); field_frame(a, sizeof(a));
+    CHECK(strcmp(a, "Rock Solid") == 0);
+    br_ui_set_clipboard(&UI, NULL);
+    br_free(g_clip);
+    g_clip = NULL;
+    ui_teardown();
+}
+
+static void test_ui_focus_and_stick(void) {
+    char name[32] = "Ball";
+    int i, slot;
+    ui_setup();
+    br_ui_focus_next(&UI);
+    begin(); br_ui_text_field(&UI, "Name", name, sizeof(name)); end();
+    CHECK(br_ui_wants_keyboard(&UI));
+    type("Rock"); key(BR_KEY_ENTER);
+    begin(); CHECK(br_ui_text_field(&UI, "Name", name, sizeof(name))); end();
+    CHECK(strcmp(name, "Rock") == 0);
+
+    for (i = 0; i < 3; ++i) {                                 /* a log that grows: it stays scrolled to the end */
+        int k;
+        br_ui_begin(&UI, &R, &IN, T);
+        br_ui_panel_begin(&UI, "log", br_rect_make(0, 0, 200, 100));
+        br_ui_stick_to_bottom(&UI);
+        for (k = 0; k < 10 + 5 * i; ++k) br_ui_labelf(&UI, "line %d", k);
+        br_ui_panel_end(&UI);
+        br_ui_end(&UI);
+        br_input_begin_frame(&IN);
+    }
+    for (slot = 0; slot < UI.scroll_count && UI.scrolls[slot].content < 150; ++slot) {}
+    CHECK(slot < UI.scroll_count && UI.scrolls[slot].scroll > 0 &&
+          fabs(UI.scrolls[slot].scroll - (UI.scrolls[slot].content - 100)) < 0.5);
+    ui_teardown();
+}
+
 void suite_ui(void) {
     RUN(test_ui_area_double_click);
+    RUN(test_ui_context_menu);
+    RUN(test_ui_focus_and_stick);
+    RUN(test_ui_clipboard);
     RUN(test_ui_drag_drop);
     RUN(test_ui_buttons);
     RUN(test_ui_checkbox_selectable);

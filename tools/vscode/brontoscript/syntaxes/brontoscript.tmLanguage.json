@@ -13,6 +13,12 @@
    "include": "#string"
   },
   {
+   "include": "#annotation"
+  },
+  {
+   "include": "#type"
+  },
+  {
    "include": "#function-def"
   },
   {
@@ -91,6 +97,20 @@
     },
     "3": {
      "patterns": [
+      {
+       "match": "(:)\\s*([A-Za-z_]\\w*)(?:\\s*\\[\\s*([A-Za-z_]\\w*)\\s*\\])?",
+       "captures": {
+        "1": {
+         "name": "punctuation.separator.type.brontoscript"
+        },
+        "2": {
+         "name": "support.type.brontoscript"
+        },
+        "3": {
+         "name": "support.type.brontoscript"
+        }
+       }
+      },
       {
        "match": "[A-Za-z_]\\w*",
        "name": "variable.parameter.brontoscript"
@@ -215,6 +235,46 @@
     {
      "name": "keyword.operator.arithmetic.brontoscript",
      "match": "[-+*/%]"
+    }
+   ]
+  },
+  "annotation": {
+   "name": "storage.modifier.annotation.brontoscript",
+   "match": "@\\w+"
+  },
+  "type": {
+   "patterns": [
+    {
+     "match": "(->)\\s*([A-Za-z_]\\w*)(?:\\s*\\[\\s*([A-Za-z_]\\w*)\\s*\\])?",
+     "captures": {
+      "1": {
+       "name": "keyword.operator.arrow.brontoscript"
+      },
+      "2": {
+       "name": "support.type.brontoscript"
+      },
+      "3": {
+       "name": "support.type.brontoscript"
+      }
+     }
+    },
+    {
+     "match": "(:)(?!=)\\s*([A-Za-z_]\\w*)(?:\\s*\\[\\s*([A-Za-z_]\\w*)\\s*\\])?",
+     "captures": {
+      "1": {
+       "name": "punctuation.separator.type.brontoscript"
+      },
+      "2": {
+       "name": "support.type.brontoscript"
+      },
+      "3": {
+       "name": "support.type.brontoscript"
+      }
+     }
+    },
+    {
+     "match": ":=",
+     "name": "keyword.operator.assignment.infer.brontoscript"
     }
    ]
   }
