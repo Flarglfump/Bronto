@@ -8,6 +8,7 @@
  */
 #include "bronto/platform.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #define HEADLESS_MAX_INJECTED 1024
@@ -22,6 +23,9 @@ static struct {
     br_recti last_viewport;
     int16_t *capture;
     uint32_t capture_cap, captured;
+    br_image icon;
+    char folder_answer[512], opened[512];
+    bool folder_set, folder_cancel, folder_none;
     double audio_debt;   /* fractional frames owed to the virtual device */
     int win_w, win_h;    /* pixels */
     int saved_w, saved_h;
@@ -64,6 +68,9 @@ static bool hl_init(const br_platform_config *cfg) {
 }
 
 static void hl_shutdown(void) {
+    br_image_destroy(&g_hl.icon);
+    g_hl.folder_set = false;
+    g_hl.opened[0] = 0;
     g_hl.last_frame = NULL;
     g_hl.injected_count = 0;
     g_hl.quit_after = 0;
@@ -120,6 +127,31 @@ static void hl_audio_submit(const int16_t *data, uint32_t frames) {
 
 static void hl_get_window_size(int *w, int *h) { *w = g_hl.win_w; *h = g_hl.win_h; }
 static float hl_get_window_scale(void) { return hl_scale(); }
+static void hl_set_icon(const br_image *icon) {
+    br_image_destroy(&g_hl.icon);
+    if (icon && br_image_init(&g_hl.icon, icon->width, icon->height))
+        memcpy(g_hl.icon.pixels, icon->pixels, (size_t)icon->width * (size_t)icon->height * sizeof(br_color));
+}
+const br_image *br_headless_icon(void) { return g_hl.icon.pixels ? &g_hl.icon : NULL; }
+
+void br_headless_set_folder_answer(const char *path, bool available) {
+    g_hl.folder_set = true;
+    g_hl.folder_none = !available;
+    g_hl.folder_cancel = path == NULL;
+    snprintf(g_hl.folder_answer, sizeof(g_hl.folder_answer), "%s", path ? path : "");
+}
+
+static int hl_pick_folder(const char *title, const char *start, char *out, size_t size) {
+    BR_UNUSED(title); BR_UNUSED(start);
+    if (!g_hl.folder_set || g_hl.folder_none) return -1;     /* like a desktop without a dialog */
+    if (g_hl.folder_cancel) return 0;
+    snprintf(out, size, "%s", g_hl.folder_answer);
+    return 1;
+}
+
+static bool hl_open_path(const char *path) { snprintf(g_hl.opened, sizeof(g_hl.opened), "%s", path); return true; }
+const char *br_headless_last_opened(void) { return g_hl.opened; }
+
 static void hl_set_title(const char *t) { strncpy(g_hl.title, t, sizeof(g_hl.title) - 1); }
 
 static void hl_set_window_size(int w, int h) {
@@ -165,7 +197,7 @@ static const br_platform k_headless = {
     "headless", hl_init, hl_shutdown, hl_poll, hl_present, hl_time, hl_sleep,
     hl_audio_wanted, hl_audio_submit,
     hl_get_window_size, hl_get_window_scale, hl_set_title, hl_set_window_size,
-    hl_set_fullscreen, hl_set_cursor_visible,
+    hl_set_fullscreen, hl_set_cursor_visible, hl_set_icon, hl_pick_folder, hl_open_path,
     hl_set_gamepad_rumble,
     NULL
 };

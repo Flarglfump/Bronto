@@ -6,7 +6,7 @@ and the math and render APIs are designed so that 3D can be added later.
 
 Status (v0.1):
 - **Done:** the core systems; native windows, sound output and gamepads on Windows,
-  macOS and Linux; and two sample games, Snake and Pop Defense.
+  macOS and Linux; two sample games, Snake and Pop Defense; and a visual scene editor.
 - **Not yet:** the web build. See the roadmap below.
 
 ## Quick start
@@ -14,6 +14,7 @@ Status (v0.1):
 ```sh
 make snake         # build and play Snake
 make towerdefense  # build and play Pop Defense (tower defense)
+make editor        # build and run the scene editor (make editor SCENE=level.scene)
 make test          # build libbronto.a and run the test suite
 make examples      # build examples/ into build/examples/
 make sanitize      # tests under AddressSanitizer + UndefinedBehaviorSanitizer
@@ -23,7 +24,7 @@ make evdev-test    # Linux: feeds kernel gamepad events through the evdev backen
 ```
 
 On Windows with MSVC, run `build.bat` from a Developer Command Prompt; it builds
-`build\snake.exe` and `build\towerdefense.exe`. With MinGW, use `make`.
+`build\snake.exe`, `build\towerdefense.exe` and `build\editor.exe`. With MinGW, use `make`.
 
 With no build system at all, the unity build compiles everything from one file:
 
@@ -80,6 +81,62 @@ Mouse, keyboard and gamepad are all supported. `--autopilot` lets the scripted p
 and `--headless` plays all 30 rounds at triple speed with no window. See
 [examples/towerdefense/README.md](examples/towerdefense/README.md) for the code tour and
 the rules.
+
+## Scene editor
+
+`tools/editor` is a visual editor for scenes, built on the engine itself:
+
+- **Projects:** **Load Project** opens a folder with the system's folder dialog (Windows
+  and macOS; on Linux zenity or kdialog if installed, else a picker drawn by the editor).
+  Its `main.scene` opens if it has one. `editor <folder>` does the same.
+- **Hierarchy:** every entity in the scene. Add, copy and delete them, and drag rows to
+  reorder.
+- **Viewport:** the scene exactly as a game draws it, with a grid and a frame showing
+  the game's screen. Scroll to zoom, right-drag to pan, click to select. Drag to move,
+  and use the handles to rotate and scale. Snap is optional.
+- **Inspector:** the selected entity's components, with a widget for every field. It is
+  generated from component descriptions, so any described component is editable with
+  no editor code.
+- **Play / Stop:** runs the scene's systems in place. Stop puts everything back exactly
+  as it was.
+- **Assets:** a file browser for the project folder, with image thumbnails and a
+  preview (image size, sound length with Play, scene entity count). Drag images, sounds
+  and scenes into the view: an image becomes a sprite, a sound a Sound entity, and a
+  scene is placed as a prefab copy. Drop onto Sprite.image or Sound.file in the
+  inspector to fill them in. New folder, rename, delete (to a `.trash` folder),
+  double-click to open a folder or scene or to hear a sound, and **To prefab** for the
+  selected entity. Scripts (`.bs`) show their first lines and any mistake; drag one onto an
+  entity to attach it, double-click to edit it in your text editor, or **+ Script** for a
+  new one.
+- **Physics and scripts** run when you press Play. **Colliders** outlines every collider,
+  and script errors appear in the status bar.
+- **Undo / redo**, and a prompt to save before unsaved changes are lost.
+
+Scenes are saved as readable text files that games load with one call; see
+`examples/sceneplayer` and [tools/editor/README.md](tools/editor/README.md).
+
+## Physics and scripts
+
+Add a **Collider** (a box or a circle) to make something solid, and a **RigidBody** to
+make it move: gravity, bouncing, friction, tumbling and stacking. A collider marked
+`trigger` reports what enters it instead of blocking it. A **Script** component runs a
+BrontoScript file, a small language built into the engine:
+
+```
+var speed = 90
+func update(dt) {
+    if key_down("right") { self.velocity.x = speed }
+    if key_pressed("space") and raycast(self.position, self.position + vec2(0, 12), self) != nil {
+        self.velocity.y = -280
+    }
+}
+func on_trigger(other) { if other.name == "Coin" { destroy(other) } }
+```
+
+`examples/platformer` is a complete level made this way, with no C code: open it with
+**Load Project**, or run `sceneplayer examples/platformer/main.scene`. The language is
+described in [docs/scripting.md](docs/scripting.md). When speed matters, a script can
+instead be a behaviour written in C (`br_script_register_behaviour`).
 
 ## Platforms
 
@@ -139,6 +196,10 @@ tests/               unit tests; tests/platform/ holds backend checks
 examples/bounce/     every system in a small toy
 examples/snake/      sample game: Snake
 examples/towerdefense/  sample game: Pop Defense (tower defense)
+examples/sceneplayer/   plays scene files made in the editor
+examples/platformer/    a level built only from the editor: physics + scripts, no C
+tools/editor/        the visual scene editor
+docs/scripting.md    the BrontoScript reference
 ```
 
 ## Architecture
@@ -151,10 +212,17 @@ examples/towerdefense/  sample game: Pop Defense (tower defense)
 | Input | `input.h` | Keyboard, mouse, text and 4 gamepads, built purely from events. Pressed/released edges are frame-accurate. Named actions bind to keys, buttons and stick directions. Gamepad snapshot diffing is shared by all backends; rumble goes through `br_gamepad_rumble` |
 | ECS | `ecs.h` | Sparse-set storage with generation-checked entity handles. Components are registered at runtime. Queries take include and exclude lists. Supports deferred destruction, add/remove hooks, and systems ordered within 4 phases |
 | Scenes | `scene.h` | Scene stack where each scene has its own ECS world. `transparent` and `update_below` flags handle overlays and modals. Push/pop/switch requests are deferred to a safe point |
-| Render | `render.h` | Software rasterizer: shapes, triangles (including per-vertex colour), affine sprites, 4 blend modes, 2D camera, 8x8 font, BMP/TGA |
+| Render | `render.h` | Software rasterizer: shapes, triangles (including per-vertex colour; rasterised in fixed point so shared edges have no cracks or double pixels), affine sprites, 4 blend modes, 2D camera, 8x8 font, BMP/TGA |
 | Audio | `audio.h` | 32-voice mixer with volume, pan, pitch, looping, ramps, buses and resampling; WAV loader; tone generator; lock-free ring for audio threads |
-| Window | `window.h` | Viewport and scale modes, mouse mapping, window state and control |
+| Window | `window.h` | Viewport and scale modes, mouse mapping, window state and control, and the app icon (`br_window_set_icon`: window, taskbar and Dock) |
 | Platform | `platform.h` | Table of function pointers that each OS backend implements |
+| Scene files | `serialize.h` | Saves and loads worlds as readable text. Every *described* component (a list of its fields with names and types, `ecs.h`) is saved field by field. Loading skips unknown components and fields with a warning, and is all-or-nothing on errors |
+| Built-in components | `components.h` | Name, Transform, Shape, Sprite, Label, Motion, Bounds and Sound, with motion, audio and layered draw systems: enough to make and play simple scenes |
+| Physics | `physics.h` | RigidBody (dynamic, static, kinematic), Collider (box or circle; friction, bounce, trigger, layers) and PhysicsWorld (gravity). Sort-and-sweep broad phase; circle and oriented-box contacts with clipping; a sequential-impulse solver, warm-started so stacks settle. Contact and trigger events, raycasts and point queries |
+| Scripts | `script.h` | The Script component. BrontoScript is interpreted from `.bs` files, re-read when they change, with a garbage-collected heap. Errors give a file and line and stop only that script. C behaviours can be registered by name |
+| Assets | `assets.h` | Image and sound cache: each file is loaded once, at a stable address, with relative paths resolved against the project folder (the nearest folder holding `project.bronto`, else the scene's own). Forgetting a sound silences it first |
+| File system | `fs.h` | List folders (folders first, sorted), stat, make folders, rename without overwriting, remove; path string helpers. POSIX and Win32 backends in the platform layer |
+| GUI | `ui.h` | Immediate-mode widgets: buttons, checkboxes, number fields you drag or type into, vec2 and colour fields, text fields, drop-downs, list rows, collapsible sections, scrolling panels, clickable custom-drawn areas with double-click, and drag and drop. The editor uses it, and so can games |
 | Engine | `engine.h` | Fixed-timestep loop, frame limiter, per-frame arena; `br_engine_frame()` runs one frame at a time so a browser can drive the loop |
 
 ## Gamepads
@@ -246,6 +314,6 @@ networking and golden-image tests practical. Two rules keep it that way:
 
 1. Web backend (Emscripten, canvas, WebAudio, Gamepad API)
 2. PNG decoder, sprite sheets and animation, tilemaps
-3. Collision and physics helpers, asset manager, scene serialisation
-4. 3D path: depth buffer and perspective-correct triangles on the existing mat4/quat math
-5. GUI editor
+3. Joints, one-way platforms and continuous collision for fast bodies; a script debugger
+4. Editor: multi-select, copy/paste between scenes, nested prefabs that update, game-specific components
+5. 3D path: depth buffer and perspective-correct triangles on the existing mat4/quat math

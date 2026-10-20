@@ -145,3 +145,18 @@ float br_window_scale(const br_engine *e) { return e->window.scale; }
 bool br_window_is_focused(const br_engine *e) { return e->window.focused; }
 bool br_window_is_minimized(const br_engine *e) { return e->window.minimized; }
 const br_window_state *br_window_state_get(const br_engine *e) { return &e->window; }
+
+void br_window_set_icon(br_engine *e, const br_image *icon) {
+    if (e->platform && e->platform->set_icon) e->platform->set_icon(icon && icon->pixels ? icon : NULL);
+}
+
+int br_pick_folder(br_engine *e, const char *title, const char *start, char *out, size_t size) {
+    if (!out || size == 0) return -1;
+    out[0] = 0;
+    if (!e->platform || !e->platform->pick_folder) return -1;
+    return e->platform->pick_folder(title ? title : "Choose a folder", start, out, size);
+}
+
+bool br_open_path(br_engine *e, const char *path) {
+    return path && e->platform && e->platform->open_path && e->platform->open_path(path);
+}

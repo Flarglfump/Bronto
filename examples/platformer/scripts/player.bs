@@ -1,0 +1,35 @@
+# The player: arrows (or A/D) to run, space (or up) to jump.
+# speed and jump are set per entity in the inspector (Script > vars).
+var speed = 90
+var jump = 280
+var spawn_point
+var grounded = false
+
+func start() {
+    spawn_point = self.position
+}
+
+func update(dt) {
+    var dir = 0
+    if key_down("left") or key_down("a") { dir -= 1 }
+    if key_down("right") or key_down("d") { dir += 1 }
+    self.velocity.x = dir * speed
+    grounded = on_ground()
+    if grounded and (key_pressed("space") or key_pressed("up") or key_pressed("w")) {
+        self.velocity.y = -jump
+    }
+    if self.y > 260 {                       # fell out of the world: back to the start
+        self.position = spawn_point
+        self.velocity = vec2(0, 0)
+    }
+}
+
+# Standing on something? A short ray down from each foot.
+func on_ground() {
+    var feet = self.position + vec2(0, 6)
+    for dx in [-5, 5] {
+        var from = feet + vec2(dx, 0)
+        if raycast(from, from + vec2(0, 5), self) != nil { return true }
+    }
+    return false
+}

@@ -1,0 +1,19 @@
+# A coin: spins, and is collected when the player touches it.
+var t = 0
+
+func start() {
+    t = self.x                              # coins spin out of step with each other
+}
+
+func update(dt) {
+    t += dt * 240
+    self.scale = vec2(abs(cos(t)), 1)
+}
+
+func on_trigger(other) {
+    if other.name == "Player" {
+        var hud = find("HUD")
+        if hud != nil { hud.collect() }
+        destroy(self)
+    }
+}

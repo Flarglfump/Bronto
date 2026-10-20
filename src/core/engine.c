@@ -1,5 +1,7 @@
 #include "bronto/engine.h"
 #include "bronto/log.h"
+#include "bronto/assets.h"
+#include "bronto/components.h"
 
 #include <string.h>
 
@@ -200,6 +202,7 @@ bool br_engine_init(br_engine *e, const br_engine_config *cfg) {
     br_input_init(&e->input);
     br_renderer_init(&e->renderer, &e->framebuffer);
     br_mixer_init(&e->mixer, e->config.audio_sample_rate ? e->config.audio_sample_rate : 44100);
+    br_assets_set_mixer(&e->mixer);
     br_scenes_init(&e->scenes, e, &e->events);
     br_rng_seed(&e->rng, 0xB40270ull);
 
@@ -365,6 +368,9 @@ void br_engine_shutdown(br_engine *e) {
     if (!e->initialized) return;
     br_scenes_shutdown(&e->scenes);
     if (e->config.on_shutdown) e->config.on_shutdown(e);
+    br_assets_clear();                  /* (silences the voices playing cached sounds) */
+    br_assets_set_mixer(NULL);
+    br_builtin_release();
     {   /* never leave a controller vibrating */
         int i;
         for (i = 0; i < BR_MAX_GAMEPADS; ++i)

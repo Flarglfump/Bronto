@@ -1,0 +1,22 @@
+# The coin counter in the top-left corner.
+var coins = 0
+var total = 0
+
+func start() {
+    total = len(find_all("Coin"))
+    show()
+}
+
+func collect() {
+    coins += 1
+    show()
+}
+
+func show() {
+    if coins == total and total > 0 {
+        self.Label.text = "All " + total + " coins!"
+        self.Label.color = rgb(120, 255, 140)
+    } else {
+        self.Label.text = "Coins: " + coins + " / " + total
+    }
+}

@@ -9,14 +9,16 @@ if not exist build mkdir build
 if not exist build\obj mkdir build\obj
 if not exist build\test_out mkdir build\test_out
 
-cl %CFLAGS% /Iexamples\snake /Iexamples\towerdefense /Fobuild\obj\ /Fdbuild\ /Fe:build\bronto_tests.exe src\bronto.c tests\test_main.c tests\test_core.c tests\test_gamepad.c tests\test_audio_ring.c tests\test_ecs_scene.c tests\test_render_audio.c tests\test_engine.c tests\test_window.c tests\test_snake.c tests\test_towerdefense.c examples\snake\snake_*.c examples\towerdefense\td_*.c || goto :error
+cl %CFLAGS% /Iexamples\snake /Iexamples\towerdefense /Itools\editor /Fobuild\obj\ /Fdbuild\ /Fe:build\bronto_tests.exe src\bronto.c tests\*.c examples\snake\snake_*.c examples\towerdefense\td_*.c tools\editor\doc.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bounce.exe src\bronto.c examples\bounce\main.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\snake.exe src\bronto.c examples\snake\*.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\towerdefense.exe src\bronto.c examples\towerdefense\*.c || goto :error
+cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\sceneplayer.exe src\bronto.c examples\sceneplayer\main.c || goto :error
+cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\editor.exe src\bronto.c tools\editor\*.c || goto :error
 
 build\bronto_tests.exe --out build\test_out || goto :error
 echo.
-echo Build and tests succeeded. Play: build\snake.exe or build\towerdefense.exe
+echo Build and tests succeeded. Play: build\snake.exe or build\towerdefense.exe; edit scenes: build\editor.exe
 exit /b 0
 
 :error

@@ -64,6 +64,13 @@ void suite_snake(void);
 void suite_audio_ring(void);
 void suite_gamepad(void);
 void suite_towerdefense(void);
+void suite_serialize(void);
+void suite_components(void);
+void suite_ui(void);
+void suite_editor_doc(void);
+void suite_fs(void);
+void suite_physics(void);
+void suite_script(void);
 
 /* Directory for test artefacts (images, wav). */
 extern const char *g_out_dir;

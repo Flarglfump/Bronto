@@ -249,47 +249,72 @@ void br_draw_line(br_renderer *r, br_vec2 a, br_vec2 b, br_color c) {
 
 /* ---- triangles ------------------------------------------------------------- */
 
-static float edge_fn(br_vec2 a, br_vec2 b, br_vec2 p) {
-    return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+/* Triangles are rasterised in fixed point (1/256 pixel) with exact integer
+ * edge functions. In floating point the same edge evaluated from the two
+ * triangles that share it can disagree by a rounding error, leaving pixel
+ * cracks or double-drawn pixels along it; integers can't disagree. */
+#define SUBPIXEL 256
+typedef long long fx64;
+typedef struct fxpt { fx64 x, y; } fxpt;
+
+static fxpt to_fixed(br_vec2 v) {
+    fxpt p;
+    p.x = (fx64)floor((double)v.x * SUBPIXEL + 0.5);
+    p.y = (fx64)floor((double)v.y * SUBPIXEL + 0.5);
+    return p;
 }
-/* Antisymmetric tie-break so pixels on a shared edge are drawn exactly once. */
-static bool edge_owns(br_vec2 a, br_vec2 b) {
-    float dy = b.y - a.y, dx = b.x - a.x;
+
+static fx64 edge_fx(fxpt a, fxpt b, fx64 px, fx64 py) {
+    return (b.x - a.x) * (py - a.y) - (b.y - a.y) * (px - a.x);
+}
+
+/* Top-left rule: a pixel centre exactly on a shared edge belongs to one side only. */
+static bool edge_owns(fxpt a, fxpt b) {
+    fx64 dy = b.y - a.y, dx = b.x - a.x;
     return dy < 0 || (dy == 0 && dx > 0);
 }
 
-static void raster_triangle(br_renderer *r, br_vec2 v0, br_vec2 v1, br_vec2 v2,
+static void raster_triangle(br_renderer *r, br_vec2 f0, br_vec2 f1, br_vec2 f2,
                             const br_color *colors, br_color flat) {
-    float area = edge_fn(v0, v1, v2), minx, miny, maxx, maxy, inv_area;
+    fxpt v0, v1, v2;
+    fx64 area, minx, miny, maxx, maxy;
+    float inv_area;
     br_color c0 = flat, c1 = flat, c2 = flat;
     bool o0, o1, o2;
     int x, y, ix0, iy0, ix1, iy1;
     if (colors) { c0 = colors[0]; c1 = colors[1]; c2 = colors[2]; }
-    if (area == 0.0f || area != area) return;
+    if (!(f0.x == f0.x && f0.y == f0.y && f1.x == f1.x && f1.y == f1.y && f2.x == f2.x && f2.y == f2.y)) return;
+    if (fabsf(f0.x) > 1e6f || fabsf(f0.y) > 1e6f || fabsf(f1.x) > 1e6f || fabsf(f1.y) > 1e6f ||
+        fabsf(f2.x) > 1e6f || fabsf(f2.y) > 1e6f) return;          /* absurdly far off screen */
+    v0 = to_fixed(f0); v1 = to_fixed(f1); v2 = to_fixed(f2);
+    area = edge_fx(v0, v1, v2.x, v2.y);
+    if (area == 0) return;
     if (area < 0) {
-        br_vec2 t = v1; br_color tc = c1;
+        fxpt t = v1; br_color tc = c1;
         v1 = v2; v2 = t; c1 = c2; c2 = tc;
         area = -area;
     }
-    inv_area = 1.0f / area;
+    inv_area = 1.0f / (float)area;
     minx = BR_MIN(v0.x, BR_MIN(v1.x, v2.x)); maxx = BR_MAX(v0.x, BR_MAX(v1.x, v2.x));
     miny = BR_MIN(v0.y, BR_MIN(v1.y, v2.y)); maxy = BR_MAX(v0.y, BR_MAX(v1.y, v2.y));
-    ix0 = BR_MAX(pix_ceil(minx), r->clip.x);
-    iy0 = BR_MAX(pix_ceil(miny), r->clip.y);
-    ix1 = BR_MIN(pix_ceil(maxx), r->clip.x + r->clip.w);
-    iy1 = BR_MIN(pix_ceil(maxy), r->clip.y + r->clip.h);
+    /* a box around every pixel centre that could be inside */
+    ix0 = BR_MAX((int)floor((double)(minx - SUBPIXEL / 2) / SUBPIXEL), r->clip.x);
+    iy0 = BR_MAX((int)floor((double)(miny - SUBPIXEL / 2) / SUBPIXEL), r->clip.y);
+    ix1 = BR_MIN((int)floor((double)(maxx - SUBPIXEL / 2) / SUBPIXEL) + 1, r->clip.x + r->clip.w);
+    iy1 = BR_MIN((int)floor((double)(maxy - SUBPIXEL / 2) / SUBPIXEL) + 1, r->clip.y + r->clip.h);
     o0 = edge_owns(v1, v2); o1 = edge_owns(v2, v0); o2 = edge_owns(v0, v1);
 
     for (y = iy0; y < iy1; ++y) {
         br_color *row = r->target->pixels + (size_t)y * (size_t)r->target->width;
+        fx64 py = (fx64)y * SUBPIXEL + SUBPIXEL / 2;
         for (x = ix0; x < ix1; ++x) {
-            br_vec2 p = br_v2((float)x + 0.5f, (float)y + 0.5f);
-            float w0 = edge_fn(v1, v2, p), w1 = edge_fn(v2, v0, p), w2 = edge_fn(v0, v1, p);
+            fx64 px = (fx64)x * SUBPIXEL + SUBPIXEL / 2;
+            fx64 w0 = edge_fx(v1, v2, px, py), w1 = edge_fx(v2, v0, px, py), w2 = edge_fx(v0, v1, px, py);
             br_color c;
             if (w0 < 0 || w1 < 0 || w2 < 0) continue;
             if ((w0 == 0 && !o0) || (w1 == 0 && !o1) || (w2 == 0 && !o2)) continue;
             if (colors) {
-                float b0 = w0 * inv_area, b1 = w1 * inv_area, b2 = w2 * inv_area;
+                float b0 = (float)w0 * inv_area, b1 = (float)w1 * inv_area, b2 = (float)w2 * inv_area;
                 c = br_rgba((uint8_t)(c0.r * b0 + c1.r * b1 + c2.r * b2 + 0.5f),
                             (uint8_t)(c0.g * b0 + c1.g * b1 + c2.g * b2 + 0.5f),
                             (uint8_t)(c0.b * b0 + c1.b * b1 + c2.b * b2 + 0.5f),

@@ -148,6 +148,28 @@ int main(int argc, char **argv) {
     /* window exists with our title and size */
     CHECK(XFetchName(drv, w, &name) && name && strcmp(name, "Bronto X11 test") == 0);
     if (name) XFree(name);
+
+    /* icon: _NET_WM_ICON holds 16x16 first, then larger sizes up to the image's */
+    {
+        br_image icon;
+        Atom type;
+        int format;
+        unsigned long count = 0, after;
+        unsigned char *data = NULL;
+        CHECK(br_image_init(&icon, 64, 64));
+        br_image_fill(&icon, br_rgb(10, 200, 30));
+        br_window_set_icon(e, &icon);
+        br_image_destroy(&icon);
+        pump(e, 1);
+        XGetWindowProperty(drv, w, XInternAtom(drv, "_NET_WM_ICON", False), 0, 1 << 20, False, AnyPropertyType,
+                           &type, &format, &count, &after, &data);
+        CHECK(format == 32 && count == (2 + 256) + (2 + 576) + (2 + 1024) + (2 + 2304) + (2 + 4096));
+        if (data) {
+            const long *v = (const long *)data;
+            CHECK(v[0] == 16 && v[1] == 16 && ((unsigned long)v[2] & 0xFFFFFFFFUL) == 0xFF0AC81EUL);   /* ARGB */
+            XFree(data);
+        }
+    }
     CHECK(e->window.width == 320 && e->window.height == 180);
     /* pixels reached the screen: left half red, right half blue, 2x scaled */
     CHECK(pixel_at(w, 40, 120) == RED);

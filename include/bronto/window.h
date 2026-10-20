@@ -83,6 +83,16 @@ void  br_window_set_fullscreen(struct br_engine *e, bool fullscreen);
 void  br_window_toggle_fullscreen(struct br_engine *e);
 bool  br_window_is_fullscreen(const struct br_engine *e);
 void  br_window_set_cursor_visible(struct br_engine *e, bool visible);
+/* The app's icon: any size (square, 64x64 or larger looks best); copied,
+ * so the image can be freed afterwards. NULL restores the default. */
+void  br_window_set_icon(struct br_engine *e, const br_image *icon);
+
+/* The OS's folder dialog. 1: chosen (absolute path in `out`), 0: cancelled,
+ * -1: no dialog on this platform (Linux without zenity or kdialog, the web). */
+int   br_pick_folder(struct br_engine *e, const char *title, const char *start, char *out, size_t size);
+/* Opens a file or folder with the OS's default program (a text editor for
+ * a script, Finder/Explorer for a folder). */
+bool  br_open_path(struct br_engine *e, const char *path);
 void  br_window_set_scale_mode(struct br_engine *e, br_scale_mode mode);
 float br_window_scale(const struct br_engine *e);
 bool  br_window_is_focused(const struct br_engine *e);

@@ -1,0 +1,297 @@
+# Bronto scene - the platformer example (open this folder with Load Project)
+bronto_scene 1
+
+entity
+  Name
+    text = "Sky"
+  Transform
+    position = 160 90
+  Shape
+    kind = rect
+    size = 320 180
+    color = #1c2433ff
+    layer = -10
+
+entity
+  Name
+    text = "Physics"
+  PhysicsWorld
+    gravity = 0 700
+    iterations = 10
+
+entity
+  Name
+    text = "Ground"
+  Transform
+    position = 160 172
+  Shape
+    kind = rect
+    size = 320 16
+    color = #4a5568ff
+    layer = 0
+  Collider
+    size = 320 16
+    friction = 0.8
+
+entity
+  Name
+    text = "Platform 1"
+  Transform
+    position = 70 130
+  Shape
+    kind = rect
+    size = 64 8
+    color = #6b7a90ff
+    layer = 0
+  Collider
+    size = 64 8
+    friction = 0.8
+
+entity
+  Name
+    text = "Platform 2"
+  Transform
+    position = 170 104
+  Shape
+    kind = rect
+    size = 64 8
+    color = #6b7a90ff
+    layer = 0
+  Collider
+    size = 64 8
+    friction = 0.8
+
+entity
+  Name
+    text = "Platform 3"
+  Transform
+    position = 270 78
+  Shape
+    kind = rect
+    size = 56 8
+    color = #6b7a90ff
+    layer = 0
+  Collider
+    size = 56 8
+    friction = 0.8
+
+entity
+  Name
+    text = "Wall L"
+  Transform
+    position = -4 90
+  Collider
+    size = 8 400
+
+entity
+  Name
+    text = "Wall R"
+  Transform
+    position = 324 90
+  Collider
+    size = 8 400
+
+entity
+  Name
+    text = "Coin"
+  Transform
+    position = 120 152
+  Shape
+    kind = ellipse
+    size = 8 8
+    color = #ffd84dff
+    layer = 1
+    outline = #b8860bff
+  Collider
+    shape = circle
+    radius = 4
+    trigger = true
+  Script
+    file = "scripts/coin.bs"
+
+entity
+  Name
+    text = "Coin"
+  Transform
+    position = 70 114
+  Shape
+    kind = ellipse
+    size = 8 8
+    color = #ffd84dff
+    layer = 1
+    outline = #b8860bff
+  Collider
+    shape = circle
+    radius = 4
+    trigger = true
+  Script
+    file = "scripts/coin.bs"
+
+entity
+  Name
+    text = "Coin"
+  Transform
+    position = 170 88
+  Shape
+    kind = ellipse
+    size = 8 8
+    color = #ffd84dff
+    layer = 1
+    outline = #b8860bff
+  Collider
+    shape = circle
+    radius = 4
+    trigger = true
+  Script
+    file = "scripts/coin.bs"
+
+entity
+  Name
+    text = "Coin"
+  Transform
+    position = 270 62
+  Shape
+    kind = ellipse
+    size = 8 8
+    color = #ffd84dff
+    layer = 1
+    outline = #b8860bff
+  Collider
+    shape = circle
+    radius = 4
+    trigger = true
+  Script
+    file = "scripts/coin.bs"
+
+entity
+  Name
+    text = "Coin"
+  Transform
+    position = 300 152
+  Shape
+    kind = ellipse
+    size = 8 8
+    color = #ffd84dff
+    layer = 1
+    outline = #b8860bff
+  Collider
+    shape = circle
+    radius = 4
+    trigger = true
+  Script
+    file = "scripts/coin.bs"
+
+entity
+  Name
+    text = "Crate"
+  Transform
+    position = 232 156
+  Shape
+    kind = rect
+    size = 16 16
+    color = #a0703cff
+    layer = 0
+    outline = #5c3d1eff
+  RigidBody
+    mass = 2
+  Collider
+    size = 16 16
+    friction = 0.6
+
+entity
+  Name
+    text = "Crate"
+  Transform
+    position = 233 140
+  Shape
+    kind = rect
+    size = 16 16
+    color = #a0703cff
+    layer = 0
+    outline = #5c3d1eff
+  RigidBody
+    mass = 2
+  Collider
+    size = 16 16
+    friction = 0.6
+
+entity
+  Name
+    text = "Crate"
+  Transform
+    position = 232.5 124
+  Shape
+    kind = rect
+    size = 16 16
+    color = #a0703cff
+    layer = 0
+    outline = #5c3d1eff
+  RigidBody
+    mass = 2
+  Collider
+    size = 16 16
+    friction = 0.6
+
+entity
+  Name
+    text = "Ball"
+  Transform
+    position = 150 30
+  Shape
+    kind = ellipse
+    size = 14 14
+    color = #6fc3ffff
+    layer = 0
+    outline = #2a6f9eff
+  RigidBody
+    mass = 0.5
+  Collider
+    shape = circle
+    radius = 7
+    bounce = 0.6
+    friction = 0.4
+
+entity
+  Name
+    text = "Player"
+  Transform
+    position = 30 150
+  Shape
+    kind = rect
+    size = 12 16
+    color = #ffa64dff
+    layer = 2
+    outline = #7a3d00ff
+  RigidBody
+    fixed_rotation = true
+    linear_damping = 0
+  Collider
+    size = 12 16
+    friction = 0
+  Script
+    file = "scripts/player.bs"
+    vars = "speed = 90, jump = 280"
+
+entity
+  Name
+    text = "HUD"
+  Transform
+    position = 50 10
+  Label
+    text = "Coins: 0"
+    size = 1
+    color = #ffffffff
+    layer = 5
+  Script
+    file = "scripts/hud.bs"
+
+entity
+  Name
+    text = "Help"
+  Transform
+    position = 235 10
+  Label
+    text = "arrows + space"
+    size = 1
+    color = #8a94a8ff
+    layer = 5

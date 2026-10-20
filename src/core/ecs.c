@@ -43,9 +43,29 @@ bool br_world_init(br_world *w) {
     return grow_entities(w, INITIAL_ENTITY_CAPACITY);
 }
 
+bool br_world_attach(br_world *w, const void *key, void *data, void (*destroy)(void *data)) {
+    int i;
+    for (i = 0; i < BR_WORLD_ATTACHMENTS; ++i)
+        if (!w->attached[i].key || w->attached[i].key == key) {
+            w->attached[i].key = key;
+            w->attached[i].data = data;
+            w->attached[i].destroy = destroy;
+            return true;
+        }
+    return false;
+}
+
+void *br_world_attached(const br_world *w, const void *key) {
+    int i;
+    for (i = 0; i < BR_WORLD_ATTACHMENTS; ++i) if (w->attached[i].key == key) return w->attached[i].data;
+    return NULL;
+}
+
 void br_world_destroy(br_world *w) {
     uint32_t i;
     br_world_clear(w);
+    for (i = 0; i < BR_WORLD_ATTACHMENTS; ++i)
+        if (w->attached[i].key && w->attached[i].destroy) w->attached[i].destroy(w->attached[i].data);
     for (i = 0; i < w->pool_count; ++i) {
         br_component_pool *p = &w->pools[i];
         br_free(p->name);
@@ -89,6 +109,30 @@ br_entity br_entity_create(br_world *w) {
     w->alive[idx] = 1;
     w->alive_count++;
     return (br_entity)(((uint32_t)w->generations[idx] << BR_ENTITY_INDEX_BITS) | idx);
+}
+
+br_entity br_entity_clone(br_world *w, br_entity src) {
+    br_entity e;
+    uint32_t c;
+    if (!br_entity_alive(w, src)) return BR_ENTITY_NULL;
+    e = br_entity_create(w);
+    if (e == BR_ENTITY_NULL) return e;
+    for (c = 0; c < w->pool_count; ++c) {
+        const void *data = br_get(w, src, c);
+        unsigned char copy[1024];
+        if (!data) continue;
+        if (w->pools[c].size > sizeof(copy)) {          /* big component: copy via the heap */
+            void *tmp = br_alloc(w->pools[c].size);
+            if (!tmp) continue;
+            memcpy(tmp, data, w->pools[c].size);
+            br_add(w, e, c, tmp);
+            br_free(tmp);
+        } else {
+            memcpy(copy, data, w->pools[c].size);       /* br_add may move the source */
+            br_add(w, e, c, w->pools[c].size ? copy : NULL);
+        }
+    }
+    return e;
 }
 
 bool br_entity_alive(const br_world *w, br_entity e) {
@@ -161,6 +205,22 @@ br_component br_component_register(br_world *w, const char *name, size_t size) {
     return w->pool_count++;
 }
 
+br_component br_component_register_desc(br_world *w, const br_component_desc *desc) {
+    br_component c = br_component_register(w, desc->name, desc->size);
+    if (c != BR_COMPONENT_INVALID) w->pools[c].desc = desc;
+    return c;
+}
+
+const br_component_desc *br_component_get_desc(const br_world *w, br_component c) {
+    return c < w->pool_count ? w->pools[c].desc : NULL;
+}
+
+const char *br_component_name(const br_world *w, br_component c) {
+    return c < w->pool_count ? w->pools[c].name : NULL;
+}
+
+uint32_t br_component_type_count(const br_world *w) { return w->pool_count; }
+
 void br_component_set_hooks(br_world *w, br_component c, br_component_hook on_add,
                             br_component_hook on_remove, void *user) {
     if (c >= w->pool_count) return;
@@ -194,6 +254,7 @@ void *br_add(br_world *w, br_entity e, br_component c, const void *init) {
     p = &w->pools[c];
     if (p->sparse[idx]) {               /* already present: overwrite */
         dst = p->data + (size_t)(p->sparse[idx] - 1) * p->stride;
+        if (!init && p->desc) init = p->desc->defaults;
         if (p->size) { if (init) memcpy(dst, init, p->size); else memset(dst, 0, p->size); }
         return dst;
     }
@@ -203,6 +264,7 @@ void *br_add(br_world *w, br_entity e, br_component c, const void *init) {
     p->sparse[idx] = slot + 1;
     dst = p->data + (size_t)slot * p->stride;
     memset(dst, 0, p->stride);
+    if (!init && p->desc) init = p->desc->defaults;
     if (init && p->size) memcpy(dst, init, p->size);
     if (p->on_add) p->on_add(w, e, dst, p->hook_user);
     /* The hook might add to this same pool; re-resolve the pointer. */

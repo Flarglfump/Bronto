@@ -56,6 +56,9 @@ typedef struct br_image {
 
 bool br_image_init(br_image *img, int width, int height);  /* cleared to transparent */
 void br_image_destroy(br_image *img);
+/* A smaller (or equal) copy of `src`: each pixel averages the area it
+ * covers, with alpha weighting (smooth icons and thumbnails). */
+bool br_image_downscale(const br_image *src, br_image *dst, int width, int height);
 bool br_image_copy(br_image *dst, const br_image *src);
 void br_image_fill(br_image *img, br_color c);
 BR_INLINE br_color br_image_get(const br_image *img, int x, int y) {

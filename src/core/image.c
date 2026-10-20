@@ -313,3 +313,35 @@ bool br_image_load(br_image *img, const char *path) {
     br_free(data);
     return ok;
 }
+
+/* ---- downscaling ------------------------------------------------------------ */
+
+bool br_image_downscale(const br_image *src, br_image *dst, int width, int height) {
+    int x, y;
+    if (!src->pixels || width < 1 || height < 1 || !br_image_init(dst, width, height)) return false;
+    for (y = 0; y < height; ++y) {
+        int y0 = y * src->height / height, y1 = (y + 1) * src->height / height;
+        if (y1 <= y0) y1 = y0 + 1;
+        for (x = 0; x < width; ++x) {
+            int x0 = x * src->width / width, x1 = (x + 1) * src->width / width, sx, sy;
+            uint32_t r = 0, g = 0, b = 0, a = 0, n = 0;
+            if (x1 <= x0) x1 = x0 + 1;
+            for (sy = y0; sy < y1; ++sy)
+                for (sx = x0; sx < x1; ++sx) {
+                    br_color c = src->pixels[sy * src->width + sx];
+                    r += (uint32_t)c.r * c.a; g += (uint32_t)c.g * c.a; b += (uint32_t)c.b * c.a;
+                    a += c.a;
+                    ++n;
+                }
+            {
+                br_color *o = &dst->pixels[y * width + x];
+                o->a = (uint8_t)((a + n / 2) / n);
+                if (a == 0) a = 1;                       /* fully clear: r = g = b = 0 */
+                o->r = (uint8_t)((r + a / 2) / a);
+                o->g = (uint8_t)((g + a / 2) / a);
+                o->b = (uint8_t)((b + a / 2) / a);
+            }
+        }
+    }
+    return true;
+}

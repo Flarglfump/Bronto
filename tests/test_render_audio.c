@@ -70,6 +70,38 @@ static void test_blending(void) {
     br_image_destroy(&img);
 }
 
+/* A quad split into two triangles, at awkward angles and sizes: no pixel
+ * may be missed (a crack) or drawn twice along the shared diagonal. */
+static void test_triangles_watertight(void) {
+    br_image img;
+    br_renderer r;
+    int k, x, y, doubled = 0, cracks = 0;
+    br_image_init(&img, 96, 96);
+    br_renderer_init(&r, &img);
+    for (k = 0; k < 40; ++k) {
+        float a = 0.13f + (float)k * 0.377f, s = 9.0f + (float)(k % 7) * 4.3f, c = cosf(a), sn = sinf(a);
+        br_vec2 m = br_v2(48.3f + (float)(k % 3) * 0.17f, 47.9f), p[4];
+        float lx[4] = { -1, 1, 1, -1 }, ly[4] = { -1, -1, 1, 1 };
+        int i;
+        for (i = 0; i < 4; ++i)
+            p[i] = br_v2(m.x + (lx[i] * c - ly[i] * sn) * s, m.y + (lx[i] * sn + ly[i] * c) * s * 0.7f);
+        br_image_fill(&img, BR_BLACK);
+        br_set_blend(&r, BR_BLEND_ADD);
+        br_fill_triangle(&r, p[0], p[1], p[2], br_rgb(100, 0, 0));
+        br_fill_triangle(&r, p[0], p[2], p[3], br_rgb(100, 0, 0));
+        for (y = 1; y < 95; ++y)
+            for (x = 1; x < 95; ++x) {
+                int v = br_image_get(&img, x, y).r;
+                if (v > 100) doubled++;
+                if (v == 0 && br_image_get(&img, x - 1, y).r && br_image_get(&img, x + 1, y).r &&
+                    br_image_get(&img, x, y - 1).r && br_image_get(&img, x, y + 1).r) cracks++;
+            }
+    }
+    CHECK_EQ_INT(doubled, 0);
+    CHECK_EQ_INT(cracks, 0);
+    br_image_destroy(&img);
+}
+
 static void test_triangles_shared_edge(void) {
     /* Two alpha triangles forming a quad must blend each pixel exactly once:
      * the result must equal a single rect fill. */
@@ -312,10 +344,25 @@ static void test_showcase_image(void) {
     br_image_destroy(&img);
 }
 
+static void test_image_downscale(void) {
+    br_image a, b;
+    CHECK(br_image_init(&a, 4, 4));
+    a.pixels[0] = BR_WHITE;                                  /* top-left 2x2: one white, three clear */
+    CHECK(br_image_downscale(&a, &b, 2, 2));
+    CHECK(b.width == 2 && b.pixels[0].a == 64);              /* coverage averages */
+    CHECK(b.pixels[0].r == 255 && b.pixels[0].g == 255);    /* clear pixels don't darken it */
+    CHECK(b.pixels[3].a == 0);
+    br_image_destroy(&b);
+    CHECK(!br_image_downscale(&a, &b, 0, 2));
+    br_image_destroy(&a);
+}
+
 void suite_render(void) {
+    RUN(test_image_downscale);
     RUN(test_rect_coverage_and_clip);
     RUN(test_blending);
     RUN(test_triangles_shared_edge);
+    RUN(test_triangles_watertight);
     RUN(test_circles_lines);
     RUN(test_images_and_sprites);
     RUN(test_camera);

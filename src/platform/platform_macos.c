@@ -461,6 +461,70 @@ static void build_menu(const char *title) {
 }
 
 /* ---- window control -------------------------------------------------------------- */
+/* The Dock icon: an NSImage holding one NSBitmapImageRep (premultiplied RGBA). */
+static void mac_set_icon(const br_image *icon) {
+    id rep, image;
+    unsigned char *dst;
+    int p;
+    if (!M.app) return;
+    if (!icon) { msg_v_id(M.app, "setApplicationIconImage:", (id)0); return; }
+    rep = ((id (*)(id, SEL, unsigned char **, long, long, long, long, BOOL, BOOL, id, long, long))objc_msgSend)(
+        msg_id(cls("NSBitmapImageRep"), "alloc"),
+        SEL_("initWithBitmapDataPlanes:pixelsWide:pixelsHigh:bitsPerSample:samplesPerPixel:hasAlpha:isPlanar:colorSpaceName:bytesPerRow:bitsPerPixel:"),
+        (unsigned char **)0, (long)icon->width, (long)icon->height, 8L, 4L, YES, NO,
+        nsstring("NSDeviceRGBColorSpace"), (long)icon->width * 4, 32L);
+    if (!rep) return;
+    dst = ((unsigned char *(*)(id, SEL))objc_msgSend)(rep, SEL_("bitmapData"));
+    for (p = 0; dst && p < icon->width * icon->height; ++p) {
+        br_color c = icon->pixels[p];
+        dst[p * 4 + 0] = (unsigned char)((c.r * c.a + 127) / 255);
+        dst[p * 4 + 1] = (unsigned char)((c.g * c.a + 127) / 255);
+        dst[p * 4 + 2] = (unsigned char)((c.b * c.a + 127) / 255);
+        dst[p * 4 + 3] = c.a;
+    }
+    {
+        CGSize size;
+        size.width = (CGFloat)icon->width;
+        size.height = (CGFloat)icon->height;
+        image = ((id (*)(id, SEL, CGSize))objc_msgSend)(msg_id(cls("NSImage"), "alloc"), SEL_("initWithSize:"), size);
+    }
+    msg_v_id(image, "addRepresentation:", rep);
+    msg_v_id(M.app, "setApplicationIconImage:", image);
+    msg_v(rep, "release");
+    msg_v(image, "release");
+}
+
+/* NSOpenPanel in folder mode, run modally. */
+static int mac_pick_folder(const char *title, const char *start, char *out, size_t size) {
+    id panel = msg_id(cls("NSOpenPanel"), "openPanel"), url, path;
+    long response;
+    const char *utf8;
+    if (!panel) return -1;
+    msg_v_bool(panel, "setCanChooseDirectories:", YES);
+    msg_v_bool(panel, "setCanChooseFiles:", NO);
+    msg_v_bool(panel, "setAllowsMultipleSelection:", NO);
+    msg_v_bool(panel, "setCanCreateDirectories:", YES);
+    msg_v_id(panel, "setMessage:", nsstring(title));
+    msg_v_id(panel, "setPrompt:", nsstring("Open"));
+    if (start && start[0])
+        msg_v_id(panel, "setDirectoryURL:", msg_id_id(cls("NSURL"), "fileURLWithPath:", nsstring(start)));
+    response = msg_long(panel, "runModal");
+    if (M.window) msg_v_id(M.window, "makeKeyAndOrderFront:", (id)0);
+    if (response != 1 /* NSModalResponseOK */) return 0;
+    url = msg_id(panel, "URL");
+    path = url ? msg_id(url, "path") : (id)0;
+    utf8 = path ? msg_cstr(path, "UTF8String") : NULL;
+    if (!utf8) return 0;
+    snprintf(out, size, "%s", utf8);
+    return 1;
+}
+
+static bool mac_open_path(const char *path) {
+    id url = msg_id_id(cls("NSURL"), "fileURLWithPath:", nsstring(path));
+    id ws = msg_id(cls("NSWorkspace"), "sharedWorkspace");
+    return url && ws && ((BOOL (*)(id, SEL, id))objc_msgSend)(ws, SEL_("openURL:"), url);
+}
+
 static void mac_set_title(const char *title) { msg_v_id(M.window, "setTitle:", nsstring(title)); }
 
 static void mac_set_window_size(int w, int h) {
@@ -661,7 +725,7 @@ static const br_platform k_macos = {
     "cocoa", mac_init, mac_shutdown, mac_poll, mac_present, mac_time, mac_sleep,
     mac_audio_wanted, mac_audio_submit,
     mac_get_window_size, mac_get_window_scale, mac_set_title, mac_set_window_size,
-    mac_set_fullscreen, mac_set_cursor_visible,
+    mac_set_fullscreen, mac_set_cursor_visible, mac_set_icon, mac_pick_folder, mac_open_path,
     mac_set_gamepad_rumble,
     NULL
 };

@@ -50,18 +50,21 @@ int main(int argc, char **argv) {
     br_log_set_level(BR_LOG_WARN);
     printf("Bronto test suite (out dir: %s)\n", g_out_dir);
 
-    printf("[memory]\n"); suite_memory();
+    printf("[memory]\n"); suite_memory(); suite_fs();
     printf("[math]\n");   suite_math();
     printf("[events]\n"); suite_events();
     printf("[input]\n");  suite_input(); suite_gamepad();
-    printf("[ecs]\n");    suite_ecs();
+    printf("[ecs]\n");    suite_ecs(); suite_serialize(); suite_components();
+    printf("[physics]\n"); suite_physics();
+    printf("[script]\n");  suite_script();
     printf("[scene]\n");  suite_scene();
-    printf("[render]\n"); suite_render();
+    printf("[render]\n"); suite_render(); suite_ui();
     printf("[audio]\n");  suite_audio(); suite_audio_ring();
     printf("[engine]\n"); suite_engine();
     printf("[window]\n"); suite_window();
     printf("[snake]\n");  suite_snake();
     printf("[towerdefense]\n"); suite_towerdefense();
+    printf("[editor]\n"); suite_editor_doc();
 
     printf("\n%d tests, %d checks, %d failed test(s), %d leak(s)\n", g_tests, g_checks,
            g_failed_tests, g_leaky_tests);

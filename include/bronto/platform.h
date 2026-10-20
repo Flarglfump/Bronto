@@ -62,6 +62,17 @@ typedef struct br_platform {
     void   (*set_window_size)(int width_points, int height_points);
     void   (*set_fullscreen)(bool fullscreen);
     void   (*set_cursor_visible)(bool visible);
+    /* The window's (and, on macOS, the Dock's) icon; NULL restores the
+     * default. Backends make the sizes they need from it. May be NULL. */
+    void   (*set_icon)(const br_image *icon);
+
+    /* ---- desktop ----
+     * pick_folder: the OS's folder dialog (modal). `start` may be NULL.
+     * Returns 1 with the folder's absolute path in `out`, 0 if the user
+     * cancelled, -1 if this platform has no dialog. open_path opens a file
+     * or folder in the program the OS uses for it. Either may be NULL. */
+    int    (*pick_folder)(const char *title, const char *start, char *out, size_t size);
+    bool   (*open_path)(const char *path);
 
     /* ---- gamepads ----
      * Controllers are polled inside poll_events and reported as GAMEPAD_*
@@ -95,6 +106,11 @@ void br_headless_set_scale(float scale);
 double br_headless_slept(void);
 bool br_headless_cursor_visible(void);
 const char *br_headless_title(void);
+const br_image *br_headless_icon(void);       /* the last icon set (NULL: none) */
+/* Scripted folder dialog: what the next pick_folder answers (path, or NULL
+ * = the user cancels); `available` false makes it report no dialog. */
+void br_headless_set_folder_answer(const char *path, bool available);
+const char *br_headless_last_opened(void);   /* the last open_path, "" if none */
 /* Simulated controllers: set a pad's current snapshot (connected=false to
  * unplug); read back the last rumble request. */
 void br_headless_set_gamepad(int pad, const br_gamepad_raw *state);

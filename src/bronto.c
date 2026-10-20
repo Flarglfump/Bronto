@@ -15,6 +15,9 @@
 #  ifndef _POSIX_C_SOURCE
 #    define _POSIX_C_SOURCE 200809L
 #  endif
+#  ifndef _XOPEN_SOURCE
+#    define _XOPEN_SOURCE 700
+#  endif
 #  if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
 #    define _DARWIN_C_SOURCE
 #  endif
@@ -25,12 +28,20 @@
 #include "core/event.c"
 #include "core/input.c"
 #include "core/ecs.c"
+#include "core/serialize.c"
 #include "core/scene.c"
 #include "core/image.c"
 #include "core/render.c"
 #include "core/font8x8.c"
+#include "core/assets.c"
+#include "core/components.c"
+#include "core/ui.c"
+#include "core/path.c"
+#include "core/physics.c"
+#include "core/script.c"
 #include "core/audio.c"
 #include "core/window.c"
 #include "core/engine.c"
 #include "platform/platform_headless.c"
 #include "platform/platform_native.c"
+#include "platform/fs.c"

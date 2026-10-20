@@ -464,6 +464,40 @@ static void x11_set_title(const char *title) {
     pXFlush(X.dpy);
 }
 
+/* _NET_WM_ICON: several sizes, each "width, height, then ARGB pixels"
+ * (straight alpha), one per `long` - 64 bits on 64-bit systems. */
+static void x11_set_icon(const br_image *icon) {
+    static const int sizes[] = { 16, 24, 32, 48, 64, 128 };
+    Atom net_wm_icon = pXInternAtom(X.dpy, "_NET_WM_ICON", 0);
+    long *data;
+    size_t n = 0, cap = 0;
+    int i;
+    if (!X.dpy || !X.win) return;
+    if (!icon) {
+        pXChangeProperty(X.dpy, X.win, net_wm_icon, (Atom)6 /* CARDINAL */, 32, X_PropModeReplace, NULL, 0);
+        pXFlush(X.dpy);
+        return;
+    }
+    for (i = 0; i < (int)BR_ARRAY_COUNT(sizes); ++i) cap += 2 + (size_t)sizes[i] * (size_t)sizes[i];
+    if (!(data = (long *)br_alloc(cap * sizeof(long)))) return;
+    for (i = 0; i < (int)BR_ARRAY_COUNT(sizes); ++i) {
+        br_image small;
+        int s = sizes[i], p;
+        if (s > icon->width && s > 16) break;          /* never enlarge (except to the smallest size) */
+        if (!br_image_downscale(icon, &small, s, s)) continue;
+        data[n++] = s;
+        data[n++] = s;
+        for (p = 0; p < s * s; ++p) {
+            br_color c = small.pixels[p];
+            data[n++] = (long)(((unsigned long)c.a << 24) | ((unsigned long)c.r << 16) | ((unsigned long)c.g << 8) | c.b);
+        }
+        br_image_destroy(&small);
+    }
+    pXChangeProperty(X.dpy, X.win, net_wm_icon, (Atom)6, 32, X_PropModeReplace, (const unsigned char *)data, (int)n);
+    pXFlush(X.dpy);
+    br_free(data);
+}
+
 static void x11_set_fullscreen(bool fs) {
     if (X.has_wm) {
         XEvent ev;
@@ -729,11 +763,13 @@ static float x11_get_window_scale(void) { return 1.0f; }
 
 static bool x11_set_gamepad_rumble(int pad, float lo, float hi) { return evdev_rumble(pad, lo, hi); }
 
+#include "desktop_unix.c"
+
 static const br_platform k_x11 = {
     "x11", x11_init, x11_shutdown, x11_poll, x11_present, x11_time, x11_sleep,
     x11_audio_wanted, x11_audio_submit,
     x11_get_window_size, x11_get_window_scale, x11_set_title, x11_set_window_size,
-    x11_set_fullscreen, x11_set_cursor_visible,
+    x11_set_fullscreen, x11_set_cursor_visible, x11_set_icon, du_pick_folder, du_open_path,
     x11_set_gamepad_rumble,
     NULL
 };

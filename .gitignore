@@ -15,3 +15,7 @@ snake_audio.wav
 snake_highscore.txt
 td_*.bmp
 td_audio.wav
+editor*.bmp
+editor_demo.scene
+editor_project/
+sceneplayer.bmp

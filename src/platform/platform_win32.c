@@ -10,7 +10,8 @@
  *   Alt+Tab, no display mode change).
  * - Audio: waveOut (audio_waveout.c). Gamepads: XInput (gamepad_xinput.c).
  * - Only system DLLs are used: user32, gdi32 (linked), winmm (loaded at run
- *   time for 1 ms timer resolution and audio).
+ *   time for 1 ms timer resolution and audio), ole32 and shell32 (loaded
+ *   for the folder dialog and opening files).
  *
  * Included by platform_native.c.
  */
@@ -20,7 +21,12 @@
 #ifndef NOMINMAX
 #  define NOMINMAX
 #endif
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601
+#  undef _WIN32_WINNT
+#  define _WIN32_WINNT 0x0601            /* Windows 7: IFileOpenDialog */
+#endif
 #include <windows.h>
+#include <shobjidl.h>                  /* IFileOpenDialog (declarations only) */
 #include <string.h>
 
 #include "bronto/platform.h"
@@ -50,6 +56,7 @@ typedef UINT (WINAPI *timeBeginPeriod_fn)(UINT);
 static struct {
     HINSTANCE inst;
     HWND hwnd;
+    HICON icon_big, icon_small;     /* set by br_window_set_icon */
     HDC hdc;
     br_platform_config cfg;
     int width, height;          /* client area, pixels */
@@ -516,6 +523,63 @@ static bool w32_init(const br_platform_config *cfg) {
     return true;
 }
 
+/* A 32-bit icon (straight alpha) of the given size, made from `icon`. */
+static HICON w32_make_icon(const br_image *icon, int size) {
+    BITMAPV5HEADER bi;
+    br_image small;
+    void *bits = NULL;
+    HDC dc;
+    HBITMAP color, mask;
+    ICONINFO ii;
+    HICON result;
+    int p;
+    if (!br_image_downscale(icon, &small, size, size)) return NULL;
+    memset(&bi, 0, sizeof(bi));
+    bi.bV5Size = sizeof(bi);
+    bi.bV5Width = size;
+    bi.bV5Height = -size;                       /* top-down */
+    bi.bV5Planes = 1;
+    bi.bV5BitCount = 32;
+    bi.bV5Compression = BI_BITFIELDS;
+    bi.bV5RedMask = 0x00FF0000;
+    bi.bV5GreenMask = 0x0000FF00;
+    bi.bV5BlueMask = 0x000000FF;
+    bi.bV5AlphaMask = 0xFF000000;
+    dc = GetDC(NULL);
+    color = CreateDIBSection(dc, (BITMAPINFO *)&bi, DIB_RGB_COLORS, &bits, NULL, 0);
+    ReleaseDC(NULL, dc);
+    if (!color || !bits) { br_image_destroy(&small); return NULL; }
+    for (p = 0; p < size * size; ++p) {
+        br_color c = small.pixels[p];
+        ((uint32_t *)bits)[p] = ((uint32_t)c.a << 24) | ((uint32_t)c.r << 16) | ((uint32_t)c.g << 8) | c.b;
+    }
+    br_image_destroy(&small);
+    mask = CreateBitmap(size, size, 1, 1, NULL);
+    memset(&ii, 0, sizeof(ii));
+    ii.fIcon = TRUE;
+    ii.hbmMask = mask;
+    ii.hbmColor = color;
+    result = CreateIconIndirect(&ii);
+    DeleteObject(color);
+    DeleteObject(mask);
+    return result;
+}
+
+static void w32_set_icon(const br_image *icon) {
+    HICON big = NULL, small = NULL;
+    if (!W.hwnd) return;
+    if (icon) {
+        big = w32_make_icon(icon, GetSystemMetrics(SM_CXICON));
+        small = w32_make_icon(icon, GetSystemMetrics(SM_CXSMICON));
+    }
+    SendMessageW(W.hwnd, WM_SETICON, ICON_BIG, (LPARAM)(big ? big : LoadIcon(NULL, IDI_APPLICATION)));
+    SendMessageW(W.hwnd, WM_SETICON, ICON_SMALL, (LPARAM)(small ? small : LoadIcon(NULL, IDI_APPLICATION)));
+    if (W.icon_big) DestroyIcon(W.icon_big);
+    if (W.icon_small) DestroyIcon(W.icon_small);
+    W.icon_big = big;
+    W.icon_small = small;
+}
+
 static void w32_shutdown(void) {
     wo_close();
     xi_shutdown();
@@ -527,6 +591,8 @@ static void w32_shutdown(void) {
     }
     ReleaseDC(W.hwnd, W.hdc);
     DestroyWindow(W.hwnd);
+    if (W.icon_big) DestroyIcon(W.icon_big);
+    if (W.icon_small) DestroyIcon(W.icon_small);
     br_free(W.staging);
     memset(&W, 0, sizeof(W));
 }
@@ -564,11 +630,76 @@ static float w32_get_window_scale(void) { return w32_scale(); }
 
 static bool w32_set_gamepad_rumble(int pad, float lo, float hi) { return xi_rumble(pad, lo, hi); }
 
+/* ---- desktop: folder dialog and opening files ------------------------------
+ * The Vista+ IFileOpenDialog in folder mode, called through its vtable
+ * from C. ole32 and shell32 are loaded at run time, and the two GUIDs are
+ * spelled out here, so nothing extra is linked. */
+typedef HRESULT (WINAPI *CoInitializeEx_fn)(LPVOID, DWORD);
+typedef void    (WINAPI *CoUninitialize_fn)(void);
+typedef HRESULT (WINAPI *CoCreateInstance_fn)(REFCLSID, LPUNKNOWN, DWORD, REFIID, LPVOID *);
+typedef void    (WINAPI *CoTaskMemFree_fn)(LPVOID);
+typedef HINSTANCE (WINAPI *ShellExecuteW_fn)(HWND, LPCWSTR, LPCWSTR, LPCWSTR, LPCWSTR, INT);
+
+static const GUID k_clsid_file_open_dialog = { 0xDC1C5A9C, 0xE88A, 0x4DDE, { 0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7 } };
+static const GUID k_iid_file_open_dialog   = { 0xD57C7288, 0xD4AD, 0x4768, { 0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60 } };
+
+static int w32_utf8_to_wide(const char *s, wchar_t *out, int count) { return MultiByteToWideChar(CP_UTF8, 0, s, -1, out, count); }
+
+static int w32_pick_folder(const char *title, const char *start, char *out, size_t size) {
+    HMODULE ole = LoadLibraryA("ole32.dll");
+    CoInitializeEx_fn co_init = ole ? W32_PROC(CoInitializeEx_fn, ole, "CoInitializeEx") : NULL;
+    CoUninitialize_fn co_uninit = ole ? W32_PROC(CoUninitialize_fn, ole, "CoUninitialize") : NULL;
+    CoCreateInstance_fn co_create = ole ? W32_PROC(CoCreateInstance_fn, ole, "CoCreateInstance") : NULL;
+    CoTaskMemFree_fn co_free = ole ? W32_PROC(CoTaskMemFree_fn, ole, "CoTaskMemFree") : NULL;
+    IFileOpenDialog *dlg = NULL;
+    IShellItem *item = NULL;
+    PWSTR wpath = NULL;
+    HRESULT init_hr;
+    int result = -1;
+    BR_UNUSED(start);                    /* the dialog remembers the last folder by itself */
+    if (!co_init || !co_uninit || !co_create || !co_free) { if (ole) FreeLibrary(ole); return -1; }
+    init_hr = co_init(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    if (SUCCEEDED(co_create(&k_clsid_file_open_dialog, NULL, CLSCTX_INPROC_SERVER, &k_iid_file_open_dialog, (void **)&dlg)) && dlg) {
+        FILEOPENDIALOGOPTIONS opts = 0;
+        wchar_t wtitle[256];
+        dlg->lpVtbl->GetOptions(dlg, &opts);
+        dlg->lpVtbl->SetOptions(dlg, opts | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
+        if (w32_utf8_to_wide(title, wtitle, 256) > 0) dlg->lpVtbl->SetTitle(dlg, wtitle);
+        result = 0;
+        if (SUCCEEDED(dlg->lpVtbl->Show(dlg, W.hwnd)) && SUCCEEDED(dlg->lpVtbl->GetResult(dlg, &item)) && item) {
+            if (SUCCEEDED(item->lpVtbl->GetDisplayName(item, SIGDN_FILESYSPATH, &wpath)) && wpath) {
+                if (WideCharToMultiByte(CP_UTF8, 0, wpath, -1, out, (int)size, NULL, NULL) > 0) {
+                    char *p;
+                    for (p = out; *p; ++p) if (*p == '\\') *p = '/';
+                    result = 1;
+                }
+                co_free(wpath);
+            }
+            item->lpVtbl->Release(item);
+        }
+        dlg->lpVtbl->Release(dlg);
+    }
+    if (SUCCEEDED(init_hr)) co_uninit();
+    FreeLibrary(ole);
+    return result;
+}
+
+static bool w32_open_path(const char *path) {
+    HMODULE shell = LoadLibraryA("shell32.dll");
+    ShellExecuteW_fn exec = shell ? W32_PROC(ShellExecuteW_fn, shell, "ShellExecuteW") : NULL;
+    wchar_t wpath[1024];
+    bool ok = false;
+    if (exec && w32_utf8_to_wide(path, wpath, 1024) > 0)
+        ok = (INT_PTR)exec(W.hwnd, L"open", wpath, NULL, NULL, SW_SHOWNORMAL) > 32;
+    if (shell) FreeLibrary(shell);
+    return ok;
+}
+
 static const br_platform k_win32 = {
     "win32", w32_init, w32_shutdown, w32_poll, w32_present, w32_time, w32_sleep,
     w32_audio_wanted, w32_audio_submit,
     w32_get_window_size, w32_get_window_scale, w32_set_title, w32_set_window_size,
-    w32_set_fullscreen, w32_set_cursor_visible,
+    w32_set_fullscreen, w32_set_cursor_visible, w32_set_icon, w32_pick_folder, w32_open_path,
     w32_set_gamepad_rumble,
     NULL
 };

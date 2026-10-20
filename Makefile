@@ -5,6 +5,7 @@
 #   make test       build and run the test suite
 #   make snake      build and play the Snake sample
 #   make towerdefense  build and play the Pop Defense sample
+#   make editor     build and run the scene editor (tools/editor)
 #   make examples   build the examples (build/examples/*)
 #   make run-examples  run every example headless in build/run (CI smoke test)
 #   make sanitize   run the tests under AddressSanitizer + UBSan
@@ -45,7 +46,7 @@ else
 endif
 
 CORE_SRC := $(wildcard src/core/*.c)
-PLAT_SRC := src/platform/platform_headless.c src/platform/platform_native.c
+PLAT_SRC := src/platform/platform_headless.c src/platform/platform_native.c src/platform/fs.c
 LIB_SRC  := $(CORE_SRC) $(PLAT_SRC)
 LIB_OBJ  := $(patsubst src/%.c,$(BUILD)/obj/%.o,$(LIB_SRC))
 LIB      := $(BUILD)/libbronto.a
@@ -53,14 +54,15 @@ LIB      := $(BUILD)/libbronto.a
 # The rules of the sample games are unit-tested too.
 SNAKE_RULES := $(wildcard examples/snake/snake_*.c)
 TD_RULES := $(wildcard examples/towerdefense/td_*.c)
-TEST_SRC := $(wildcard tests/*.c) $(SNAKE_RULES) $(TD_RULES)
+TEST_SRC := $(wildcard tests/*.c) $(SNAKE_RULES) $(TD_RULES) tools/editor/doc.c
 TEST_BIN := $(BUILD)/bronto_tests
 
 # Each examples/<name>/ directory becomes $(BUILD)/examples/<name>, built
 # from every .c file in it.
 EXAMPLES := $(patsubst examples/%/main.c,$(BUILD)/examples/%,$(wildcard examples/*/main.c))
+EDITOR   := $(BUILD)/editor
 
-.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td audio-test evdev-test
+.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools audio-test evdev-test
 
 all: lib
 
@@ -74,15 +76,23 @@ $(BUILD)/obj/%.o: src/%.c $(wildcard include/bronto/*.h)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # platform_native.c #includes the OS backend files.
-$(BUILD)/obj/platform/platform_native.o: $(wildcard src/platform/platform_*.c) $(wildcard src/platform/audio_*.c) $(wildcard src/platform/gamepad_*.c)
+$(BUILD)/obj/platform/platform_native.o: $(wildcard src/platform/platform_*.c) $(wildcard src/platform/desktop_*.c) $(wildcard src/platform/audio_*.c) $(wildcard src/platform/gamepad_*.c)
+$(BUILD)/obj/platform/fs.o: $(wildcard src/platform/fs_*.c)
 
 $(LIB): $(LIB_OBJ)
 	$(AR) rcs $@ $^
 
-$(TEST_BIN): $(TEST_SRC) $(LIB) tests/test.h $(wildcard examples/snake/snake*.h) $(wildcard examples/towerdefense/td*.h)
-	$(CC) $(CFLAGS) -Iexamples/snake -Iexamples/towerdefense -Wno-missing-prototypes $(TEST_SRC) $(LIB) $(LDFLAGS) $(LDLIBS) $(TEST_LDLIBS) -o $@
+$(TEST_BIN): $(TEST_SRC) $(LIB) tests/test.h $(wildcard examples/snake/snake*.h) $(wildcard examples/towerdefense/td*.h) tools/editor/editor.h
+	$(CC) $(CFLAGS) -Iexamples/snake -Iexamples/towerdefense -Itools/editor -Wno-missing-prototypes $(TEST_SRC) $(LIB) $(LDFLAGS) $(LDLIBS) $(TEST_LDLIBS) -o $@
 
-test: $(TEST_BIN)
+# The single-file build (src/bronto.c, used by build.bat) must keep compiling:
+# every static name in the engine has to be unique across all its files.
+$(BUILD)/obj/unity.stamp: src/bronto.c $(LIB_SRC) $(wildcard src/platform/*.c) $(wildcard include/bronto/*.h)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fsyntax-only src/bronto.c
+	@touch $@
+
+test: $(TEST_BIN) $(BUILD)/obj/unity.stamp
 	@mkdir -p $(BUILD)/test_out
 	$(TEST_BIN) --out $(BUILD)/test_out
 
@@ -107,11 +117,22 @@ towerdefense: $(BUILD)/examples/towerdefense
 td: $(BUILD)/examples/towerdefense
 	$(BUILD)/examples/towerdefense
 
+# The editor: every .c file in tools/editor.
+tools: $(EDITOR)
+
+$(EDITOR): $(wildcard tools/editor/*.c) $(wildcard tools/editor/*.h) $(LIB)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(filter %.c,$^) $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
+
+editor: $(EDITOR)
+	$(EDITOR) $(SCENE)
+
 # Runs from $(BUILD)/run so the screenshots and WAVs the demos write stay
 # out of the source tree.
-run-examples: examples
+run-examples: examples tools
 	@mkdir -p $(BUILD)/run
-	@cd $(BUILD)/run && for e in $(abspath $(EXAMPLES)); do echo "== $$e --headless"; $$e --headless || exit 1; done
+	@cd $(BUILD)/run && for e in $(abspath $(EXAMPLES) $(EDITOR)); do echo "== $$e --headless"; $$e --headless || exit 1; done
+	@cd $(BUILD)/run && $(abspath $(BUILD)/examples/sceneplayer) $(abspath examples/platformer/main.scene) --headless
 
 clean:
 	rm -rf build build-asan

@@ -201,6 +201,17 @@ static void test_title_cursor_hidpi(void) {
     CHECK_NEAR(br_window_scale(e), 2, 0);
     br_window_set_title(e, "Renamed");
     CHECK(strcmp(br_headless_title(), "Renamed") == 0);
+    {   /* the icon is copied: the caller's image can go */
+        br_image icon;
+        CHECK(br_headless_icon() == NULL);
+        CHECK(br_image_init(&icon, 8, 8));
+        br_image_fill(&icon, BR_RED);
+        br_window_set_icon(e, &icon);
+        br_image_destroy(&icon);
+        CHECK(br_headless_icon() && br_headless_icon()->width == 8 && br_color_eq(br_headless_icon()->pixels[63], BR_RED));
+        br_window_set_icon(e, NULL);
+        CHECK(br_headless_icon() == NULL);
+    }
     br_window_set_cursor_visible(e, false);
     CHECK(!br_headless_cursor_visible() && !e->window.cursor_visible);
     br_headless_set_scale(1.0f);                /* dragged to a normal monitor */
