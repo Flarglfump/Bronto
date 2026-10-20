@@ -1,0 +1,17 @@
+build/
+build-asan/
+*.o
+*.a
+*.obj
+*.exe
+*.pdb
+*.ilk
+# example / test artefacts
+bounce_*.bmp
+bounce_*.wav
+.DS_Store
+snake_*.bmp
+snake_audio.wav
+snake_highscore.txt
+td_*.bmp
+td_audio.wav
