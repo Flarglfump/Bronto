@@ -1,0 +1,148 @@
+{
+ "func": {
+  "prefix": "func",
+  "body": [
+   "func ${1:name}(${2}) {",
+   "\t$0",
+   "}"
+  ],
+  "description": "A function"
+ },
+ "var": {
+  "prefix": "var",
+  "body": [
+   "var ${1:name} = ${2:0}"
+  ],
+  "description": "A variable"
+ },
+ "if": {
+  "prefix": "if",
+  "body": [
+   "if ${1:condition} {",
+   "\t$0",
+   "}"
+  ],
+  "description": "if"
+ },
+ "ifelse": {
+  "prefix": "ifelse",
+  "body": [
+   "if ${1:condition} {",
+   "\t$2",
+   "} else {",
+   "\t$0",
+   "}"
+  ],
+  "description": "if ... else"
+ },
+ "elif": {
+  "prefix": "elif",
+  "body": [
+   "elif ${1:condition} {",
+   "\t$0",
+   "}"
+  ],
+  "description": "elif"
+ },
+ "while": {
+  "prefix": "while",
+  "body": [
+   "while ${1:condition} {",
+   "\t$0",
+   "}"
+  ],
+  "description": "while loop"
+ },
+ "for": {
+  "prefix": "for",
+  "body": [
+   "for ${1:item} in ${2:list} {",
+   "\t$0",
+   "}"
+  ],
+  "description": "for each item"
+ },
+ "forn": {
+  "prefix": "forn",
+  "body": [
+   "for ${1:i} in ${2:10} {",
+   "\t$0",
+   "}"
+  ],
+  "description": "for i in 0..n-1"
+ },
+ "move": {
+  "prefix": "move",
+  "body": [
+   "var dir = 0",
+   "if key_down(\"left\") { dir -= 1 }",
+   "if key_down(\"right\") { dir += 1 }",
+   "self.velocity.x = dir * ${1:speed}"
+  ],
+  "description": "Left/right movement with the arrow keys"
+ },
+ "ground": {
+  "prefix": "onground",
+  "body": [
+   "func on_ground() {",
+   "\tvar feet = self.position + vec2(0, ${1:6})",
+   "\treturn raycast(feet, feet + vec2(0, 5), self) != nil",
+   "}"
+  ],
+  "description": "Is something under this entity?"
+ },
+ "callback start": {
+  "prefix": "start",
+  "body": [
+   "func start() {",
+   "\t$0",
+   "}"
+  ],
+  "description": "Runs once, before the entity's first update."
+ },
+ "callback update": {
+  "prefix": "update",
+  "body": [
+   "func update(dt) {",
+   "\t$0",
+   "}"
+  ],
+  "description": "Runs every fixed step; dt is the step in seconds."
+ },
+ "callback on_collision": {
+  "prefix": "on_collision",
+  "body": [
+   "func on_collision(other, normal, speed) {",
+   "\t$0",
+   "}"
+  ],
+  "description": "This collider started touching other's."
+ },
+ "callback on_collision_end": {
+  "prefix": "on_collision_end",
+  "body": [
+   "func on_collision_end(other) {",
+   "\t$0",
+   "}"
+  ],
+  "description": "They stopped touching."
+ },
+ "callback on_trigger": {
+  "prefix": "on_trigger",
+  "body": [
+   "func on_trigger(other) {",
+   "\t$0",
+   "}"
+  ],
+  "description": "other entered a trigger (this entity's or its own)."
+ },
+ "callback on_trigger_exit": {
+  "prefix": "on_trigger_exit",
+  "body": [
+   "func on_trigger_exit(other) {",
+   "\t$0",
+   "}"
+  ],
+  "description": "other left the trigger."
+ }
+}

@@ -1,0 +1,736 @@
+{
+ "builtins": [
+  {
+   "name": "print",
+   "signature": "print(value, ...)",
+   "doc": "Writes the values to the log (and the editor's status bar), separated by spaces.",
+   "params": [
+    "value"
+   ],
+   "min": 0
+  },
+  {
+   "name": "str",
+   "signature": "str(value)",
+   "doc": "The value as text.",
+   "params": [
+    "value"
+   ],
+   "min": 1
+  },
+  {
+   "name": "num",
+   "signature": "num(text)",
+   "doc": "The number in a string, or nil if it isn't one.",
+   "params": [
+    "text"
+   ],
+   "min": 1
+  },
+  {
+   "name": "floor",
+   "signature": "floor(x)",
+   "doc": "Rounds down.",
+   "params": [
+    "x"
+   ],
+   "min": 1
+  },
+  {
+   "name": "ceil",
+   "signature": "ceil(x)",
+   "doc": "Rounds up.",
+   "params": [
+    "x"
+   ],
+   "min": 1
+  },
+  {
+   "name": "round",
+   "signature": "round(x)",
+   "doc": "Rounds to the nearest whole number.",
+   "params": [
+    "x"
+   ],
+   "min": 1
+  },
+  {
+   "name": "abs",
+   "signature": "abs(x)",
+   "doc": "The value without its sign.",
+   "params": [
+    "x"
+   ],
+   "min": 1
+  },
+  {
+   "name": "sqrt",
+   "signature": "sqrt(x)",
+   "doc": "Square root (x must not be negative).",
+   "params": [
+    "x"
+   ],
+   "min": 1
+  },
+  {
+   "name": "sin",
+   "signature": "sin(degrees)",
+   "doc": "Sine of an angle in degrees.",
+   "params": [
+    "degrees"
+   ],
+   "min": 1
+  },
+  {
+   "name": "cos",
+   "signature": "cos(degrees)",
+   "doc": "Cosine of an angle in degrees.",
+   "params": [
+    "degrees"
+   ],
+   "min": 1
+  },
+  {
+   "name": "atan2",
+   "signature": "atan2(y, x)",
+   "doc": "The angle of (x, y), in degrees.",
+   "params": [
+    "y",
+    "x"
+   ],
+   "min": 2
+  },
+  {
+   "name": "pow",
+   "signature": "pow(x, y)",
+   "doc": "x to the power y.",
+   "params": [
+    "x",
+    "y"
+   ],
+   "min": 2
+  },
+  {
+   "name": "sign",
+   "signature": "sign(x)",
+   "doc": "-1, 0 or 1.",
+   "params": [
+    "x"
+   ],
+   "min": 1
+  },
+  {
+   "name": "min",
+   "signature": "min(a, b, ...)",
+   "doc": "The smallest of the numbers.",
+   "params": [
+    "a",
+    "b"
+   ],
+   "min": 1
+  },
+  {
+   "name": "max",
+   "signature": "max(a, b, ...)",
+   "doc": "The largest of the numbers.",
+   "params": [
+    "a",
+    "b"
+   ],
+   "min": 1
+  },
+  {
+   "name": "clamp",
+   "signature": "clamp(v, lo, hi)",
+   "doc": "v kept between lo and hi.",
+   "params": [
+    "v",
+    "lo",
+    "hi"
+   ],
+   "min": 3
+  },
+  {
+   "name": "lerp",
+   "signature": "lerp(a, b, t)",
+   "doc": "From a (t = 0) to b (t = 1). Numbers or vec2s.",
+   "params": [
+    "a",
+    "b",
+    "t"
+   ],
+   "min": 3
+  },
+  {
+   "name": "random",
+   "signature": "random() / random(n) / random(a, b)",
+   "doc": "A random number: 0..1, 0..n or a..b. Deterministic per world.",
+   "params": [
+    "a",
+    "b"
+   ],
+   "min": 0
+  },
+  {
+   "name": "vec2",
+   "signature": "vec2(x, y)",
+   "doc": "A 2D vector. Has .x, .y and .length; + - with vec2s, * / by numbers.",
+   "params": [
+    "x",
+    "y"
+   ],
+   "min": 2
+  },
+  {
+   "name": "length",
+   "signature": "length(v)",
+   "doc": "How long a vec2 is.",
+   "params": [
+    "v"
+   ],
+   "min": 1
+  },
+  {
+   "name": "normalize",
+   "signature": "normalize(v)",
+   "doc": "v scaled to length 1 (or (0, 0)).",
+   "params": [
+    "v"
+   ],
+   "min": 1
+  },
+  {
+   "name": "dot",
+   "signature": "dot(a, b)",
+   "doc": "The dot product of two vec2s.",
+   "params": [
+    "a",
+    "b"
+   ],
+   "min": 2
+  },
+  {
+   "name": "distance",
+   "signature": "distance(a, b)",
+   "doc": "The distance between two points.",
+   "params": [
+    "a",
+    "b"
+   ],
+   "min": 2
+  },
+  {
+   "name": "angle",
+   "signature": "angle(v)",
+   "doc": "The direction of a vec2, in degrees (0 = right, 90 = down).",
+   "params": [
+    "v"
+   ],
+   "min": 1
+  },
+  {
+   "name": "from_angle",
+   "signature": "from_angle(degrees, length = 1)",
+   "doc": "A vec2 pointing that way.",
+   "params": [
+    "degrees",
+    "length"
+   ],
+   "min": 1
+  },
+  {
+   "name": "rgb",
+   "signature": "rgb(r, g, b, a = 255)",
+   "doc": "A colour (\"#rrggbbaa\") for colour fields, e.g. self.Shape.color = rgb(255, 0, 0).",
+   "params": [
+    "r",
+    "g",
+    "b",
+    "a"
+   ],
+   "min": 3
+  },
+  {
+   "name": "len",
+   "signature": "len(list_or_string)",
+   "doc": "How many items (or characters).",
+   "params": [
+    "list"
+   ],
+   "min": 1
+  },
+  {
+   "name": "push",
+   "signature": "push(list, value)",
+   "doc": "Adds value at the end; returns the list.",
+   "params": [
+    "list",
+    "value"
+   ],
+   "min": 2
+  },
+  {
+   "name": "pop",
+   "signature": "pop(list)",
+   "doc": "Removes and returns the last item.",
+   "params": [
+    "list"
+   ],
+   "min": 1
+  },
+  {
+   "name": "remove",
+   "signature": "remove(list, index)",
+   "doc": "Removes and returns the item at index (-1 = the last).",
+   "params": [
+    "list",
+    "index"
+   ],
+   "min": 2
+  },
+  {
+   "name": "contains",
+   "signature": "contains(list, value)",
+   "doc": "Whether the list holds the value.",
+   "params": [
+    "list",
+    "value"
+   ],
+   "min": 2
+  },
+  {
+   "name": "range",
+   "signature": "range(n) / range(a, b, step = 1)",
+   "doc": "A list of numbers: 0..n-1, or a up to (not including) b.",
+   "params": [
+    "a",
+    "b",
+    "step"
+   ],
+   "min": 1
+  },
+  {
+   "name": "key_down",
+   "signature": "key_down(name)",
+   "doc": "Whether a key is held: \"left\", \"a\", \"space\", \"shift\", \"F1\"...",
+   "params": [
+    "name"
+   ],
+   "min": 1
+  },
+  {
+   "name": "key_pressed",
+   "signature": "key_pressed(name)",
+   "doc": "Whether a key went down this frame.",
+   "params": [
+    "name"
+   ],
+   "min": 1
+  },
+  {
+   "name": "key_released",
+   "signature": "key_released(name)",
+   "doc": "Whether a key came up this frame.",
+   "params": [
+    "name"
+   ],
+   "min": 1
+  },
+  {
+   "name": "mouse_down",
+   "signature": "mouse_down(button = 0)",
+   "doc": "Whether a mouse button is held (0 left, 1 right, 2 middle).",
+   "params": [
+    "button"
+   ],
+   "min": 0
+  },
+  {
+   "name": "mouse_pressed",
+   "signature": "mouse_pressed(button = 0)",
+   "doc": "Whether a mouse button went down this frame.",
+   "params": [
+    "button"
+   ],
+   "min": 0
+  },
+  {
+   "name": "mouse_position",
+   "signature": "mouse_position()",
+   "doc": "Where the mouse is, in game pixels.",
+   "params": [],
+   "min": 0
+  },
+  {
+   "name": "time",
+   "signature": "time()",
+   "doc": "Seconds since the game started.",
+   "params": [],
+   "min": 0
+  },
+  {
+   "name": "find",
+   "signature": "find(name)",
+   "doc": "The first entity with this name, or nil.",
+   "params": [
+    "name"
+   ],
+   "min": 1
+  },
+  {
+   "name": "find_all",
+   "signature": "find_all(name)",
+   "doc": "A list of every entity with this name.",
+   "params": [
+    "name"
+   ],
+   "min": 1
+  },
+  {
+   "name": "destroy",
+   "signature": "destroy(entity)",
+   "doc": "Removes the entity (and its children) at the end of the step.",
+   "params": [
+    "entity"
+   ],
+   "min": 1
+  },
+  {
+   "name": "spawn",
+   "signature": "spawn(path, position, parent)",
+   "doc": "Adds a copy of a scene file's entities and returns the first. With a parent, position is in its space.",
+   "params": [
+    "path",
+    "position",
+    "parent"
+   ],
+   "min": 1
+  },
+  {
+   "name": "children",
+   "signature": "children(entity)",
+   "doc": "The entity's direct children, as a list.",
+   "params": [
+    "entity"
+   ],
+   "min": 1
+  },
+  {
+   "name": "child",
+   "signature": "child(entity, name)",
+   "doc": "The direct child with that name, or nil.",
+   "params": [
+    "entity",
+    "name"
+   ],
+   "min": 2
+  },
+  {
+   "name": "has",
+   "signature": "has(entity, component)",
+   "doc": "Whether the entity has the component, e.g. has(other, \"RigidBody\").",
+   "params": [
+    "entity",
+    "component"
+   ],
+   "min": 2
+  },
+  {
+   "name": "add",
+   "signature": "add(entity, component)",
+   "doc": "Adds a component (with its defaults) and returns it.",
+   "params": [
+    "entity",
+    "component"
+   ],
+   "min": 2
+  },
+  {
+   "name": "remove_component",
+   "signature": "remove_component(entity, component)",
+   "doc": "Removes a component.",
+   "params": [
+    "entity",
+    "component"
+   ],
+   "min": 2
+  },
+  {
+   "name": "apply_force",
+   "signature": "apply_force(entity, force, point)",
+   "doc": "Pushes a RigidBody over the next step. With a world point, also spins it.",
+   "params": [
+    "entity",
+    "force",
+    "point"
+   ],
+   "min": 2
+  },
+  {
+   "name": "apply_impulse",
+   "signature": "apply_impulse(entity, impulse, point)",
+   "doc": "Changes a RigidBody's velocity at once.",
+   "params": [
+    "entity",
+    "impulse",
+    "point"
+   ],
+   "min": 2
+  },
+  {
+   "name": "raycast",
+   "signature": "raycast(from, to, ignore)",
+   "doc": "The first solid collider on the line: [entity, point, normal], or nil.",
+   "params": [
+    "from",
+    "to",
+    "ignore"
+   ],
+   "min": 2
+  },
+  {
+   "name": "entity_at",
+   "signature": "entity_at(point)",
+   "doc": "The collider under a point, or nil.",
+   "params": [
+    "point"
+   ],
+   "min": 1
+  },
+  {
+   "name": "play_sound",
+   "signature": "play_sound(path, volume = 1)",
+   "doc": "Plays a WAV file from the project.",
+   "params": [
+    "path",
+    "volume"
+   ],
+   "min": 1
+  },
+  {
+   "name": "send",
+   "signature": "send(entity, function, args...)",
+   "doc": "Calls a function in another entity's script if it has one; nil otherwise.",
+   "params": [
+    "entity",
+    "function",
+    "args"
+   ],
+   "min": 2
+  }
+ ],
+ "properties": [
+  {
+   "name": "name",
+   "type": "string",
+   "doc": "Name.text"
+  },
+  {
+   "name": "position",
+   "type": "vec2",
+   "doc": "Transform.position, in the parent's space"
+  },
+  {
+   "name": "x",
+   "type": "number",
+   "doc": "Transform.position.x"
+  },
+  {
+   "name": "y",
+   "type": "number",
+   "doc": "Transform.position.y"
+  },
+  {
+   "name": "rotation",
+   "type": "number",
+   "doc": "Transform.rotation (degrees, clockwise), relative to the parent"
+  },
+  {
+   "name": "scale",
+   "type": "vec2",
+   "doc": "Transform.scale (set a number or a vec2)"
+  },
+  {
+   "name": "global_position",
+   "type": "vec2",
+   "doc": "Where it is in the world, after its parents"
+  },
+  {
+   "name": "global_rotation",
+   "type": "number",
+   "doc": "Rotation in the world, after its parents"
+  },
+  {
+   "name": "parent",
+   "type": "entity",
+   "doc": "The parent entity, or nil. Set it to reparent (it stays where it is on screen)"
+  },
+  {
+   "name": "velocity",
+   "type": "vec2",
+   "doc": "RigidBody.velocity, or Motion.velocity"
+  },
+  {
+   "name": "angular_velocity",
+   "type": "number",
+   "doc": "RigidBody.angular_velocity (degrees / second)"
+  },
+  {
+   "name": "alive",
+   "type": "bool",
+   "doc": "False once destroyed"
+  },
+  {
+   "name": "id",
+   "type": "number",
+   "doc": "A number unique to the entity"
+  }
+ ],
+ "vec2": [
+  {
+   "name": "x",
+   "doc": "x"
+  },
+  {
+   "name": "y",
+   "doc": "y"
+  },
+  {
+   "name": "length",
+   "doc": "length (read only)"
+  }
+ ],
+ "components": {
+  "Name": [
+   "text"
+  ],
+  "Transform": [
+   "position",
+   "rotation",
+   "scale"
+  ],
+  "Shape": [
+   "kind",
+   "size",
+   "color",
+   "outline",
+   "layer"
+  ],
+  "Sprite": [
+   "image",
+   "tint",
+   "layer"
+  ],
+  "Label": [
+   "text",
+   "size",
+   "color",
+   "layer"
+  ],
+  "Motion": [
+   "velocity",
+   "spin"
+  ],
+  "Bounds": [
+   "min",
+   "max",
+   "wrap"
+  ],
+  "Sound": [
+   "file",
+   "volume",
+   "loop",
+   "play_on_start"
+  ],
+  "RigidBody": [
+   "type",
+   "mass",
+   "gravity_scale",
+   "velocity",
+   "angular_velocity",
+   "linear_damping",
+   "angular_damping",
+   "fixed_rotation"
+  ],
+  "Collider": [
+   "shape",
+   "size",
+   "radius",
+   "offset",
+   "friction",
+   "bounce",
+   "trigger",
+   "layer",
+   "mask"
+  ],
+  "PhysicsWorld": [
+   "gravity",
+   "iterations"
+  ],
+  "Script": [
+   "file",
+   "vars"
+  ],
+  "Parent": [
+   "entity"
+  ]
+ },
+ "callbacks": [
+  {
+   "name": "start",
+   "signature": "start()",
+   "doc": "Runs once, before the entity's first update.",
+   "snippet": "func start() {\n\t$0\n}"
+  },
+  {
+   "name": "update",
+   "signature": "update(dt)",
+   "doc": "Runs every fixed step; dt is the step in seconds.",
+   "snippet": "func update(dt) {\n\t$0\n}"
+  },
+  {
+   "name": "on_collision",
+   "signature": "on_collision(other, normal, speed)",
+   "doc": "This collider started touching other's.",
+   "snippet": "func on_collision(other, normal, speed) {\n\t$0\n}"
+  },
+  {
+   "name": "on_collision_end",
+   "signature": "on_collision_end(other)",
+   "doc": "They stopped touching.",
+   "snippet": "func on_collision_end(other) {\n\t$0\n}"
+  },
+  {
+   "name": "on_trigger",
+   "signature": "on_trigger(other)",
+   "doc": "other entered a trigger (this entity's or its own).",
+   "snippet": "func on_trigger(other) {\n\t$0\n}"
+  },
+  {
+   "name": "on_trigger_exit",
+   "signature": "on_trigger_exit(other)",
+   "doc": "other left the trigger.",
+   "snippet": "func on_trigger_exit(other) {\n\t$0\n}"
+  }
+ ],
+ "keywords": {
+  "var": "Declares a variable. At the top of a file: one per entity, kept between calls.",
+  "func": "Declares a function.",
+  "if": "if condition { ... }",
+  "elif": "elif condition { ... }",
+  "else": "else { ... }",
+  "while": "while condition { ... }",
+  "for": "for item in list { ... }  /  for i in 10 { ... }",
+  "in": "for item in list",
+  "return": "Returns from the function (with a value).",
+  "break": "Leaves the loop.",
+  "continue": "Skips to the next turn of the loop.",
+  "and": "Both (returns an operand).",
+  "or": "Either (returns an operand).",
+  "not": "Negation.",
+  "true": "true",
+  "false": "false",
+  "nil": "Nothing. nil, false and 0 count as false.",
+  "self": "The entity running this script."
+ }
+}

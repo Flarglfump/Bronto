@@ -160,3 +160,7 @@ int br_pick_folder(br_engine *e, const char *title, const char *start, char *out
 bool br_open_path(br_engine *e, const char *path) {
     return path && e->platform && e->platform->open_path && e->platform->open_path(path);
 }
+
+bool br_launch(br_engine *e, const char *command_line) {
+    return command_line && command_line[0] && e->platform && e->platform->launch && e->platform->launch(command_line);
+}

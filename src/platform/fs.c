@@ -17,6 +17,7 @@
 
 #include <ctype.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 /* Grows a listing by one entry (NULL when out of memory). */
@@ -65,6 +66,25 @@ void br_dir_list_free(br_dir_list *list) {
     br_free(list->entries);
     list->entries = NULL;
     list->count = 0;
+}
+
+bool br_fs_config_dir(const char *app, char *out, size_t size) {
+    char base[BR_PATH_MAX];
+    const char *env;
+#if defined(_WIN32)
+    if (!(env = getenv("APPDATA")) || !env[0]) return false;
+    snprintf(base, sizeof(base), "%s", env);
+#elif defined(__APPLE__)
+    if (!(env = getenv("HOME")) || !env[0]) return false;
+    snprintf(base, sizeof(base), "%s/Library/Application Support", env);
+#else
+    if ((env = getenv("XDG_CONFIG_HOME")) != NULL && env[0]) snprintf(base, sizeof(base), "%s", env);
+    else if ((env = getenv("HOME")) != NULL && env[0]) snprintf(base, sizeof(base), "%s/.config", env);
+    else return false;
+#endif
+    br_fs_mkdir(base);
+    br_path_join(out, size, base, app);
+    return br_fs_mkdir(out);
 }
 
 bool br_fs_exists(const char *path) { br_dir_entry e; return br_fs_stat(path, &e); }

@@ -74,6 +74,13 @@ void br_field_format(const br_field *f, const void *component, char *out, size_t
         else snprintf(out, size, "%d", v);
         break;
     }
+    case BR_FIELD_ENTITY: {             /* on its own, a raw handle; scene files write file positions */
+        br_entity e;
+        memcpy(&e, p, sizeof(e));
+        if (e == BR_ENTITY_NULL) snprintf(out, size, "none");
+        else snprintf(out, size, "@%u", (unsigned)e);
+        break;
+    }
     case BR_FIELD_STRING: {
         const char *s = (const char *)p;
         size_t n = bounded_len(s, f->size), i, o = 0;
@@ -201,6 +208,18 @@ bool br_field_parse(const br_field *f, void *component, const char *text) {
         memcpy(p, &v, sizeof(v));
         return true;
     }
+    case BR_FIELD_ENTITY: {
+        long v;
+        char *end;
+        br_entity e = BR_ENTITY_NULL;
+        if (strncmp(s, "none", 4) == 0 && at_end(s + 4)) { memcpy(p, &e, sizeof(e)); return true; }
+        if (*s != '@') return false;
+        v = strtol(s + 1, &end, 10);
+        if (end == s + 1 || !at_end(end) || v < 0) return false;
+        e = (br_entity)v;
+        memcpy(p, &e, sizeof(e));
+        return true;
+    }
     case BR_FIELD_STRING: {
         char buf[VALUE_MAX];
         if (f->size == 0 || !parse_string(s, buf, f->size < sizeof(buf) ? f->size : sizeof(buf))) return false;
@@ -213,7 +232,26 @@ bool br_field_parse(const br_field *f, void *component, const char *text) {
 
 /* ---- writing --------------------------------------------------------------------- */
 
-static void write_entity(strbuf *b, const br_world *w, br_entity e) {
+/* Entity references are written as the referenced entity's position among
+ * those being saved (0 = the first), found through a sorted handle list. */
+typedef struct ref_slot { br_entity e; uint32_t index; } ref_slot;
+static int compare_ref_slots(const void *a, const void *b) {
+    br_entity x = ((const ref_slot *)a)->e, y = ((const ref_slot *)b)->e;
+    return x < y ? -1 : x > y ? 1 : 0;
+}
+typedef struct ref_map { ref_slot *slots; uint32_t count; } ref_map;
+
+static long ref_index(const ref_map *m, br_entity e) {
+    uint32_t lo = 0, hi = m->count;
+    while (lo < hi) {
+        uint32_t mid = (lo + hi) / 2;
+        if (m->slots[mid].e < e) lo = mid + 1;
+        else hi = mid;
+    }
+    return lo < m->count && m->slots[lo].e == e ? (long)m->slots[lo].index : -1;
+}
+
+static void write_entity(strbuf *b, const br_world *w, br_entity e, const ref_map *refs) {
     uint32_t c;
     int i;
     char value[VALUE_MAX];
@@ -227,7 +265,16 @@ static void write_entity(strbuf *b, const br_world *w, br_entity e) {
         sb_puts(b, d->name);
         sb_puts(b, "\n");
         for (i = 0; i < d->field_count; ++i) {
-            br_field_format(&d->fields[i], data, value, sizeof(value));
+            if (d->fields[i].type == BR_FIELD_ENTITY) {
+                br_entity ref;
+                long at;
+                memcpy(&ref, (const unsigned char *)data + d->fields[i].offset, sizeof(ref));
+                at = ref == BR_ENTITY_NULL || !br_entity_alive(w, ref) ? -1 : ref_index(refs, ref);
+                if (at < 0) snprintf(value, sizeof(value), "none");     /* not saved with it: dropped */
+                else snprintf(value, sizeof(value), "%ld", at);
+            } else {
+                br_field_format(&d->fields[i], data, value, sizeof(value));
+            }
             sb_puts(b, "    ");
             sb_puts(b, d->fields[i].name);
             sb_puts(b, " = ");
@@ -240,17 +287,28 @@ static void write_entity(strbuf *b, const br_world *w, br_entity e) {
 char *br_world_to_text(const br_world *w, const br_entity *order, uint32_t count, size_t *out_len) {
     strbuf b;
     char header[64];
-    uint32_t i;
+    uint32_t i, n = 0;
+    ref_map refs;
+    br_entity *list = (br_entity *)br_alloc(sizeof(br_entity) * (order ? count : w->high_water) + 1);
     memset(&b, 0, sizeof(b));
-    snprintf(header, sizeof(header), "# Bronto scene\nbronto_scene %d\n", BR_SCENE_FORMAT_VERSION);
-    sb_puts(&b, header);
+    memset(&refs, 0, sizeof(refs));
+    if (!list) return NULL;
     if (order) {
-        for (i = 0; i < count; ++i)
-            if (br_entity_alive(w, order[i])) write_entity(&b, w, order[i]);
+        for (i = 0; i < count; ++i) if (br_entity_alive(w, order[i])) list[n++] = order[i];
     } else {
         for (i = 0; i < w->high_water; ++i)
-            if (w->alive[i]) write_entity(&b, w, (br_entity)(((uint32_t)w->generations[i] << BR_ENTITY_INDEX_BITS) | i));
+            if (w->alive[i]) list[n++] = (br_entity)(((uint32_t)w->generations[i] << BR_ENTITY_INDEX_BITS) | i);
     }
+    refs.slots = (ref_slot *)br_alloc(sizeof(ref_slot) * n + 1);
+    if (!refs.slots) { br_free(list); return NULL; }
+    for (i = 0; i < n; ++i) { refs.slots[i].e = list[i]; refs.slots[i].index = i; }
+    refs.count = n;
+    if (n > 1) qsort(refs.slots, n, sizeof(ref_slot), compare_ref_slots);
+    snprintf(header, sizeof(header), "# Bronto scene\nbronto_scene %d\n", BR_SCENE_FORMAT_VERSION);
+    sb_puts(&b, header);
+    for (i = 0; i < n; ++i) write_entity(&b, w, list[i], &refs);
+    br_free(refs.slots);
+    br_free(list);
     if (b.failed) { br_free(b.data); return NULL; }
     if (out_len) *out_len = b.len;
     return b.data;
@@ -358,6 +416,17 @@ static bool read_all(scene_reader *r, const char *p) {
             f = find_field(desc, line);
             if (!f) { BR_WARN("scene line %d: %s has no field '%s' (ignored)", r->line, desc->name, line); continue; }
             data = br_get(r->w, cur, comp);
+            if (f->type == BR_FIELD_ENTITY) {                    /* a position in this file, connected at the end */
+                const char *v = skip_space(eq + 1);
+                int at;
+                br_entity slot = BR_ENTITY_NULL;
+                if (!(strncmp(v, "none", 4) == 0 && at_end(v + 4))) {
+                    if (!parse_int(v, &at) || at < 0) return fail(r, "bad value for %s.%s: %s (expected an entity number or none)", desc->name, f->name, v);
+                    slot = (br_entity)at + 1;
+                }
+                memcpy((unsigned char *)data + f->offset, &slot, sizeof(slot));
+                continue;
+            }
             if (!br_field_parse(f, data, eq + 1)) return fail(r, "bad value for %s.%s: %s", desc->name, f->name, skip_space(eq + 1));
             continue;
         }
@@ -390,6 +459,22 @@ int br_world_from_text(br_world *w, const char *text, br_entity *out, uint32_t c
         for (i = 0; i < r.made_count; ++i) br_entity_destroy(w, r.made[i]);   /* all or nothing */
         br_free(r.made);
         return -1;
+    }
+    for (i = 0; i < r.made_count; ++i) {                       /* entity references: positions -> handles */
+        uint32_t c;
+        for (c = 0; c < w->pool_count; ++c) {
+            const br_component_desc *d = w->pools[c].desc;
+            unsigned char *data;
+            int k;
+            if (!d || !(data = (unsigned char *)br_get(w, r.made[i], c))) continue;
+            for (k = 0; k < d->field_count; ++k) {
+                br_entity ref;
+                if (d->fields[k].type != BR_FIELD_ENTITY) continue;
+                memcpy(&ref, data + d->fields[k].offset, sizeof(ref));
+                ref = ref >= 1 && ref <= r.made_count ? r.made[ref - 1] : BR_ENTITY_NULL;
+                memcpy(data + d->fields[k].offset, &ref, sizeof(ref));
+            }
+        }
     }
     for (i = 0; out && i < r.made_count && i < cap; ++i) out[i] = r.made[i];
     count = (int)r.made_count;

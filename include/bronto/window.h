@@ -93,6 +93,9 @@ int   br_pick_folder(struct br_engine *e, const char *title, const char *start, 
 /* Opens a file or folder with the OS's default program (a text editor for
  * a script, Finder/Explorer for a folder). */
 bool  br_open_path(struct br_engine *e, const char *path);
+/* Starts another program, e.g. "code -g \"/path/a.bs:12\"", without waiting
+ * for it (Windows runs it through cmd.exe, others through /bin/sh). */
+bool  br_launch(struct br_engine *e, const char *command_line);
 void  br_window_set_scale_mode(struct br_engine *e, br_scale_mode mode);
 float br_window_scale(const struct br_engine *e);
 bool  br_window_is_focused(const struct br_engine *e);

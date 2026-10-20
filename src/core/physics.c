@@ -24,6 +24,7 @@
  */
 #include "bronto/physics.h"
 #include "bronto/components.h"
+#include "bronto/hierarchy.h"
 #include "bronto/memory.h"
 
 #include <math.h>
@@ -128,7 +129,9 @@ typedef struct pbody {
     br_rigidbody *rb;              /* NULL: static scenery */
     const br_collider *col;        /* NULL: moves, collides with nothing */
     int type;
-    br_vec2 pos, v;
+    br_vec2 pos, v, scale;          /* world space */
+    bool parented;
+    uint32_t depth;                /* in the tree: parents are written back first */
     float angle, w;                /* radians, radians/s */
     float inv_mass, inv_i;
     /* shape in world space */
@@ -161,6 +164,7 @@ typedef struct phys_state {
     uint32_t body_count, body_cap;
     int *order;                    /* sort and sweep */
     uint32_t order_cap;
+    uint32_t max_depth;
     arbiter *arb[2];               /* this step's and last step's contacts */
     uint32_t arb_count[2], arb_cap[2];
     int cur;
@@ -217,10 +221,10 @@ static void ph_push_event(phys_state *s, br_contact_kind kind, br_entity a, br_e
 /* Shape and bounding box from the body's current position. */
 static void ph_update_shape(pbody *b) {
     const br_collider *c = b->col;
-    br_vec2 sc = br_v2(br_absf(b->t->scale.x), br_absf(b->t->scale.y));
+    br_vec2 sc = br_v2(br_absf(b->scale.x), br_absf(b->scale.y));
     b->q = ph_rot_of(b->angle);
     if (!c) { b->lo = b->hi = b->pos; return; }
-    b->center = ph_add2(b->pos, ph_rot_apply(b->q, br_v2(c->offset.x * b->t->scale.x, c->offset.y * b->t->scale.y)));
+    b->center = ph_add2(b->pos, ph_rot_apply(b->q, br_v2(c->offset.x * b->scale.x, c->offset.y * b->scale.y)));
     if (c->shape == BR_COLLIDER_CIRCLE) {
         b->radius = c->radius * BR_MAX(sc.x, sc.y);
         b->lo = ph_sub2(b->center, br_v2(b->radius, b->radius));
@@ -240,6 +244,7 @@ static void ph_gather(br_world *w, const phys_ids *id, phys_state *s) {
     int k;
     uint32_t i;
     s->body_count = 0;
+    s->max_depth = 0;
     pools[0] = &w->pools[id->collider];
     pools[1] = &w->pools[id->body];
     for (k = 0; k < 2; ++k) {                       /* colliders, then bodies without one */
@@ -256,8 +261,15 @@ static void ph_gather(br_world *w, const phys_ids *id, phys_state *s) {
             b->rb = (br_rigidbody *)br_get(w, e, id->body);
             b->col = (const br_collider *)br_get(w, e, id->collider);
             b->type = b->rb ? b->rb->type : BR_BODY_STATIC;
-            b->pos = t->position;
-            b->angle = t->rotation * DEG2RAD;
+            {   /* the world transform: colliders on children sit where the tree puts them */
+                br_transform wt = br_world_transform(w, e);
+                b->pos = wt.position;
+                b->angle = wt.rotation * DEG2RAD;
+                b->scale = wt.scale;
+                b->parented = br_parent_of(w, e) != BR_ENTITY_NULL;
+                b->depth = b->parented ? br_depth(w, e) : 0;
+                if (b->depth > s->max_depth) s->max_depth = b->depth;
+            }
             if (b->rb) {
                 b->v = b->rb->velocity;
                 b->w = b->rb->angular_velocity * DEG2RAD;
@@ -630,7 +642,7 @@ void br_physics_step(br_world *w, float dt) {
     phys_state *s;
     br_vec2 gravity = br_v2(0, DEFAULT_GRAVITY_Y);
     int iterations = DEFAULT_ITERATIONS, it;
-    uint32_t i;
+    uint32_t i, d;
     float inv_dt;
     if (dt <= 0 || !ph_ids_of(w, &id) || !(s = ph_state_of(w))) return;
     if (w->pools[id.world].count > 0) {
@@ -659,14 +671,23 @@ void br_physics_step(br_world *w, float dt) {
         for (i = 0; i < s->arb_count[s->cur]; ++i)
             if (!s->arb[s->cur][i].trigger) ph_apply_impulses(s, &s->arb[s->cur][i]);
 
-    for (i = 0; i < s->body_count; ++i) {                  /* velocities -> positions */
+    for (d = 0; d <= s->max_depth; ++d)                  /* velocities -> positions, parents first */
+    for (i = 0; i < s->body_count; ++i) {
         pbody *b = &s->bodies[i];
-        if (!b->rb) continue;
+        if (!b->rb || b->depth != d) continue;
         if (b->type != BR_BODY_STATIC) {
             b->pos = ph_add2(b->pos, ph_mul2(b->v, dt));
             b->angle += b->w * dt;
-            b->t->position = b->pos;
-            b->t->rotation = fmodf(b->angle / DEG2RAD, 360.0f);
+            if (b->parented) {                                /* back into the parent's space */
+                br_transform wt;
+                wt.position = b->pos;
+                wt.rotation = fmodf(b->angle / DEG2RAD, 360.0f);
+                wt.scale = b->scale;
+                *b->t = br_local_from_world(w, b->e, &wt);
+            } else {
+                b->t->position = b->pos;
+                b->t->rotation = fmodf(b->angle / DEG2RAD, 360.0f);
+            }
             b->rb->velocity = b->v;
             b->rb->angular_velocity = b->w / DEG2RAD;
         }
@@ -728,8 +749,12 @@ static bool ph_shape_now(const br_world *w, const phys_ids *id, uint32_t i, pbod
     if (!b->t) return false;
     b->e = e;
     b->col = (const br_collider *)(p->data + (size_t)i * p->stride);
-    b->pos = b->t->position;
-    b->angle = b->t->rotation * DEG2RAD;
+    {
+        br_transform wt = br_world_transform(w, e);
+        b->pos = wt.position;
+        b->angle = wt.rotation * DEG2RAD;
+        b->scale = wt.scale;
+    }
     ph_update_shape(b);
     return true;
 }

@@ -62,7 +62,10 @@ typedef enum br_field_type {
     BR_FIELD_VEC2,      /* br_vec2                                    */
     BR_FIELD_COLOR,     /* br_color                                   */
     BR_FIELD_STRING,    /* char[N], always NUL terminated              */
-    BR_FIELD_ENUM       /* int, shown and saved by name (enum_names)  */
+    BR_FIELD_ENUM,      /* int, shown and saved by name (enum_names)  */
+    BR_FIELD_ENTITY     /* br_entity: a reference to another entity. Scene
+                           files save it as that entity's position in the
+                           file (or "none"), and loading reconnects it */
 } br_field_type;
 
 typedef struct br_field {
@@ -151,6 +154,10 @@ typedef struct br_world {
     void *context;  /* owner pointer (the engine sets this to br_engine*) */
     void *user;     /* free for game use (scenes set it to br_scene*)     */
 
+    /* called after an entity is destroyed (the hierarchy destroys its children) */
+    struct { void (*fn)(struct br_world *w, br_entity e, void *user); void *user; } destroy_hooks[4];
+    int destroy_hook_count;
+
     /* per-world state of engine modules (physics contacts, script runtime) */
     struct { const void *key; void *data; void (*destroy)(void *data); } attached[BR_WORLD_ATTACHMENTS];
 } br_world;
@@ -161,6 +168,9 @@ bool br_world_init(br_world *w);
  * world is destroyed, after its entities. Returns false when full. */
 bool  br_world_attach(br_world *w, const void *key, void *data, void (*destroy)(void *data));
 void *br_world_attached(const br_world *w, const void *key);
+/* `fn` runs after any entity is destroyed (its components are gone, and its
+ * handle is no longer alive). Up to 4 per world. */
+bool br_world_on_destroy(br_world *w, void (*fn)(br_world *w, br_entity e, void *user), void *user);
 void br_world_destroy(br_world *w);
 /* Destroys all entities but keeps component types and systems. */
 void br_world_clear(br_world *w);

@@ -21,6 +21,7 @@
 #include "bronto/script.h"
 #include "bronto/components.h"
 #include "bronto/physics.h"
+#include "bronto/hierarchy.h"
 #include "bronto/serialize.h"
 #include "bronto/assets.h"
 #include "bronto/engine.h"
@@ -1415,6 +1416,11 @@ static sc_value sc_field_get(sc_vm *vm, const br_field *f, const void *data) {
     case BR_FIELD_BOOL: return sc_bool(*(const bool *)p);
     case BR_FIELD_VEC2: return sc_vec(((const br_vec2 *)p)->x, ((const br_vec2 *)p)->y);
     case BR_FIELD_STRING: return sc_string(vm, (const char *)p, strlen((const char *)p));
+    case BR_FIELD_ENTITY: {
+        br_entity e;
+        memcpy(&e, p, sizeof(e));
+        return br_entity_alive(vm->rt->w, e) ? sc_ent(e) : sc_nil();
+    }
     default: {                                             /* colours ("#rrggbbaa") and enum names */
         char text[64];
         br_field_format(f, data, text, sizeof(text));
@@ -1432,6 +1438,11 @@ static void sc_field_set(sc_vm *vm, const br_field *f, void *data, const sc_valu
     case BR_FIELD_BOOL: *(bool *)p = sc_truthy(v); return;
     case BR_FIELD_VEC2: *(br_vec2 *)p = sc_need_vec(vm, v, line, f->name); return;
     case BR_FIELD_STRING: snprintf((char *)p, f->size, "%s", sc_need_str(vm, v, line, f->name)); return;
+    case BR_FIELD_ENTITY: {
+        br_entity e = v->t == V_NIL ? BR_ENTITY_NULL : sc_need_entity(vm, v, line, f->name);
+        memcpy(p, &e, sizeof(e));
+        return;
+    }
     case BR_FIELD_ENUM:
         if (v->t == V_NUM) {
             int i = (int)v->as.n;
@@ -1486,6 +1497,9 @@ static sc_value sc_get_member(sc_vm *vm, const sc_value *obj, const char *name, 
         if (strcmp(name, "y") == 0) return sc_num(sc_transform(vm, e, line)->position.y);
         if (strcmp(name, "rotation") == 0) return sc_num(sc_transform(vm, e, line)->rotation);
         if (strcmp(name, "scale") == 0) { br_transform *t = sc_transform(vm, e, line); return sc_vec(t->scale.x, t->scale.y); }
+        if (strcmp(name, "global_position") == 0) { br_transform wt = br_world_transform(rt->w, e); return sc_vec(wt.position.x, wt.position.y); }
+        if (strcmp(name, "global_rotation") == 0) return sc_num(br_world_transform(rt->w, e).rotation);
+        if (strcmp(name, "parent") == 0) { br_entity p = br_parent_of(rt->w, e); return p == BR_ENTITY_NULL ? sc_nil() : sc_ent(p); }
         if (strcmp(name, "velocity") == 0) { br_vec2 *v = sc_velocity(vm, e, line); return sc_vec(v->x, v->y); }
         if (strcmp(name, "angular_velocity") == 0) {
             br_rigidbody *rb = (br_rigidbody *)br_get(rt->w, e, rt->body_id);
@@ -1544,6 +1558,22 @@ static void sc_set_member(sc_vm *vm, const sc_value *obj, const char *name, cons
             return;
         }
         if (strcmp(name, "velocity") == 0) { *sc_velocity(vm, e, line) = sc_need_vec(vm, val, line, "velocity"); return; }
+        if (strcmp(name, "global_position") == 0) {
+            sc_transform(vm, e, line);
+            br_set_world_position(rt->w, e, sc_need_vec(vm, val, line, "global_position"));
+            return;
+        }
+        if (strcmp(name, "global_rotation") == 0) {
+            sc_transform(vm, e, line);
+            br_set_world_rotation(rt->w, e, (float)sc_need_num(vm, val, line, "global_rotation"));
+            return;
+        }
+        if (strcmp(name, "parent") == 0) {                 /* stays where it is on screen */
+            br_entity p = BR_ENTITY_NULL;
+            if (val->t != V_NIL) p = sc_need_entity(vm, val, line, "parent");
+            if (!br_set_parent(rt->w, e, p, true)) sc_fail(vm, line, "can't make an entity a child of itself or of its own child");
+            return;
+        }
         if (strcmp(name, "angular_velocity") == 0) {
             br_rigidbody *rb = (br_rigidbody *)br_get(rt->w, e, rt->body_id);
             if (!rb) sc_fail(vm, line, "angular_velocity needs a RigidBody");
@@ -1805,16 +1835,37 @@ static sc_value bi_spawn(ARGS) {
     br_free(text);
     if (count < 0) sc_fail(vm, line, "spawn(): %s: %s", path, err);
     if (count == 0) return sc_nil();
-    if (n > 1) {                                           /* move it so the first entity lands at pos */
+    if (n > 2 && a[2].t != V_NIL) {                        /* under a parent: pos is in its space */
+        br_entity parent = sc_need_entity(vm, &a[2], line, "spawn() parent");
+        for (i = 0; i < count && i < 64; ++i)
+            if (br_parent_of(rt->w, made[i]) == BR_ENTITY_NULL) br_set_parent(rt->w, made[i], parent, false);
+    }
+    if (n > 1 && a[1].t != V_NIL) {                       /* move it so the first entity lands at pos */
         br_vec2 at = sc_need_vec(vm, &a[1], line, "spawn() position");
         br_transform *t0 = (br_transform *)br_get(rt->w, made[0], rt->ids.transform);
         br_vec2 shift = t0 ? br_v2_sub(at, t0->position) : br_v2(0, 0);
-        for (i = 0; i < count && i < 64; ++i) {
+        for (i = 0; i < count && i < 64; ++i) {           /* the file's roots; their children follow */
             br_transform *t = (br_transform *)br_get(rt->w, made[i], rt->ids.transform);
-            if (t) t->position = br_v2_add(t->position, shift);
+            br_entity p = br_parent_of(rt->w, made[i]);
+            bool root = p == BR_ENTITY_NULL || (n > 2 && a[2].t == V_ENT && p == a[2].as.e);
+            if (t && root) t->position = br_v2_add(t->position, shift);
         }
     }
     return sc_ent(made[0]);
+}
+static sc_value bi_children(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "children()"), kids[256];
+    uint32_t count = br_children(vm->rt->w, e, kids, 256), i;
+    sc_value list = sc_new_list(vm, line);
+    BR_UNUSED(n);
+    for (i = 0; i < count && i < 256; ++i) sc_list_push(vm, list.as.l, sc_ent(kids[i]), line);
+    return list;
+}
+static sc_value bi_child(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "child()");
+    br_entity c = br_child_named(vm->rt->w, e, sc_need_str(vm, &a[1], line, "child()"));
+    BR_UNUSED(n);
+    return c == BR_ENTITY_NULL ? sc_nil() : sc_ent(c);
 }
 static sc_value bi_has(ARGS) {
     br_entity e = sc_need_entity(vm, &a[0], line, "has()");
@@ -1911,7 +1962,7 @@ static const sc_builtin k_builtin_table[] = {
     { "mouse_down", 0, 1, bi_mouse_down }, { "mouse_pressed", 0, 1, bi_mouse_pressed },
     { "mouse_position", 0, 0, bi_mouse_position }, { "time", 0, 0, bi_time },
     { "find", 1, 1, bi_find }, { "find_all", 1, 1, bi_find_all }, { "destroy", 1, 1, bi_destroy },
-    { "spawn", 1, 2, bi_spawn }, { "has", 2, 2, bi_has }, { "add", 2, 2, bi_add },
+    { "spawn", 1, 3, bi_spawn }, { "children", 1, 1, bi_children }, { "child", 2, 2, bi_child }, { "has", 2, 2, bi_has }, { "add", 2, 2, bi_add },
     { "remove_component", 2, 2, bi_remove_component },
     { "apply_force", 2, 3, bi_apply_force }, { "apply_impulse", 2, 3, bi_apply_impulse },
     { "raycast", 2, 3, bi_raycast }, { "entity_at", 1, 1, bi_entity_at },
@@ -1924,6 +1975,11 @@ static int sc_find_builtin(const char *name) {
     return -1;
 }
 static const sc_builtin *sc_builtin_at(int index) { return &k_builtin_table[index]; }
+
+int br_script_builtin_count(void) { return (int)BR_ARRAY_COUNT(k_builtin_table); }
+const char *br_script_builtin_name(int index) {
+    return index >= 0 && index < (int)BR_ARRAY_COUNT(k_builtin_table) ? k_builtin_table[index].name : NULL;
+}
 
 /* ======================================================================== */
 /* 6. runtime                                                               */

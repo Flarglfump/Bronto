@@ -1,0 +1,45 @@
+{
+  "name": "brontoscript",
+  "displayName": "BrontoScript",
+  "description": "Bronto engine scripts (.bs): highlighting, completion, hover docs, signature help, go to definition, outline and error checking.",
+  "version": "0.1.0",
+  "publisher": "bronto",
+  "engines": { "vscode": "^1.60.0" },
+  "categories": ["Programming Languages", "Snippets", "Linters"],
+  "keywords": ["bronto", "brontoscript", "game engine", "scripting"],
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:brontoscript", "onCommand:brontoscript.checkFile"],
+  "contributes": {
+    "languages": [{
+      "id": "brontoscript",
+      "aliases": ["BrontoScript", "brontoscript"],
+      "extensions": [".bs"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "brontoscript",
+      "scopeName": "source.brontoscript",
+      "path": "./syntaxes/brontoscript.tmLanguage.json"
+    }],
+    "snippets": [{ "language": "brontoscript", "path": "./snippets/brontoscript.json" }],
+    "commands": [{ "command": "brontoscript.checkFile", "title": "BrontoScript: Check This File" }],
+    "configuration": {
+      "title": "BrontoScript",
+      "properties": {
+        "brontoscript.checker.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check scripts for mistakes with the engine's checker (bscheck) as you type."
+        },
+        "brontoscript.checker.path": {
+          "type": "string",
+          "default": "",
+          "description": "The bscheck program (built by \"make tools\" into build/bscheck). Empty: look in the workspace's build/ folders, then on PATH."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "[brontoscript]": { "editor.insertSpaces": true, "editor.tabSize": 4 }
+    }
+  }
+}

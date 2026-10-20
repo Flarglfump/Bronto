@@ -53,7 +53,7 @@ static void shortcuts(editor *ed) {
     const br_input *in = &ed->engine->input;
     bool cmd = (in->mods & (BR_MOD_CONTROL | BR_MOD_SUPER)) != 0, shift = (in->mods & BR_MOD_SHIFT) != 0;
     float step;
-    if (br_ui_wants_keyboard(&ed->ui) || ed->pending != ED_PENDING_NONE || ed->picker.open) return;   /* typing, or a dialog */
+    if (br_ui_wants_keyboard(&ed->ui) || ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible) return;   /* typing, or a dialog */
     if (ed->doc.playing) {                         /* the game has the keyboard: only Stop */
         if (br_key_pressed(in, BR_KEY_F5) || br_key_pressed(in, BR_KEY_ESCAPE) || (cmd && br_key_pressed(in, BR_KEY_P))) ed_cmd_play(ed);
         return;
@@ -98,6 +98,7 @@ static bool editor_enter(br_scene *s) {
     br_ui_init(&ed->ui);
     ed_view_init(&ed->view);
     ed->show_colliders = true;
+    ed_prefs_load(ed);
     ed_doc_init(&ed->doc);
     ed->doc.world.context = ed->engine;              /* Sound components play while playing */
     {   /* the project: the scene's (see br_assets_find_root), or the folder the editor started in */
@@ -157,7 +158,7 @@ static void editor_render(br_scene *s) {
     br_engine *e = s->engine;
     layout l = make_layout(e);
     br_ui_begin(&ed->ui, &e->renderer, &e->input, e->time);
-    br_ui_set_disabled(&ed->ui, ed->pending != ED_PENDING_NONE || ed->picker.open);
+    br_ui_set_disabled(&ed->ui, ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible);
     ed_view_frame(ed, l.view);
     ed_toolbar(ed, l.toolbar);
     ed_hierarchy(ed, l.hierarchy);
@@ -167,6 +168,7 @@ static void editor_render(br_scene *s) {
     ed_statusbar(ed, l.status);
     ed_dialog(ed, l.screen);
     ed_picker_dialog(ed, l.screen);
+    ed_settings_dialog(ed, l.screen);
     br_ui_set_disabled(&ed->ui, false);
     br_ui_end(&ed->ui);
 }
@@ -199,7 +201,7 @@ static void inject_click(float x, float y) {
 
 static void frames(br_engine *e, int n) { while (n-- > 0) br_engine_frame(e); }
 
-#define HIER_ROW_Y(i) (TOOLBAR_H + 6 + 19 * 2 + 5 + 3 + 19 * (float)(i) + 8)
+#define HIER_ROW_Y(i) (TOOLBAR_H + 6 + 19 * 3 + 5 + 3 + 19 * (float)(i) + 8)
 
 /* Press at a, move there in steps, release at b. */
 static void inject_drag(br_engine *e, br_vec2 a, br_vec2 b) {
@@ -269,8 +271,8 @@ static int test_assets(br_engine *e) {
     ed_assets_destroy(ed);
     ed_assets_init(ed, "editor_project");
     frames(e, 2);
-    if (ed->assets.list.count < 2 || strcmp(ed->assets.list.entries[0].name, "art") != 0 || strcmp(ed->assets.list.entries[1].name, "sfx") != 0)
-        { printf("FAIL: the project doesn't list art/ and sfx/ first\n"); ++failures; }
+    if (ed->assets.list.count < 2 || strcmp(ed->assets.list.entries[0].name, "art") != 0 || !ed->assets.list.entries[1].is_dir)
+        { printf("FAIL: the project doesn't list its folders first\n"); ++failures; }
     p = tile_center(e, 0);                                    /* double-click "art" */
     inject_click(p.x, p.y); frames(e, 1);
     inject_click(p.x, p.y); frames(e, 2);
@@ -351,6 +353,21 @@ static int test_assets(br_engine *e) {
         frames(e, 3);
         if (!strstr(ed->status, "broken.bs:2: unknown name 'speeed'")) { printf("FAIL: a script error wasn't shown (%s)\n", ed->status); ++failures; }
         br_image_save_bmp(&e->framebuffer, "editor_script_error.bmp");
+        {   /* the chosen script editor is run with the file and the line of the mistake */
+            ed_assets_select(ed, "scripts/broken.bs");
+            frames(e, 1);
+            snprintf(ed->prefs.script_editor, sizeof(ed->prefs.script_editor), "myeditor --goto {line} \"{file}\"");
+            ed_assets_edit(ed, "scripts/broken.bs");
+            if (!strstr(br_headless_last_launched(), "myeditor --goto 2 \"") || !strstr(br_headless_last_launched(), "broken.bs\""))
+                { printf("FAIL: the script editor command (%s)\n", br_headless_last_launched()); ++failures; }
+            ed->prefs.script_editor[0] = 0;
+            ed_assets_edit(ed, "scripts/mover.bs");            /* empty: the system's default program */
+            if (!strstr(br_headless_last_opened(), "mover.bs")) { printf("FAIL: opening with the default program\n"); ++failures; }
+            ed_settings_open(ed);
+            frames(e, 2);
+            br_image_save_bmp(&e->framebuffer, "editor_settings.bmp");
+            ed->settings_visible = false;
+        }
         ed_cmd_play(ed);
         frames(e, 2);
     }
@@ -419,6 +436,28 @@ static int run_headless(br_engine *e) {
         if (ed_doc_index(&ed->doc, ball) != 0) { printf("FAIL: dragging in the hierarchy didn't reorder (at %d)\n", ed_doc_index(&ed->doc, ball)); ++failures; }
         inject_drag(e, br_v2(60, HIER_ROW_Y(0)), br_v2(60, HIER_ROW_Y(3) + 4));
         if (ed_doc_index(&ed->doc, ball) != 3) { printf("FAIL: dragging back put Ball at %d\n", ed_doc_index(&ed->doc, ball)); ++failures; }
+    }
+    {   /* the tree: drag row 4 onto the middle of row 3 (Ball) - it becomes Ball's child and stays put */
+        br_entity ball = ed->doc.order[3], other = ed->doc.order[4];
+        br_vec2 before = br_world_transform(&ed->doc.world, other).position, moved;
+        inject_drag(e, br_v2(60, HIER_ROW_Y(4)), br_v2(80, HIER_ROW_Y(3)));
+        moved = br_world_transform(&ed->doc.world, other).position;
+        if (br_parent_of(&ed->doc.world, other) != ball || ed->doc.order[4] != other || br_v2_dist(before, moved) > 0.01f)
+            { printf("FAIL: dropping a row onto another didn't make it a child\n"); ++failures; }
+        ed->doc.selected = other;
+        ed_cmd_add_child(ed);                                 /* a grandchild */
+        if (br_depth(&ed->doc.world, ed->doc.selected) != 2) { printf("FAIL: + Child\n"); ++failures; }
+        frames(e, 2);
+        br_image_save_bmp(&e->framebuffer, "editor_tree.bmp");
+        inject_click(6 + 6, HIER_ROW_Y(3));              /* fold Ball's arrow: its subtree hides */
+        frames(e, 2);
+        if (!ed_collapsed(ed, ball)) { printf("FAIL: clicking the arrow didn't fold the row\n"); ++failures; }
+        ed_set_collapsed(ed, ball, false);
+        ed_cmd_undo(ed); ed_cmd_undo(ed);                       /* back to the flat sample scene */
+        frames(e, 2);
+        if (ed->doc.count != 7 || br_parent_of(&ed->doc.world, ed->doc.order[4]) != BR_ENTITY_NULL)
+            { printf("FAIL: undoing the tree changes (%u entities)\n", ed->doc.count); ++failures; }
+        ed->doc.selected = ed->doc.order[3];
     }
 
     ed_cmd_play(ed);

@@ -24,7 +24,7 @@ static struct {
     int16_t *capture;
     uint32_t capture_cap, captured;
     br_image icon;
-    char folder_answer[512], opened[512];
+    char folder_answer[512], opened[512], launched[1024];
     bool folder_set, folder_cancel, folder_none;
     double audio_debt;   /* fractional frames owed to the virtual device */
     int win_w, win_h;    /* pixels */
@@ -71,6 +71,7 @@ static void hl_shutdown(void) {
     br_image_destroy(&g_hl.icon);
     g_hl.folder_set = false;
     g_hl.opened[0] = 0;
+    g_hl.launched[0] = 0;
     g_hl.last_frame = NULL;
     g_hl.injected_count = 0;
     g_hl.quit_after = 0;
@@ -151,6 +152,8 @@ static int hl_pick_folder(const char *title, const char *start, char *out, size_
 
 static bool hl_open_path(const char *path) { snprintf(g_hl.opened, sizeof(g_hl.opened), "%s", path); return true; }
 const char *br_headless_last_opened(void) { return g_hl.opened; }
+static bool hl_launch(const char *cmd) { snprintf(g_hl.launched, sizeof(g_hl.launched), "%s", cmd); return true; }
+const char *br_headless_last_launched(void) { return g_hl.launched; }
 
 static void hl_set_title(const char *t) { strncpy(g_hl.title, t, sizeof(g_hl.title) - 1); }
 
@@ -197,7 +200,7 @@ static const br_platform k_headless = {
     "headless", hl_init, hl_shutdown, hl_poll, hl_present, hl_time, hl_sleep,
     hl_audio_wanted, hl_audio_submit,
     hl_get_window_size, hl_get_window_scale, hl_set_title, hl_set_window_size,
-    hl_set_fullscreen, hl_set_cursor_visible, hl_set_icon, hl_pick_folder, hl_open_path,
+    hl_set_fullscreen, hl_set_cursor_visible, hl_set_icon, hl_pick_folder, hl_open_path, hl_launch,
     hl_set_gamepad_rumble,
     NULL
 };

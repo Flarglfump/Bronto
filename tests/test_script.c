@@ -390,7 +390,71 @@ static void test_platformer_example(void) {
     teardown();
 }
 
+static void test_tree_from_scripts(void) {
+    br_entity boss, arm, hand;
+    double v;
+    setup();
+    write_script("boss.bs",
+        "var arms = 0\nvar hand_x = 0\nvar spawned = 0\n"
+        "func start() {\n"
+        "    var arm = child(self, \"Arm\")\n"
+        "    arms = len(children(self))\n"
+        "    hand_x = child(arm, \"Hand\").global_position.x\n"
+        "    self.rotation = 90\n"
+        "    var shot = spawn(\"part.scene\", vec2(5, 0), arm)\n"
+        "    if shot.parent == arm and shot.global_position.y > 0 { spawned = 1 }\n"
+        "    arm.parent = nil\n"
+        "}\n");
+    {
+        br_world tmp;
+        br_entity e;
+        br_world_init(&tmp);
+        br_builtin_register(&tmp, NULL);
+        e = br_entity_create(&tmp);
+        br_add(&tmp, e, br_component_find(&tmp, "Transform"), NULL);
+        CHECK(br_world_save_file(&tmp, &e, 1, test_path("part.scene")));
+        br_world_destroy(&tmp);
+    }
+    boss = scripted("Boss", "boss.bs", NULL, br_v2(100, 100));
+    arm = br_entity_create(&W);
+    snprintf(((br_name *)br_add(&W, arm, ID.name, NULL))->text, 32, "Arm");
+    ((br_transform *)br_add(&W, arm, ID.transform, NULL))->position = br_v2(20, 0);
+    br_set_parent(&W, arm, boss, false);
+    hand = br_entity_create(&W);
+    snprintf(((br_name *)br_add(&W, hand, ID.name, NULL))->text, 32, "Hand");
+    ((br_transform *)br_add(&W, hand, ID.transform, NULL))->position = br_v2(10, 0);
+    br_set_parent(&W, hand, arm, false);
+    steps(1);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    CHECK(br_script_get_number(&W, boss, "arms", &v) && v == 1);
+    CHECK(br_script_get_number(&W, boss, "hand_x", &v) && v == 130);
+    CHECK(br_script_get_number(&W, boss, "spawned", &v) && v == 1);
+    CHECK(br_parent_of(&W, arm) == BR_ENTITY_NULL);                       /* detached, but didn't move */
+    CHECK_NEAR(br_world_transform(&W, hand).position.y, 130, 1e-3);
+    teardown();
+}
+
+/* The VS Code extension documents every built-in function the language has. */
+static void test_extension_knows_builtins(void) {
+    size_t size;
+    char *json = (char *)br_file_read_all("tools/vscode/brontoscript/lib/builtins.json", &size);
+    int i;
+    CHECK(json != NULL);
+    if (!json) return;
+    CHECK(br_script_builtin_count() > 40 && br_script_builtin_name(br_script_builtin_count()) == NULL);
+    for (i = 0; i < br_script_builtin_count(); ++i) {
+        char key[64];
+        snprintf(key, sizeof(key), "\"name\": \"%s\"", br_script_builtin_name(i));
+        if (!strstr(json, key)) printf("      builtins.json is missing %s\n", br_script_builtin_name(i));
+        CHECK(strstr(json, key) != NULL);
+    }
+    br_free(json);
+}
+
 void suite_script(void) {
+    RUN(test_extension_knows_builtins);
+    RUN(test_tree_from_scripts);
     RUN(test_platformer_example);
     RUN(test_check_and_errors);
     RUN(test_language);

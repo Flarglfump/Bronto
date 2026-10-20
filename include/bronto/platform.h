@@ -73,6 +73,9 @@ typedef struct br_platform {
      * or folder in the program the OS uses for it. Either may be NULL. */
     int    (*pick_folder)(const char *title, const char *start, char *out, size_t size);
     bool   (*open_path)(const char *path);
+    /* Starts a program from a command line (as a shell would read it) and
+     * returns without waiting for it. */
+    bool   (*launch)(const char *command_line);
 
     /* ---- gamepads ----
      * Controllers are polled inside poll_events and reported as GAMEPAD_*
@@ -111,6 +114,7 @@ const br_image *br_headless_icon(void);       /* the last icon set (NULL: none) 
  * = the user cancels); `available` false makes it report no dialog. */
 void br_headless_set_folder_answer(const char *path, bool available);
 const char *br_headless_last_opened(void);   /* the last open_path, "" if none */
+const char *br_headless_last_launched(void); /* the last launch command, "" if none */
 /* Simulated controllers: set a pad's current snapshot (connected=false to
  * unplug); read back the last rumble request. */
 void br_headless_set_gamepad(int pad, const br_gamepad_raw *state);

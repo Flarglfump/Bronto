@@ -6,6 +6,7 @@
 #include "bronto/engine.h"
 #include "bronto/memory.h"
 #include "bronto/physics.h"
+#include "bronto/hierarchy.h"
 #include "bronto/script.h"
 
 #include <math.h>
@@ -239,9 +240,11 @@ static br_vec2 to_world(const br_transform *t, br_vec2 p) {
 
 bool br_builtin_box(const br_world *w, br_entity e, br_vec2 corners[4]) {
     br_builtin_ids id;
-    const br_transform *t;
+    br_transform wt;
+    const br_transform *t = &wt;
     br_vec2 h;
-    if (!br_builtin_ids_of(w, &id) || !(t = (const br_transform *)br_get(w, e, id.transform))) return false;
+    if (!br_builtin_ids_of(w, &id) || !br_has(w, e, id.transform)) return false;
+    wt = br_world_transform(w, e);                         /* where it is, after its parents */
     h = local_half_extent(w, &id, e);
     corners[0] = to_world(t, br_v2(-h.x, -h.y));
     corners[1] = to_world(t, br_v2(h.x, -h.y));
@@ -252,10 +255,12 @@ bool br_builtin_box(const br_world *w, br_entity e, br_vec2 corners[4]) {
 
 bool br_builtin_hit(const br_world *w, br_entity e, br_vec2 p) {
     br_builtin_ids id;
-    const br_transform *t;
+    br_transform wt;
+    const br_transform *t = &wt;
     br_vec2 h, d, l;
     float a, c, s, sx, sy;
-    if (!br_builtin_ids_of(w, &id) || !(t = (const br_transform *)br_get(w, e, id.transform))) return false;
+    if (!br_builtin_ids_of(w, &id) || !br_has(w, e, id.transform)) return false;
+    wt = br_world_transform(w, e);
     h = local_half_extent(w, &id, e);
     a = -t->rotation * (BR_PI / 180.0f);
     c = cosf(a);
@@ -269,7 +274,7 @@ bool br_builtin_hit(const br_world *w, br_entity e, br_vec2 p) {
 
 /* ---- drawing ------------------------------------------------------------------ */
 
-typedef struct draw_item { br_entity e; int layer; int what; } draw_item;   /* what: 0 shape, 1 sprite, 2 label */
+typedef struct draw_item { br_entity e; int layer; int what; uint32_t depth; } draw_item;   /* parents under their children */   /* what: 0 shape, 1 sprite, 2 label */
 
 static draw_item *g_items;
 static uint32_t g_item_cap;
@@ -277,6 +282,7 @@ static uint32_t g_item_cap;
 static int compare_items(const void *a, const void *b) {
     const draw_item *x = (const draw_item *)a, *y = (const draw_item *)b;
     if (x->layer != y->layer) return x->layer < y->layer ? -1 : 1;
+    if (x->depth != y->depth) return x->depth < y->depth ? -1 : 1;
     if (x->e != y->e) return BR_ENTITY_INDEX(x->e) < BR_ENTITY_INDEX(y->e) ? -1 : 1;
     return x->what - y->what;
 }
@@ -354,6 +360,7 @@ void br_builtin_draw(const br_world *w, br_renderer *r) {
             }
             g_items[n].e = e;
             g_items[n].what = (int)k;
+            g_items[n].depth = br_depth(w, e);
             g_items[n].layer = k == 0 ? ((const br_shape *)data)->layer
                              : k == 1 ? ((const br_sprite *)data)->layer : ((const br_label *)data)->layer;
             ++n;
@@ -362,7 +369,8 @@ void br_builtin_draw(const br_world *w, br_renderer *r) {
     qsort(g_items, n, sizeof(draw_item), compare_items);
     for (i = 0; i < n; ++i) {
         const draw_item *it = &g_items[i];
-        const br_transform *t = (const br_transform *)br_get(w, it->e, id.transform);
+        br_transform wt = br_world_transform(w, it->e);   /* children follow their parents */
+        const br_transform *t = &wt;
         if (it->what == 0) draw_shape(r, t, (const br_shape *)br_get(w, it->e, id.shape));
         else if (it->what == 1) draw_sprite(r, t, (const br_sprite *)br_get(w, it->e, id.sprite));
         else draw_label(r, t, (const br_label *)br_get(w, it->e, id.label));
@@ -400,6 +408,7 @@ void br_builtin_register(br_world *w, br_builtin_ids *ids) {
     br_system_add(w, "builtin_motion", BR_PHASE_FIXED_UPDATE, sys_motion, NULL, 0);
     br_system_add(w, "builtin_audio", BR_PHASE_FIXED_UPDATE, sys_audio, NULL, 0);
     br_component_set_hooks(w, br_component_find(w, "Sound"), sound_added, sound_removed, NULL);
+    br_hierarchy_register(w);
     br_physics_register(w);
     br_script_register(w);
     br_system_add(w, "builtin_draw", BR_PHASE_RENDER, sys_draw, NULL, 0);

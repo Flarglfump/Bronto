@@ -19,6 +19,7 @@
 #include "render.h"
 #include "assets.h"
 #include "components.h"
+#include "hierarchy.h"
 #include "physics.h"
 #include "script.h"
 #include "ui.h"

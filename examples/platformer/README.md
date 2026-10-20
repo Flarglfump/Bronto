@@ -9,10 +9,8 @@ A small level made with the editor, using physics and scripts and no C code:
 - `scripts/hud.bs`: counts the coins.
 
 Open it in the editor with **Load Project** (or `build/editor examples/platformer`)
-and press Play. You can also play it on its own:
-
-```sh
-build/examples/sceneplayer examples/platformer/main.scene
-```
+and press Play. A game plays it the same way: register the built-in components, load
+`main.scene` and let the engine's systems run (see "Using scenes in a game" in
+tools/editor/README.md).
 
 Arrows (or A/D) run; space (or up/W) jumps.

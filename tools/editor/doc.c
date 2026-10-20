@@ -70,6 +70,7 @@ static bool restore(ed_doc *d, const char *text, int select_index) {
     br_world_clear(&d->world);
     n = br_world_from_text(&d->world, text, d->order, d->cap, d->error, sizeof(d->error));
     d->count = n > 0 ? (uint32_t)n : 0;
+    ed_doc_normalize(d);
     d->selected = select_index >= 0 && (uint32_t)select_index < d->count ? d->order[select_index] : BR_ENTITY_NULL;
     return n >= 0;
 }
@@ -174,6 +175,53 @@ bool ed_doc_dirty(const ed_doc *d) { return d->state && d->saved && strcmp(d->st
 
 /* ---- editing ------------------------------------------------------------------------ */
 
+/* ---- the tree ---------------------------------------------------------------------
+ * `order` is always the tree flattened depth first: each entity is followed
+ * by its whole subtree. Sibling order is the order they have in `order`.
+ * Every change that touches the tree ends with normalize(), which rebuilds
+ * that shape from the Parent components while keeping sibling order. */
+
+static void emit(ed_doc *d, const br_entity *old, uint32_t n, br_entity node, br_entity *out, uint32_t *count, uint8_t *done) {
+    uint32_t i;
+    for (i = 0; i < n; ++i) if (old[i] == node) { if (done[i]) return; done[i] = 1; break; }
+    out[(*count)++] = node;
+    for (i = 0; i < n; ++i)                           /* its children, in their current order */
+        if (!done[i] && br_parent_of(&d->world, old[i]) == node) emit(d, old, n, old[i], out, count, done);
+}
+
+void ed_doc_normalize(ed_doc *d) {
+    br_entity *old, *fresh;
+    uint8_t *done;
+    uint32_t i, n = 0, count = 0;
+    if (!d->count) return;
+    old = (br_entity *)br_alloc(sizeof(br_entity) * d->count);
+    fresh = (br_entity *)br_alloc(sizeof(br_entity) * d->count);
+    done = (uint8_t *)br_alloc(d->count);
+    if (!old || !fresh || !done) { br_free(old); br_free(fresh); br_free(done); return; }
+    for (i = 0; i < d->count; ++i) if (br_entity_alive(&d->world, d->order[i])) old[n++] = d->order[i];
+    memset(done, 0, n);
+    for (i = 0; i < n; ++i) {                         /* roots (and orphans of entities not in the list) */
+        br_entity p = br_parent_of(&d->world, old[i]);
+        bool listed = false;
+        uint32_t k;
+        for (k = 0; p != BR_ENTITY_NULL && k < n && !listed; ++k) listed = old[k] == p;
+        if (!done[i] && !listed) emit(d, old, n, old[i], fresh, &count, done);
+    }
+    memcpy(d->order, fresh, sizeof(br_entity) * count);
+    d->count = count;
+    if (!br_entity_alive(&d->world, d->selected)) d->selected = BR_ENTITY_NULL;
+    br_free(old);
+    br_free(fresh);
+    br_free(done);
+}
+
+/* How many entries of `order`, from `at`, belong to the subtree starting there. */
+static uint32_t block_len(const ed_doc *d, uint32_t at) {
+    uint32_t n = 1;
+    while (at + n < d->count && br_is_ancestor(&d->world, d->order[at], d->order[at + n])) ++n;
+    return n;
+}
+
 br_entity ed_doc_create(ed_doc *d, const char *name, br_vec2 pos) {
     br_entity e = br_entity_create(&d->world);
     if (e == BR_ENTITY_NULL) return e;
@@ -184,48 +232,109 @@ br_entity ed_doc_create(ed_doc *d, const char *name, br_vec2 pos) {
     return e;
 }
 
+br_entity ed_doc_create_child(ed_doc *d, br_entity parent, const char *name, br_vec2 local) {
+    br_entity e;
+    if (!br_entity_alive(&d->world, parent)) return ed_doc_create(d, name, local);
+    if ((e = ed_doc_create(d, name, local)) == BR_ENTITY_NULL) return e;
+    br_set_parent(&d->world, e, parent, false);       /* `local` is in the parent's space */
+    ed_doc_normalize(d);
+    return e;
+}
+
 br_entity ed_doc_duplicate(ed_doc *d, br_entity e) {
     int at = ed_doc_index(d, e);
-    br_entity c;
-    br_name *n;
+    uint32_t n, i, k;
+    br_entity *src, *dst;
+    br_name *nm;
     br_transform *t;
-    if (at < 0 || (c = br_entity_clone(&d->world, e)) == BR_ENTITY_NULL) return BR_ENTITY_NULL;
-    if ((n = (br_name *)br_get(&d->world, c, d->ids.name)) != NULL) {
-        char base[sizeof(n->text)];
-        snprintf(base, sizeof(base), "%s", n->text);
-        snprintf(n->text, sizeof(n->text), "%.26s copy", base);
+    if (at < 0) return BR_ENTITY_NULL;
+    n = block_len(d, (uint32_t)at);
+    src = (br_entity *)br_alloc(sizeof(br_entity) * n);
+    dst = (br_entity *)br_alloc(sizeof(br_entity) * n);
+    if (!src || !dst || !reserve(d, d->count + n)) { br_free(src); br_free(dst); return BR_ENTITY_NULL; }
+    memcpy(src, d->order + at, sizeof(br_entity) * n);
+    for (i = 0; i < n; ++i) dst[i] = br_entity_clone(&d->world, src[i]);
+    for (i = 1; i < n; ++i) {                         /* copies point at copies */
+        br_entity p = br_parent_of(&d->world, src[i]);
+        for (k = 0; k < n; ++k) if (src[k] == p) { br_set_parent(&d->world, dst[i], dst[k], false); break; }
     }
-    if ((t = (br_transform *)br_get(&d->world, c, d->ids.transform)) != NULL)
-        t->position = br_v2_add(t->position, br_v2(8, 8));       /* visibly not on top */
-    insert_at(d, (uint32_t)at + 1, c);
-    d->selected = c;
-    return c;
+    if ((nm = (br_name *)br_get(&d->world, dst[0], d->ids.name)) != NULL) {
+        char base[sizeof(nm->text)];
+        snprintf(base, sizeof(base), "%s", nm->text);
+        snprintf(nm->text, sizeof(nm->text), "%.26s copy", base);
+    }
+    if ((t = (br_transform *)br_get(&d->world, dst[0], d->ids.transform)) != NULL)
+        t->position = br_v2_add(t->position, br_world_to_parent_vector(&d->world, dst[0], br_v2(8, 8)));   /* visibly not on top */
+    memmove(d->order + at + n + n, d->order + at + n, (d->count - (uint32_t)at - n) * sizeof(br_entity));
+    memcpy(d->order + at + n, dst, sizeof(br_entity) * n);   /* right after the original's subtree */
+    d->count += n;
+    d->selected = dst[0];
+    br_free(src);
+    br_free(dst);
+    ed_doc_normalize(d);
+    return d->selected;
 }
 
 void ed_doc_delete(ed_doc *d, br_entity e) {
     int at = ed_doc_index(d, e);
     if (at < 0) return;
-    memmove(d->order + at, d->order + at + 1, (d->count - (uint32_t)at - 1) * sizeof(br_entity));
-    d->count--;
-    br_entity_destroy(&d->world, e);
-    if (d->selected == e)   /* select the neighbour, so Delete can be pressed repeatedly */
+    br_entity_destroy(&d->world, e);                  /* and its children (the hierarchy's hook) */
+    ed_doc_normalize(d);
+    if (d->selected == BR_ENTITY_NULL || d->selected == e)   /* the neighbour, so Delete can be pressed again */
         d->selected = d->count ? d->order[(uint32_t)at < d->count ? (uint32_t)at : d->count - 1] : BR_ENTITY_NULL;
 }
 
+bool ed_doc_place(ed_doc *d, br_entity e, br_entity parent, br_entity before) {
+    int at = ed_doc_index(d, e), to;
+    uint32_t n;
+    br_entity *block;
+    if (at < 0 || (parent != BR_ENTITY_NULL && (parent == e || br_is_ancestor(&d->world, e, parent)))) return false;
+    if (before == e || (before != BR_ENTITY_NULL && br_is_ancestor(&d->world, e, before))) before = BR_ENTITY_NULL;
+    if (!br_set_parent(&d->world, e, parent, true)) return false;   /* stays where it is on screen */
+    n = block_len(d, (uint32_t)at);
+    if (!(block = (br_entity *)br_alloc(sizeof(br_entity) * n))) return false;
+    memcpy(block, d->order + at, sizeof(br_entity) * n);
+    memmove(d->order + at, d->order + at + n, (d->count - (uint32_t)at - n) * sizeof(br_entity));
+    d->count -= n;
+    if (before != BR_ENTITY_NULL && (to = ed_doc_index(d, before)) >= 0) {
+    } else if (parent != BR_ENTITY_NULL && (to = ed_doc_index(d, parent)) >= 0) {
+        to += (int)block_len(d, (uint32_t)to);        /* after the parent's last descendant */
+    } else {
+        to = (int)d->count;
+    }
+    memmove(d->order + to + n, d->order + to, (d->count - (uint32_t)to) * sizeof(br_entity));
+    memcpy(d->order + to, block, sizeof(br_entity) * n);
+    d->count += n;
+    br_free(block);
+    ed_doc_normalize(d);
+    return true;
+}
+
+/* Swaps with the previous / next sibling. */
 void ed_doc_reorder(ed_doc *d, br_entity e, int delta) {
-    int at = ed_doc_index(d, e), to = at + delta;
-    if (at < 0 || to < 0 || to >= (int)d->count) return;
-    d->order[at] = d->order[to];
-    d->order[to] = e;
+    br_entity p = br_parent_of(&d->world, e), sib = BR_ENTITY_NULL;
+    int at = ed_doc_index(d, e), i;
+    if (at < 0) return;
+    if (delta < 0) {
+        for (i = at - 1; i >= 0; --i) if (br_parent_of(&d->world, d->order[i]) == p) { sib = d->order[i]; break; }
+        if (sib != BR_ENTITY_NULL) ed_doc_place(d, e, p, sib);
+    } else {
+        for (i = at + (int)block_len(d, (uint32_t)at); i < (int)d->count; ++i)
+            if (br_parent_of(&d->world, d->order[i]) == p) { sib = d->order[i]; break; }
+        if (sib != BR_ENTITY_NULL) {                  /* before the sibling after that one */
+            int j = ed_doc_index(d, sib) + (int)block_len(d, (uint32_t)ed_doc_index(d, sib));
+            br_entity after = BR_ENTITY_NULL;
+            for (; j < (int)d->count; ++j) if (br_parent_of(&d->world, d->order[j]) == p) { after = d->order[j]; break; }
+            ed_doc_place(d, e, p, after);
+        }
+    }
 }
 
 void ed_doc_move(ed_doc *d, br_entity e, int slot) {
-    int at = ed_doc_index(d, e);
-    if (at < 0 || slot < 0 || slot > (int)d->count) return;
-    if (slot > at) slot--;                       /* the gap it leaves shifts the rest up */
-    memmove(d->order + at, d->order + at + 1, (d->count - (uint32_t)at - 1) * sizeof(br_entity));
-    memmove(d->order + slot + 1, d->order + slot, (d->count - 1 - (uint32_t)slot) * sizeof(br_entity));
-    d->order[slot] = e;
+    br_entity before = slot >= 0 && slot < (int)d->count ? d->order[slot] : BR_ENTITY_NULL;
+    br_entity parent = before != BR_ENTITY_NULL ? br_parent_of(&d->world, before) : BR_ENTITY_NULL;
+    if (before == e) return;
+    ed_doc_place(d, e, parent, before);
 }
 
 const char *ed_doc_name(const ed_doc *d, br_entity e, char *buf, size_t size) {
@@ -292,30 +401,39 @@ int ed_doc_instantiate(ed_doc *d, const char *path, br_vec2 at) {
     }
     br_free(text);
     if (n < 0) { br_free(made); return -1; }
-    for (i = 0; i < n; ++i) {
+    for (i = 0; i < n; ++i) {                         /* the prefab's roots; children ride along */
         const br_transform *t = (const br_transform *)br_get(&d->world, made[i], d->ids.transform);
-        if (t) { sum = br_v2_add(sum, t->position); ++placed; }
+        if (t && br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL) { sum = br_v2_add(sum, t->position); ++placed; }
     }
     if (placed) {
         br_vec2 shift = br_v2_sub(at, br_v2_scale(sum, 1.0f / (float)placed));
         for (i = 0; i < n; ++i) {
             br_transform *t = (br_transform *)br_get(&d->world, made[i], d->ids.transform);
-            if (t) t->position = br_v2_add(t->position, shift);
+            if (t && br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL) t->position = br_v2_add(t->position, shift);
         }
     }
     for (i = 0; i < n; ++i) insert_at(d, d->count, made[i]);
+    ed_doc_normalize(d);
     if (n > 0) d->selected = made[0];
     br_free(made);
     return n;
 }
 
 bool ed_doc_save_entity(ed_doc *d, br_entity e, const char *path) {
-    if (!br_entity_alive(&d->world, e)) { snprintf(d->error, sizeof(d->error), "nothing selected"); return false; }
-    if (!br_world_save_file(&d->world, &e, 1, path)) {
-        snprintf(d->error, sizeof(d->error), "can't write '%s'", path);
-        return false;
-    }
-    return true;
+    int at = ed_doc_index(d, e);
+    br_entity parent;
+    br_transform *t, local;
+    bool ok;
+    if (at < 0) { snprintf(d->error, sizeof(d->error), "nothing selected"); return false; }
+    parent = br_parent_of(&d->world, e);
+    t = (br_transform *)br_get(&d->world, e, d->ids.transform);
+    if (t) local = *t;
+    if (parent != BR_ENTITY_NULL) br_set_parent(&d->world, e, BR_ENTITY_NULL, true);   /* saved as a root, where it is */
+    ok = br_world_save_file(&d->world, d->order + at, block_len(d, (uint32_t)at), path);   /* with its subtree */
+    if (parent != BR_ENTITY_NULL) br_set_parent(&d->world, e, parent, false);
+    if (t) *(br_transform *)br_get(&d->world, e, d->ids.transform) = local;
+    if (!ok) snprintf(d->error, sizeof(d->error), "can't write '%s'", path);
+    return ok;
 }
 
 /* ---- undo / redo --------------------------------------------------------------------- */

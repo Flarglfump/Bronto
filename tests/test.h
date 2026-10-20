@@ -70,6 +70,7 @@ void suite_ui(void);
 void suite_editor_doc(void);
 void suite_fs(void);
 void suite_physics(void);
+void suite_hierarchy(void);
 void suite_script(void);
 
 /* Directory for test artefacts (images, wav). */

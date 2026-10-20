@@ -37,6 +37,7 @@
 #include "core/components.c"
 #include "core/ui.c"
 #include "core/path.c"
+#include "core/hierarchy.c"
 #include "core/physics.c"
 #include "core/script.c"
 #include "core/audio.c"

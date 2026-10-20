@@ -89,9 +89,11 @@ Operators, loosest first: `or`, `and`, `not`, comparisons (`== != < <= > >=`), `
 | Property | Meaning |
 |---|---|
 | `.name` | Name.text |
-| `.position`, `.x`, `.y` | Transform.position (pixels; +y is down) |
-| `.rotation` | Transform.rotation (degrees, clockwise) |
+| `.position`, `.x`, `.y` | Transform.position (pixels; +y is down), relative to the parent |
+| `.rotation` | Transform.rotation (degrees, clockwise), relative to the parent |
 | `.scale` | Transform.scale (set it to a number or a vec2) |
+| `.global_position`, `.global_rotation` | where it is in the world, after its parents; setting them moves it there |
+| `.parent` | the parent entity, or nil for a root. Setting it reparents (nil makes a root), and the entity stays where it is on screen |
 | `.velocity` | RigidBody.velocity, or Motion.velocity if there is no RigidBody |
 | `.angular_velocity` | RigidBody.angular_velocity (degrees / second) |
 | `.alive` | false once the entity has been destroyed |
@@ -104,7 +106,8 @@ Nested values write back: `self.velocity.x = 50` and `self.Shape.size.y += 2` bo
 `other.hit(3)` calls the function `hit` in `other`'s script and returns its result.
 Field types map as follows: numbers to numbers, true/false to true/false, vec2 to vec2,
 strings to strings, enums to their names (`"ellipse"`), and colours to `"#rrggbbaa"`
-strings. You can also set a colour from a list `[r, g, b]` or `[r, g, b, a]`.
+strings. You can also set a colour from a list `[r, g, b]` or `[r, g, b, a]`. Entity
+fields (such as a game component's `target`) are entities or nil.
 
 ## Functions
 
@@ -128,9 +131,11 @@ range(n) range(a, b[, step])`.
 
 **The world:**
 - `find(name)` returns the first entity with that name, or nil. `find_all(name)` returns a list.
-- `spawn("prefabs/bullet.scene", position)` adds a copy of a scene file's entities and
-  returns the first one.
-- `destroy(e)` removes an entity at the end of the step.
+- `children(e)` returns its direct children; `child(e, "Gun")` the one with that name, or nil.
+- `spawn("prefabs/bullet.scene", position[, parent])` adds a copy of a scene file's entities
+  and returns the first one. With a parent, they become its children, and position is in
+  its space.
+- `destroy(e)` removes an entity, and its children, at the end of the step.
 - `has(e, "Shape")`, `add(e, "Motion")` (returns the component) and `remove_component(e, "Motion")`.
 - `send(e, "function", args...)` calls a function on another entity's script if it has one,
   and quietly does nothing if not.
@@ -154,6 +159,19 @@ editor's asset preview shows them as soon as you save the file. A loop that neve
 is stopped after a few million steps.
 
 Scripts are read again when their file changes, and every time Play starts in the editor.
+
+## Editing scripts
+
+- **Which editor opens them:** in the Bronto editor, **Settings › Script editor** sets the
+  program that opens `.bs` files: a command line where `{file}` is the script and `{line}`
+  the line to show. There are presets for VS Code, Sublime Text, Notepad++ and Zed, and
+  empty means your system's default program. When a script has a mistake, it opens at
+  that line.
+- **VS Code:** `tools/vscode` has an extension with highlighting, completion, hover
+  documentation, signature help, go to definition and checking as you type. See
+  [its README](../tools/vscode/brontoscript/README.md).
+- **Any editor:** `bscheck file.bs ...` (built by `make tools`) prints each mistake as
+  `file:line: message`, the format most editors and CI systems understand.
 
 ## C behaviours
 

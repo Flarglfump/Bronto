@@ -43,6 +43,10 @@ bool br_fs_remove(const char *path);                   /* a file, or an empty fo
 /* The absolute form of an existing path, with '/' separators ("" = the
  * current directory). False if it doesn't exist. */
 bool br_fs_absolute(const char *path, char *out, size_t size);
+/* The folder for a program's settings, created if needed:
+ *   Windows %APPDATA%/<app>, macOS ~/Library/Application Support/<app>,
+ *   others $XDG_CONFIG_HOME/<app> or ~/.config/<app>. */
+bool br_fs_config_dir(const char *app, char *out, size_t size);
 
 /* ---- path strings ----------------------------------------------------------- */
 void br_path_join(char *out, size_t size, const char *a, const char *b);   /* "a/b"; "" + b = b */

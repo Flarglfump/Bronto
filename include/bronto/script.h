@@ -95,6 +95,10 @@ bool br_script_get_number(br_world *w, br_entity e, const char *var, double *out
 bool br_script_set_number(br_world *w, br_entity e, const char *var, double value);
 bool br_script_get_string(br_world *w, br_entity e, const char *var, char *out, size_t size);
 
+/* The language's built-in functions, by name (for tools such as editors). */
+int br_script_builtin_count(void);
+const char *br_script_builtin_name(int index);
+
 /* Checks a script file without running it: true if it parses. */
 bool br_script_check(const char *source, const char *name, char *err, size_t err_size);
 

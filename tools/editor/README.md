@@ -21,9 +21,11 @@ build/editor --headless              # scripted self-test, writes screenshots
 | **View** | Scroll to zoom around the cursor. Right-drag, middle-drag or Space+drag pans. **F** centres the selection. **G** toggles the grid. |
 | **Edit values** | In the inspector, drag a number left or right, or click it and type. Text fields commit on Enter. Colours are R G B A. |
 | **Components** | Add them from **+ Add component** at the bottom of the inspector, and remove one with the x on its header. |
-| **Entities** | **+ New**, **Copy** (Ctrl+D), **Delete** (Del), and drag rows up or down in the list to reorder them (a line shows where the row will go; the order is the save order). |
+| **Entities** | **+ New** adds a root, **+ Child** a child of the selection. **Copy** (Ctrl+D) and **Delete** (Del) take the whole subtree. |
+| **The tree** | The hierarchy is a tree. Drag a row onto the middle of another row to make it a child (it stays where it is on screen); drag it between rows to reorder it or move it to another parent; drag it below everything to make it a root. A line or box shows where it will land. The arrows fold subtrees, and double-clicking a row centres the view on it. Children move, turn and scale with their parent, and their Transform is relative to it. **Unparent** in the inspector makes the selection a root. |
 | **Play** | **Play** (F5) runs the scene's systems: Motion and Bounds, physics (RigidBody, Collider), sounds and scripts. While playing, the keyboard belongs to the game; F5 or Esc stops. **Stop** puts every entity back exactly as it was, and edits made while playing are undone too. A script error shows in the status bar, with its file and line. |
 | **Physics** | Add a **Collider** to make an entity solid and a **RigidBody** to make it fall and collide. **Colliders** in the toolbar outlines them: green for solid, yellow for triggers. |
+| **Settings** | **Script editor**: the program that opens `.bs` files, a command line with `{file}` and `{line}`, with presets for VS Code, Sublime Text, Notepad++ and Zed (empty = the system's default). Saved in your settings folder, so it applies to every project. |
 | **Scripts** | **+ Script** makes a new `.bs` file from a template. Drag a script onto an entity to attach it (it gets a Script component), or into empty space for a new entity. Double-click to edit it in your text editor; Play reads it again. The preview shows the first lines and any mistake. See [docs/scripting.md](../../docs/scripting.md). |
 | **Undo** | Ctrl+Z and Ctrl+Y (or Ctrl+Shift+Z). Every finished drag or edit is one step. |
 | **Assets** | The strip under the view shows the project folder. Click a tile to preview it on the right; double-click to open a folder or scene, hear a sound, or add an image. **Up** and the path buttons move between folders. |
@@ -55,6 +57,7 @@ commands.c    every user action (New, Save, Delete, Play...). Buttons and
 viewport.c    the scene view: camera, grid, picking, move/rotate/scale handles
 panels.c      toolbar, hierarchy, inspector, status bar, the unsaved-changes dialog
 assets.c      the asset browser and preview, file operations, drops into the scene
+settings.c    preferences (the script editor) and the Settings dialog
 icon.c        the app icon: a little brontosaurus drawn with the renderer
 main.c        engine setup, window layout, keyboard shortcuts, headless self-test
 ```
@@ -79,8 +82,9 @@ br_builtin_register(&scene->world, NULL);   /* the components and their systems 
 br_world_load_file(&scene->world, "level.scene", NULL, 0, err, sizeof(err));
 ```
 
-That's all. The built-in systems move and draw everything. `examples/sceneplayer` is
-a complete example: `sceneplayer level.scene`.
+That's all. The built-in systems move, collide, run the scripts and draw everything.
+Set the asset root first with `br_assets_find_root(path, dir, size)` and
+`br_assets_set_root(dir)` so sprites, sounds and scripts are found.
 
 **A game's own components** work the same way, once they have a description (see the
 example in `ecs.h`). To edit them in the editor, register them on the document's world

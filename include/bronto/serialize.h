@@ -20,7 +20,10 @@
  *       color = #ff7828ff
  *
  * Values: int and float numbers, true/false, "x y" pairs, #rrggbbaa
- * colours, "quoted strings" (with \" \\ \n escapes) and enum names.
+ * colours, "quoted strings" (with \" \\ \n escapes), enum names, and
+ * entity references written as the entity's position in the file (0 is
+ * the first) or "none". A reference to an entity that isn't saved with it
+ * is written as none.
  * Indentation is optional and '#' starts a comment. Loading is forgiving
  * about what it doesn't know: an unknown component or field (say, from a
  * newer game) is skipped with a warning, and fields a file leaves out keep

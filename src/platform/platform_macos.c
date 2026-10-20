@@ -23,6 +23,7 @@
 #include <CoreGraphics/CoreGraphics.h>
 #include <mach/mach_time.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -519,6 +520,12 @@ static int mac_pick_folder(const char *title, const char *start, char *out, size
     return 1;
 }
 
+static bool mac_launch(const char *command_line) {       /* through the shell, in the background */
+    char cmd[2100];
+    snprintf(cmd, sizeof(cmd), "(%s) >/dev/null 2>&1 &", command_line);
+    return system(cmd) == 0;
+}
+
 static bool mac_open_path(const char *path) {
     id url = msg_id_id(cls("NSURL"), "fileURLWithPath:", nsstring(path));
     id ws = msg_id(cls("NSWorkspace"), "sharedWorkspace");
@@ -725,7 +732,7 @@ static const br_platform k_macos = {
     "cocoa", mac_init, mac_shutdown, mac_poll, mac_present, mac_time, mac_sleep,
     mac_audio_wanted, mac_audio_submit,
     mac_get_window_size, mac_get_window_scale, mac_set_title, mac_set_window_size,
-    mac_set_fullscreen, mac_set_cursor_visible, mac_set_icon, mac_pick_folder, mac_open_path,
+    mac_set_fullscreen, mac_set_cursor_visible, mac_set_icon, mac_pick_folder, mac_open_path, mac_launch,
     mac_set_gamepad_rumble,
     NULL
 };

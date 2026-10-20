@@ -55,7 +55,7 @@ static handles selection_handles(const editor *ed) {
     memset(&h, 0, sizeof(h));
     if (!t || !br_builtin_box(&ed->doc.world, ed->doc.selected, c)) return h;
     for (i = 0; i < 4; ++i) h.corner[i] = ed_view_to_screen(&ed->view, c[i]);
-    h.center = ed_view_to_screen(&ed->view, t->position);
+    h.center = ed_view_to_screen(&ed->view, br_world_transform(&ed->doc.world, ed->doc.selected).position);
     h.top = br_v2_scale(br_v2_add(h.corner[0], h.corner[1]), 0.5f);
     up = br_v2_norm(br_v2_sub(h.top, h.center));
     if (up.x == 0 && up.y == 0) up = br_v2(0, -1);
@@ -71,11 +71,12 @@ static float angle_deg(br_vec2 from, br_vec2 to) { return atan2f(to.y - from.y, 
 
 static void start_drag(editor *ed, ed_drag kind, br_transform *t) {
     ed_view *v = &ed->view;
+    br_vec2 wp = br_world_transform(&ed->doc.world, ed->doc.selected).position;   /* gizmos work on screen */
     v->drag = kind;
     v->drag_start = *t;
-    v->drag_offset = br_v2_sub(t->position, v->mouse_world);
-    v->drag_angle = angle_deg(t->position, v->mouse_world);
-    v->drag_dist = br_v2_dist(t->position, v->mouse_world);
+    v->drag_offset = br_v2_sub(wp, v->mouse_world);
+    v->drag_angle = angle_deg(wp, v->mouse_world);
+    v->drag_dist = br_v2_dist(wp, v->mouse_world);
     if (v->drag_dist < 1e-3f) v->drag_dist = 1e-3f;
 }
 
@@ -125,14 +126,16 @@ static void handle_input(editor *ed) {
         if (!t || !br_mouse_down(in, BR_MOUSE_LEFT)) {
             v->drag = ED_DRAG_NONE;
         } else if (v->drag == ED_DRAG_MOVE) {
-            t->position = br_v2_add(v->mouse_world, v->drag_offset);
-            if (v->snap) t->position = br_v2(snapped(t->position.x, v->grid_size), snapped(t->position.y, v->grid_size));
+            br_vec2 to = br_v2_add(v->mouse_world, v->drag_offset);
+            if (v->snap) to = br_v2(snapped(to.x, v->grid_size), snapped(to.y, v->grid_size));
+            br_set_world_position(&ed->doc.world, ed->doc.selected, to);   /* a child: into its parent's space */
         } else if (v->drag == ED_DRAG_ROTATE) {
-            float a = v->drag_start.rotation + angle_deg(t->position, v->mouse_world) - v->drag_angle;
+            br_vec2 wp = br_world_transform(&ed->doc.world, ed->doc.selected).position;
+            float a = v->drag_start.rotation + angle_deg(wp, v->mouse_world) - v->drag_angle;
             a = fmodf(a + 540.0f, 360.0f) - 180.0f;                 /* -180 .. 180 */
             t->rotation = v->snap ? snapped(a, 15) : roundf(a * 10) / 10;
         } else if (v->drag == ED_DRAG_SCALE) {
-            float f = br_v2_dist(t->position, v->mouse_world) / v->drag_dist;
+            float f = br_v2_dist(br_world_transform(&ed->doc.world, ed->doc.selected).position, v->mouse_world) / v->drag_dist;
             br_vec2 s = br_v2_scale(v->drag_start.scale, f);
             if (v->snap) s = br_v2(snapped(s.x, 0.25f), snapped(s.y, 0.25f));
             if (br_absf(s.x) < 0.05f) s.x = 0.05f;
@@ -191,7 +194,7 @@ static void draw_overlays(editor *ed) {
         const br_transform *t = (const br_transform *)br_get(&d->world, e, d->ids.transform);
         br_vec2 p;
         if (!t || br_has(&d->world, e, d->ids.shape) || br_has(&d->world, e, d->ids.sprite) || br_has(&d->world, e, d->ids.label)) continue;
-        p = ed_view_to_screen(v, t->position);
+        p = ed_view_to_screen(v, br_world_transform(&d->world, e).position);
         br_draw_line(r, br_v2(p.x - 5, p.y), br_v2(p.x + 5, p.y), br_rgb(255, 200, 80));
         br_draw_line(r, br_v2(p.x, p.y - 5), br_v2(p.x, p.y + 5), br_rgb(255, 200, 80));
     }

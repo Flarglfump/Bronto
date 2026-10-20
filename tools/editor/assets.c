@@ -17,6 +17,7 @@
 #include "editor.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define TILE_W 76.0f
@@ -283,12 +284,11 @@ bool ed_assets_new_script(editor *ed) {
 }
 
 bool ed_assets_edit(editor *ed, const char *rel) {
-    char full[ED_PATH_MAX], abs[ED_PATH_MAX];
-    ed_asset_path(ed, rel, full, sizeof(full));
-    if (!br_fs_absolute(full, abs, sizeof(abs))) snprintf(abs, sizeof(abs), "%s", full);
-    if (br_open_path(ed->engine, abs)) { ed_status(ed, "Opened %s in your editor; changes are picked up the next time you press Play", rel); return true; }
-    ed_status(ed, "Couldn't open %s with another program - edit %s in any text editor", rel, abs);
-    return false;
+    int line = 1;
+    const char *colon;
+    if (strcmp(ed->assets.selected, rel) == 0 && ed->assets.script_error[0] &&
+        (colon = strchr(ed->assets.script_error, ':')) != NULL) line = atoi(colon + 1);   /* "player.bs:12: ..." */
+    return ed_open_script(ed, rel, line);
 }
 
 /* A script dropped on an entity is attached to it; anywhere else it gets a new entity. */
@@ -650,8 +650,8 @@ void ed_assets_preview(editor *ed, br_rect rect) {
         if (br_ui_button(ui, "Edit")) ed_assets_edit(ed, a->selected);
         if (br_ui_button(ui, "Attach")) {
             if (br_entity_alive(&ed->doc.world, ed->doc.selected)) {
-                const br_transform *t = (const br_transform *)br_get(&ed->doc.world, ed->doc.selected, ed->doc.ids.transform);
-                ed_assets_drop(ed, a->selected, t ? t->position : ed->view.center);
+                br_transform wt = br_world_transform(&ed->doc.world, ed->doc.selected);
+                ed_assets_drop(ed, a->selected, wt.position);
             } else {
                 ed_status(ed, "Select an entity first, or drag the script onto one");
             }

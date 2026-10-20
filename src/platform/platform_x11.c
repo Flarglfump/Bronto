@@ -769,7 +769,7 @@ static const br_platform k_x11 = {
     "x11", x11_init, x11_shutdown, x11_poll, x11_present, x11_time, x11_sleep,
     x11_audio_wanted, x11_audio_submit,
     x11_get_window_size, x11_get_window_scale, x11_set_title, x11_set_window_size,
-    x11_set_fullscreen, x11_set_cursor_visible, x11_set_icon, du_pick_folder, du_open_path,
+    x11_set_fullscreen, x11_set_cursor_visible, x11_set_icon, du_pick_folder, du_open_path, du_launch,
     x11_set_gamepad_rumble,
     NULL
 };

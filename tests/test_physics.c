@@ -232,7 +232,47 @@ static void test_deterministic(void) {
     }
 }
 
+static void test_bodies_in_a_tree(void) {
+    br_entity group, wall, crate, holder, kid;
+    br_component parent;
+    setup();
+    parent = br_component_find(&W, "Parent");
+    ground();
+    group = br_entity_create(&W);                      /* a moving group: kinematic, no shape of its own */
+    br_add(&W, group, ID.transform, NULL);
+    xf(group)->position = br_v2(100, 150);
+    ((br_rigidbody *)br_add(&W, group, RB, NULL))->type = BR_BODY_KINEMATIC;
+    rb(group)->velocity = br_v2(60, 0);
+    wall = br_entity_create(&W);                       /* its child: a collider with no body */
+    br_add(&W, wall, ID.transform, NULL);
+    xf(wall)->position = br_v2(10, 0);
+    ((br_collider *)br_add(&W, wall, COL, NULL))->size = br_v2(10, 20);
+    ((br_parent *)br_add(&W, wall, parent, NULL))->entity = group;
+    crate = box(140, 150, 20, 20, BR_BODY_DYNAMIC);
+    run(1);
+    CHECK_NEAR(xf(group)->position.x, 160, 0.5);
+    CHECK(xf(wall)->position.x == 10);                 /* still local */
+    CHECK(xf(crate)->position.x > 175);                /* pushed by the child's collider */
+    rb(group)->velocity = br_v2(0, 0);
+    holder = br_entity_create(&W);                     /* a dynamic body under a turned, scaled parent */
+    br_add(&W, holder, ID.transform, NULL);
+    xf(holder)->position = br_v2(250, 20);
+    xf(holder)->rotation = 90;
+    xf(holder)->scale = br_v2(2, 2);
+    kid = ball(0, 0, 5);
+    ((br_parent *)br_add(&W, kid, parent, NULL))->entity = holder;
+    run(2);
+    {
+        br_transform wt = br_world_transform(&W, kid);
+        CHECK_NEAR(wt.position.x, 250, 0.5);            /* fell straight down the screen */
+        CHECK_NEAR(wt.position.y, 150, 1.5);            /* resting on the ground (radius 5 x scale 2) */
+        CHECK(xf(kid)->position.y < -1 || xf(kid)->position.x > 1);   /* its local position changed */
+    }
+    br_world_destroy(&W);
+}
+
 void suite_physics(void) {
+    RUN(test_bodies_in_a_tree);
     RUN(test_falls_and_rests);
     RUN(test_stack_is_stable);
     RUN(test_bounce);

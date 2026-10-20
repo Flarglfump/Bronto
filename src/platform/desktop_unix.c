@@ -59,6 +59,12 @@ static int du_pick_folder(const char *title, const char *start, char *out, size_
     return 1;
 }
 
+static bool du_launch(const char *command_line) {
+    char cmd[2100];
+    snprintf(cmd, sizeof(cmd), "(%s) >/dev/null 2>&1 &", command_line);
+    return system(cmd) == 0;
+}
+
 static bool du_open_path(const char *path) {
     char cmd[1200], q[1100];
     du_quote(q, sizeof(q), path);

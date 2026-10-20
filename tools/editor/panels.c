@@ -58,6 +58,8 @@ void ed_toolbar(editor *ed, br_rect rect) {
     if (strip_button(&s, "Grid", 40, ed->view.grid)) ed->view.grid = !ed->view.grid;
     if (strip_button(&s, "Snap", 40, ed->view.snap)) ed->view.snap = !ed->view.snap;
     if (strip_button(&s, "Colliders", 76, ed->show_colliders)) ed->show_colliders = !ed->show_colliders;
+    s.x += 8;
+    if (strip_button(&s, "Settings", 68, ed->settings_visible)) ed_settings_open(ed);
     {
         const char *title = "BRONTO EDITOR";
         br_vec2 m = br_measure_text(title, 1);
@@ -76,53 +78,172 @@ void ed_toolbar(editor *ed, br_rect rect) {
 /* ---- hierarchy --------------------------------------------------------------------- */
 
 #define ED_LIST_ROWS 4096
+#define TREE_INDENT 12.0f
 
-/* While a hierarchy row is dragged: a line where it would land, and the move on release. */
-static void reorder_drop(editor *ed, br_rect panel, const br_rect *rows, uint32_t n) {
+typedef struct tree_row { br_rect r; br_entity e; float indent; bool open_parent; } tree_row;
+
+bool ed_collapsed(const editor *ed, br_entity e) {
+    int i;
+    for (i = 0; i < ed->collapsed_count; ++i) if (ed->collapsed[i] == e) return true;
+    return false;
+}
+
+void ed_set_collapsed(editor *ed, br_entity e, bool collapsed) {
+    int i;
+    for (i = 0; i < ed->collapsed_count; ++i)
+        if (ed->collapsed[i] == e) {
+            if (!collapsed) ed->collapsed[i] = ed->collapsed[--ed->collapsed_count];
+            return;
+        }
+    if (collapsed && ed->collapsed_count < ED_MAX_COLLAPSED) ed->collapsed[ed->collapsed_count++] = e;
+}
+
+static bool hidden_by_collapse(const editor *ed, br_entity e) {
+    br_entity p = br_parent_of(&ed->doc.world, e);
+    int guard = 0;
+    while (p != BR_ENTITY_NULL && guard++ < 64) {
+        if (ed_collapsed(ed, p)) return true;
+        p = br_parent_of(&ed->doc.world, p);
+    }
+    return false;
+}
+
+/* Where a dragged row would go with the mouse at y: before a row, into it,
+ * after it, or at the very end. Returns false if that isn't allowed. */
+typedef struct tree_target { br_entity parent, before; br_rect mark; bool into; } tree_target;
+
+static bool tree_target_at(const editor *ed, const tree_row *rows, uint32_t n, br_entity dragged, float y, tree_target *t) {
+    const br_world *w = &ed->doc.world;
+    uint32_t i;
+    memset(t, 0, sizeof(*t));
+    if (n == 0) return false;
+    if (y < rows[0].r.y) i = 0;
+    else for (i = 0; i < n && y >= rows[i].r.y + rows[i].r.h + 3; ++i) {}
+    if (i >= n) {                                          /* below everything: the last root */
+        t->parent = BR_ENTITY_NULL;
+        t->before = BR_ENTITY_NULL;
+        t->mark = br_rect_make(rows[0].r.x, rows[n - 1].r.y + rows[n - 1].r.h + 1, rows[0].r.w, 2);
+    } else {
+        const tree_row *row = &rows[i];
+        float frac = (y - row->r.y) / (row->r.h > 0 ? row->r.h : 1);
+        if (frac < 0.3f) {                                 /* before this row, as its sibling */
+            t->parent = br_parent_of(w, row->e);
+            t->before = row->e;
+            t->mark = br_rect_make(row->r.x + row->indent, row->r.y - 2, row->r.w - row->indent, 2);
+        } else if (frac > 0.7f && !(row->open_parent)) {   /* after it (and its subtree), as its sibling */
+            uint32_t k;
+            t->parent = br_parent_of(w, row->e);
+            t->before = BR_ENTITY_NULL;
+            for (k = i + 1; k < n; ++k)
+                if (!br_is_ancestor(w, row->e, rows[k].e)) {
+                    if (br_parent_of(w, rows[k].e) == t->parent) t->before = rows[k].e;
+                    break;
+                }
+            t->mark = br_rect_make(row->r.x + row->indent, row->r.y + row->r.h + 1, row->r.w - row->indent, 2);
+        } else if (frac > 0.7f) {                           /* an open parent: its first child */
+            t->parent = row->e;
+            t->before = i + 1 < n ? rows[i + 1].e : BR_ENTITY_NULL;
+            t->mark = br_rect_make(row->r.x + row->indent + TREE_INDENT, row->r.y + row->r.h + 1, row->r.w - row->indent - TREE_INDENT, 2);
+        } else {                                           /* into it, as its last child */
+            t->parent = row->e;
+            t->before = BR_ENTITY_NULL;
+            t->into = true;
+            t->mark = row->r;
+        }
+    }
+    if (t->parent == dragged || (t->parent != BR_ENTITY_NULL && br_is_ancestor(w, dragged, t->parent))) return false;
+    return true;
+}
+
+/* While a row is dragged: show where it would land; on release, move it there. */
+static void tree_drop(editor *ed, br_rect panel, const tree_row *rows, uint32_t n) {
     br_ui *ui = &ed->ui;
     const char *payload = br_ui_dragging(ui, ED_ENTITY_DRAG), *dropped;
-    uint32_t slot = 0;
-    float y;
-    if (!payload || n == 0) return;
-    while (slot < n && ui->mouse.y > rows[slot].y + rows[slot].h / 2) ++slot;
-    y = slot < n ? rows[slot].y - 2 : rows[n - 1].y + rows[n - 1].h + 1;
-    if (ui->mouse.x >= panel.x && ui->mouse.x < panel.x + panel.w && ui->mouse.y >= panel.y && ui->mouse.y < panel.y + panel.h)
-        br_fill_rect(ui->r, br_rect_make(rows[0].x, floorf(y), rows[0].w, 2), ui->style.accent);
-    if ((dropped = br_ui_drop_target(ui, panel, ED_ENTITY_DRAG)) != NULL) {
-        br_entity e = (br_entity)strtoul(dropped, NULL, 10);
-        ed_doc_move(&ed->doc, e, (int)slot);
-        ed->doc.selected = e;
+    br_entity dragged;
+    tree_target t;
+    bool ok;
+    if (!payload) return;
+    dragged = (br_entity)strtoul(payload, NULL, 10);
+    ok = tree_target_at(ed, rows, n, dragged, ui->mouse.y, &t);
+    if (ui->mouse.x >= panel.x && ui->mouse.x < panel.x + panel.w && ui->mouse.y >= panel.y && ui->mouse.y < panel.y + panel.h && ok) {
+        if (t.into) br_draw_rect(ui->r, t.mark, ui->style.accent);
+        else br_fill_rect(ui->r, t.mark, ui->style.accent);
     }
+    if ((dropped = br_ui_drop_target(ui, panel, ED_ENTITY_DRAG)) != NULL && ok) {
+        if (ed_doc_place(&ed->doc, dragged, t.parent, t.before)) {
+            char a[64], b[64];
+            if (t.parent != BR_ENTITY_NULL) ed_set_collapsed(ed, t.parent, false);
+            ed->doc.selected = dragged;
+            if (t.into) ed_status(ed, "%s is now a child of %s", ed_doc_name(&ed->doc, dragged, a, sizeof(a)), ed_doc_name(&ed->doc, t.parent, b, sizeof(b)));
+        }
+    }
+}
+
+static void draw_fold(br_ui *ui, br_rect r, bool open, bool hot) {
+    float cx = floorf(r.x + r.w / 2), cy = floorf(r.y + r.h / 2);
+    br_color c = hot ? ui->style.text : ui->style.text_dim;
+    if (open) br_fill_triangle(ui->r, br_v2(cx - 4, cy - 2), br_v2(cx + 4, cy - 2), br_v2(cx, cy + 3), c);
+    else br_fill_triangle(ui->r, br_v2(cx - 2, cy - 4), br_v2(cx + 3, cy), br_v2(cx - 2, cy + 4), c);
 }
 
 void ed_hierarchy(editor *ed, br_rect rect) {
     br_ui *ui = &ed->ui;
     ed_doc *d = &ed->doc;
-    uint32_t i;
+    uint32_t i, n = 0;
     char name[64];
-    static br_rect rows[ED_LIST_ROWS];
+    static tree_row rows[ED_LIST_ROWS];
     br_ui_panel_begin(ui, "hierarchy", rect);
     br_ui_heading(ui, "Scene");
-    br_ui_columns(ui, 3);
+    br_ui_columns(ui, 2);
     if (br_ui_button(ui, "+ New")) ed_cmd_add_entity(ed);
+    if (br_ui_button(ui, "+ Child")) ed_cmd_add_child(ed);
+    br_ui_columns(ui, 2);
     if (br_ui_button(ui, "Copy")) ed_cmd_duplicate(ed);
     if (br_ui_button(ui, "Delete")) ed_cmd_delete(ed);
     br_ui_separator(ui);
-    for (i = 0; i < d->count; ++i) {                     /* drag a row up or down to reorder */
+    for (i = 0; i < d->count; ++i) {                     /* the tree: drag rows to move or reparent them */
         br_entity e = d->order[i];
         char handle[16];
+        br_rect row, fold, label;
+        float indent;
+        bool kids;
+        if (hidden_by_collapse(ed, e)) continue;
+        indent = TREE_INDENT * (float)br_depth(&d->world, e);
+        kids = i + 1 < d->count && br_parent_of(&d->world, d->order[i + 1]) == e;
+        row = br_ui_row(ui, 0);
+        fold = br_rect_make(row.x + indent, row.y, TREE_INDENT, row.h);
+        label = br_rect_make(row.x + indent + TREE_INDENT, row.y, row.w - indent - TREE_INDENT, row.h);
         br_ui_push_id_int(ui, (int)e);
+        if (kids) {                                      /* the open / closed arrow */
+            int f;
+            br_ui_place(ui, fold);
+            f = br_ui_area(ui, "##fold", 0);
+            draw_fold(ui, fold, !ed_collapsed(ed, e), (f & BR_UI_HOVERED) != 0);
+            if (f & BR_UI_CLICKED) ed_set_collapsed(ed, e, !ed_collapsed(ed, e));
+        }
+        br_ui_place(ui, label);
         if (br_ui_selectable(ui, ed_doc_name(d, e, name, sizeof(name)), e == d->selected)) d->selected = e;
+        if (br_ui_last_flags(ui) & BR_UI_DOUBLE_CLICKED) ed_cmd_frame(ed);
         snprintf(handle, sizeof(handle), "%u", (unsigned)e);
         br_ui_drag_source(ui, ED_ENTITY_DRAG, handle, name);
         br_ui_pop_id(ui);
-        rows[i < ED_LIST_ROWS ? i : ED_LIST_ROWS - 1] = br_ui_last_rect(ui);
+        if (n < ED_LIST_ROWS) {
+            rows[n].r = row;
+            rows[n].e = e;
+            rows[n].indent = indent;
+            rows[n].open_parent = kids && !ed_collapsed(ed, e);
+            ++n;
+        }
     }
-    reorder_drop(ed, rect, rows, d->count < ED_LIST_ROWS ? d->count : ED_LIST_ROWS);
+    tree_drop(ed, rect, rows, n);
     if (d->count == 0) {
         br_ui_label_colored(ui, "The scene is empty.", ui->style.text_dim);
         br_ui_label_colored(ui, "Press + New to add", ui->style.text_dim);
         br_ui_label_colored(ui, "an entity.", ui->style.text_dim);
+    } else {
+        br_ui_spacing(ui, 6);
+        br_ui_label_colored(ui, "Drag onto a row: child", ui->style.text_dim);
+        br_ui_label_colored(ui, "Drag between rows: order", ui->style.text_dim);
     }
     br_ui_panel_end(ui);
 }
@@ -138,7 +259,8 @@ static float drag_speed(const br_field *f) {
 }
 
 /* One widget per field, chosen by the field's type. */
-static void edit_field(br_ui *ui, const br_component_desc *desc, const br_field *f, void *component) {
+static void edit_field(editor *ed, const br_component_desc *desc, const br_field *f, void *component) {
+    br_ui *ui = &ed->ui;
     void *p = (unsigned char *)component + f->offset;
     switch (f->type) {
     case BR_FIELD_INT:
@@ -158,6 +280,26 @@ static void edit_field(br_ui *ui, const br_component_desc *desc, const br_field 
         break;
     }
     case BR_FIELD_ENUM:   br_ui_combo(ui, f->name, (int *)p, f->enum_names, f->enum_count); break;
+    case BR_FIELD_ENTITY: {                       /* drag a hierarchy row here; double-click clears */
+        br_entity ref;
+        char label[96], name[64];
+        const char *dropped;
+        br_rect r;
+        int flags;
+        memcpy(&ref, p, sizeof(ref));
+        if (br_entity_alive(&ed->doc.world, ref)) snprintf(label, sizeof(label), "%s: %s", f->name, ed_doc_name(&ed->doc, ref, name, sizeof(name)));
+        else snprintf(label, sizeof(label), "%s: none (drag an entity here)", f->name);
+        flags = br_ui_area(ui, f->name, 0);
+        r = br_ui_last_rect(ui);
+        br_fill_rect(ui->r, r, (flags & BR_UI_HOVERED) ? ui->style.header : ui->style.field);
+        br_draw_text(ui->r, label, r.x + 4, r.y + 4, 1, ui->style.text);
+        if (flags & BR_UI_DOUBLE_CLICKED) { ref = BR_ENTITY_NULL; memcpy(p, &ref, sizeof(ref)); }
+        if ((dropped = br_ui_drop_target(ui, r, ED_ENTITY_DRAG)) != NULL) {
+            ref = (br_entity)strtoul(dropped, NULL, 10);
+            memcpy(p, &ref, sizeof(ref));
+        }
+        break;
+    }
     }
 }
 
@@ -171,7 +313,7 @@ static void add_component_menu(editor *ed, br_entity e) {
     items[n++] = "+ Add component";
     for (c = 0; c < br_component_type_count(w); ++c) {
         const br_component_desc *desc = br_component_get_desc(w, c);
-        if (!desc || br_has(w, e, c)) continue;
+        if (!desc || br_has(w, e, c) || strcmp(desc->name, "Parent") == 0) continue;
         ids[n] = c;
         items[n++] = desc->name;
     }
@@ -192,6 +334,7 @@ void ed_inspector(editor *ed, br_rect rect) {
     br_entity e = d->selected;
     br_name *name;
     uint32_t c;
+    br_component parent_id = br_component_find(&ed->doc.world, "Parent");
     br_ui_panel_begin(ui, "inspector", rect);
     br_ui_heading(ui, "Inspector");
     if (!br_entity_alive(w, e)) {
@@ -205,18 +348,25 @@ void ed_inspector(editor *ed, br_rect rect) {
     br_ui_push_id_int(ui, (int)e);         /* edits never leak from one entity to another */
     if ((name = (br_name *)br_get(w, e, d->ids.name)) != NULL)
         br_ui_text_field(ui, "Name", name->text, sizeof(name->text));
+    if (br_parent_of(w, e) != BR_ENTITY_NULL) {
+        char pn[64], line[96];
+        snprintf(line, sizeof(line), "Child of %s", ed_doc_name(d, br_parent_of(w, e), pn, sizeof(pn)));
+        br_ui_columns(ui, 2);
+        br_ui_label_colored(ui, line, ui->style.text_dim);
+        if (br_ui_button(ui, "Unparent")) { ed_doc_place(d, e, BR_ENTITY_NULL, BR_ENTITY_NULL); ed_status(ed, "Made it a root"); }
+    }
     br_ui_spacing(ui, 4);
     for (c = 0; c < br_component_type_count(w); ++c) {
         const br_component_desc *desc = br_component_get_desc(w, c);
         bool open, remove = false;
         int i;
         void *data;
-        if (!desc || c == d->ids.name || !(data = br_get(w, e, c))) continue;
+        if (!desc || c == d->ids.name || c == parent_id || !(data = br_get(w, e, c))) continue;   /* the tree is edited in the hierarchy */
         open = !ed->section_closed[c];
         br_ui_push_id(ui, desc->name);
         if (br_ui_header(ui, desc->name, &open, &remove)) {
             br_ui_indent(ui, 6);
-            for (i = 0; i < desc->field_count; ++i) edit_field(ui, desc, &desc->fields[i], br_get(w, e, c));
+            for (i = 0; i < desc->field_count; ++i) edit_field(ed, desc, &desc->fields[i], br_get(w, e, c));
             br_ui_indent(ui, -6);
             br_ui_spacing(ui, 4);
         }

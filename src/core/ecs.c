@@ -151,6 +151,16 @@ void br_entity_destroy(br_world *w, br_entity e) {
     w->generations[idx] = gen ? gen : 1;   /* generation 0 is reserved */
     w->free_list[w->free_count++] = idx;
     w->alive_count--;
+    for (i = 0; i < (uint32_t)w->destroy_hook_count; ++i) w->destroy_hooks[i].fn(w, e, w->destroy_hooks[i].user);
+}
+
+bool br_world_on_destroy(br_world *w, void (*fn)(br_world *w, br_entity e, void *user), void *user) {
+    int i;
+    for (i = 0; i < w->destroy_hook_count; ++i) if (w->destroy_hooks[i].fn == fn) return true;
+    if (w->destroy_hook_count == 4) return false;
+    w->destroy_hooks[w->destroy_hook_count].fn = fn;
+    w->destroy_hooks[w->destroy_hook_count++].user = user;
+    return true;
 }
 
 void br_entity_destroy_deferred(br_world *w, br_entity e) {

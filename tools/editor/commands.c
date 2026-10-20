@@ -211,6 +211,16 @@ void ed_cmd_add_entity(editor *ed) {
     ed_status(ed, "Added an entity. Add components in the inspector");
 }
 
+void ed_cmd_add_child(editor *ed) {
+    br_entity parent = ed->doc.selected, e;
+    char name[64];
+    if (!br_entity_alive(&ed->doc.world, parent)) { ed_cmd_add_entity(ed); return; }
+    e = ed_doc_create_child(&ed->doc, parent, "Child", br_v2(16, 16));
+    br_add(&ed->doc.world, e, ed->doc.ids.shape, NULL);
+    ed_set_collapsed(ed, parent, false);
+    ed_status(ed, "Added a child of %s. It moves with its parent", ed_doc_name(&ed->doc, parent, name, sizeof(name)));
+}
+
 void ed_cmd_duplicate(editor *ed) {
     char name[64];
     if (ed->doc.selected == BR_ENTITY_NULL) return;
@@ -228,13 +238,13 @@ void ed_cmd_delete(editor *ed) {
 
 
 void ed_cmd_nudge(editor *ed, br_vec2 delta) {
-    br_transform *t = selected_transform(ed);
-    if (t) t->position = br_v2_add(t->position, delta);
+    br_transform *t = selected_transform(ed);   /* delta is on screen: turn it into the parent's space */
+    if (t) t->position = br_v2_add(t->position, br_world_to_parent_vector(&ed->doc.world, ed->doc.selected, delta));
 }
 
 void ed_cmd_frame(editor *ed) {
     br_transform *t = selected_transform(ed);
-    ed->view.center = t ? t->position : br_v2_scale(ed->view.game_size, 0.5f);
+    ed->view.center = t ? br_world_transform(&ed->doc.world, ed->doc.selected).position : br_v2_scale(ed->view.game_size, 0.5f);
 }
 
 /* ---- the scene a fresh editor opens with ----------------------------------------------- */

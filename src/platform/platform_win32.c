@@ -27,6 +27,7 @@
 #endif
 #include <windows.h>
 #include <shobjidl.h>                  /* IFileOpenDialog (declarations only) */
+#include <stdio.h>
 #include <string.h>
 
 #include "bronto/platform.h"
@@ -695,11 +696,28 @@ static bool w32_open_path(const char *path) {
     return ok;
 }
 
+/* Through cmd.exe, so .cmd/.bat launchers (code.cmd) and PATH work; no console window. */
+static bool w32_launch(const char *command_line) {
+    char full[2100];
+    wchar_t wide[2100];
+    STARTUPINFOW si;
+    PROCESS_INFORMATION pi;
+    snprintf(full, sizeof(full), "cmd.exe /d /s /c \"%s\"", command_line);
+    if (w32_utf8_to_wide(full, wide, 2100) <= 0) return false;
+    memset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
+    memset(&pi, 0, sizeof(pi));
+    if (!CreateProcessW(NULL, wide, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) return false;
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return true;
+}
+
 static const br_platform k_win32 = {
     "win32", w32_init, w32_shutdown, w32_poll, w32_present, w32_time, w32_sleep,
     w32_audio_wanted, w32_audio_submit,
     w32_get_window_size, w32_get_window_scale, w32_set_title, w32_set_window_size,
-    w32_set_fullscreen, w32_set_cursor_visible, w32_set_icon, w32_pick_folder, w32_open_path,
+    w32_set_fullscreen, w32_set_cursor_visible, w32_set_icon, w32_pick_folder, w32_open_path, w32_launch,
     w32_set_gamepad_rumble,
     NULL
 };

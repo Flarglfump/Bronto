@@ -113,7 +113,17 @@ the rules.
 - **Undo / redo**, and a prompt to save before unsaved changes are lost.
 
 Scenes are saved as readable text files that games load with one call; see
-`examples/sceneplayer` and [tools/editor/README.md](tools/editor/README.md).
+[tools/editor/README.md](tools/editor/README.md).
+
+## The scene tree
+
+Entities form a tree, like Godot's nodes or Unity's GameObjects. A **Parent** component makes
+an entity a child of another, and its Transform is then relative to that parent. Moving,
+turning or scaling a parent carries its whole subtree, and destroying a parent destroys its
+children. Drawing, picking and physics all use the world transform
+(`br_world_transform`). Scene files save the tree, prefabs keep their subtrees, and scripts
+see it as `parent`, `children()` and `global_position`. In the editor, drag rows in the
+hierarchy to reparent and reorder, and fold rows with their arrows (see `hierarchy.h`).
 
 ## Physics and scripts
 
@@ -134,9 +144,15 @@ func on_trigger(other) { if other.name == "Coin" { destroy(other) } }
 ```
 
 `examples/platformer` is a complete level made this way, with no C code: open it with
-**Load Project**, or run `sceneplayer examples/platformer/main.scene`. The language is
+**Load Project** and press Play. The language is
 described in [docs/scripting.md](docs/scripting.md). When speed matters, a script can
 instead be a behaviour written in C (`br_script_register_behaviour`).
+
+For editing scripts, **Settings** in the editor chooses the text editor that opens them,
+with presets for VS Code, Sublime Text, Notepad++ and Zed. `tools/vscode` is a VS Code
+extension for `.bs` files with highlighting, completion, hover docs, signature help, go to
+definition and checking as you type (`make vscode` packages it). `bscheck` (`make tools`)
+checks scripts from the command line.
 
 ## Platforms
 
@@ -196,9 +212,10 @@ tests/               unit tests; tests/platform/ holds backend checks
 examples/bounce/     every system in a small toy
 examples/snake/      sample game: Snake
 examples/towerdefense/  sample game: Pop Defense (tower defense)
-examples/sceneplayer/   plays scene files made in the editor
 examples/platformer/    a level built only from the editor: physics + scripts, no C
 tools/editor/        the visual scene editor
+tools/bscheck/       checks .bs scripts from the command line
+tools/vscode/        the BrontoScript extension for VS Code
 docs/scripting.md    the BrontoScript reference
 ```
 
@@ -218,6 +235,7 @@ docs/scripting.md    the BrontoScript reference
 | Platform | `platform.h` | Table of function pointers that each OS backend implements |
 | Scene files | `serialize.h` | Saves and loads worlds as readable text. Every *described* component (a list of its fields with names and types, `ecs.h`) is saved field by field. Loading skips unknown components and fields with a warning, and is all-or-nothing on errors |
 | Built-in components | `components.h` | Name, Transform, Shape, Sprite, Label, Motion, Bounds and Sound, with motion, audio and layered draw systems: enough to make and play simple scenes |
+| Scene tree | `hierarchy.h` | Parent component, local and world transforms, reparenting that keeps the on-screen position, children, subtrees and cascading destruction. Scene files store entity references (`BR_FIELD_ENTITY`) as positions in the file, reconnected on load |
 | Physics | `physics.h` | RigidBody (dynamic, static, kinematic), Collider (box or circle; friction, bounce, trigger, layers) and PhysicsWorld (gravity). Sort-and-sweep broad phase; circle and oriented-box contacts with clipping; a sequential-impulse solver, warm-started so stacks settle. Contact and trigger events, raycasts and point queries |
 | Scripts | `script.h` | The Script component. BrontoScript is interpreted from `.bs` files, re-read when they change, with a garbage-collected heap. Errors give a file and line and stop only that script. C behaviours can be registered by name |
 | Assets | `assets.h` | Image and sound cache: each file is loaded once, at a stable address, with relative paths resolved against the project folder (the nearest folder holding `project.bronto`, else the scene's own). Forgetting a sound silences it first |

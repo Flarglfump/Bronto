@@ -65,6 +65,8 @@ static void test_fs_ops(void) {
         CHECK(br_fs_absolute(abs, again, sizeof(again)) && strcmp(abs, again) == 0);
         CHECK(br_fs_absolute("", abs, sizeof(abs)) && br_fs_is_dir(abs));
         CHECK(!br_fs_absolute("no/such/folder", abs, sizeof(abs)));
+        CHECK(br_fs_config_dir("bronto-test", abs, sizeof(abs)) && br_fs_is_dir(abs) && strcmp(br_path_name(abs), "bronto-test") == 0);
+        br_fs_remove(abs);
     }
 }
 

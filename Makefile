@@ -6,6 +6,8 @@
 #   make snake      build and play the Snake sample
 #   make towerdefense  build and play the Pop Defense sample
 #   make editor     build and run the scene editor (tools/editor)
+#   make tools      build the editor and bscheck (checks .bs scripts)
+#   make vscode     package the VS Code extension (tools/vscode) into build/*.vsix (needs python3)
 #   make examples   build the examples (build/examples/*)
 #   make run-examples  run every example headless in build/run (CI smoke test)
 #   make sanitize   run the tests under AddressSanitizer + UBSan
@@ -61,8 +63,9 @@ TEST_BIN := $(BUILD)/bronto_tests
 # from every .c file in it.
 EXAMPLES := $(patsubst examples/%/main.c,$(BUILD)/examples/%,$(wildcard examples/*/main.c))
 EDITOR   := $(BUILD)/editor
+BSCHECK  := $(BUILD)/bscheck
 
-.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools audio-test evdev-test
+.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools audio-test evdev-test vscode vscode-test
 
 all: lib
 
@@ -117,8 +120,12 @@ towerdefense: $(BUILD)/examples/towerdefense
 td: $(BUILD)/examples/towerdefense
 	$(BUILD)/examples/towerdefense
 
-# The editor: every .c file in tools/editor.
-tools: $(EDITOR)
+# The editor: every .c file in tools/editor. bscheck: the script checker.
+tools: $(EDITOR) $(BSCHECK)
+
+$(BSCHECK): tools/bscheck/main.c $(LIB)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $< $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
 
 $(EDITOR): $(wildcard tools/editor/*.c) $(wildcard tools/editor/*.h) $(LIB)
 	@mkdir -p $(dir $@)
@@ -127,12 +134,19 @@ $(EDITOR): $(wildcard tools/editor/*.c) $(wildcard tools/editor/*.h) $(LIB)
 editor: $(EDITOR)
 	$(EDITOR) $(SCENE)
 
+# The VS Code extension for .bs scripts: package it, and test it with node.
+vscode:
+	python3 tools/vscode/package_vsix.py $(BUILD)
+
+vscode-test:
+	node tools/vscode/brontoscript/test/language.test.js
+
 # Runs from $(BUILD)/run so the screenshots and WAVs the demos write stay
 # out of the source tree.
 run-examples: examples tools
 	@mkdir -p $(BUILD)/run
 	@cd $(BUILD)/run && for e in $(abspath $(EXAMPLES) $(EDITOR)); do echo "== $$e --headless"; $$e --headless || exit 1; done
-	@cd $(BUILD)/run && $(abspath $(BUILD)/examples/sceneplayer) $(abspath examples/platformer/main.scene) --headless
+	@if [ -x $(BUILD)/examples/sceneplayer ]; then cd $(BUILD)/run && $(abspath $(BUILD)/examples/sceneplayer) $(abspath examples/platformer/main.scene) --headless; fi
 
 clean:
 	rm -rf build build-asan

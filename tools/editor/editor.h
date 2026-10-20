@@ -10,6 +10,7 @@
  *   assets.c     the asset browser: the project's files, previews, file
  *                operations, and dragging assets into the scene
  *   icon.c       the app icon, a little brontosaurus drawn in code
+ *   settings.c   preferences (the script editor) and the Settings dialog
  *   main.c       engine setup, window layout, shortcuts
  *
  * The scene is an ordinary ECS world with the engine's built-in
@@ -24,6 +25,7 @@
 
 #define ED_PATH_MAX 260
 #define ED_UNDO_MAX 100
+#define ED_MAX_COLLAPSED 256
 
 /* ======================= doc.c: the document ======================= */
 
@@ -58,11 +60,17 @@ bool ed_doc_load(ed_doc *d, const char *path);    /* false: d->error says why */
 bool ed_doc_save(ed_doc *d, const char *path);
 bool ed_doc_dirty(const ed_doc *d);
 
-br_entity ed_doc_create(ed_doc *d, const char *name, br_vec2 pos);   /* Name + Transform */
-br_entity ed_doc_duplicate(ed_doc *d, br_entity e);                  /* placed after it */
-void ed_doc_delete(ed_doc *d, br_entity e);
-void ed_doc_reorder(ed_doc *d, br_entity e, int delta);              /* up (-1) / down (+1) */
-void ed_doc_move(ed_doc *d, br_entity e, int slot);                  /* to before order[slot] (count = the end) */
+br_entity ed_doc_create(ed_doc *d, const char *name, br_vec2 pos);   /* Name + Transform, a root */
+br_entity ed_doc_create_child(ed_doc *d, br_entity parent, const char *name, br_vec2 local);
+br_entity ed_doc_duplicate(ed_doc *d, br_entity e);                  /* with its subtree, placed after it */
+void ed_doc_delete(ed_doc *d, br_entity e);                          /* with its subtree */
+void ed_doc_reorder(ed_doc *d, br_entity e, int delta);              /* swap with the previous (-1) / next (+1) sibling */
+void ed_doc_move(ed_doc *d, br_entity e, int slot);                  /* to before order[slot], as its sibling (count = the end) */
+/* The tree: `order` is always depth first (each entity, then its subtree).
+ * ed_doc_place makes `e` a child of `parent` (NULL: a root), keeping where it
+ * is on screen, just before `before` (NULL: its new parent's last child). */
+bool ed_doc_place(ed_doc *d, br_entity e, br_entity parent, br_entity before);
+void ed_doc_normalize(ed_doc *d);
 int  ed_doc_index(const ed_doc *d, br_entity e);
 const char *ed_doc_name(const ed_doc *d, br_entity e, char *buf, size_t size);
 br_entity ed_doc_pick(const ed_doc *d, br_vec2 world);               /* topmost under a point */
@@ -156,6 +164,11 @@ typedef struct editor {
     double status_time;
     bool headless;
     br_image badge;                    /* the icon, small, for the toolbar */
+    struct { char script_editor[256]; } prefs;   /* saved in the user's settings folder */
+    char settings_field[256];
+    bool settings_visible;
+    br_entity collapsed[ED_MAX_COLLAPSED];   /* folded rows in the hierarchy */
+    int collapsed_count;
     uint32_t script_errors_seen;       /* to report new script errors while playing */
     bool show_colliders;
 } editor;
@@ -176,6 +189,7 @@ void ed_cmd_undo(editor *ed);
 void ed_cmd_redo(editor *ed);
 void ed_cmd_play(editor *ed);              /* toggles play / stop */
 void ed_cmd_add_entity(editor *ed);
+void ed_cmd_add_child(editor *ed);          /* under the selection */
 void ed_cmd_duplicate(editor *ed);
 void ed_cmd_delete(editor *ed);
 void ed_cmd_nudge(editor *ed, br_vec2 delta);
@@ -193,6 +207,14 @@ br_vec2 ed_view_to_world(const ed_view *v, br_vec2 screen);
 
 /* icon.c: the brontosaurus at `size` x `size` pixels (transparent background) */
 void ed_make_icon(br_image *out, int size);
+
+/* settings.c */
+void ed_prefs_load(editor *ed);
+bool ed_prefs_save(editor *ed);
+void ed_script_command(const char *tmpl, const char *file, int line, char *out, size_t size);
+bool ed_open_script(editor *ed, const char *rel, int line);   /* in the chosen text editor */
+void ed_settings_open(editor *ed);
+void ed_settings_dialog(editor *ed, br_rect screen);
 
 /* assets.c */
 void ed_assets_init(editor *ed, const char *root);
@@ -220,6 +242,8 @@ void ed_assets_preview(editor *ed, br_rect rect);
 /* panels.c */
 void ed_toolbar(editor *ed, br_rect rect);
 void ed_hierarchy(editor *ed, br_rect rect);
+bool ed_collapsed(const editor *ed, br_entity e);
+void ed_set_collapsed(editor *ed, br_entity e, bool collapsed);
 void ed_inspector(editor *ed, br_rect rect);
 void ed_statusbar(editor *ed, br_rect rect);
 void ed_dialog(editor *ed, br_rect screen);

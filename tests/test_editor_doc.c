@@ -191,7 +191,47 @@ static void test_doc_project_root(void) {
     br_assets_set_root("");
 }
 
+static void test_doc_tree(void) {
+    br_entity a, b, c, kid, copy;
+    const char *prefab = test_path("tree_prefab.scene");
+    char name[64];
+    ed_doc_init(&D);
+    a = ed_doc_create(&D, "A", br_v2(100, 0));
+    b = ed_doc_create(&D, "B", br_v2(0, 0));
+    c = ed_doc_create(&D, "C", br_v2(50, 50));
+    CHECK(ed_doc_place(&D, c, a, BR_ENTITY_NULL));          /* C under A, stays put on screen */
+    CHECK(D.order[0] == a && D.order[1] == c && D.order[2] == b);
+    CHECK(xf(c)->position.x == -50 && br_world_transform(&D.world, c).position.x == 50);
+    kid = ed_doc_create_child(&D, c, "Kid", br_v2(1, 2));   /* local to C */
+    CHECK(D.order[2] == kid && br_world_transform(&D.world, kid).position.x == 51);
+    CHECK(!ed_doc_place(&D, a, kid, BR_ENTITY_NULL));       /* no loops */
+    CHECK(ed_doc_place(&D, b, a, c));                       /* B under A, before C */
+    CHECK(D.order[1] == b && D.order[2] == c && D.order[3] == kid);
+    ed_doc_reorder(&D, b, 1);                               /* swap with C (and C's kid) */
+    CHECK(D.order[1] == c && D.order[2] == kid && D.order[3] == b);
+    copy = ed_doc_duplicate(&D, c);                         /* C and Kid, after C's subtree */
+    CHECK(D.count == 6 && D.order[3] == copy && br_parent_of(&D.world, copy) == a);
+    CHECK(br_parent_of(&D.world, D.order[4]) == copy && strcmp(ed_doc_name(&D, D.order[4], name, sizeof(name)), "Kid") == 0);
+    ed_doc_checkpoint(&D);
+    ed_doc_delete(&D, a);                                   /* the whole tree goes */
+    CHECK(D.count == 0 && br_world_entity_count(&D.world) == 0);
+    ed_doc_checkpoint(&D);
+    CHECK(ed_doc_undo(&D) && D.count == 6);                 /* and comes back, still a tree */
+    a = D.order[0];
+    CHECK(br_parent_of(&D.world, D.order[1]) == a && br_parent_of(&D.world, D.order[2]) == D.order[1]);
+    c = D.order[1];
+    CHECK(ed_doc_save_entity(&D, c, prefab));               /* a subtree prefab, saved as a root where it is */
+    CHECK(ed_doc_count_entities(prefab) == 2);
+    CHECK(br_parent_of(&D.world, c) == a && xf(c)->position.x == -50);   /* untouched */
+    CHECK(ed_doc_instantiate(&D, prefab, br_v2(300, 300)) == 2);
+    CHECK(D.count == 8 && br_parent_of(&D.world, D.order[7]) == D.order[6]);
+    CHECK(br_world_transform(&D.world, D.order[6]).position.x == 300);
+    CHECK(br_world_transform(&D.world, D.order[7]).position.x == 301);
+    ed_doc_destroy(&D);
+}
+
 void suite_editor_doc(void) {
+    RUN(test_doc_tree);
     RUN(test_doc_prefabs);
     RUN(test_doc_project_root);
     RUN(test_doc_create_order_delete);
