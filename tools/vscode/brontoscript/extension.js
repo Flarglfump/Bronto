@@ -16,6 +16,7 @@ const KINDS = {
     variable: vscode.CompletionItemKind.Variable, property: vscode.CompletionItemKind.Property,
     field: vscode.CompletionItemKind.Field, class: vscode.CompletionItemKind.Class,
     keyword: vscode.CompletionItemKind.Keyword, snippet: vscode.CompletionItemKind.Snippet,
+    value: vscode.CompletionItemKind.EnumMember, file: vscode.CompletionItemKind.File,
 };
 
 let diagnostics;
@@ -31,9 +32,12 @@ function activate(context) {
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider(sel, {
         provideCompletionItems(doc, pos) {
             const others = otherScripts.filter(s => s.file !== doc.uri.fsPath);
-            return lang.completions(doc.getText(), pos.line, pos.character, others).map(toItem);
+            const at = lang.stringArgAt(doc.lineAt(pos.line).text.slice(0, pos.character));
+            const answer = assets => lang.completions(doc.getText(), pos.line, pos.character, others, assets).map(i => toItem(i, pos));
+            if (at && ['play_sound', 'spawn', 'load_scene'].includes(at.func)) return projectFiles(doc).then(answer);   /* (the files: looked up) */
+            return answer([]);
         },
-    }, '.'));
+    }, '.', '"', "'", '/'));
 
     context.subscriptions.push(vscode.languages.registerHoverProvider(sel, {
         provideHover(doc, pos) {
@@ -101,14 +105,29 @@ function activate(context) {
     indexWorkspace();
 }
 
-function toItem(i) {
+function toItem(i, pos) {
     const item = new vscode.CompletionItem(i.label, KINDS[i.kind] || vscode.CompletionItemKind.Text);
+    if (i.replaceFrom !== undefined && pos) item.range = new vscode.Range(pos.line, i.replaceFrom, pos.line, pos.character);
     if (i.detail) item.detail = i.detail;
     if (i.doc) item.documentation = new vscode.MarkdownString(i.doc);
     if (i.snippet) item.insertText = new vscode.SnippetString(i.snippet);
     if (i.filter) item.filterText = i.filter;
     if (i.kind === 'snippet') item.sortText = '0' + i.label;
     return item;
+}
+
+// The project's sounds and scenes, as paths from its folder (the one with project.bronto, above
+// the script), for play_sound("|"), spawn("|") and load_scene("|").
+async function projectFiles(doc) {
+    let root = path.dirname(doc.uri.fsPath);
+    for (let dir = root, i = 0; i < 8; ++i) {
+        if (fs.existsSync(path.join(dir, 'project.bronto'))) { root = dir; break; }
+        const up = path.dirname(dir);
+        if (up === dir) break;
+        dir = up;
+    }
+    const found = await vscode.workspace.findFiles(new vscode.RelativePattern(root, '**/*.{wav,scene}'), '**/{build,builds,node_modules,.git}/**', 2000);
+    return found.map(u => path.relative(root, u.fsPath).split(path.sep).join('/')).sort();
 }
 
 // The other scripts in the workspace, for other.health / other.hit(...) and go to definition.

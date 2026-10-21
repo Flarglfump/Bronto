@@ -2606,6 +2606,60 @@ static sc_value bi_find_all(ARGS) {
         if (strcmp(((const br_name *)(p->data + (size_t)i * p->stride))->text, name) == 0) sc_list_push(vm, list.as.l, sc_ent(p->entities[i]), line);
     return list;
 }
+/* ---- tags (the Tags component: components.h) ---- */
+static const char *sc_need_tag(sc_vm *vm, const sc_value *v, int line, const char *what) {
+    const char *tag = sc_need_str(vm, v, line, what);
+    if (!br_tag_valid(tag)) sc_fail(vm, line, "\"%s\" isn't a tag: up to %d letters, digits and _-.:/", tag, BR_TAG_MAX - 1);
+    return tag;
+}
+/* find_tagged(tag, ...): every entity with all of these tags. first_tagged(tag, ...): the first, or nil. */
+static uint32_t sc_tagged(sc_vm *vm, sc_value *a, int n, int line, const char *what, br_entity *out, uint32_t max) {
+    const char *tags[16];
+    int i;
+    for (i = 0; i < n && i < 16; ++i) tags[i] = sc_need_tag(vm, &a[i], line, what);
+    return br_find_tagged(vm->rt->w, tags, n < 16 ? n : 16, out, max);
+}
+static sc_value bi_find_tagged(ARGS) {
+    sc_value list = sc_new_list(vm, line);
+    uint32_t count = sc_tagged(vm, a, n, line, "find_tagged()", NULL, 0), i;
+    br_entity *found;
+    if (count == 0) return list;
+    found = (br_entity *)br_alloc(sizeof(br_entity) * count);
+    count = sc_tagged(vm, a, n, line, "find_tagged()", found, count);
+    for (i = 0; i < count; ++i) sc_list_push(vm, list.as.l, sc_ent(found[i]), line);
+    br_free(found);
+    return list;
+}
+static sc_value bi_first_tagged(ARGS) {
+    br_entity e = BR_ENTITY_NULL;
+    return sc_tagged(vm, a, n, line, "first_tagged()", &e, 1) ? sc_ent(e) : sc_nil();
+}
+static sc_value bi_has_tag(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "has_tag()");
+    BR_UNUSED(n);
+    return sc_bool(br_tag_has(vm->rt->w, e, sc_need_tag(vm, &a[1], line, "has_tag()")));
+}
+static sc_value bi_add_tag(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "add_tag()");
+    const char *tag = sc_need_tag(vm, &a[1], line, "add_tag()");
+    BR_UNUSED(n);
+    if (!br_tag_add(vm->rt->w, e, tag)) sc_fail(vm, line, "no room for the tag \"%s\" (an entity's tags fit in %d letters)", tag, BR_TAGS_MAX - 1);
+    return sc_nil();
+}
+static sc_value bi_remove_tag(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "remove_tag()");
+    BR_UNUSED(n);
+    return sc_bool(br_tag_remove(vm->rt->w, e, sc_need_tag(vm, &a[1], line, "remove_tag()")));
+}
+static sc_value bi_tags(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "tags()");
+    sc_value list = sc_new_list(vm, line);
+    char tag[BR_TAG_MAX];
+    int i;
+    BR_UNUSED(n);
+    for (i = 0; br_tag_at(vm->rt->w, e, i, tag, sizeof(tag)); ++i) sc_list_push(vm, list.as.l, sc_string(vm, tag, strlen(tag)), line);
+    return list;
+}
 static sc_value bi_destroy(ARGS) {
     BR_UNUSED(n);
     if (a[0].t == V_ENT && br_entity_alive(vm->rt->w, a[0].as.e)) br_entity_destroy_deferred(vm->rt->w, a[0].as.e);
@@ -3084,6 +3138,9 @@ static const sc_builtin k_builtin_table[] = {
     { "gamepad_count", 0, 0, bi_gamepad_count, ">n" }, { "gamepad_name", 0, 1, bi_gamepad_name, "n>s" },
     { "last_button", 0, 0, bi_last_button, ">s" }, { "last_input", 0, 0, bi_last_input, ">s" }, { "rumble", 2, 3, bi_rumble, "nnn>b" },
     { "find", 1, 1, bi_find, "s>e" }, { "find_all", 1, 1, bi_find_all, "s>L" }, { "destroy", 1, 1, bi_destroy, "e>-" },
+    { "find_tagged", 1, 16, bi_find_tagged, "ss*>L" }, { "first_tagged", 1, 16, bi_first_tagged, "ss*>e" },
+    { "has_tag", 2, 2, bi_has_tag, "es>b" }, { "add_tag", 2, 2, bi_add_tag, "es>-" },
+    { "remove_tag", 2, 2, bi_remove_tag, "es>b" }, { "tags", 1, 1, bi_tags, "e>W" },
     { "spawn", 1, 3, bi_spawn, "spq>e" }, { "children", 1, 1, bi_children, "e>L" }, { "child", 2, 2, bi_child, "es>e" },
     { "has", 2, 2, bi_has, "es>b" }, { "add", 2, 2, bi_add, "es>c" },
     { "remove_component", 2, 2, bi_remove_component, "es>-" },
@@ -3111,6 +3168,12 @@ static const sc_builtin *sc_builtin_at(int index) { return &k_builtin_table[inde
 int br_script_builtin_count(void) { return (int)BR_ARRAY_COUNT(k_builtin_table); }
 const char *br_script_builtin_name(int index) {
     return index >= 0 && index < (int)BR_ARRAY_COUNT(k_builtin_table) ? k_builtin_table[index].name : NULL;
+}
+bool br_script_builtin_arity(int index, int *min_args, int *max_args) {
+    if (index < 0 || index >= br_script_builtin_count()) return false;
+    *min_args = k_builtin_table[index].min_args;
+    *max_args = k_builtin_table[index].max_args;
+    return true;
 }
 
 /* ======================================================================== */

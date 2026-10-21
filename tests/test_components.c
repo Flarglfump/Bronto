@@ -16,11 +16,55 @@ static void setup(void) {
     br_builtin_register(&W, &ID);
 }
 
+/* Tags: given, taken off, listed, found; a list typed in the inspector
+ * (commas or spaces, any spacing) reads the same. */
+static void test_tags(void) {
+    br_entity a, b, c, found[4];
+    const char *enemy[] = { "enemy" }, *both[] = { "enemy", "flying" }, *none[] = { "boss" };
+    char tag[BR_TAG_MAX];
+    br_tags *t;
+    setup();
+    a = br_entity_create(&W);
+    b = br_entity_create(&W);
+    c = br_entity_create(&W);
+    CHECK(!br_tag_has(&W, a, "enemy") && br_tag_count(&W, a) == 0);
+    CHECK(br_tag_add(&W, a, "enemy") && br_has(&W, a, ID.tags));       /* (the component comes with the first tag) */
+    CHECK(br_tag_add(&W, a, "flying") && br_tag_add(&W, a, "enemy"));   /* (twice: once) */
+    t = (br_tags *)br_get(&W, a, ID.tags);
+    CHECK(t && strcmp(t->list, "enemy, flying") == 0);
+    CHECK(br_tag_add(&W, b, "enemy"));
+    t = (br_tags *)br_add(&W, c, ID.tags, NULL);                        /* as typed in the inspector */
+    snprintf(t->list, sizeof(t->list), "  flying,enemy   pickup ,");
+    CHECK(br_tag_has(&W, c, "pickup") && br_tag_has(&W, c, "flying") && !br_tag_has(&W, c, "pick"));
+    CHECK(!br_tag_has(&W, a, "Enemy"));                                /* (case counts) */
+    CHECK_EQ_INT(br_tag_count(&W, c), 3);
+    CHECK(br_tag_at(&W, c, 1, tag, sizeof(tag)) && strcmp(tag, "enemy") == 0 && !br_tag_at(&W, c, 3, tag, sizeof(tag)));
+    CHECK_EQ_INT((int)br_find_tagged(&W, enemy, 1, found, 4), 3);
+    CHECK(found[0] == a && found[1] == b && found[2] == c);
+    CHECK_EQ_INT((int)br_find_tagged(&W, both, 2, found, 4), 2);
+    CHECK(found[0] == a && found[1] == c);
+    CHECK_EQ_INT((int)br_find_tagged(&W, none, 1, NULL, 0), 0);
+    CHECK_EQ_INT((int)br_find_tagged(&W, enemy, 1, found, 1), 3);       /* (counts them all; fills only 1) */
+    CHECK(br_tag_remove(&W, c, "flying") && !br_tag_remove(&W, c, "flying"));
+    t = (br_tags *)br_get(&W, c, ID.tags);
+    CHECK(t && strcmp(t->list, "enemy, pickup") == 0);
+    CHECK(!br_tag_valid("") && !br_tag_valid("two words") && !br_tag_valid("a,b") && br_tag_valid("level-1:boss/x.y_z"));
+    CHECK(!br_tag_add(&W, b, "no good"));
+    {   /* a full list: no room for more */
+        int i;
+        char name[16];
+        for (i = 0; i < 40 && br_tag_add(&W, b, (snprintf(name, sizeof(name), "tag%02d", i), name)); ++i) {}
+        CHECK(i > 10 && i < 40 && strlen(((br_tags *)br_get(&W, b, ID.tags))->list) < BR_TAGS_MAX);
+    }
+    br_world_destroy(&W);
+}
+
 static void test_builtin_register(void) {
     int count;
     const br_component_desc *const *descs = br_builtin_descs(&count);
     setup();
-    CHECK_EQ_INT(count, 9);
+    CHECK_EQ_INT(count, 10);
+    CHECK(strcmp(descs[9]->name, "Tags") == 0 && ID.tags != BR_COMPONENT_INVALID);
     CHECK(strcmp(descs[0]->name, "Name") == 0 && strcmp(descs[6]->name, "Bounds") == 0);
     CHECK(strcmp(descs[8]->name, "Tilemap") == 0 && ID.tilemap != BR_COMPONENT_INVALID);
     CHECK(strcmp(descs[7]->name, "Sound") == 0 && ID.sound != BR_COMPONENT_INVALID);
@@ -263,6 +307,7 @@ static void test_tilemap(void) {
 void suite_components(void) {
     RUN(test_tilemap);
     RUN(test_builtin_register);
+    RUN(test_tags);
     RUN(test_sound_component);
     RUN(test_builtin_motion);
     RUN(test_builtin_geometry);

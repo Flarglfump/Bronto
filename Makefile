@@ -316,7 +316,9 @@ $(BUILD)/libc_check: tests/web/libc_check.c
 web-test: $(WEB_TESTS) $(WEB)/libc_check.wasm $(BUILD)/libc_check $(WEB)/persist.wasm $(PLAYER) $(EXAMPLES) web
 	node tools/web/run_node.js $(WEB_TESTS) --mkdir build/test_out --dir examples/platformer=examples/platformer \
 	     --dir examples/pantryquest=examples/pantryquest \
-	     --file tools/vscode/brontoscript/lib/builtins.json=tools/vscode/brontoscript/lib/builtins.json -- --out build/test_out
+	     --file tools/vscode/brontoscript/lib/builtins.json=tools/vscode/brontoscript/lib/builtins.json \
+	     --file tools/vscode/brontoscript/syntaxes/brontoscript.tmLanguage.json=tools/vscode/brontoscript/syntaxes/brontoscript.tmLanguage.json \
+	     --file docs/scripting.md=docs/scripting.md -- --out build/test_out
 	@rm -rf $(BUILD)/libc_check.out && mkdir -p $(BUILD)/libc_check.out
 	@$(BUILD)/libc_check $(BUILD)/libc_check.out > $(BUILD)/libc_check.native.txt
 	@node tools/web/run_node.js $(WEB)/libc_check.wasm --mkdir scratch -- scratch > $(BUILD)/libc_check.web.txt

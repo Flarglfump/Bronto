@@ -58,6 +58,16 @@ typedef struct br_tilemap {
     br_color tint;
 } br_tilemap;
 
+/* Tags: words that say what an entity is ("enemy", "pickup", "flying"), for
+ * finding entities by kind rather than by name. `list` holds them separated
+ * by commas or spaces ("enemy, flying"); a tag is up to BR_TAG_MAX - 1
+ * letters, digits and _-.:/ characters, and matching is exact (case counts).
+ * Edit the list in the inspector, or use the br_tag_* functions (has_tag(),
+ * add_tag(), find_tagged()... in scripts). */
+#define BR_TAG_MAX 32
+#define BR_TAGS_MAX 128
+typedef struct br_tags { char list[BR_TAGS_MAX]; } br_tags;
+
 typedef struct br_sound_src {
     char file[96]; float volume; bool loop; bool play_on_start;
     int bus;                    /* BR_BUS_* it plays on: sfx (default), music, ui, ambient */
@@ -66,7 +76,7 @@ typedef struct br_sound_src {
 } br_sound_src;
 
 typedef struct br_builtin_ids {
-    br_component name, transform, shape, sprite, label, motion, bounds, sound, tilemap;
+    br_component name, transform, shape, sprite, label, motion, bounds, sound, tilemap, tags;
 } br_builtin_ids;
 
 /* Registers every built-in component and three systems: "builtin_motion"
@@ -105,6 +115,24 @@ bool br_tilemap_solid(const br_world *w, br_entity map, br_vec2 point);
 /* The world position of the centre of a cell (any column and row, even
  * outside the map). False without a Tilemap. */
 bool br_tilemap_cell_center(const br_world *w, br_entity map, int col, int row, br_vec2 *out);
+
+/* ---- tags (the Tags component) -------------------------------------------- */
+/* Does the entity have this tag? */
+bool br_tag_has(const br_world *w, br_entity e, const char *tag);
+/* Gives it the tag (adding a Tags component if it has none). True if it has it
+ * now; false for a tag that isn't a valid one or doesn't fit. */
+bool br_tag_add(br_world *w, br_entity e, const char *tag);
+/* Takes the tag off; true if it had it. */
+bool br_tag_remove(br_world *w, br_entity e, const char *tag);
+/* Its tags, one by one: the index'th into `out` (false past the last). */
+bool br_tag_at(const br_world *w, br_entity e, int index, char *out, size_t size);
+int br_tag_count(const br_world *w, br_entity e);
+/* Is `tag` a tag that can be given (1 to BR_TAG_MAX - 1 letters, digits, _-.:/)? */
+bool br_tag_valid(const char *tag);
+/* The entities with every one of `tags` (count of them), into `out` (up to
+ * `max`; NULL to count). Returns how many there are, which may be more than max.
+ * In the order they got their Tags. */
+uint32_t br_find_tagged(const br_world *w, const char *const *tags, int tag_count, br_entity *out, uint32_t max);
 
 /* Frees the draw list's scratch memory (the engine calls this at shutdown). */
 void br_builtin_release(void);

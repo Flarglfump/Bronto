@@ -158,6 +158,31 @@ test('the grammar is valid and its patterns compile', () => {
     JSON.parse(fs.readFileSync(path.join(root, 'language-configuration.json'), 'utf8'));
 });
 
+test('string arguments: key, button, axis, bus and component names, and project files', () => {
+    const names = (src, assets) => { const l = src.split('\n'); const last = l.length - 1; return lang.completions(src, last, l[last].length, [], assets).map(i => i.label); };
+    assert.ok(names('func f() {\n    if key_pressed("').includes('space'));
+    assert.ok(names('func f() {\n    if key_down("f').includes('f5'));
+    assert.ok(names('func f() {\n    if button_pressed("').includes('start'));
+    assert.deepStrictEqual(names('func f() {\n    if button_down("lt", "'), []);       // (the second is the pad: a number)
+    assert.ok(names('func f() {\n    var v = axis("').includes('left_x'));
+    assert.ok(names('func f() {\n    set_volume("').includes('music'));
+    assert.ok(names('func f() {\n    if has(self, "').includes('Collider'));
+    assert.deepStrictEqual(names('func f() {\n    if has("'), []);                     // (the first is the entity)
+    assert.deepStrictEqual(names('func f() {\n    play_sound("sfx/', ['sfx/jump.wav', 'main.scene', 'music/a.wav']), ['sfx/jump.wav', 'music/a.wav']);
+    assert.deepStrictEqual(names('func f() {\n    spawn("', ['sfx/jump.wav', 'prefabs/b.scene']), ['prefabs/b.scene']);
+    assert.deepStrictEqual(names('func f() {\n    print("'), []);
+    const item = lang.completions('func f() {\n    key_down("le', 1, 18, []).find(i => i.label === 'left');
+    assert.strictEqual(item.replaceFrom, 14);                                         // (replaces what's typed in the quotes)
+    // every name offered is one the engine takes (test_script.c checks them against the engine too)
+    const lists = lang.data.string_args.lists;
+    for (const [f, args] of Object.entries(lang.data.string_args.args)) {
+        const b = lang.data.builtins.find(x => x.name === f);
+        assert.ok(b, f);
+        for (const [i, kind] of Object.entries(args)) assert.ok(b.param_types[i] === 'string' && (kind[0] === '.' || lists[kind]), f + ' ' + i);
+    }
+    assert.ok(lists.keys.includes('escape') && lists.buttons.includes('dpad_up') && lists.axes.includes('rt'));
+});
+
 test('extension.js activates and its providers answer', () => {
     const registered = {};
     class Pos { constructor(l, c) { this.line = l; this.character = c; } }

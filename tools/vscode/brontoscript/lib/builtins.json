@@ -713,6 +713,94 @@
    "returns": "list[entity]"
   },
   {
+   "name": "find_tagged",
+   "signature": "find_tagged(tag, ...)",
+   "doc": "Every entity with the tag (or with all of the tags given: `find_tagged(\"enemy\", \"flying\")`), as a list. Tags are set in the inspector (the Tags component) or with add_tag().",
+   "params": [
+    "tag",
+    "more"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "string"
+   ],
+   "returns": "list[entity]"
+  },
+  {
+   "name": "first_tagged",
+   "signature": "first_tagged(tag, ...)",
+   "doc": "The first entity with the tag (or with all of the tags given), or nil.",
+   "params": [
+    "tag",
+    "more"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "string"
+   ],
+   "returns": "entity"
+  },
+  {
+   "name": "has_tag",
+   "signature": "has_tag(entity, tag)",
+   "doc": "Whether the entity has the tag (exactly: case counts).",
+   "params": [
+    "entity",
+    "tag"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "add_tag",
+   "signature": "add_tag(entity, tag)",
+   "doc": "Gives the entity a tag (it gets a Tags component if it has none). A tag is up to 31 letters, digits and _-.:/ characters.",
+   "params": [
+    "entity",
+    "tag"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "remove_tag",
+   "signature": "remove_tag(entity, tag)",
+   "doc": "Takes a tag off the entity; true if it had it.",
+   "params": [
+    "entity",
+    "tag"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "tags",
+   "signature": "tags(entity)",
+   "doc": "The entity's tags, as a list of strings.",
+   "params": [
+    "entity"
+   ],
+   "min": 1,
+   "param_types": [
+    "entity"
+   ],
+   "returns": "list[string]"
+  },
+  {
    "name": "destroy",
    "signature": "destroy(entity)",
    "doc": "Removes the entity (and its children) at the end of the step.",
@@ -1281,6 +1369,9 @@
    "tiles",
    "layer",
    "tint"
+  ],
+  "Tags": [
+   "list"
   ]
  },
  "callbacks": [
@@ -1383,5 +1474,221 @@
    "name": "float",
    "doc": "The same as `number`."
   }
- ]
+ ],
+ "string_args": {
+  "lists": {
+   "keys": [
+    "space",
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z",
+    "escape",
+    "enter",
+    "tab",
+    "backspace",
+    "insert",
+    "delete",
+    "right",
+    "left",
+    "down",
+    "up",
+    "pageup",
+    "pagedown",
+    "home",
+    "end",
+    "f1",
+    "f2",
+    "f3",
+    "f4",
+    "f5",
+    "f6",
+    "f7",
+    "f8",
+    "f9",
+    "f10",
+    "f11",
+    "f12",
+    "leftshift",
+    "leftctrl",
+    "leftalt",
+    "leftsuper",
+    "rightshift",
+    "rightctrl",
+    "rightalt",
+    "rightsuper",
+    "esc",
+    "return",
+    "shift",
+    "ctrl",
+    "alt"
+   ],
+   "buttons": [
+    "a",
+    "b",
+    "x",
+    "y",
+    "lb",
+    "rb",
+    "lt",
+    "rt",
+    "back",
+    "start",
+    "guide",
+    "ls",
+    "rs",
+    "up",
+    "down",
+    "left",
+    "right",
+    "cross",
+    "circle",
+    "square",
+    "triangle",
+    "l1",
+    "r1",
+    "l2",
+    "r2",
+    "l3",
+    "r3",
+    "select",
+    "view",
+    "menu",
+    "options",
+    "home",
+    "left_bumper",
+    "right_bumper",
+    "left_trigger",
+    "right_trigger",
+    "left_stick",
+    "right_stick",
+    "dpad_up",
+    "dpad_down",
+    "dpad_left",
+    "dpad_right"
+   ],
+   "axes": [
+    "left_x",
+    "left_y",
+    "right_x",
+    "right_y",
+    "lt",
+    "rt",
+    "left_trigger",
+    "right_trigger",
+    "l2",
+    "r2"
+   ],
+   "sticks": [
+    "left",
+    "right"
+   ],
+   "buses": [
+    "master",
+    "sfx",
+    "music",
+    "ui",
+    "ambient"
+   ],
+   "components": [
+    "Name",
+    "Transform",
+    "Shape",
+    "Sprite",
+    "Label",
+    "Motion",
+    "Bounds",
+    "Sound",
+    "RigidBody",
+    "Collider",
+    "PhysicsWorld",
+    "Script",
+    "Parent",
+    "Tilemap",
+    "Tags"
+   ]
+  },
+  "args": {
+   "key_down": {
+    "0": "keys"
+   },
+   "key_pressed": {
+    "0": "keys"
+   },
+   "key_released": {
+    "0": "keys"
+   },
+   "button_down": {
+    "0": "buttons"
+   },
+   "button_pressed": {
+    "0": "buttons"
+   },
+   "button_released": {
+    "0": "buttons"
+   },
+   "axis": {
+    "0": "axes"
+   },
+   "stick": {
+    "0": "sticks"
+   },
+   "set_volume": {
+    "0": "buses"
+   },
+   "volume": {
+    "0": "buses"
+   },
+   "has": {
+    "1": "components"
+   },
+   "add": {
+    "1": "components"
+   },
+   "remove_component": {
+    "1": "components"
+   },
+   "play_sound": {
+    "0": ".wav"
+   },
+   "spawn": {
+    "0": ".scene"
+   },
+   "load_scene": {
+    "0": ".scene"
+   }
+  }
+ }
 }

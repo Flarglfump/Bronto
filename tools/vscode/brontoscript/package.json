@@ -2,7 +2,7 @@
   "name": "brontoscript",
   "displayName": "BrontoScript",
   "description": "Bronto engine scripts (.bs): highlighting, completion, hover docs, signature help, go to definition, outline and error checking.",
-  "version": "0.2.1",
+  "version": "0.3.1",
   "publisher": "bronto",
   "icon": "images/icon.png",
   "engines": { "vscode": "^1.60.0" },

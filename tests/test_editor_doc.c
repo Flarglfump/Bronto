@@ -104,6 +104,32 @@ static void test_doc_play_stop(void) {
     ed_doc_destroy(&D);
 }
 
+/* The hierarchy's filter: parts of names (any case) and #tags, all of them;
+ * tags typed into the inspector are kept by Save and Open. */
+static void test_doc_filter_and_tags(void) {
+    const char *path = test_path("editor_tags_test.scene");
+    br_entity bat, acro, heart;
+    ed_doc_init(&D);
+    bat = ed_doc_create(&D, "Bat", br_v2(0, 0));
+    acro = ed_doc_create(&D, "Acrobat", br_v2(0, 0));
+    heart = ed_doc_create(&D, "Heart", br_v2(0, 0));
+    snprintf(((br_tags *)br_add(&D.world, bat, D.ids.tags, NULL))->list, BR_TAGS_MAX, "enemy, flying");
+    br_tag_add(&D.world, acro, "enemy");
+    br_tag_add(&D.world, heart, "pickup");
+    CHECK(ed_doc_matches(&D, heart, "") && ed_doc_matches(&D, heart, "  "));
+    CHECK(ed_doc_matches(&D, bat, "bat") && ed_doc_matches(&D, acro, "BAT") && !ed_doc_matches(&D, heart, "bat"));
+    CHECK(ed_doc_matches(&D, bat, "#enemy") && ed_doc_matches(&D, acro, "#enemy") && !ed_doc_matches(&D, heart, "#enemy"));
+    CHECK(ed_doc_matches(&D, bat, "#enemy #flying") && !ed_doc_matches(&D, acro, "#enemy, #flying"));
+    CHECK(ed_doc_matches(&D, acro, "#enemy acro") && !ed_doc_matches(&D, bat, "#enemy acro"));
+    CHECK(!ed_doc_matches(&D, bat, "#Enemy") && ed_doc_matches(&D, bat, "#"));
+    CHECK(ed_doc_save(&D, path));
+    CHECK(ed_doc_load(&D, path));
+    CHECK(D.count == 3 && br_tag_has(&D.world, D.order[0], "flying") && br_tag_has(&D.world, D.order[2], "pickup"));
+    CHECK(!br_has(&D.world, D.order[1], D.ids.shape) && br_tag_count(&D.world, D.order[1]) == 1);
+    br_assets_set_root("");
+    ed_doc_destroy(&D);
+}
+
 static void test_doc_save_load(void) {
     const char *path = test_path("editor_doc_test.scene");
     br_entity e;
@@ -324,4 +350,5 @@ void suite_editor_doc(void) {
     RUN(test_doc_undo_redo);
     RUN(test_doc_play_stop);
     RUN(test_doc_save_load);
+    RUN(test_doc_filter_and_tags);
 }

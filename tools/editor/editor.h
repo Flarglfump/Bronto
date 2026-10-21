@@ -76,6 +76,9 @@ bool ed_doc_place(ed_doc *d, br_entity e, br_entity parent, br_entity before);
 void ed_doc_normalize(ed_doc *d);
 int  ed_doc_index(const ed_doc *d, br_entity e);
 const char *ed_doc_name(const ed_doc *d, br_entity e, char *buf, size_t size);
+/* The hierarchy's filter: words that must all match - "#enemy" a tag the entity
+ * has, anything else part of its name (any case). Empty: everything matches. */
+bool ed_doc_matches(const ed_doc *d, br_entity e, const char *filter);
 br_entity ed_doc_pick(const ed_doc *d, br_vec2 world);               /* topmost under a point */
 
 /* Fixes the project folder (the editor's asset browser shows it). */
@@ -264,6 +267,7 @@ typedef struct editor {
     bool console_show[3];              /* the filters, per ED_LEVEL_* */
     bool console_clear_on_play;
     char console_search[64];
+    char hierarchy_filter[64];         /* the hierarchy shows only what matches (ed_doc_matches) */
     uint64_t console_seen;             /* console.added when the Console tab was last shown */
     uint32_t console_errors_seen;      /* errors counted then */
     int console_selected;              /* a line, -1: none */

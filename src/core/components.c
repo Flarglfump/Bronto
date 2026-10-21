@@ -86,6 +86,9 @@ static const br_field k_tilemap_fields[] = {
 };
 static const br_tilemap k_tilemap_default = { "", 16, 16, 11, "", "", "", -10, { 255, 255, 255, 255 } };
 
+static const br_field k_tags_fields[] = { BR_FIELD(br_tags, list, BR_FIELD_STRING, 0, 0) };
+static const br_tags k_tags_default = { "" };
+
 #define DESC(name, T, fields, def) { name, sizeof(T), fields, (int)BR_ARRAY_COUNT(fields), def }
 static const br_component_desc k_descs[] = {
     DESC("Name", br_name, k_name_fields, &k_name_default),
@@ -97,10 +100,11 @@ static const br_component_desc k_descs[] = {
     DESC("Bounds", br_bounds, k_bounds_fields, &k_bounds_default),
     DESC("Sound", br_sound_src, k_sound_fields, &k_sound_default),
     DESC("Tilemap", br_tilemap, k_tilemap_fields, &k_tilemap_default),
+    DESC("Tags", br_tags, k_tags_fields, &k_tags_default),
 };
 static const br_component_desc *const k_desc_list[] = {
     &k_descs[0], &k_descs[1], &k_descs[2], &k_descs[3], &k_descs[4], &k_descs[5], &k_descs[6], &k_descs[7],
-    &k_descs[8],
+    &k_descs[8], &k_descs[9],
 };
 
 const br_component_desc *const *br_builtin_descs(int *count) {
@@ -118,11 +122,138 @@ bool br_builtin_ids_of(const br_world *w, br_builtin_ids *ids) {
     ids->bounds = br_component_find(w, "Bounds");
     ids->sound = br_component_find(w, "Sound");
     ids->tilemap = br_component_find(w, "Tilemap");
-    return ids->transform != BR_COMPONENT_INVALID && ids->shape != BR_COMPONENT_INVALID &&
+    ids->tags = br_component_find(w, "Tags");
+    return ids->tags != BR_COMPONENT_INVALID && ids->transform != BR_COMPONENT_INVALID && ids->shape != BR_COMPONENT_INVALID &&
            ids->sprite != BR_COMPONENT_INVALID && ids->label != BR_COMPONENT_INVALID &&
            ids->motion != BR_COMPONENT_INVALID && ids->bounds != BR_COMPONENT_INVALID &&
            ids->name != BR_COMPONENT_INVALID && ids->sound != BR_COMPONENT_INVALID &&
            ids->tilemap != BR_COMPONENT_INVALID;
+}
+
+/* ---- tags ------------------------------------------------------------------ */
+
+static bool tag_char(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+           c == '_' || c == '-' || c == '.' || c == ':' || c == '/';
+}
+static bool tag_sep(char c) { return c == ',' || c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+
+bool br_tag_valid(const char *tag) {
+    size_t i;
+    if (!tag || !tag[0]) return false;
+    for (i = 0; tag[i]; ++i) if (!tag_char(tag[i]) || i >= BR_TAG_MAX - 1) return false;
+    return true;
+}
+
+/* The next tag in a list from *p: its start and length (0 at the end). */
+static size_t next_tag(const char **p, const char **start) {
+    const char *q = *p;
+    size_t n = 0;
+    while (*q && tag_sep(*q)) ++q;
+    *start = q;
+    while (q[n] && !tag_sep(q[n])) ++n;
+    *p = q + n;
+    return n;
+}
+
+static const br_tags *tags_of(const br_world *w, br_entity e) {
+    br_component c = br_component_find(w, "Tags");
+    return c == BR_COMPONENT_INVALID ? NULL : (const br_tags *)br_get(w, e, c);
+}
+
+static bool list_has(const char *list, const char *tag, size_t len) {
+    const char *p = list, *s;
+    size_t n;
+    while ((n = next_tag(&p, &s)) > 0)
+        if (n == len && strncmp(s, tag, len) == 0) return true;
+    return false;
+}
+
+bool br_tag_has(const br_world *w, br_entity e, const char *tag) {
+    const br_tags *t = tags_of(w, e);
+    return t && tag && tag[0] && list_has(t->list, tag, strlen(tag));
+}
+
+int br_tag_count(const br_world *w, br_entity e) {
+    const br_tags *t = tags_of(w, e);
+    const char *p, *s;
+    int count = 0;
+    if (!t) return 0;
+    for (p = t->list; next_tag(&p, &s) > 0;) ++count;
+    return count;
+}
+
+bool br_tag_at(const br_world *w, br_entity e, int index, char *out, size_t size) {
+    const br_tags *t = tags_of(w, e);
+    const char *p, *s;
+    size_t n;
+    int i = 0;
+    if (!t || size == 0) return false;
+    for (p = t->list; (n = next_tag(&p, &s)) > 0; ++i) {
+        if (i == index) {
+            if (n >= size) n = size - 1;
+            memcpy(out, s, n);
+            out[n] = 0;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool br_tag_add(br_world *w, br_entity e, const char *tag) {
+    br_component c = br_component_find(w, "Tags");
+    br_tags *t;
+    size_t len, used;
+    if (c == BR_COMPONENT_INVALID || !br_entity_alive(w, e) || !br_tag_valid(tag)) return false;
+    t = (br_tags *)br_get(w, e, c);
+    if (!t) t = (br_tags *)br_add(w, e, c, NULL);
+    if (!t) return false;
+    len = strlen(tag);
+    if (list_has(t->list, tag, len)) return true;
+    used = strlen(t->list);
+    while (used > 0 && tag_sep(t->list[used - 1])) t->list[--used] = 0;   /* (no trailing ", ") */
+    if (used + (used ? 2 : 0) + len >= sizeof(t->list)) return false;
+    if (used) { memcpy(t->list + used, ", ", 2); used += 2; }
+    memcpy(t->list + used, tag, len + 1);
+    return true;
+}
+
+bool br_tag_remove(br_world *w, br_entity e, const char *tag) {
+    br_tags *t = (br_tags *)tags_of(w, e);
+    char out[BR_TAGS_MAX];
+    const char *p, *s;
+    size_t n, len, used = 0;
+    bool had = false;
+    if (!t || !tag || !tag[0]) return false;
+    len = strlen(tag);
+    for (p = t->list; (n = next_tag(&p, &s)) > 0;) {      /* the list again, without it, tidily */
+        if (n == len && strncmp(s, tag, len) == 0) { had = true; continue; }
+        if (used + 2 + n >= sizeof(out)) break;           /* (can't happen with lists the component holds) */
+        if (used) { memcpy(out + used, ", ", 2); used += 2; }
+        memcpy(out + used, s, n);
+        used += n;
+    }
+    out[used] = 0;
+    if (had) memcpy(t->list, out, used + 1);
+    return had;
+}
+
+uint32_t br_find_tagged(const br_world *w, const char *const *tags, int tag_count, br_entity *out, uint32_t max) {
+    br_component c = br_component_find(w, "Tags");
+    const br_component_pool *pool;
+    uint32_t i, found = 0;
+    int k;
+    if (c == BR_COMPONENT_INVALID || tag_count <= 0) return 0;
+    pool = &w->pools[c];
+    for (i = 0; i < pool->count; ++i) {
+        const br_tags *t = (const br_tags *)(pool->data + (size_t)i * pool->stride);
+        for (k = 0; k < tag_count; ++k)
+            if (!tags[k] || !tags[k][0] || !list_has(t->list, tags[k], strlen(tags[k]))) break;
+        if (k < tag_count) continue;
+        if (out && found < max) out[found] = pool->entities[i];
+        ++found;
+    }
+    return found;
 }
 
 /* ---- motion ---------------------------------------------------------------- */

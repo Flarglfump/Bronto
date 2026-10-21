@@ -9,6 +9,7 @@
  * exact, and scenes are small enough for it to be instant.
  */
 #include "editor.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -342,6 +343,32 @@ const char *ed_doc_name(const ed_doc *d, br_entity e, char *buf, size_t size) {
     if (n && n->text[0]) snprintf(buf, size, "%s", n->text);
     else snprintf(buf, size, "Entity %u", BR_ENTITY_INDEX(e));
     return buf;
+}
+
+bool ed_doc_matches(const ed_doc *d, br_entity e, const char *filter) {
+    const char *p = filter;
+    char name[64];
+    ed_doc_name(d, e, name, sizeof(name));
+    while (p && *p) {
+        char word[64];
+        size_t n = 0;
+        while (*p == ' ' || *p == ',') ++p;
+        while (*p && *p != ' ' && *p != ',' && n < sizeof(word) - 1) word[n++] = *p++;
+        word[n] = 0;
+        if (!n) break;
+        if (word[0] == '#') {                            /* a tag */
+            if (word[1] && !br_tag_has(&d->world, e, word + 1)) return false;
+        } else {                                         /* part of the name, any case */
+            size_t i, j, len = strlen(name);
+            bool found = false;
+            for (i = 0; !found && i + n <= len; ++i) {
+                for (j = 0; j < n && tolower((unsigned char)name[i + j]) == tolower((unsigned char)word[j]); ++j) {}
+                found = j == n;
+            }
+            if (!found) return false;
+        }
+    }
+    return true;
 }
 
 /* The same order as drawing: highest layer, then the latest entity. */

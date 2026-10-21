@@ -10,6 +10,7 @@ const CALLBACKS = new Map(data.callbacks.map(c => [c.name, c]));
 const KEYWORDS = data.keywords;
 const COMPONENTS = data.components;
 const TYPES = new Map((data.types || []).map(t => [t.name, t]));
+const STRING_ARGS = data.string_args || { lists: {}, args: {} };
 const TYPE_RE = '[A-Za-z_]\\w*(?:\\s*\\[\\s*[A-Za-z_]\\w*\\s*\\])?';
 
 // "amount: int" -> { name: 'amount', type: 'int' }
@@ -102,11 +103,13 @@ function trailingComment(line) {
 
 // What comes before the cursor on its line decides what to offer.
 // Returns items { label, kind, detail, doc, insert?, snippet? }.
-function completions(text, line, character, otherScripts) {
+// `assets`: the project's files (paths from its folder), for play_sound("|"), spawn("|")...
+function completions(text, line, character, otherScripts, assets) {
     const lines = text.split(/\r?\n/);
     const before = (lines[line] || '').slice(0, character);
     const items = [];
-    if (/#/.test(stripStrings(before)) || inString(before)) return items;
+    if (/#/.test(stripStrings(before))) return items;
+    if (inString(before)) return stringCompletions(before, character, assets);
 
     // var x: |   func f(a: |) -> |   for i: |  ->  the types
     if (/(?:(?:^|[^:]):(?!=)|->)\s*\w*$/.test(before) || /\blist\s*\[\s*\w*$/.test(before)) {
@@ -171,6 +174,43 @@ function builtinSignature(b) {
 }
 
 function placeholders(params) { return params.map((p, i) => '${' + (i + 1) + ':' + p + '}').join(', '); }
+
+// Inside a string that is a call's argument: { func, arg, prefix, from } (from: the column the
+// string's text starts at), or null.
+function stringArgAt(before) {
+    const stack = [];
+    let quote = null, start = 0;
+    for (let i = 0; i < before.length; ++i) {
+        const c = before[i];
+        if (quote) {
+            if (c === '\\') ++i;
+            else if (c === quote) quote = null;
+            continue;
+        }
+        if (c === '"' || c === "'") { quote = c; start = i + 1; }
+        else if (c === '#') return null;
+        else if (c === '(' || c === '[') {
+            const m = c === '(' ? /([A-Za-z_]\w*)\s*$/.exec(before.slice(0, i)) : null;
+            stack.push({ func: m ? m[1] : null, arg: 0 });
+        } else if (c === ')' || c === ']') stack.pop();
+        else if (c === ',' && stack.length) stack[stack.length - 1].arg++;
+    }
+    if (!quote || !stack.length || !stack[stack.length - 1].func) return null;
+    const top = stack[stack.length - 1];
+    return { func: top.func, arg: top.arg, prefix: before.slice(start), from: start };
+}
+
+// key_down("|"), button_pressed("|"), set_volume("|"), has(e, "|"), play_sound("|")...: the names it takes.
+function stringCompletions(before, character, assets) {
+    const at = stringArgAt(before);
+    const kind = at && (STRING_ARGS.args[at.func] || {})[String(at.arg)];
+    if (!kind) return [];
+    if (kind[0] === '.') {                              /* files of that kind, from the project's folder */
+        return (assets || []).filter(f => f.toLowerCase().endsWith(kind))
+            .map(f => ({ label: f, kind: 'file', detail: at.func + '()', replaceFrom: at.from }));
+    }
+    return (STRING_ARGS.lists[kind] || []).map(v => ({ label: v, kind: 'value', detail: at.func + '()', replaceFrom: at.from }));
+}
 
 function inString(before) {
     let quote = null;
@@ -322,4 +362,5 @@ function parseCheckerOutput(output) {
 
 module.exports = {
     data, builtinSignature, parseDocument, localsAt, completions, hover, signatureAt, definition, quickCheck, parseCheckerOutput, wordAt,
+    stringArgAt,
 };

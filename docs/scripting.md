@@ -34,7 +34,13 @@ Only two things can appear at the top level of a file:
 - `func name(a, b) { ... }` declares a function.
 - `@strict`, on the first line only, makes types required (see [Types](#types)).
 
-`#` starts a comment. Statements end at the end of the line, or at a `;`.
+`#` starts a comment. Statements end at the end of the line, or at a `;`. Inside `( )` or
+`[ ]` a statement can carry on over several lines:
+
+```
+var names = ["UP", "DOWN",
+             "LEFT", "RIGHT"]
+```
 
 ## Callbacks
 
@@ -56,7 +62,7 @@ Every callback can declare fewer parameters than the engine passes.
 | Type | Examples | Notes |
 |---|---|---|
 | number | `3`, `-0.5`, `1e3` | always floating point |
-| string | `"hi"`, `'hi'`, `"a\nb"` | `+` joins strings, and turns anything else into text: `"score: " + 5` |
+| string | `"hi"`, `'hi'`, `"a\nb"` | `+` joins strings, and turns anything else into text: `"score: " + 5`. `\n` is a new line (a Label shows it as one), `\t` a tab, and `\"`, `\'` and `\\` the characters themselves. `text[i]` is one character, `len(text)` the length |
 | true / false | `true`, `false` | |
 | nil | `nil` | "nothing"; variables start as nil |
 | vec2 | `vec2(3, 4)` | `.x`, `.y`, `.length`. `+ -` with another vec2; `* /` by a number |
@@ -100,7 +106,7 @@ Operators, loosest first: `or`, `and`, `not`, comparisons (`== != < <= > >=`), `
 | `.angular_velocity` | RigidBody.angular_velocity (degrees / second) |
 | `.alive` | false once the entity has been destroyed |
 | `.id` | a number unique to the entity |
-| `.Shape`, `.Sprite`, ... | a component (any capitalised name), or nil if the entity doesn't have it. Read and write its fields: `self.Shape.color = rgb(255, 0, 0)`, `self.Label.text = "Hi"`, `self.Collider.trigger = true` |
+| `.Shape`, `.Sprite`, ... | a component (any capitalised name), or nil if the entity doesn't have it. Read and write its fields: `self.Shape.color = rgb(255, 0, 0)`, `self.Label.text = "Hi"`, `self.Collider.trigger = true`, `self.Tags.list = "enemy, boss"` |
 | `.health` (any other name) | that entity's script variable |
 
 Nested values write back: `self.velocity.x = 50` and `self.Shape.size.y += 2` both work.
@@ -126,8 +132,12 @@ editor's console and status bar), `rgb(r, g, b[, a])` (a colour string).
 **Lists:** `len(x) push(list, v) pop(list) remove(list, index) contains(list, v)
 range(n) range(a, b[, step])`.
 
-**Input:** `key_down(name) key_pressed(name) key_released(name)`. Key names include
-`"left"`, `"a"`, `"space"`, `"enter"`, `"shift"` and `"F1"`, ignoring case.
+**Input:** `key_down(name) key_pressed(name) key_released(name)`. Key names, ignoring case:
+the letters `"a"` to `"z"` and digits `"0"` to `"9"`; `"space" "enter" "escape" "tab"
+"backspace" "insert" "delete" "home" "end" "pageup" "pagedown"`; the arrows `"left" "right"
+"up" "down"`; `"f1"` to `"f12"`; `"shift" "ctrl" "alt"` (either side) or `"leftshift"
+"rightctrl"`... (one side); `"esc"` and `"return"` work too, and so do punctuation keys by
+their character (`","`, `"/"`).
 `mouse_down(button) mouse_pressed(button)` (0 left, 1 right, 2 middle),
 `mouse_position()` (in game pixels), and `time()` (seconds since the game started).
 `last_key()` gives the name of a key pressed this step (`""` if none) in the form
@@ -207,6 +217,25 @@ func load_game() {
 
 Each name is a text file (`slot1.txt`) holding the value written as BrontoScript, such
 as `[3, 12, "ow_7_7", ["spoon", "d1:key1"]]`.
+
+**Tags** (a `Tags` component: words that say what an entity is, so you can find entities by
+kind rather than by name). In the inspector, add a **Tags** component and type its list:
+`enemy, flying` (commas or spaces). A tag is up to 31 letters, digits and `_-.:/`, and
+case counts (`enemy` isn't `Enemy`). The editor's hierarchy filter finds them with `#enemy`.
+- `has_tag(e, "enemy")` tells whether an entity has a tag.
+- `add_tag(e, "stunned")` gives it one (adding the Tags component if needed), and
+  `remove_tag(e, "stunned")` takes it off again (true if it had it).
+- `tags(e)` lists an entity's tags.
+- `find_tagged("enemy")` returns every entity with the tag, and `find_tagged("enemy",
+  "flying")` every one with all of them. `first_tagged(...)` returns the first, or nil.
+
+```
+func explode() {                               # hurts every enemy nearby
+    for e in find_tagged("enemy") {
+        if distance(e.position, self.position) < 40 { e.hit(2) }
+    }
+}
+```
 
 **Tilemaps** (a `Tilemap` component: a grid of tiles from one image, one character per cell):
 - `tile_at(map, point)` returns the character in the cell under a world point, or `""`
@@ -297,7 +326,9 @@ Scripts are read again when their file changes, and every time Play starts in th
   the line to show. There are presets for VS Code, Sublime Text, Notepad++ and Zed, and
   empty means your system's default program. When a script has a mistake, it opens at
   that line.
-- **VS Code:** `tools/vscode` has an extension with highlighting, completion, hover
+- **VS Code:** `tools/vscode` has an extension with highlighting, completion (including the
+  names that go inside strings: keys, gamepad buttons, axes, sound buses, components, and
+  the project's sounds and scenes for `play_sound`, `spawn` and `load_scene`), hover
   documentation, signature help, go to definition and checking as you type. See
   [its README](../tools/vscode/brontoscript/README.md).
 - **Any editor:** `bscheck file.bs ...` (built by `make tools`) prints each mistake as

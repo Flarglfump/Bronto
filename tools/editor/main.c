@@ -416,7 +416,7 @@ static void inject_click(float x, float y) {
 
 static void frames(br_engine *e, int n) { while (n-- > 0) br_engine_frame(e); }
 
-#define HIER_ROW_Y(i) (TOOLBAR_H + 6 + 19 * 3 + 5 + 3 + 19 * (float)(i) + 8)
+#define HIER_ROW_Y(i) (TOOLBAR_H + 6 + 19 * 4 + 5 + 3 + 19 * (float)(i) + 8)   /* heading, two button rows, the filter */
 
 /* Press at a, move there in steps, release at b. */
 static void inject_drag(br_engine *e, br_vec2 a, br_vec2 b) {
@@ -1059,6 +1059,21 @@ static int run_headless(br_engine *e) {
         if (ed_doc_index(&ed->doc, ball) != 0) { printf("FAIL: dragging in the hierarchy didn't reorder (at %d)\n", ed_doc_index(&ed->doc, ball)); ++failures; }
         inject_drag(e, br_v2(60, HIER_ROW_Y(0)), br_v2(60, HIER_ROW_Y(3) + 4));
         if (ed_doc_index(&ed->doc, ball) != 3) { printf("FAIL: dragging back put Ball at %d\n", ed_doc_index(&ed->doc, ball)); ++failures; }
+    }
+    {   /* the filter: "#bouncy" shows only Ball (tagged in its inspector), as the first row - a click selects it */
+        br_entity ball = ed->doc.order[3];
+        ed->doc.selected = ed->doc.order[0];
+        br_tag_add(&ed->doc.world, ball, "bouncy");
+        snprintf(ed->hierarchy_filter, sizeof(ed->hierarchy_filter), "#bouncy");
+        frames(e, 2);
+        br_image_save_bmp(&e->framebuffer, "editor_filter.bmp");
+        inject_click(60, HIER_ROW_Y(1));                 /* (row 0 is "1 of N match") */
+        frames(e, 2);
+        if (ed->doc.selected != ball) { printf("FAIL: the hierarchy's #tag filter didn't show Ball first\n"); ++failures; }
+        ed->hierarchy_filter[0] = 0;
+        br_tag_remove(&ed->doc.world, ball, "bouncy");
+        br_remove(&ed->doc.world, ball, ed->doc.ids.tags);
+        frames(e, 2);
     }
     {   /* the tree: drag row 4 onto the middle of row 3 (Ball) - it becomes Ball's child and stays put */
         br_entity ball = ed->doc.order[3], other = ed->doc.order[4];

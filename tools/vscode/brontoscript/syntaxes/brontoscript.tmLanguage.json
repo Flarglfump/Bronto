@@ -201,7 +201,7 @@
   "call": {
    "patterns": [
     {
-     "match": "\\b(print|str|num|floor|ceil|round|abs|sqrt|sin|cos|atan2|pow|sign|min|max|clamp|lerp|random|vec2|length|normalize|dot|distance|angle|from_angle|rgb|len|push|pop|remove|contains|range|key_down|key_pressed|key_released|mouse_down|mouse_pressed|mouse_position|button_down|button_pressed|button_released|axis|stick|gamepad_connected|gamepad_count|gamepad_name|last_button|last_input|rumble|time|find|find_all|destroy|spawn|children|child|has|add|remove_component|apply_force|apply_impulse|raycast|entity_at|play_sound|send)\\s*(?=\\()",
+     "match": "\\b(print|str|num|floor|ceil|round|abs|sqrt|sin|cos|atan2|pow|sign|min|max|clamp|lerp|random|vec2|length|normalize|dot|distance|angle|from_angle|rgb|len|push|pop|remove|contains|range|key_down|key_pressed|key_released|mouse_down|mouse_pressed|mouse_position|time|button_down|button_pressed|button_released|axis|stick|gamepad_connected|gamepad_count|gamepad_name|last_button|last_input|rumble|find|find_all|find_tagged|first_tagged|has_tag|add_tag|remove_tag|tags|destroy|spawn|children|child|has|add|remove_component|apply_force|apply_impulse|raycast|entity_at|play_sound|send|load_scene|quit|tile_at|set_tile|tile_solid|tile_center|substr|save_data|load_data|has_data|delete_data|data_names|last_key|set_volume|volume)\\s*(?=\\()",
      "captures": {
       "1": {
        "name": "support.function.builtin.brontoscript"

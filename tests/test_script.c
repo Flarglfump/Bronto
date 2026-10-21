@@ -1,6 +1,8 @@
 /* Tests: BrontoScript and the Script component (script.h). */
 #include "test.h"
+#include <ctype.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 static br_world W;
@@ -1597,6 +1599,46 @@ static void test_gamepad_input(void) {
     teardown();
 }
 
+/* Tags in scripts: given, tested, listed, found (all of several), taken off;
+ * a tag that isn't one is a mistake. */
+static void test_script_tags(void) {
+    br_entity runner, a, b;
+    char text[64];
+    setup();
+    a = br_entity_create(&W);
+    b = br_entity_create(&W);
+    snprintf(((br_name *)br_add(&W, a, ID.name, NULL))->text, 32, "Bat");
+    snprintf(((br_name *)br_add(&W, b, ID.name, NULL))->text, 32, "Slime");
+    write_script("tagger.bs",
+        "var found = 0\nvar both = 0\nvar first = \"\"\nvar listed = \"\"\nvar had = false\nvar gone = 0\nvar none = 0\n"
+        "func start() {\n"
+        "    add_tag(find(\"Bat\"), \"enemy\")\n"
+        "    add_tag(find(\"Bat\"), \"flying\")\n"
+        "    add_tag(find(\"Slime\"), \"enemy\")\n"
+        "    found = len(find_tagged(\"enemy\"))\n"
+        "    both = len(find_tagged(\"enemy\", \"flying\"))\n"
+        "    first = first_tagged(\"flying\").name\n"
+        "    for t in tags(find(\"Bat\")) { listed += t + \";\" }\n"
+        "    had = remove_tag(find(\"Bat\"), \"flying\") and not has_tag(find(\"Bat\"), \"flying\")\n"
+        "    gone = len(find_tagged(\"flying\"))\n"
+        "    if first_tagged(\"boss\") == nil { none = 1 }\n"
+        "}\n");
+    runner = scripted("Runner", "tagger.bs", NULL, br_v2(0, 0));
+    steps(2);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    CHECK(num(runner, "found") == 2 && num(runner, "both") == 1 && num(runner, "gone") == 0 && num(runner, "none") == 1);
+    CHECK(br_script_get_string(&W, runner, "first", text, sizeof(text)) && strcmp(text, "Bat") == 0);
+    CHECK(br_script_get_string(&W, runner, "listed", text, sizeof(text)) && strcmp(text, "enemy;flying;") == 0);
+    CHECK(br_tag_has(&W, a, "enemy") && !br_tag_has(&W, a, "flying") && br_tag_has(&W, b, "enemy"));
+    write_script("tagger_bad.bs", "func start() {\n    add_tag(self, \"two words\")\n}\n");
+    scripted("Bad", "tagger_bad.bs", NULL, br_v2(0, 0));
+    steps(2);
+    CHECK(br_script_error_count(&W) == 1 && strstr(br_script_last_error(&W), "isn't a tag") != NULL);
+    CHECK(!br_script_check("func f() {\n    var e: entity = find_tagged(\"x\")\n}\n", "x.bs", text, sizeof(text)));   /* (a list) */
+    teardown();
+}
+
 typedef struct counter_state { int starts, updates, hits; } counter_state;
 static int g_destroyed;
 static void cb_start(br_world *w, br_entity e, void *s) { BR_UNUSED(w); BR_UNUSED(e); ((counter_state *)s)->starts++; }
@@ -1738,21 +1780,100 @@ static void test_tree_from_scripts(void) {
     teardown();
 }
 
-/* The VS Code extension documents every built-in function the language has. */
+/* Is `word` in `text` as a whole word? */
+static bool has_word(const char *text, const char *word) {
+    size_t n = strlen(word);
+    const char *p = text;
+    while ((p = strstr(p, word)) != NULL) {
+        bool before = p > text && (isalnum((unsigned char)p[-1]) || p[-1] == '_');
+        bool after = isalnum((unsigned char)p[n]) || p[n] == '_';
+        if (!before && !after) return true;
+        p += n;
+    }
+    return false;
+}
+
+/* The VS Code extension knows every built-in function the language has - with
+ * the engine's numbers of arguments - and highlights it, and the reference
+ * (docs/scripting.md) describes it. The names the extension offers inside
+ * strings (keys, buttons, axes, buses, components) are ones the engine takes. */
 static void test_extension_knows_builtins(void) {
-    size_t size;
+    size_t size, gsize, dsize;
     char *json = (char *)br_file_read_all("tools/vscode/brontoscript/lib/builtins.json", &size);
+    char *grammar = (char *)br_file_read_all("tools/vscode/brontoscript/syntaxes/brontoscript.tmLanguage.json", &gsize);
+    char *docs = (char *)br_file_read_all("docs/scripting.md", &dsize);
     int i;
-    CHECK(json != NULL);
-    if (!json) return;
+    CHECK(json != NULL && grammar != NULL && docs != NULL);
+    if (!json || !grammar || !docs) { br_free(json); br_free(grammar); br_free(docs); return; }
     CHECK(br_script_builtin_count() > 40 && br_script_builtin_name(br_script_builtin_count()) == NULL);
     for (i = 0; i < br_script_builtin_count(); ++i) {
+        const char *name = br_script_builtin_name(i), *entry, *p;
         char key[64];
-        snprintf(key, sizeof(key), "\"name\": \"%s\"", br_script_builtin_name(i));
-        if (!strstr(json, key)) printf("      builtins.json is missing %s\n", br_script_builtin_name(i));
-        CHECK(strstr(json, key) != NULL);
+        int lo = -1, hi = -1, min = -1, params = 0;
+        CHECK(br_script_builtin_arity(i, &lo, &hi));
+        snprintf(key, sizeof(key), "\"name\": \"%s\"", name);
+        entry = strstr(json, key);
+        if (!entry) printf("      builtins.json is missing %s\n", name);
+        CHECK(entry != NULL);
+        if (entry) {                                     /* its "params": [...] and "min": n */
+            const char *end = strstr(entry + 1, "\"name\": ");
+            p = strstr(entry, "\"params\": [");
+            if (p && (!end || p < end)) {
+                const char *close = strchr(p, ']');
+                for (p += 11; p < close; ++p) params += *p == '"';
+                params /= 2;
+            }
+            p = strstr(entry, "\"min\": ");
+            if (p && (!end || p < end)) min = atoi(p + 7);
+            if (min != lo || (hi < 16 && params != hi))
+                printf("      builtins.json: %s takes %d to %d arguments, not %d to %d\n", name, lo, hi, min, params);
+            CHECK(min == lo && (hi >= 16 || params == hi));
+        }
+        snprintf(key, sizeof(key), "|%s|", name);
+        if (!strstr(grammar, key) && !(snprintf(key, sizeof(key), "(%s|", name), strstr(grammar, key)) &&
+            !(snprintf(key, sizeof(key), "|%s)", name), strstr(grammar, key))) {
+            printf("      the grammar doesn't highlight %s\n", name);
+            CHECK(false);
+        }
+        if (!has_word(docs, name)) printf("      docs/scripting.md doesn't mention %s\n", name);
+        CHECK(has_word(docs, name));
+    }
+    {   /* the names offered inside strings, tried on the engine */
+        static const struct { const char *list, *call; } uses[] = {
+            { "keys", "key_down(v)" }, { "buttons", "button_down(v)" }, { "axes", "axis(v)" }, { "sticks", "stick(v)" },
+            { "buses", "volume(v)" }, { "components", "has(self, v)" },
+        };
+        char *src = (char *)br_alloc(64 * 1024);
+        size_t k;
+        br_entity e;
+        setup();
+        for (k = 0; k < BR_ARRAY_COUNT(uses); ++k) {
+            char key[64];
+            const char *p, *close;
+            snprintf(key, sizeof(key), "\"%s\": [", uses[k].list);
+            p = strstr(json, key);
+            CHECK(p != NULL);
+            if (!p) continue;
+            p = strchr(p, '[');
+            close = strchr(p, ']');
+            snprintf(src, 64 * 1024, "var n = 0\nfunc update(dt) {\n    for v in %.*s {\n        var r = %s\n        n += 1\n    }\n}\n",
+                     (int)(close - p + 1), p, uses[k].call);
+            snprintf(key, sizeof(key), "names_%d.bs", (int)k);
+            write_script(key, src);
+            e = scripted("Names", key, NULL, br_v2(0, 0));
+            steps(1);
+            if (br_script_error_count(&W)) printf("      %s: %s\n", uses[k].list, br_script_last_error(&W));
+            CHECK_EQ_INT(br_script_error_count(&W), 0);
+            CHECK(num(e, "n") > 1);
+            br_entity_destroy(&W, e);
+            steps(1);
+        }
+        br_free(src);
+        teardown();
     }
     br_free(json);
+    br_free(grammar);
+    br_free(docs);
 }
 
 
@@ -1907,6 +2028,7 @@ void suite_script(void) {
     RUN(test_physics_callbacks_and_messages);
     RUN(test_spawn_destroy_input);
     RUN(test_gamepad_input);
+    RUN(test_script_tags);
     RUN(test_tiles_substr_big_spawn);
     RUN(test_spawn_then_set);
     RUN(test_c_behaviour_and_reload);

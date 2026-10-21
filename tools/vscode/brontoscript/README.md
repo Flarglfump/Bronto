@@ -14,7 +14,12 @@ Editing support for Bronto engine scripts (`.bs` files):
   - at the top of a file: the callbacks the script doesn't define yet (typed:
     `func update(dt: number) -> void`),
   - after `:` and `->`: the types (`number`, `int`, `string`, `bool`, `vec2`, `list`,
-    `list[T]`, `entity`, `any`, `void`), and `@strict`.
+    `list[T]`, `entity`, `any`, `void`), and `@strict`,
+  - inside a string: the names that function takes - key names in `key_pressed("`,
+    gamepad buttons in `button_down("`, axes in `axis("`, `"left"`/`"right"` in `stick("`,
+    sound buses in `set_volume("`, components in `has(self, "`, and the project's sounds and
+    scenes (paths from the folder with `project.bronto`) in `play_sound("`, `spawn("` and
+    `load_scene("`.
 - **Hover** documentation for built-ins (with their parameter and result types), keywords,
   types, properties and your own functions and variables, with their declared types (the `#`
   comment above a declaration is its documentation).
@@ -35,10 +40,10 @@ Editing support for Bronto engine scripts (`.bs` files):
 Either:
 
 - Build the package with `make vscode` (from the engine's folder; it needs Python 3), then
-  in VS Code run **Extensions: Install from VSIX...** and pick `build/brontoscript-0.2.1.vsix`.
-  From a terminal, `code --install-extension build/brontoscript-0.2.1.vsix` does the same.
+  in VS Code run **Extensions: Install from VSIX...** and pick `build/brontoscript-0.3.1.vsix`.
+  From a terminal, `code --install-extension build/brontoscript-0.3.1.vsix` does the same.
 - Or copy this `brontoscript` folder into your extensions folder as
-  `bronto.brontoscript-0.2.1`: `~/.vscode/extensions/` on macOS and Linux,
+  `bronto.brontoscript-0.3.1`: `~/.vscode/extensions/` on macOS and Linux,
   `%USERPROFILE%\.vscode\extensions\` on Windows. Then restart VS Code.
 
 For full error checking, build the checker with `make tools` (it lands in `build/bscheck`).

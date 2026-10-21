@@ -210,6 +210,19 @@ void ed_hierarchy(editor *ed, br_rect rect) {
     br_ui_columns(ui, 2);
     if (br_ui_button(ui, "Copy")) ed_cmd_duplicate(ed);
     if (br_ui_button(ui, "Delete")) ed_cmd_delete(ed);
+    {   /* the filter: part of a name, or #tag */
+        br_rect box = br_ui_row(ui, 0);
+        uint32_t shown = 0;
+        br_ui_place(ui, box);
+        br_ui_text_field(ui, "##hierarchy_filter", ed->hierarchy_filter, sizeof(ed->hierarchy_filter));
+        if (!ed->hierarchy_filter[0] && !br_ui_wants_keyboard(ui))
+            br_draw_text(ui->r, "filter: name or #tag", box.x + 4, box.y + 4, 1, ui->style.text_dim);
+        if (ed->hierarchy_filter[0]) {
+            for (i = 0; i < d->count; ++i) shown += ed_doc_matches(d, d->order[i], ed->hierarchy_filter);
+            snprintf(name, sizeof(name), "%u of %u match", (unsigned)shown, (unsigned)d->count);
+            br_ui_label_colored(ui, name, ui->style.text_dim);
+        }
+    }
     br_ui_separator(ui);
     for (i = 0; i < d->count; ++i) {                     /* the tree: drag rows to move or reparent them */
         br_entity e = d->order[i];
@@ -217,7 +230,8 @@ void ed_hierarchy(editor *ed, br_rect rect) {
         br_rect row, fold, label;
         float indent;
         bool kids;
-        if (hidden_by_collapse(ed, e)) continue;
+        bool filtering = ed->hierarchy_filter[0] != 0;
+        if (filtering ? !ed_doc_matches(d, e, ed->hierarchy_filter) : hidden_by_collapse(ed, e)) continue;
         indent = TREE_INDENT * (float)br_depth(&d->world, e);
         kids = i + 1 < d->count && br_parent_of(&d->world, d->order[i + 1]) == e;
         row = br_ui_row(ui, 0);
@@ -232,7 +246,16 @@ void ed_hierarchy(editor *ed, br_rect rect) {
             if (f & BR_UI_CLICKED) ed_set_collapsed(ed, e, !ed_collapsed(ed, e));
         }
         br_ui_place(ui, label);
-        if (br_ui_selectable(ui, ed_doc_name(d, e, name, sizeof(name)), e == d->selected)) d->selected = e;
+        ed_doc_name(d, e, name, sizeof(name));
+        if (filtering) {                                 /* (with its tags, while filtering) */
+            char tag[BR_TAG_MAX];
+            int t;
+            for (t = 0; br_tag_at(&d->world, e, t, tag, sizeof(tag)) && strlen(name) + strlen(tag) + 3 < sizeof(name); ++t) {
+                strcat(name, t ? " #" : "  #");
+                strcat(name, tag);
+            }
+        }
+        if (br_ui_selectable(ui, name, e == d->selected)) d->selected = e;
         if (br_ui_last_flags(ui) & BR_UI_DOUBLE_CLICKED) ed_cmd_frame(ed);
         if (br_ui_last_flags(ui) & BR_UI_RIGHT_CLICKED) ed_menu_entity(ed, e);
         snprintf(handle, sizeof(handle), "%u", (unsigned)e);
