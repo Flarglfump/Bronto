@@ -2,14 +2,15 @@
 # Pip was in), Escape goes back to the title. Or a click on either; on a
 # gamepad, A and B.
 var t = 0
+func start() { update(0) }
 func update(dt) {
     t += dt
-    if t < 1 { return }
     var s = find("Settings")
     var c1 = child(self, "Choice1")
     var c2 = child(self, "Choice2")
-    c1.Label.text = s.ok_label() + " - TRY AGAIN"
+    c1.Label.text = s.ok_label() + " - TRY AGAIN"         # (named for keys or the gamepad, from the start)
     c2.Label.text = s.back_label() + " - BACK TO THE TITLE"
+    if t < 1 { return }
     if s.over_label(c1) { c1.Label.color = rgb(142, 26, 42) } else { c1.Label.color = rgb(98, 56, 26) }
     if s.over_label(c2) { c2.Label.color = rgb(142, 26, 42) } else { c2.Label.color = rgb(160, 120, 80) }
     if key_pressed("enter") or button_pressed("a") or (s.clicked() and s.over_label(c1)) {

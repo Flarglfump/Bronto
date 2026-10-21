@@ -6,14 +6,15 @@
 #
 # Gamepads: the left stick and the d-pad always move (and choose in menus), A
 # is always OK and B always back in menus. Whichever Pip was last played with
-# - keys or a gamepad - is what the menus' hints name (using_pad).
+# - keys or a gamepad - is what the menus' hints name (the engine keeps track:
+# last_input()).
 
 var actions = ["up", "down", "left", "right", "spoon", "item", "pantry", "pause", "quicksave", "map", "item_next", "item_prev"]
 var names = ["UP", "DOWN", "LEFT", "RIGHT", "SPOON", "ITEM (B)", "POCKET PANTRY", "PAUSE", "QUICK SAVE", "MAP",
              "NEXT ITEM", "PREVIOUS ITEM"]
 var keys = []               # for each action, [first key, second key] ("" = none)
 var pads = []               # for each action, a gamepad button ("" = none), as button_down() names them
-var using_pad = false       # was a gamepad used last (rather than the keys or the mouse)?
+var using_pad = false       # was a gamepad used last (rather than the keys or the mouse)? (pad_now(), each step)
 var stick_on = [false, false, false, false]      # the left stick pushed up, down, left, right
 var stick_hit = [false, false, false, false]     # ... just now (this step)
 var music = 8               # 0 (off) to 10
@@ -63,8 +64,7 @@ func update(dt) {
         stick_hit[i] = on[i] and not stick_on[i]
         stick_on[i] = on[i]
     }
-    if last_button() != "" or length(s) > 0.5 { using_pad = true }
-    if last_key() != "" or mouse_pressed(0) { using_pad = false }
+    using_pad = pad_now()
 }
 
 func dir_index(action) {
@@ -138,26 +138,28 @@ func nav(dir) {
 # The other page (the Pocket Pantry's tabs): Tab, or a shoulder button.
 func page() { return key_pressed("tab") or button_pressed("lb") or button_pressed("rb") }
 
+func pad_now() { return last_input() == "gamepad" }
+
 # What the menus' hints call a control - the keys' or the gamepad's, whichever was used last.
 func label_of(action) {
     var i = index_of(action)
-    if using_pad { return pad_label(pads[i]) }
+    if pad_now() { return pad_label(pads[i]) }
     return key_label(keys[i][0])
 }
 func ok_label() {
-    if using_pad { return "A" }
+    if pad_now() { return "A" }
     return "ENTER"
 }
 func back_label() {
-    if using_pad { return "B" }
+    if pad_now() { return "B" }
     return "ESC"
 }
 func page_label() {
-    if using_pad { return "LB/RB" }
+    if pad_now() { return "LB/RB" }
     return "TAB"
 }
 func choose_label() {
-    if using_pad { return "STICK" }
+    if pad_now() { return "STICK" }
     return "ARROWS"
 }
 

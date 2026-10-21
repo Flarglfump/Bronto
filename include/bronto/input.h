@@ -124,6 +124,13 @@ typedef struct br_gamepad_state {
     bool trigger_released[2];
 } br_gamepad_state;
 
+/* Which kind of device the player touched last (br_input.last_device): a key,
+ * the mouse (a button, the wheel, or a real move), or a gamepad (a button, or
+ * a stick or trigger pushed past half way). For showing the right prompts. */
+typedef enum br_input_device {
+    BR_DEVICE_NONE = 0, BR_DEVICE_KEYBOARD, BR_DEVICE_MOUSE, BR_DEVICE_GAMEPAD
+} br_input_device;
+
 typedef struct br_input {
     bool keys[BR_KEY_COUNT];
     bool keys_pressed[BR_KEY_COUNT];
@@ -146,7 +153,32 @@ typedef struct br_input {
 
     br_action_def actions[BR_MAX_ACTIONS];
     int action_count;
+
+    br_input_device last_device;      /* kept across frames (and scenes) */
 } br_input;
+
+/* A frame's edges - what was pressed / released this frame - on their own. The
+ * engine uses these so that fixed-step code (scripts, physics callbacks) sees
+ * each press exactly once: in the first fixed step of the frame, or, when a
+ * frame runs no fixed step at all, in the next frame's. */
+typedef struct br_input_edges {
+    bool keys_pressed[BR_KEY_COUNT];
+    bool keys_released[BR_KEY_COUNT];
+    bool keys_repeated[BR_KEY_COUNT];
+    bool mouse_pressed[BR_MOUSE_BUTTON_COUNT];
+    bool mouse_released[BR_MOUSE_BUTTON_COUNT];
+    struct {
+        bool pressed[BR_PAD_BUTTON_COUNT];
+        bool released[BR_PAD_BUTTON_COUNT];
+        bool trigger_pressed[2];
+        bool trigger_released[2];
+    } pads[BR_MAX_GAMEPADS];
+} br_input_edges;
+void br_input_edges_get(const br_input *in, br_input_edges *out);
+void br_input_edges_set(br_input *in, const br_input_edges *edges);
+void br_input_edges_add(br_input_edges *to, const br_input_edges *from);   /* to |= from */
+void br_input_edges_clear(br_input *in);
+const char *br_input_device_name(br_input_device d);   /* "keyboard", "mouse", "gamepad", "" */
 
 struct br_event;
 

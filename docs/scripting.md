@@ -149,6 +149,12 @@ numbered 0 to 3; without a pad number, these look at every pad.
 - `last_button()` gives the name of a button pressed this step (`""` if none), as
   `button_down()` takes it, for letting players choose their own buttons.
 - `rumble(strength, seconds[, pad])` shakes the pad (0 to 1; 0 stops it).
+- `last_input()` says what the player touched last: `"keyboard"`, `"mouse"` or
+  `"gamepad"` (`""` before anything). It carries over from scene to scene, so a prompt can
+  name the right button straight away.
+
+Every press is seen once: `key_pressed()`, `button_pressed()` and the rest are true in
+exactly one step of `update()`, even when the game runs two steps in one frame (or none).
 
 ```
 var move := stick()                          # the left stick, any pad

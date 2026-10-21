@@ -12,6 +12,10 @@
  *   while Sony pads follow the kernel spec (BTN_WEST = left, BTN_NORTH =
  *   top); both are mapped by physical position.
  * - Rumble through force feedback (FF_RUMBLE) when the device supports it.
+ * - Steam Input: while Steam's virtual gamepad is there (Valve's vendor id,
+ *   product 0x11ff), Valve's own controllers (a Steam Deck's controls, a
+ *   Steam Controller) are left out - Steam is already passing them on as
+ *   that virtual pad, so reading both would count every press twice.
  *
  * Access: most distributions grant the logged-in user access to game
  * controllers (systemd "uaccess"); otherwise add the user to "input".
@@ -43,7 +47,11 @@ typedef struct evdev_pad {
     bool analog_triggers;
     bool has_rumble;
     int ff_id;
+    unsigned short vendor, product;
 } evdev_pad;
+
+#define EVDEV_VALVE 0x28de
+#define EVDEV_STEAM_VIRTUAL 0x11ff
 
 static struct {
     evdev_pad pads[BR_MAX_GAMEPADS];
@@ -208,7 +216,11 @@ static bool evdev_try_open(evdev_pad *p, const char *path) {
     snprintf(p->path, sizeof(p->path), "%s", path);
     p->raw.connected = true;
     if (ioctl(fd, EVIOCGNAME(sizeof(p->raw.name) - 1), p->raw.name) < 0) strcpy(p->raw.name, "Gamepad");
-    if (ioctl(fd, EVIOCGID, &id) >= 0) p->spec_face_layout = id.vendor == 0x054c;   /* Sony */
+    if (ioctl(fd, EVIOCGID, &id) >= 0) {
+        p->spec_face_layout = id.vendor == 0x054c;     /* Sony */
+        p->vendor = id.vendor;
+        p->product = id.product;
+    }
     for (code = 0; code < EVDEV_ABS_TRACKED; ++code) {
         struct input_absinfo ai;
         if (!EVDEV_TEST_BIT(absbits, code) || ioctl(fd, EVIOCGABS(code), &ai) < 0) continue;
@@ -264,8 +276,14 @@ static void evdev_shutdown(void) {
     EV.initialised = false;
 }
 
+static bool evdev_steam_virtual(const evdev_pad *p) {
+    return p->fd >= 0 && ((p->vendor == EVDEV_VALVE && p->product == EVDEV_STEAM_VIRTUAL) || strstr(p->raw.name, "Steam Virtual") != NULL);
+}
+
 static void evdev_poll(br_events *events) {
     int i;
+    bool steam_input = false;
+    static const br_gamepad_raw none;
     if (!EV.initialised) return;
     if (evdev_now() >= EV.next_scan) {
         evdev_scan();
@@ -292,7 +310,12 @@ static void evdev_poll(br_events *events) {
                 if ((size_t)n < sizeof(buf)) break;
             }
         }
-        br_gamepads_sync(&EV.tracker, i, &p->raw, events);   /* fd < 0 => raw is zeroed */
+    }
+    for (i = 0; i < BR_MAX_GAMEPADS; ++i) steam_input = steam_input || evdev_steam_virtual(&EV.pads[i]);
+    for (i = 0; i < BR_MAX_GAMEPADS; ++i) {
+        evdev_pad *p = &EV.pads[i];
+        bool hidden = steam_input && p->fd >= 0 && p->vendor == EVDEV_VALVE && !evdev_steam_virtual(p);
+        br_gamepads_sync(&EV.tracker, i, hidden ? &none : &p->raw, events);   /* fd < 0 => raw is zeroed */
     }
 }
 

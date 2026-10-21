@@ -7,7 +7,7 @@
 # The mouse works too: over a line, it's chosen; click a volume's pip to set
 # it, a key to change it, RESET or BACK to do that, an arrow to scroll.
 #
-# With a gamepad (whichever was used last: scripts/settings.bs using_pad),
+# With a gamepad (whichever was used last: scripts/settings.bs pad_now()),
 # the actions show their gamepad buttons instead, one each: A waits for the
 # new button, X clears it. Waiting gives up after five seconds.
 # Saved as Pip leaves (scripts/settings.bs).
@@ -50,7 +50,7 @@ func start() {
     more_up = child(self, "MoreUp")
     more_down = child(self, "MoreDown")
     mouse_at = mouse_position()
-    was_pad = s.using_pad
+    was_pad = s.pad_now()
     show()
 }
 
@@ -234,8 +234,8 @@ func update(dt) {
         return
     }
     var moved = false
-    if s.using_pad != was_pad {                          # (keys or buttons: whichever was used last)
-        was_pad = s.using_pad
+    if s.pad_now() != was_pad {                          # (keys or buttons: whichever was used last)
+        was_pad = s.pad_now()
         show()
     }
     var n = last_row() + 1

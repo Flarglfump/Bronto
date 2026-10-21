@@ -192,13 +192,6 @@ game's Properties), `library_capsule_600x900.png` (the library grid),
 and `logo.png` (the title over the banner). Right-click each place in Steam to set custom
 artwork. The folder isn't packed into built games (`exclude` in `project.bronto`).
 
-`steam/` holds artwork for adding the game to a Steam library as a non-Steam game, drawn
-with the game's own sprites and font: `icon_256.png` (the shortcut's icon, in the game's
-Properties), `library_capsule_600x900.png` (the library grid), `wide_capsule_920x430.png`
-(Recent Games), `hero_1920x620.png` (the banner on its page) and `logo.png` (the title over
-the banner). Right-click each place in Steam to set custom artwork. The folder isn't packed
-into built games (`exclude` in `project.bronto`).
-
 ## How it's made
 
 - `title.scene` is the title screen.

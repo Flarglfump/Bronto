@@ -157,6 +157,37 @@ int main(void) {
     evdev_close_pad(p);
     close(g_pipe[1]);
 
+    /* ---- Steam Input: the Deck's own controls and Steam's virtual pad of them: only the virtual one counts ---- */
+    {
+        int deck_pipe[2], virt_pipe[2];
+        evdev_pad *deck = &EV.pads[0], *virt = &EV.pads[1];
+        if (pipe(deck_pipe) != 0 || pipe(virt_pipe) != 0) return 2;
+        fcntl(deck_pipe[0], F_SETFL, O_NONBLOCK);
+        fcntl(virt_pipe[0], F_SETFL, O_NONBLOCK);
+        g_pipe[0] = deck_pipe[0]; g_pipe[1] = deck_pipe[1];
+        deck = fake_device("Steam Deck", false);
+        deck->vendor = EVDEV_VALVE; deck->product = 0x1205;
+        absinfo(deck, ABS_X, -32768, 32767); absinfo(deck, ABS_Y, -32768, 32767);
+        evdev_layout_axes(deck);
+        EV.pads[1] = *deck;                                  /* (the same, then made the virtual pad) */
+        virt->fd = virt_pipe[0];
+        virt->product = EVDEV_STEAM_VIRTUAL;
+        strcpy(virt->raw.name, "Steam Virtual Gamepad");
+        send_ev(EV_KEY, BTN_START, 1);                       /* to the Deck's own device */
+        g_pipe[1] = virt_pipe[1];
+        send_ev(EV_KEY, BTN_START, 1);                       /* and to the virtual one */
+        pump(&in, &events);
+        CHECK(!br_pad_connected(&in, 0) && !br_pad_down(&in, 0, BR_PAD_START));
+        CHECK(br_pad_connected(&in, 1) && br_pad_pressed(&in, 1, BR_PAD_START));
+        evdev_close_pad(virt);                               /* Steam gone: the Deck's own controls count again */
+        pump(&in, &events);
+        CHECK(br_pad_connected(&in, 0) && br_pad_down(&in, 0, BR_PAD_START) && !br_pad_connected(&in, 1));
+        evdev_close_pad(deck);
+        close(deck_pipe[1]);
+        close(virt_pipe[1]);
+        pump(&in, &events);
+    }
+
     /* the real scan must cope with whatever this machine has (or nothing) */
     EV.next_scan = 0;
     pump(&in, &events);

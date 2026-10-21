@@ -1,6 +1,7 @@
 #include "bronto/input.h"
 #include "bronto/event.h"
 
+#include <math.h>
 #include <string.h>
 
 void br_input_init(br_input *in) {
@@ -52,6 +53,7 @@ void br_input_handle_event(br_input *in, const br_event *e) {
         int k = (int)e->u.key.key;
         in->mods = e->u.key.mods;
         if (!valid_key(k)) break;
+        in->last_device = BR_DEVICE_KEYBOARD;
         if (!in->keys[k]) in->keys_pressed[k] = true;
         in->keys_repeated[k] = true;
         in->keys[k] = true;
@@ -73,12 +75,14 @@ void br_input_handle_event(br_input *in, const br_event *e) {
         in->mouse_dy += e->u.mouse_move.y - in->mouse_y;
         in->mouse_x = e->u.mouse_move.x;
         in->mouse_y = e->u.mouse_move.y;
+        if (fabsf(e->u.mouse_move.dx) + fabsf(e->u.mouse_move.dy) >= 3) in->last_device = BR_DEVICE_MOUSE;   /* (not a nudge) */
         break;
     case BR_EVENT_MOUSE_BUTTON_DOWN: {
         int b = (int)e->u.mouse_button.button;
         if (b < 0 || b >= BR_MOUSE_BUTTON_COUNT) break;
         if (!in->mouse[b]) in->mouse_pressed[b] = true;
         in->mouse[b] = true;
+        in->last_device = BR_DEVICE_MOUSE;
         in->mouse_x = e->u.mouse_button.x;
         in->mouse_y = e->u.mouse_button.y;
         break;
@@ -95,6 +99,7 @@ void br_input_handle_event(br_input *in, const br_event *e) {
     case BR_EVENT_MOUSE_WHEEL:
         in->wheel_x += e->u.wheel.dx;
         in->wheel_y += e->u.wheel.dy;
+        in->last_device = BR_DEVICE_MOUSE;
         break;
     case BR_EVENT_GAMEPAD_CONNECTED:
         if (valid_pad(e->u.gamepad.pad)) {
@@ -126,6 +131,7 @@ void br_input_handle_event(br_input *in, const br_event *e) {
         if (down && !p->buttons[b]) p->pressed[b] = true;
         if (!down && p->buttons[b]) p->released[b] = true;
         p->buttons[b] = down;
+        if (down) in->last_device = BR_DEVICE_GAMEPAD;
         break;
     }
     case BR_EVENT_GAMEPAD_AXIS: {
@@ -133,6 +139,7 @@ void br_input_handle_event(br_input *in, const br_event *e) {
         if (!valid_pad(pad) || a < 0 || a >= BR_PAD_AXIS_COUNT) break;
         in->pads[pad].connected = true;
         in->pads[pad].axes[a] = e->u.gamepad.value;
+        if (fabsf(e->u.gamepad.value) >= 0.5f) in->last_device = BR_DEVICE_GAMEPAD;   /* (pushed, not drifting) */
         break;
     }
     case BR_EVENT_WINDOW_FOCUS_LOST:
@@ -162,6 +169,59 @@ bool br_pad_down(const br_input *in, int pad, br_gamepad_button b) {
 bool br_pad_pressed(const br_input *in, int pad, br_gamepad_button b) {
     return valid_pad(pad) && (int)b >= 0 && b < BR_PAD_BUTTON_COUNT && in->pads[pad].pressed[b];
 }
+/* ---- a frame's edges, on their own ---------------------------------------- */
+
+void br_input_edges_get(const br_input *in, br_input_edges *out) {
+    int i;
+    memcpy(out->keys_pressed, in->keys_pressed, sizeof(out->keys_pressed));
+    memcpy(out->keys_released, in->keys_released, sizeof(out->keys_released));
+    memcpy(out->keys_repeated, in->keys_repeated, sizeof(out->keys_repeated));
+    memcpy(out->mouse_pressed, in->mouse_pressed, sizeof(out->mouse_pressed));
+    memcpy(out->mouse_released, in->mouse_released, sizeof(out->mouse_released));
+    for (i = 0; i < BR_MAX_GAMEPADS; ++i) {
+        memcpy(out->pads[i].pressed, in->pads[i].pressed, sizeof(out->pads[i].pressed));
+        memcpy(out->pads[i].released, in->pads[i].released, sizeof(out->pads[i].released));
+        memcpy(out->pads[i].trigger_pressed, in->pads[i].trigger_pressed, sizeof(out->pads[i].trigger_pressed));
+        memcpy(out->pads[i].trigger_released, in->pads[i].trigger_released, sizeof(out->pads[i].trigger_released));
+    }
+}
+
+void br_input_edges_set(br_input *in, const br_input_edges *ed) {
+    int i;
+    memcpy(in->keys_pressed, ed->keys_pressed, sizeof(in->keys_pressed));
+    memcpy(in->keys_released, ed->keys_released, sizeof(in->keys_released));
+    memcpy(in->keys_repeated, ed->keys_repeated, sizeof(in->keys_repeated));
+    memcpy(in->mouse_pressed, ed->mouse_pressed, sizeof(in->mouse_pressed));
+    memcpy(in->mouse_released, ed->mouse_released, sizeof(in->mouse_released));
+    for (i = 0; i < BR_MAX_GAMEPADS; ++i) {
+        memcpy(in->pads[i].pressed, ed->pads[i].pressed, sizeof(in->pads[i].pressed));
+        memcpy(in->pads[i].released, ed->pads[i].released, sizeof(in->pads[i].released));
+        memcpy(in->pads[i].trigger_pressed, ed->pads[i].trigger_pressed, sizeof(in->pads[i].trigger_pressed));
+        memcpy(in->pads[i].trigger_released, ed->pads[i].trigger_released, sizeof(in->pads[i].trigger_released));
+    }
+}
+
+void br_input_edges_add(br_input_edges *to, const br_input_edges *from) {
+    const bool *f = (const bool *)from;                 /* (nothing but bools) */
+    bool *t = (bool *)to;
+    size_t i;
+    for (i = 0; i < sizeof(*to) / sizeof(bool); ++i) t[i] = t[i] || f[i];
+}
+
+void br_input_edges_clear(br_input *in) {
+    static const br_input_edges none;
+    br_input_edges_set(in, &none);
+}
+
+const char *br_input_device_name(br_input_device d) {
+    switch (d) {
+    case BR_DEVICE_KEYBOARD: return "keyboard";
+    case BR_DEVICE_MOUSE: return "mouse";
+    case BR_DEVICE_GAMEPAD: return "gamepad";
+    default: return "";
+    }
+}
+
 bool br_pad_released(const br_input *in, int pad, br_gamepad_button b) {
     return valid_pad(pad) && (int)b >= 0 && b < BR_PAD_BUTTON_COUNT && in->pads[pad].released[b];
 }

@@ -94,6 +94,12 @@ struct br_engine {
 
     double rumble_until[BR_MAX_GAMEPADS];   /* engine time when rumble stops */
 
+    /* Input edges for the fixed steps (see br_input_edges): this frame's, and
+     * any from frames that ran no fixed step, still to be seen. */
+    br_input_edges frame_edges;
+    br_input_edges pending_edges;
+    bool edges_pending;
+
     int16_t *audio_buffer;
     uint32_t audio_buffer_frames;
 

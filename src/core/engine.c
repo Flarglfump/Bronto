@@ -309,17 +309,33 @@ bool br_engine_frame(br_engine *e) {
 
     paused = e->window.minimized && e->config.pause_when_minimized;
     if (!paused) {
-        /* 4. fixed updates */
+        /* 4. fixed updates. Each press or release is seen by exactly one fixed
+         *    step: the first of this frame (with any left over from frames
+         *    that ran none) - not by every step of a frame that runs two, and
+         *    not lost in a frame that runs none. */
         fdt = (float)e->config.fixed_timestep;
         e->accumulator += dt;
+        br_input_edges_get(&e->input, &e->frame_edges);
+        if (e->edges_pending) {
+            br_input_edges_add(&e->pending_edges, &e->frame_edges);
+            br_input_edges_set(&e->input, &e->pending_edges);
+        }
         while (e->accumulator >= e->config.fixed_timestep && steps < e->config.max_fixed_steps) {
             br_scenes_fixed_update(&e->scenes, fdt);
             e->accumulator -= e->config.fixed_timestep;
             e->fixed_steps++;
             steps++;
+            if (steps == 1) br_input_edges_clear(&e->input);
         }
         if (steps == e->config.max_fixed_steps && e->accumulator >= e->config.fixed_timestep)
             e->accumulator = 0;  /* running behind: drop the backlog */
+        if (steps == 0) {                                   /* none ran: keep the edges for the next frame's */
+            if (!e->edges_pending) e->pending_edges = e->frame_edges;
+            e->edges_pending = true;
+        } else {
+            e->edges_pending = false;
+        }
+        br_input_edges_set(&e->input, &e->frame_edges);    /* the variable update sees this frame's */
 
         /* 5. update */
         br_scenes_update(&e->scenes, (float)dt);

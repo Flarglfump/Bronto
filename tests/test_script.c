@@ -788,6 +788,7 @@ static void test_pantryquest_eight_ways(void) {
  * find the file there; then choose a new key and a softer volume. */
 static void pq_press(br_key k) {
     g_engine.input.keys_pressed[k] = g_engine.input.keys[k] = true;
+    g_engine.input.last_device = BR_DEVICE_KEYBOARD;
     steps(1);
     g_engine.input.keys_pressed[k] = g_engine.input.keys[k] = false;
     steps(2);
@@ -1282,6 +1283,7 @@ static void test_pantryquest_pocket_pantry(void) {
 static void pq_button(br_gamepad_button b) {
     g_engine.input.pads[0].connected = true;
     g_engine.input.pads[0].pressed[b] = g_engine.input.pads[0].buttons[b] = true;
+    g_engine.input.last_device = BR_DEVICE_GAMEPAD;
     steps(1);
     g_engine.input.pads[0].pressed[b] = g_engine.input.pads[0].buttons[b] = false;
     steps(2);
@@ -1521,6 +1523,7 @@ static void test_gamepad_input(void) {
         "    if b != \"\" { last = b }\n"
         "    if button_pressed(\"start\") and rumble(1, 0.5) { shook += 1 }\n"
         "    if not gamepad_connected(2) and gamepad_connected() { count += 10 }\n"
+        "    name = name + \"/\" + last_input()\n"
         "}\n");
     e = scripted("Pad", "pad.bs", NULL, br_v2(0, 0));
     steps(1);
@@ -1530,7 +1533,7 @@ static void test_gamepad_input(void) {
     pad_frame(ev, 2);
     CHECK(num(e, "down") == 1 && num(e, "pressed") == 1 && num(e, "on_one") == 0);
     CHECK(num(e, "count") == 11);
-    CHECK(br_script_get_string(&W, e, "name", text, sizeof(text)) && strcmp(text, "Test Pad") == 0);
+    CHECK(br_script_get_string(&W, e, "name", text, sizeof(text)) && strcmp(text, "Test Pad/gamepad") == 0);
     CHECK(br_script_get_string(&W, e, "last", text, sizeof(text)) && strcmp(text, "a") == 0);
     pad_frame(NULL, 0);
     CHECK(num(e, "down") == 2 && num(e, "pressed") == 1);         /* held: pressed only once */
@@ -1568,6 +1571,24 @@ static void test_gamepad_input(void) {
         CHECK(!br_script_check("func update(dt) {\n    rumble(1)\n}\n", "x.bs", text, sizeof(text)) && strstr(text, "rumble() takes 2 to 3"));
     }
     br_gamepad_rumble(&g_engine, 0, 0, 0, 0);
+    {   /* what was touched last: a key, then the mouse (a real move, not a nudge), then the gamepad again */
+        br_event k = br_event_key(BR_EVENT_KEY_DOWN, BR_KEY_SPACE, 0, false);
+        br_input_handle_event(&g_engine.input, &k);
+        CHECK(g_engine.input.last_device == BR_DEVICE_KEYBOARD);
+        k = br_event_mouse_move(10, 10, 1, 0);
+        br_input_handle_event(&g_engine.input, &k);
+        CHECK(g_engine.input.last_device == BR_DEVICE_KEYBOARD);
+        k = br_event_mouse_move(20, 10, 10, 0);
+        br_input_handle_event(&g_engine.input, &k);
+        CHECK(g_engine.input.last_device == BR_DEVICE_MOUSE);
+        k = pad_event(BR_EVENT_GAMEPAD_AXIS, 0, BR_PAD_AXIS_LEFT_X, 0.2f);       /* (drift) */
+        br_input_handle_event(&g_engine.input, &k);
+        CHECK(g_engine.input.last_device == BR_DEVICE_MOUSE);
+        k = pad_event(BR_EVENT_GAMEPAD_AXIS, 0, BR_PAD_AXIS_LEFT_X, 0.8f);
+        br_input_handle_event(&g_engine.input, &k);
+        CHECK(g_engine.input.last_device == BR_DEVICE_GAMEPAD);
+        g_engine.input.last_device = BR_DEVICE_NONE;
+    }
     {
         br_gamepad_raw raw;
         memset(&raw, 0, sizeof(raw));

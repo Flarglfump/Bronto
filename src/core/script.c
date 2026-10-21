@@ -2559,6 +2559,15 @@ static sc_value bi_last_button(ARGS) {
             if (sc_pad_button_on(&e->input, p, b, 1)) return sc_string(vm, k_pad_button_names[b], strlen(k_pad_button_names[b]));
     return sc_string(vm, "", 0);
 }
+/* last_input(): what the player touched last - "keyboard", "mouse" or "gamepad" ("" before anything) -
+ * kept across scenes: for showing a key's name or a button's. */
+static sc_value bi_last_input(ARGS) {
+    br_engine *e = sc_engine(vm);
+    const char *name;
+    UNUSED_ARGS;
+    name = e ? br_input_device_name(e->input.last_device) : "";
+    return sc_string(vm, name, strlen(name));
+}
 /* rumble(strength, seconds[, pad]): shakes the pad (or every pad): strength 0 to 1; 0 stops it.
  * True if a pad could. */
 static sc_value bi_rumble(ARGS) {
@@ -3073,7 +3082,7 @@ static const sc_builtin k_builtin_table[] = {
     { "button_released", 1, 2, bi_button_released, "sn>b" }, { "axis", 1, 2, bi_axis, "sn>n" },
     { "stick", 0, 2, bi_stick, "sn>v" }, { "gamepad_connected", 0, 1, bi_gamepad_connected, "n>b" },
     { "gamepad_count", 0, 0, bi_gamepad_count, ">n" }, { "gamepad_name", 0, 1, bi_gamepad_name, "n>s" },
-    { "last_button", 0, 0, bi_last_button, ">s" }, { "rumble", 2, 3, bi_rumble, "nnn>b" },
+    { "last_button", 0, 0, bi_last_button, ">s" }, { "last_input", 0, 0, bi_last_input, ">s" }, { "rumble", 2, 3, bi_rumble, "nnn>b" },
     { "find", 1, 1, bi_find, "s>e" }, { "find_all", 1, 1, bi_find_all, "s>L" }, { "destroy", 1, 1, bi_destroy, "e>-" },
     { "spawn", 1, 3, bi_spawn, "spq>e" }, { "children", 1, 1, bi_children, "e>L" }, { "child", 2, 2, bi_child, "es>e" },
     { "has", 2, 2, bi_has, "es>b" }, { "add", 2, 2, bi_add, "es>c" },

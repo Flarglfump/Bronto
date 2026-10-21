@@ -652,6 +652,15 @@
    "returns": "string"
   },
   {
+   "name": "last_input",
+   "signature": "last_input()",
+   "doc": "What the player touched last: \"keyboard\", \"mouse\" or \"gamepad\" (\"\" before anything), kept from scene to scene: for showing a key's name or a button's in prompts.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "string"
+  },
+  {
    "name": "rumble",
    "signature": "rumble(strength, seconds, pad = all)",
    "doc": "Shakes a gamepad (or every one): strength 0 to 1, for that long; 0 stops it. True if a pad could.",

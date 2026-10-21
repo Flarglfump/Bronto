@@ -11,6 +11,7 @@ typedef struct play_data {
     br_action left, right, jump;
     br_sound blip;
     int fixed_steps, updates, renders, jumps, quit_seen;
+    int fixed_presses;                /* space presses seen by fixed steps */
     bool veto_quit;
 } play_data;
 
@@ -75,6 +76,7 @@ static void play_fixed(br_scene *s, float dt) {
     BR_UNUSED(dt);
     v->x = 60.0f * br_action_axis(&s->engine->input, d->left, d->right);
     d->fixed_steps++;
+    if (br_key_pressed(&s->engine->input, BR_KEY_SPACE)) d->fixed_presses++;
 }
 
 static void play_update(br_scene *s, float dt) {
@@ -145,6 +147,41 @@ static void test_fixed_step_slow_frames(void) {
     while (br_engine_frame(e)) {}
     CHECK(e->fixed_steps <= 3 * 5);
     CHECK_NEAR(e->dt, 0.25, 1e-9);
+    br_engine_shutdown(e);
+    br_headless_set_timestep(1.0 / 60.0);
+    br_free(e);
+}
+
+/* A press is seen by exactly one fixed step: not by all three of a slow
+ * frame, and not lost by a fast frame that runs none (it waits for the next
+ * step). The variable update sees it in its own frame either way. */
+static void test_fixed_steps_see_each_press_once(void) {
+    br_engine *e = BR_NEW(br_engine);
+    br_engine_config c = headless_config();
+    br_event down = br_event_key(BR_EVENT_KEY_DOWN, BR_KEY_SPACE, 0, false);
+    br_event up = br_event_key(BR_EVENT_KEY_UP, BR_KEY_SPACE, 0, false);
+    int i, steps_before;
+    br_headless_set_timestep(1.0 / 20.0);   /* 3 fixed steps a frame */
+    br_engine_init(e, &c);
+    br_engine_frame(e);
+    br_headless_inject(&down);
+    br_engine_frame(e);
+    CHECK_EQ_INT(g_last_play->fixed_presses, 1);
+    CHECK_EQ_INT(g_last_play->jumps, 1);
+    CHECK(br_key_pressed(&e->input, BR_KEY_SPACE));       /* (still this frame's, after the fixed steps) */
+    br_headless_inject(&up);
+    br_engine_frame(e);
+    br_headless_set_timestep(1.0 / 240.0);  /* a fixed step every fourth frame */
+    for (i = 0; i < 8 && !(e->accumulator < 1e-9); ++i) br_engine_frame(e);
+    steps_before = (int)e->fixed_steps;
+    br_headless_inject(&down);
+    br_engine_frame(e);                     /* (no fixed step in this frame) */
+    CHECK_EQ_INT((int)e->fixed_steps, steps_before);
+    CHECK_EQ_INT(g_last_play->jumps, 2);
+    for (i = 0; i < 4; ++i) br_engine_frame(e);
+    CHECK((int)e->fixed_steps == steps_before + 1);
+    CHECK_EQ_INT(g_last_play->fixed_presses, 2);           /* seen once, a few frames late */
+    CHECK_EQ_INT(g_last_play->jumps, 2);
     br_engine_shutdown(e);
     br_headless_set_timestep(1.0 / 60.0);
     br_free(e);
@@ -258,6 +295,7 @@ static void test_quit_when_no_scenes(void) {
 
 void suite_engine(void) {
     RUN(test_engine_loop_and_timing);
+    RUN(test_fixed_steps_see_each_press_once);
     RUN(test_fixed_step_slow_frames);
     RUN(test_input_drives_gameplay_and_audio);
     RUN(test_quit_and_veto);
