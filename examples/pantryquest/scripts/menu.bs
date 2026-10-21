@@ -2,7 +2,7 @@
 # while it's open. The arrows (or the mouse) choose the item for B - its name
 # and what it does show underneath - and Enter closes it. The recipe pages
 # found so far are along the bottom, and the treasures Pip carries (they
-# work by themselves: the wafer plank) down the right edge - the mouse over
+# work by themselves: the wafer plank, the oven mitt, the baking tray) down the right edge - the mouse over
 # one shows what it is.
 
 var game
@@ -44,7 +44,7 @@ func start() {
         if i < game.pages { child(self, "Page" + i).Sprite.image = "art/page_on.bmp" }
     }
     child(self, "Pages").Label.text = "RECIPE PAGES"
-    for i in 2 {
+    for i in 3 {
         var t = child(self, "Treasure" + i)
         push(treasure_spots, t)
         if i < len(game.treasures) {
@@ -64,6 +64,8 @@ func name_of(item) {
     if item == "chili" { return "FIRE CHILI" }
     if item == "whisk" { return "WHISK" }
     if item == "plank" { return "WAFER PLANK" }
+    if item == "mitt" { return "OVEN MITT" }
+    if item == "tray" { return "BAKING TRAY" }
     return ""
 }
 func info_of(item) {
@@ -73,6 +75,8 @@ func info_of(item) {
     if item == "chili" { return "BURNS BUSHES AND FOES" }
     if item == "whisk" { return "WHIRLS YOU TO A CELLAR DOOR" }
     if item == "plank" { return "CROSS JAM ONE TILE WIDE" }
+    if item == "mitt" { return "WALK INTO A CRATE TO PUSH IT" }
+    if item == "tray" { return "YOUR LID STOPS EVERY SHOT" }
     return ""
 }
 
@@ -121,7 +125,7 @@ func update(dt) {
             }
             var over = -1
             for i in len(game.treasures) {
-                if i < 2 and distance(treasure_spots[i].global_position, m) < 10 { over = i }
+                if i < 3 and distance(treasure_spots[i].global_position, m) < 9 { over = i }
             }
             if over != on_treasure {
                 on_treasure = over

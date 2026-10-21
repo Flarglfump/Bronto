@@ -1,0 +1,12 @@
+# Pantry Quest - the Sugar Golem's shadow on the floor (scripts/enemies/sugar_golem.bs moves it)
+bronto_scene 1
+
+entity
+  Name
+    text = "Shadow"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/shadow.bmp"
+    tint = #ffffff70
+    layer = 2

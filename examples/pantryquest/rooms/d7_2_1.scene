@@ -1,0 +1,97 @@
+# Pantry Quest - room d7_2_1 (made by tools/make_rooms.py from tools/world/cellar7.txt: edit it there)
+#
+#   #######LL#######
+#   #######LL#######
+#   ##............##
+#   ##..O......O..##
+#   ##............##
+#   ,,....~~~~....##
+#   ##............##
+#   ##..O......O..##
+#   ##............##
+#   #######LL#######
+#   #######LL#######
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d7_2_1\", music = \"cellar\", stays_clear = true"
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,"
+    solid = "#O~LHXPV"
+    tiles = "#######LL##############LL#########............####..O......O..####............##,,....~~~~....####............####..O......O..####............#########LL##############LL#######"
+    layer = -10
+    tint = #e6d2aaff
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 88
+  Sprite
+    image = "art/imp_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 2, image = \"art/imp_\", speed = 58, shot = \"prefabs/spice.scene\", shot_speed = 100, shot_chance = 0.3"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 184 88
+  Sprite
+    image = "art/imp_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 2, image = \"art/imp_\", speed = 58, shot = \"prefabs/spice.scene\", shot_speed = 100, shot_chance = 0.3"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 120 120
+  Sprite
+    image = "art/ant_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 1, size = 5, damage = 1, image = \"art/ant_\", speed = 96"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 136 56
+  Sprite
+    image = "art/ant_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 1, size = 5, damage = 1, image = \"art/ant_\", speed = 96"
+  Parent
+    entity = 0

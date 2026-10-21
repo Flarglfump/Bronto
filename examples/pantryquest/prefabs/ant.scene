@@ -1,0 +1,14 @@
+# Pantry Quest - a sugar ant, of the Sugar Mill: small and very quick (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/ant_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 1, size = 5, damage = 1, image = \"art/ant_\", speed = 96"

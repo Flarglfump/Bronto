@@ -1,5 +1,6 @@
 # Anything Pip can pick up. `kind` says what (bean, bean5, heart, key, bomb,
-# bombs_item, spoon, cutter, heart_pie, page, soup, map, compass, skewers, chili, plank, whisk); `flag`, if set, makes it
+# bombs_item, spoon, cutter, heart_pie, page, soup, map, compass, skewers, chili, plank, whisk,
+# mitt, tray, ladle); `flag`, if set, makes it
 # a one-off that stays taken; `price` makes it something to buy; `on_clear`
 # keeps it hidden until every enemy in the room is gone; `timeout` (drops)
 # makes it vanish after a while.
@@ -25,7 +26,8 @@ func start() {
                   "bomb", "art/bomb.bmp", "bombs_item", "art/bomb.bmp", "spoon", "art/spoon.bmp", "cutter", "art/cutter.bmp",
                   "heart_pie", "art/heart_pie.bmp", "page", "art/page.bmp", "soup", "art/soup.bmp",
                   "map", "art/dmap.bmp", "compass", "art/compass.bmp", "skewers", "art/skewer.bmp", "chili", "art/chili.bmp",
-                  "plank", "art/plank.bmp", "whisk", "art/whisk.bmp"]
+                  "plank", "art/plank.bmp", "whisk", "art/whisk.bmp", "mitt", "art/mitt.bmp", "tray", "art/tray.bmp",
+                  "ladle", "art/ladle.bmp"]
     for i in range(0, len(images), 2) {
         if images[i] == kind { self.Sprite.image = images[i + 1] }
     }

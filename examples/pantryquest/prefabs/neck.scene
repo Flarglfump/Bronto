@@ -1,0 +1,11 @@
+# Pantry Quest - a bit of a Noodle Hydra's neck (scripts/enemies/noodle_hydra.bs places it)
+bronto_scene 1
+
+entity
+  Name
+    text = "Neck"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/neck.bmp"
+    layer = 3

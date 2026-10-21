@@ -159,6 +159,8 @@ def make_sfx():
                            (0.05, tone(R, 'G5', 0.35, 'triangle', vol=0.2, f1='G3'))])
     sfx('splash', 0.4, [(0, tone(R, 900, 0.35, 'noise', vol=0.3, f1=200, decay=0.12)),
                         (0, tone(R, 'G3', 0.2, 'triangle', vol=0.3, f1='C3'))])
+    sfx('push', 0.35, [(0, tone(R, 260, 0.32, 'noise', vol=0.3, f1=140, decay=0.3)),
+                      (0, tone(R, 'C2', 0.3, 'saw', vol=0.12))])
     sfx('whisk', 1.0, [(0, tone(R, 400, 0.95, 'noise', vol=0.25, f1=2400, decay=0.6)),
                        (0, tone(R, 'C4', 0.9, duty=0.125, vol=0.12, f1='C6', vibrato=14))])
 

@@ -106,7 +106,7 @@ CELLARS = {(7, 5): (1, 'THE COLD CELLAR', False), (13, 1): (2, 'THE PICKLE PANTR
            (13, 6): (5, 'THE CANDY WORKS', False), (1, 1): (6, 'THE FORTUNE HALL', False),
            (11, 4): (7, 'THE SUGAR MILL', True), (9, 1): (8, 'THE SOUP CAULDRON', True),
            (5, 0): (9, "BARON GORGE'S BANQUET HALL", False)}
-BUILT = {1, 2, 3, 4, 5}       # cellars with their own world file (cellarN.txt): no stand-in entrance room
+BUILT = {1, 2, 3, 4, 5, 6, 7, 8}       # cellars with their own world file (cellarN.txt): no stand-in entrance room
 SHOP_STOCK = {
     'cave_shop2': [('bombs_item', 20), ('key', 60), ('heart', 10)],
     'cave_shop3': [('soup', 30), ('bombs_item', 25), ('key', 50)],

@@ -675,15 +675,20 @@ static void pq_fight(const char *room, int max_hp, const char *only) {
     if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
     teardown();
 }
-/* The Gumdrop King: four hits and he bursts into two gumdrops, two hits
- * each and those burst into two little ones; one hit pops each of those.
- * Twelve in all, poking at every gumdrop in the room, and his bar counts
- * them down. */
-static void pq_fight_gumdrops(void) {
+/* Guardians in pieces, fought by poking at every enemy in the room until
+ * the guardian is gone; its bar (hp) must count down `total` hits, and at
+ * most `pieces` other enemies are about at once.
+ *  - The Gumdrop King: four hits and he bursts into two gumdrops, two hits
+ *    each and those burst into two little ones; one hit pops each of those.
+ *  - The Lucky Cookie: eight crumbs circle it, and while any is left its
+ *    shell turns every hit.
+ *  - The Noodle Hydra: an iron pot no hit dents, with four heads; three hits
+ *    break each off (to fly loose, beyond hurting) and the last takes the pot. */
+static void pq_fight_all(const char *room, int total, int pieces) {
     char err[200], music[32];
     br_entity game, king, all[32];
     br_script *sc;
-    double hp = 0, last_hp = 12, life = 32;
+    double hp = 0, last_hp = total, life = 32;
     int i, j, n, landed = 0, most = 0;
     static const double poke[3] = { 1, 0, 0 };
     setup();
@@ -691,13 +696,13 @@ static void pq_fight_gumdrops(void) {
     CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
     game = named("Game");
     sc = (br_script *)br_get(&W, game, SCRIPT);
-    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"d5_2_0\", start_pos = vec2(128, 200), weapon = 1, hearts_max = 16");
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"%s\", start_pos = vec2(128, 200), weapon = 1, hearts_max = 16", room);
     steps(40);
     king = named("Enemy");
     CHECK(king != BR_ENTITY_NULL);
     if (king == BR_ENTITY_NULL) { teardown(); return; }
     steps(60 * 4);                                     /* (his entrance) */
-    CHECK(br_script_get_number(&W, king, "hp", &hp) && hp == 12);
+    CHECK(br_script_get_number(&W, king, "hp", &hp) && hp == total);
     for (i = 0; i < 60 * 60 && br_entity_alive(&W, king); ++i) {
         br_script_set_number(&W, game, "hp", life);
         steps(1);
@@ -715,8 +720,8 @@ static void pq_fight_gumdrops(void) {
         last_hp = hp;
     }
     CHECK(!br_entity_alive(&W, king));
-    CHECK_EQ_INT(landed, 12);
-    CHECK_EQ_INT(most, 4);
+    CHECK_EQ_INT(landed, total);
+    CHECK_EQ_INT(most, pieces);
     steps(2);
     CHECK(br_script_get_string(&W, game, "music_name", music, sizeof(music)) && strcmp(music, "cellar") == 0);
     CHECK_EQ_INT(br_script_error_count(&W), 0);
@@ -727,7 +732,10 @@ static void test_pantryquest_bosses(void) {
     pq_fight("d2_2_1", 6, "dizzy");             /* the Big Dill */
     pq_fight("d3_1_0", 8, NULL);                /* the Spice Wraith */
     pq_fight("d4_2_0", 8, "up rise");           /* the Jammerwock */
-    pq_fight_gumdrops();                        /* the Gumdrop King */
+    pq_fight_all("d5_2_0", 12, 4);              /* the Gumdrop King */
+    pq_fight_all("d6_2_0", 6, 8);               /* the Lucky Cookie */
+    pq_fight("d7_2_0", 8, "stuck");             /* the Sugar Golem */
+    pq_fight_all("d8_1_0", 12, 4);              /* the Noodle Hydra */
 }
 
 /* Pantry Quest: Pip walks in eight directions - a diagonal as fast as
@@ -810,7 +818,33 @@ static float pq_walk_west(const char *treasures) {
     teardown();
     return x;
 }
+/* The oven mitt: below the crate that plugs the gap in the Fortune Hall's
+ * wall of crates, Pip leans on it (pushing it up a tile) and walks on
+ * through the gap and out of the east door; without the mitt, he can't. */
+static void pq_mitt(bool mitt, char *room, size_t size) {
+    br_script *sc;
+    br_entity game;
+    room[0] = 0;
+    if (!pq_load("main.scene")) { teardown(); return; }
+    game = named("Game");
+    sc = (br_script *)br_get(&W, game, SCRIPT);
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"d6_1_1\", start_pos = vec2(168, 164), weapon = 1, treasures = [%s]",
+             mitt ? "\"mitt\"" : "");
+    steps(40);
+    hold_key(BR_KEY_UP, 30);
+    hold_key(BR_KEY_RIGHT, 80);
+    steps(60);
+    br_script_get_string(&W, game, "room_name", room, size);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
 static void test_pantryquest_plank_and_whisk(void) {
+    char room32[32];
+    pq_mitt(false, room32, sizeof(room32));
+    CHECK(strcmp(room32, "d6_1_1") == 0);
+    pq_mitt(true, room32, sizeof(room32));
+    CHECK(strcmp(room32, "d6_2_1") == 0);
     char room[32];
     br_entity game;
     br_script *sc;

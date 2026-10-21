@@ -424,7 +424,7 @@ entity
   Name
     text = "Treasure0"
   Transform
-    position = 96 -30
+    position = 96 -36
   Sprite
     image = "art/plank.bmp"
     tint = #ffffff00
@@ -436,7 +436,19 @@ entity
   Name
     text = "Treasure1"
   Transform
-    position = 96 0
+    position = 96 -17
+  Sprite
+    image = "art/plank.bmp"
+    tint = #ffffff00
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Treasure2"
+  Transform
+    position = 96 2
   Sprite
     image = "art/plank.bmp"
     tint = #ffffff00

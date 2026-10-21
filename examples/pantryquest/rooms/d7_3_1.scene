@@ -1,0 +1,97 @@
+# Pantry Quest - room d7_3_1 (made by tools/make_rooms.py from tools/world/cellar7.txt: edit it there)
+#
+#   #######,,#######
+#   #######,,#######
+#   ##............##
+#   ##.P........P.##
+#   ##............##
+#   ##....P..P....##
+#   ##............##
+#   ##.P........P.##
+#   ##............##
+#   #######,,#######
+#   #######,,#######
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d7_3_1\", music = \"cellar\", stays_clear = true"
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,"
+    solid = "#O~LHXPV"
+    tiles = "#######,,##############,,#########............####.P........P.####............####....P..P....####............####.P........P.####............#########,,##############,,#######"
+    layer = -10
+    tint = #e6d2aaff
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 72
+  Sprite
+    image = "art/imp_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 2, image = \"art/imp_\", speed = 58, shot = \"prefabs/spice.scene\", shot_speed = 100, shot_chance = 0.3"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 184 120
+  Sprite
+    image = "art/olive_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/olive_\", speed = 36, shot = \"prefabs/seed.scene\", shot_speed = 120, aim = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 136 56
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 128 120
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"compass\", flag = \"d7:compass\", on_clear = true"
+  Parent
+    entity = 0

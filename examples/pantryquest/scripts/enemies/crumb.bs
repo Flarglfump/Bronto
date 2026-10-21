@@ -1,0 +1,27 @@
+# A crumb circling the Lucky Cookie (scripts/enemies/lucky_cookie.bs moves
+# it). One hit knocks it away; touching it stings.
+
+var slot = 0                # its place in the ring (0 to 7)
+var hp = 1
+var size = 5
+var damage = 1
+var game
+var hero
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    self.rotation += 360 * dt
+    if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+func hit(amount, d, kind) {
+    play_sound("sfx/hit.wav")
+    game.enemy_killed(self)
+    destroy(self)
+    return true
+}

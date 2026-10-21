@@ -1,0 +1,14 @@
+# Pantry Quest - a carrot soldier, of the Soup Cauldron: it throws carrot coins (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/carrot_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 4, damage = 2, image = \"art/carrot_\", speed = 38, shot = \"prefabs/carrot_coin.scene\", shot_speed = 120, shot_chance = 0.3"

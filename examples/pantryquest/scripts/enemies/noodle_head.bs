@@ -1,0 +1,80 @@
+# One of the Noodle Hydra's heads (scripts/enemies/noodle_hydra.bs). On its
+# neck it spits a drop of broth at Pip every couple of seconds; three hits
+# break it off, and then it flies loose round the room - biting, spitting
+# now and then, and beyond hurting - until the pot goes down.
+
+var pot
+var slot = 0
+var attached = true
+var hp = 3
+var size = 7
+var damage = 1
+var game
+var hero
+var shoot_t = 2
+var mouth_t = 0
+var flash_t = 0
+var vel := vec2(0, 0)
+var turn_t = 0
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+}
+
+func spit() {
+    var s = spawn("prefabs/broth.scene", self.position, self.parent)
+    s.vel = normalize(hero.position - self.global_position) * 96
+    mouth_t = 0.3
+    play_sound("sfx/splash.wav", 0.5)
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    shoot_t -= dt
+    if mouth_t > 0 { mouth_t -= dt }
+    if flash_t > 0 { flash_t -= dt }
+    if attached {
+        if shoot_t <= 0 {
+            spit()
+            shoot_t = 2.2 + random(1.2)
+        }
+    } else {                                           # loose: flying about
+        turn_t -= dt
+        if turn_t <= 0 {
+            vel = from_angle(random(360), 74)
+            turn_t = 0.6 + random(0.8)
+        }
+        var p = self.position + vel * dt
+        if p.x < 40 or p.x > 216 { vel.x = -vel.x }
+        if p.y < 40 or p.y > 136 { vel.y = -vel.y }
+        self.position = vec2(clamp(p.x, 40, 216), clamp(p.y, 40, 136))
+        if shoot_t <= 0 {
+            spit()
+            shoot_t = 3.5 + random(2)
+        }
+    }
+    if mouth_t > 0 { self.Sprite.image = "art/noodle_1.bmp" } else { self.Sprite.image = "art/noodle_0.bmp" }
+    var c = 255
+    if flash_t > 0 and floor(flash_t * 24) % 2 == 0 { c = 120 }
+    if attached { self.Sprite.tint = rgb(255, c, c) } else { self.Sprite.tint = rgb(255, 210, 160) }
+    if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+func hit(amount, d, kind) {
+    if not attached or flash_t > 0.15 { return false }
+    if kind == "cutter" {
+        shoot_t = max(shoot_t, 1.5)
+        play_sound("sfx/tink.wav", 0.6)
+        return true
+    }
+    hp -= amount
+    flash_t = 0.4
+    play_sound("sfx/hit.wav")
+    if hp <= 0 {
+        attached = false
+        pot.head_gone(self)
+        vel = from_angle(random(360), 74)
+    }
+    return true
+}

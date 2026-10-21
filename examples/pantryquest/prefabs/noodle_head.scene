@@ -1,0 +1,14 @@
+# Pantry Quest - one of the Noodle Hydra's heads (spawned by scripts/enemies/noodle_hydra.bs)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/noodle_0.bmp"
+    layer = 4
+  Script
+    file = "scripts/enemies/noodle_head.bs"
+    vars = ""

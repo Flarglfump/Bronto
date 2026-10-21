@@ -1,6 +1,7 @@
 # Something an enemy threw or spat: a seed, a toothpick, a sprinkle. It
 # flies straight (`vel`, set by whoever threw it) until it leaves the room,
-# hits a wall, or reaches Pip - whose pot lid stops the small ones.
+# hits a wall, or reaches Pip - whose pot lid stops the small ones (and,
+# with the baking tray, every one).
 
 var vel := vec2(0, 0)
 var damage = 1
@@ -30,7 +31,7 @@ func update(dt) {
         return
     }
     if hero.touches(g, 2) {
-        if blockable and hero.blocks(vel) {
+        if (blockable or game.has_treasure("tray")) and hero.blocks(vel) {
             play_sound("sfx/tink.wav", 0.7)
             destroy(self)
         } elif hero.hurt(damage, g) {

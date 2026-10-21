@@ -6,7 +6,7 @@ into eight pages and hidden them all over the land. Pip, a young cook, picks up 
 spoon and sets out to find them.
 
 This is the first part of a bigger game. The whole land is there to explore now, with
-the first five of its nine cellars:
+eight of its nine cellars:
 
 - **The Pantry Plains:** 128 screens in ten regions: the start plains, the Lettuce Woods,
   Blueberry Lake, the Frosty Fields, the Fortune Cookie Field, the Chocolate Mountains,
@@ -17,7 +17,7 @@ the first five of its nine cellars:
   - **Two healing springs**, and three heart pies hidden out in the land.
   - **The doors of all nine cellars.** Two are hidden behind cracked cliffs, and the
     last, Baron Gorge's Banquet Hall, waits at the top of the Chocolate Mountains.
-    Cellars 6 to 9 are still being dug: for now each door leads to an entrance room
+    The Banquet Hall is still being dug: for now its door leads to an entrance room
     where a cook says so.
 - **The Cold Cellar** (in the Frosty Fields): nine rooms. It has locked doors and keys,
   shutters that close until the enemies are beaten, and a bombable wall with a stash
@@ -42,6 +42,22 @@ the first five of its nine cellars:
   is the **whisk**: out on the land, it whirls Pip to the door of a cellar whose recipe
   page he has, the next one each time. The guardian, the **Gumdrop King**, bounces off
   the walls, and when beaten bursts into two gumdrops, which burst into two more each.
+- **The Fortune Hall** (in the Fortune Cookie Field): fourteen rooms, with dumplings. Its
+  treasure is the **oven mitt**, carried: walk into a crate for a moment and it slides a
+  tile. Crates plug the gaps on the way to the guardian (leaving a room puts its crates
+  back). The guardian, the **Lucky Cookie**, floats after Pip inside a ring of crumbs;
+  only once every crumb is knocked away can it be hurt, and then it flings fortunes.
+- **The Sugar Mill** (behind a cracked cliff in the Sugar Desert): sixteen rooms, with
+  quick sugar ants, and keys behind syrup and crates. Its treasure is the **baking
+  tray**, carried: Pip's pot lid stops every shot, even spice and jam. The guardian, the
+  **Sugar Golem**, leaps at Pip (watch for its shadow) and lands in a burst of sugar;
+  only while it is stuck in the floor after landing can it be hurt.
+- **The Soup Cauldron** (behind a cracked cliff in the Chocolate Mountains): sixteen
+  rooms, with carrot soldiers that throw carrot coins. Its treasure is the **silver
+  ladle**: it replaces the spoon, and every poke hits twice as hard. The guardian, the
+  **Noodle Hydra**, is an iron pot with four noodle heads that spit broth. Three hits
+  break a head off, and it flies loose round the room until the pot goes down with
+  its last head.
 - Every cellar has a **map**, which shows all its rooms on the HUD, and a **compass**,
   which marks the guardian's room until it is beaten. Behind each guardian is a heart
   pie and a page of the recipe, and the page takes Pip back out of the cellar's door.
@@ -102,10 +118,12 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
 - **Scripts:**
   - `hero.bs` handles Pip: walking in eight directions, the spoon, items, and being hurt.
   - `enemies/walker.bs` covers tomatoes, plums, burger knights, breadstick soldiers,
-    toast knights (`front_guard`) and candy-corn soldiers.
+    toast knights (`front_guard`), candy-corn soldiers, dumplings, sugar ants and carrot
+    soldiers.
   - `jelly.bs`, `bat.bs` and `meatball.bs` are cellar creatures; `gelatin.bs`,
-    `big_dill.bs`, `spice_wraith.bs`, `jammerwock.bs` and `gumdrop.bs` (the Gumdrop King
-    and the gumdrops he splits into) are the guardians. Sour olives and chili imps are
+    `big_dill.bs`, `spice_wraith.bs`, `jammerwock.bs`, `gumdrop.bs` (the Gumdrop King
+    and the gumdrops he splits into), `lucky_cookie.bs` (with `crumb.bs`),
+    `sugar_golem.bs` and `noodle_hydra.bs` (with `noodle_head.bs`) are the guardians. Sour olives and chili imps are
     walkers with their own vars (`prefabs/olive.scene`, `prefabs/imp.scene`).
   - `skewer.bs` and `fire.bs` are the skewer bow's skewers and the fire chili's flame.
   - `pickup.bs` covers anything to pick up or buy.
@@ -135,7 +153,7 @@ standard library only:
 - `make_rooms.py` turns the maps in `tools/world/*.txt` into `rooms/*.scene`. The maps
   are easier to edit there than tile by tile. Each map is 16 x 11 characters, or a
   cellar room's 12 x 7 inside with its doors named. `overworld.txt` holds the land,
-  `caves.txt` the caves, `cellar1.txt` to `cellar5.txt` the cellars built so far (each
+  `caves.txt` the caves, `cellar1.txt` to `cellar8.txt` the cellars built so far (each
   with its own `name` and `tint`), and `cellars_unbuilt.txt` the entrance rooms of the cellars to
   come. It also writes `scripts/cellars.bs`, which tells the game each cellar's rooms,
   its guardian's room and its way out (for the HUD's map and compass).

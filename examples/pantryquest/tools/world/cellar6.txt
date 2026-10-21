@@ -1,0 +1,253 @@
+# The Fortune Hall (the sixth cellar, "d6"), in the Fortune Cookie Field.
+# Its treasure is the oven mitt: carried, it lets Pip push a crate one tile
+# (walk into it for a moment). Crates plug the way on to the guardian. Its
+# guardian, the Lucky Cookie, hides behind a ring of crumbs; once they are
+# all knocked away it can be hit, and it starts flinging fortunes.
+#
+#   .  tiled floor   O  crate (the mitt pushes it)   ~  honey   P  pepper-mill statue
+#
+# A crate "plug": a wall of crates with a gap, and a crate in front of the
+# gap with floor on both sides of it - push it aside and walk through.
+# Leaving the room and coming back puts every crate back where it was.
+#
+# Map of the cellar (columns 0-3, rows 0-4):
+#
+#   [1,0 recipe][2,0 Lucky Cookie]
+#   [0,1 key  ][1,1 compass][2,1 hall    ]            [3,1 stash]
+#   [0,2 soup ][1,2 mitt   ][2,2 hub     ]            [3,2 hall ]
+#              [1,3 key    ][2,3 hall    ]            [3,3 map  ]
+#                           [2,4 entrance] - the door south goes back out to the field
+name The Fortune Hall
+tint #ff9a96ff
+
+room d6_2_4
+music cellar
+doors n=open s=open
+var exit_s = "ow_1_1"
+var exit_pos = vec2(120, 120)
+var exit_face = "down"
+inside
+............
+..P......P..
+............
+............
+............
+..P......P..
+............
+end
+
+room d6_2_3
+music cellar
+doors s=open n=open w=open e=open
+inside
+............
+..O......O..
+............
+....O..O....
+............
+..O......O..
+............
+put dumpling 4 4
+put dumpling 12 7
+put bat 7 6
+end
+
+room d6_1_3
+music cellar
+doors e=open
+inside
+............
+.OO......OO.
+.O........O.
+............
+.O........O.
+.OO......OO.
+............
+put dumpling 5 4
+put dumpling 10 6
+put dumpling 7 8
+put pickup 7.5 5 kind = "key", flag = "d6:key1", on_clear = true
+end
+
+room d6_3_3
+music cellar
+doors w=open n=open
+inside
+............
+.P..P..P..P.
+............
+............
+............
+.P..P..P..P.
+............
+put bat 5 4
+put bat 10 6
+put olive 8 7
+put pickup 7.5 5 kind = "map", flag = "d6:map", on_clear = true
+end
+
+room d6_3_2
+music cellar
+doors s=open w=open n=bomb
+inside
+............
+.~~......~~.
+.~~..OO..~~.
+............
+.~~..OO..~~.
+.~~......~~.
+............
+put dumpling 4 5
+put dumpling 11 5
+put jelly 7 8
+end
+
+room d6_3_1
+music cellar
+doors s=bomb
+inside
+OOOOOOOOOOOO
+O..........O
+O..P....P..O
+O..........O
+O..P....P..O
+O..........O
+OOOOO..OOOOO
+put pickup 6 5 kind = "bean5", flag = "d6:stash1"
+put pickup 7.5 5 kind = "bomb", flag = "d6:stash2"
+put pickup 9 5 kind = "bean5", flag = "d6:stash3"
+end
+
+room d6_2_2
+music cellar
+doors s=open e=open w=locked
+inside
+............
+.OOO....OOO.
+............
+.....PP.....
+............
+.OOO....OOO.
+............
+put dumpling 4 5
+put olive 11 5
+put dumpling 7 3
+end
+
+room d6_1_2
+music cellar
+doors e=locked n=open w=open
+var shut = "e"
+inside
+............
+.P..P..P..P.
+............
+............
+............
+.P..P..P..P.
+............
+put dumpling 4 4
+put dumpling 11 6
+put olive 5 7
+put olive 10 3
+put pickup 7.5 5 kind = "mitt", flag = "d6:mitt", on_clear = true
+end
+
+room d6_0_2
+music cellar
+doors e=open
+inside
+............
+.OOOOOO.....
+.O....O.....
+.O....O.....
+.OOO.OO.....
+....O.......
+............
+put jelly 10 4
+put jelly 11 7
+put pickup 5.5 4.5 kind = "soup", flag = "d6:soup"
+put pickup 4 5 kind = "bean5", flag = "d6:tin1"
+put pickup 7 5 kind = "bean5", flag = "d6:tin2"
+end
+
+room d6_1_1
+music cellar
+doors s=open w=open e=open
+inside
+.........O..
+.........O..
+.........O..
+........O...
+.........O..
+.........O..
+.........O..
+put dumpling 4 4
+put dumpling 5 7
+put bat 8 3
+put pickup 13 7 kind = "compass", flag = "d6:compass", on_clear = true
+end
+
+room d6_0_1
+music cellar
+doors e=open
+inside
+OOOOOOOOOOOO
+O..........O
+O..~~..~~..O
+O...........
+O..~~..~~..O
+O..........O
+OOOOOOOOOOOO
+put dumpling 4 3
+put olive 11 7
+put dumpling 4 7
+put pickup 7.5 5 kind = "key", flag = "d6:key2", on_clear = true
+end
+
+room d6_2_1
+music cellar
+doors w=open n=locked
+inside
+............
+.O..O..O..O.
+............
+............
+............
+.O..O..O..O.
+............
+put dumpling 5 4
+put dumpling 10 6
+put olive 7 7
+put bat 8 3
+end
+
+room d6_2_0
+music cellar
+doors s=locked w=open
+var shut = "w"
+inside
+............
+.P........P.
+............
+............
+............
+.P........P.
+............
+put lucky_cookie 7.5 4.5
+put pickup 7.5 7 kind = "heart_pie", flag = "d6:heart", on_clear = true
+end
+
+room d6_1_0
+music cellar
+doors e=open
+inside
+............
+............
+.....PP.....
+............
+............
+............
+............
+put pickup 7.5 4 kind = "page", flag = "d6:page"
+end

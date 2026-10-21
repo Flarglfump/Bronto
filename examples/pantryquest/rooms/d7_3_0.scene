@@ -1,0 +1,83 @@
+# Pantry Quest - room d7_3_0 (made by tools/make_rooms.py from tools/world/cellar7.txt: edit it there)
+#
+#   ################
+#   ################
+#   ##............##
+#   ##....OOOO....##
+#   ##....O..O....##
+#   ##....O..O....##
+#   ##....OO.O....##
+#   ##......O.....##
+#   ##............##
+#   #######,,#######
+#   #######,,#######
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d7_3_0\", music = \"cellar\", stays_clear = true"
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,"
+    solid = "#O~LHXPV"
+    tiles = "##################################............####....OOOO....####....O..O....####....O..O....####....OO.O....####......O.....####............#########,,##############,,#######"
+    layer = -10
+    tint = #e6d2aaff
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 72
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 184 104
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 128 80
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"key\", flag = \"d7:key3\""
+  Parent
+    entity = 0

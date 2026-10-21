@@ -1,0 +1,14 @@
+# Pantry Quest - a crumb circling the Lucky Cookie (spawned by scripts/enemies/lucky_cookie.bs)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/crumb.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/crumb.bs"
+    vars = ""

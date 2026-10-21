@@ -1,0 +1,279 @@
+# The Soup Cauldron (the eighth cellar, "d8"), hidden behind a cracked cliff
+# in the Chocolate Mountains. Its treasure is the silver ladle: it takes the
+# wooden spoon's place, and every poke hits twice as hard. Its guardian, the
+# Noodle Hydra, is an iron pot with four noodle heads that spit broth; a
+# beaten head breaks loose and flies about the room until the pot goes down
+# with its last head.
+#
+#   .  tiled floor   O  crate   ~  broth   P  pepper-mill statue
+#
+# Map of the cellar (columns 0-4, rows 0-4):
+#
+#   [0,0 recipe][1,0 Noodle Hydra]
+#   [0,1 compass][1,1 hall ][2,1 key  ]           [3,1 key  ][4,1 ladle]
+#   [0,2 key   ][1,2 hall  ][2,2 hub  ]           [3,2 hall ][4,2 stash]
+#               [1,3 hall  ][2,3 hall ]           [3,3 map  ]
+#                           [2,4 entrance] - the door south goes back out to the mountains
+name The Soup Cauldron
+tint #8ce6d2ff
+
+room d8_2_4
+music cellar
+doors n=open s=open
+var exit_s = "ow_9_1"
+var exit_pos = vec2(168, 136)
+var exit_face = "down"
+inside
+............
+..P......P..
+............
+....~~~~....
+............
+..P......P..
+............
+end
+
+room d8_2_3
+music cellar
+doors s=open n=open w=open e=open
+inside
+............
+.O..O..O..O.
+............
+............
+............
+.O..O..O..O.
+............
+put carrot 4 4
+put carrot 11 6
+put meatball 7 7
+end
+
+room d8_1_3
+music cellar
+doors e=open n=open
+inside
+............
+.~~~....~~~.
+.~........~.
+............
+.~........~.
+.~~~....~~~.
+............
+put meatball 4 5
+put meatball 11 5
+put carrot 7 8
+end
+
+room d8_3_3
+music cellar
+doors w=open n=open
+inside
+............
+.P..P..P..P.
+............
+............
+............
+.P..P..P..P.
+............
+put carrot 5 4
+put carrot 10 6
+put bat 8 7
+put pickup 7.5 5 kind = "map", flag = "d8:map", on_clear = true
+end
+
+room d8_1_2
+music cellar
+doors s=open w=open n=locked
+inside
+............
+.OO......OO.
+.O........O.
+............
+.O........O.
+.OO......OO.
+............
+put carrot 5 4
+put jelly 10 6
+put imp 7 7
+end
+
+room d8_0_2
+music cellar
+doors e=open
+inside
+OOOOOOOOOOOO
+O..........O
+O..O....O..O
+O...........
+O..O....O..O
+O..........O
+OOOOOOOOOOOO
+put carrot 4 3
+put carrot 11 7
+put meatball 4 7
+put pickup 7.5 5 kind = "key", flag = "d8:key1", on_clear = true
+end
+
+room d8_2_2
+music cellar
+doors s=open e=locked
+inside
+............
+.~~~....~~~.
+.~~~....~~~.
+............
+.~~~....~~~.
+.~~~....~~~.
+............
+put carrot 7 3
+put carrot 8 7
+put bat 5 5
+end
+
+room d8_3_2
+music cellar
+doors w=locked s=open n=open e=bomb
+inside
+............
+..O......O..
+............
+....O..O....
+............
+..O......O..
+............
+put meatball 4 4
+put carrot 11 6
+put imp 7 7
+end
+
+room d8_4_2
+music cellar
+doors w=bomb
+inside
+OOOOOOOOOOOO
+O..........O
+O..P....P..O
+............
+O..P....P..O
+O..........O
+OOOOOOOOOOOO
+put pickup 6 5 kind = "bean5", flag = "d8:stash1"
+put pickup 7.5 5 kind = "soup", flag = "d8:stash2"
+put pickup 9 5 kind = "bean5", flag = "d8:stash3"
+end
+
+room d8_3_1
+music cellar
+doors s=open e=open
+inside
+...~........
+...~........
+...~........
+...~........
+...~........
+...~........
+...~........
+put carrot 8 4
+put carrot 11 7
+put pickup 3.5 5 kind = "key", flag = "d8:key2"
+end
+
+room d8_4_1
+music cellar
+doors w=open
+var shut = "w"
+inside
+OOOOOOOOOOOO
+O..........O
+O..P....P..O
+...........O
+O..P....P..O
+O..........O
+OOOOOOOOOOOO
+put carrot 5 5
+put carrot 10 5
+put imp 5 7
+put imp 10 3
+put pickup 7.5 5 kind = "ladle", flag = "d8:ladle", on_clear = true
+end
+
+room d8_1_1
+music cellar
+doors s=locked w=open e=open n=locked
+inside
+............
+.~~......~~.
+.~~..PP..~~.
+............
+.~~..PP..~~.
+.~~......~~.
+............
+put carrot 4 5
+put carrot 11 5
+put meatball 7 8
+end
+
+room d8_0_1
+music cellar
+doors e=open
+inside
+............
+....OOOO....
+....O..O....
+....O..O....
+....OO.O....
+......O.....
+............
+put jelly 4 7
+put jelly 11 4
+put bat 10 7
+put pickup 7.5 4.5 kind = "compass", flag = "d8:compass"
+end
+
+room d8_2_1
+music cellar
+doors w=open
+inside
+............
+.O.O....O.O.
+............
+.O.O....O.O.
+............
+.O.O....O.O.
+............
+put carrot 6 4
+put carrot 9 6
+put imp 7 8
+put pickup 7.5 5 kind = "key", flag = "d8:key3", on_clear = true
+end
+
+room d8_1_0
+music cellar
+doors s=locked w=open
+var shut = "w"
+inside
+............
+............
+............
+............
+............
+............
+............
+put noodle_hydra 7.5 3.5
+put pickup 7.5 7 kind = "heart_pie", flag = "d8:heart", on_clear = true
+end
+
+room d8_0_0
+music cellar
+doors e=open
+inside
+............
+............
+.....PP.....
+............
+............
+............
+............
+put pickup 7.5 4 kind = "page", flag = "d8:page"
+end

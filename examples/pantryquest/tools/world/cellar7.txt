@@ -1,0 +1,278 @@
+# The Sugar Mill (the seventh cellar, "d7"), hidden behind a cracked cliff in
+# the Sugar Desert. Its treasure is the baking tray: carried, it makes Pip's
+# pot lid stop every shot, even spice and jam. Its guardian, the Sugar Golem,
+# leaps at Pip - watch for its shadow - and lands in a burst of sugar; only
+# while it is stuck after landing can it be hurt.
+#
+#   .  tiled floor   O  crate   ~  syrup   P  pepper-mill statue
+#
+# Map of the cellar (columns 0-4, rows 0-4):
+#
+#              [1,0 recipe][2,0 Sugar Golem]           [3,0 key   ]
+#   [0,1 tray ][1,1 hall  ][2,1 hall       ]           [3,1 compass]
+#   [0,2 map  ][1,2 key   ][2,2 hub        ]           [3,2 hall  ][4,2 stash]
+#              [1,3 hall  ][2,3 hall       ]           [3,3 key   ]
+#                          [2,4 entrance] - the door south goes back out to the desert
+name The Sugar Mill
+tint #e6d2aaff
+
+room d7_2_4
+music cellar
+doors n=open s=open
+var exit_s = "ow_11_4"
+var exit_pos = vec2(136, 136)
+var exit_face = "down"
+inside
+............
+..P......P..
+............
+............
+............
+..P......P..
+............
+end
+
+room d7_2_3
+music cellar
+doors s=open n=open w=open e=open
+inside
+............
+.OO.O..O.OO.
+............
+............
+............
+.OO.O..O.OO.
+............
+put ant 4 4
+put ant 11 6
+put ant 7 7
+end
+
+room d7_1_3
+music cellar
+doors e=open n=open
+inside
+............
+..~~~..~~~..
+..~......~..
+............
+..~......~..
+..~~~..~~~..
+............
+put ant 4 5
+put ant 12 8
+put imp 7 5
+end
+
+room d7_3_3
+music cellar
+doors w=open
+inside
+.......~....
+.......~....
+.......~....
+.......~....
+.......~....
+.......~....
+.......~....
+put ant 5 4
+put ant 6 7
+put pickup 11.5 5 kind = "key", flag = "d7:key1"
+end
+
+room d7_1_2
+music cellar
+doors s=open w=locked
+inside
+OOOOO..OOOOO
+O..........O
+O..P....P..O
+...........O
+O..P....P..O
+O..........O
+OOOOO..OOOOO
+put imp 4 4
+put imp 11 6
+put ant 7 7
+put pickup 7.5 5 kind = "key", flag = "d7:key2", on_clear = true
+end
+
+room d7_0_2
+music cellar
+doors e=locked n=open
+inside
+............
+.~~......~~.
+.~~..OO..~~.
+............
+.~~..OO..~~.
+.~~......~~.
+............
+put olive 4 5
+put olive 12 5
+put bat 7 7
+put pickup 7.5 7 kind = "map", flag = "d7:map", on_clear = true
+end
+
+room d7_0_1
+music cellar
+doors s=open e=open
+var shut = "s"
+inside
+............
+.P..P..P..P.
+............
+............
+............
+.P..P..P..P.
+............
+put imp 4 4
+put imp 11 6
+put ant 5 7
+put ant 10 3
+put pickup 7.5 5 kind = "tray", flag = "d7:tray", on_clear = true
+end
+
+room d7_1_1
+music cellar
+doors w=open e=open
+inside
+............
+.OOO....OOO.
+...O....O...
+............
+...O....O...
+.OOO....OOO.
+............
+put ant 4 4
+put ant 11 6
+put olive 7 5
+end
+
+room d7_2_2
+music cellar
+doors s=open e=open n=locked
+inside
+............
+..~~~..~~~..
+............
+.....OO.....
+............
+..~~~..~~~..
+............
+put imp 4 5
+put imp 11 5
+put ant 7 7
+end
+
+room d7_3_2
+music cellar
+doors w=open n=open e=bomb
+inside
+............
+.O.O.O.O.O..
+............
+............
+............
+.O.O.O.O.O..
+............
+put ant 5 4
+put ant 10 6
+put imp 8 7
+end
+
+room d7_4_2
+music cellar
+doors w=bomb
+inside
+OOOOOOOOOOOO
+O..........O
+O...~~~~...O
+............
+O...~~~~...O
+O..........O
+OOOOOOOOOOOO
+put pickup 6 5 kind = "bean5", flag = "d7:stash1"
+put pickup 7.5 5 kind = "bomb", flag = "d7:stash2"
+put pickup 9 5 kind = "bean5", flag = "d7:stash3"
+end
+
+room d7_3_1
+music cellar
+doors s=open n=open
+inside
+............
+.P........P.
+............
+....P..P....
+............
+.P........P.
+............
+put imp 4 4
+put olive 11 7
+put bat 8 3
+put pickup 7.5 7 kind = "compass", flag = "d7:compass", on_clear = true
+end
+
+room d7_3_0
+music cellar
+doors s=open
+inside
+............
+....OOOO....
+....O..O....
+....O..O....
+....OO.O....
+......O.....
+............
+put bat 4 4
+put bat 11 6
+put pickup 7.5 4.5 kind = "key", flag = "d7:key3"
+end
+
+room d7_2_1
+music cellar
+doors w=open s=locked n=locked
+inside
+............
+..O......O..
+............
+....~~~~....
+............
+..O......O..
+............
+put imp 4 5
+put imp 11 5
+put ant 7 7
+put ant 8 3
+end
+
+room d7_2_0
+music cellar
+doors s=locked w=open
+var shut = "w"
+inside
+............
+............
+............
+............
+............
+............
+............
+put sugar_golem 7.5 4
+put pickup 7.5 6 kind = "heart_pie", flag = "d7:heart", on_clear = true
+end
+
+room d7_1_0
+music cellar
+doors e=open
+inside
+............
+............
+.....PP.....
+............
+............
+............
+............
+put pickup 7.5 4 kind = "page", flag = "d7:page"
+end

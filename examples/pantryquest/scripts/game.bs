@@ -14,9 +14,9 @@ var beans = 0
 var keys = 0
 var bombs = 0
 var bombs_max = 8
-var weapon = 0              # 0 none, 1 wooden spoon
+var weapon = 0              # 0 none, 1 wooden spoon, 2 silver ladle (hits twice as hard)
 var items = []              # "bombs", "cutter", "skewers", "chili", "whisk"
-var treasures = []          # things carried that work by themselves: "plank"
+var treasures = []          # things carried that work by themselves: "plank", "mitt", "tray"
 var b_item = ""             # the one on the B button (Z)
 var pages = 0               # pages of the Grand Recipe
 var flags = []              # what's been done: doors opened, items taken...
@@ -457,6 +457,12 @@ func collect(kind, thing) {
     } elif kind == "plank" {
         if not contains(treasures, "plank") { push(treasures, "plank") }
         hold("art/plank.bmp", 1.6)
+    } elif kind == "mitt" or kind == "tray" {
+        if not contains(treasures, kind) { push(treasures, kind) }
+        hold("art/" + kind + ".bmp", 1.6)
+    } elif kind == "ladle" {
+        weapon = 2
+        hold("art/ladle.bmp", 1.6)
     } elif kind == "whisk" {
         give("whisk")
         b_item = "whisk"
@@ -515,7 +521,7 @@ func after_hold() {
         flag("page:" + area)
         note1 = "RECIPE PAGE " + pages + " OF 8 FOUND!"
         note2 = "NOW FIND THE NEXT CELLAR!"
-        if pages >= 5 { note2 = "MORE CELLARS ARE BEING DUG!" }
+        if pages >= 8 { note2 = "THE BARON'S HALL ISN'T DUG YET" }
         area_start = start_room
         area_pos = start_pos
         var cellars = find("Cellars")                       # back out of this cellar's door

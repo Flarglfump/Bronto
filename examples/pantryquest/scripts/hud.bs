@@ -36,6 +36,8 @@ func icon(item) {
     if item == "chili" { return "art/chili.bmp" }
     if item == "whisk" { return "art/whisk.bmp" }
     if item == "plank" { return "art/plank.bmp" }
+    if item == "mitt" { return "art/mitt.bmp" }
+    if item == "tray" { return "art/tray.bmp" }
     return ""
 }
 
@@ -95,6 +97,7 @@ func update(dt) {
         b_item.Sprite.image = b
         b_item.Sprite.tint = rgb(255, 255, 255)
     }
+    if game.weapon >= 2 { a_item.Sprite.image = "art/ladle.bmp" } else { a_item.Sprite.image = "art/spoon.bmp" }
     if game.weapon > 0 { a_item.Sprite.tint = rgb(255, 255, 255) } else { a_item.Sprite.tint = rgb(255, 255, 255, 0) }
     for i in 16 {
         var h = hearts[i]

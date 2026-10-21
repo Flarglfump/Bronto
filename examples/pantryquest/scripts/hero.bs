@@ -1,7 +1,8 @@
 # Pip, the young cook. The keys are the player's (scripts/settings.bs): at
 # first the arrows or WASD walk, X (or Space) pokes with the spoon, Z (or J)
 # uses the item on B (bombs, the pizza cutter, the skewer bow, the fire chili,
-# the whisk). With the wafer plank he walks over jam (or water) one tile wide.
+# the whisk). With the wafer plank he walks over jam (or water) one tile wide;
+# with the oven mitt, walking into a crate for a moment pushes it a tile.
 #
 # He walks in eight directions, as fast on a diagonal as straight. Each axis
 # moves on its own, so pushing into a wall at an angle slides along it, and
@@ -27,6 +28,7 @@ var held
 var beam                    # the spoon's flying spark (at full health)
 var cutter                  # the pizza cutter, while it's out
 var plank                   # the wafer plank, shown under him while he crosses on it
+var push_t = 0              # how long he has been leaning on a crate
 
 func start() {
     game = find("Game")
@@ -178,6 +180,36 @@ func walk(d, dist, slide) {
     self.position = p
 }
 
+# The oven mitt: the crate he is leaning on (lined up with it) slides a
+# tile along, if there is bare floor there - not a doorway, not onto
+# anything. Leaving the room puts it back.
+func push_crate(d) {
+    var m = game.map
+    var feet = self.position + vec2(0, 4)
+    var probe = feet + vec2(d.x * 10, d.y * 6)
+    if tile_at(m, probe) != "O" { return false }
+    var room = game.room.global_position
+    var local = probe - room
+    var cell = vec2(floor(local.x / 16), floor(local.y / 16))
+    var centre = room + cell * 16 + vec2(8, 8)
+    if d.x != 0 and abs(feet.y - centre.y) > 6 { return false }
+    if d.y != 0 and abs(feet.x - centre.x) > 6 { return false }
+    var to = cell + d
+    if to.x < 2 or to.x > 13 or to.y < 2 or to.y > 8 { return false }
+    var dest = room + to * 16 + vec2(8, 8)
+    if tile_at(m, dest) != "." { return false }
+    for e in find_all("Enemy") {
+        if distance(e.global_position, dest) < 12 { return false }
+    }
+    for p in find_all("Pickup") {
+        if distance(p.global_position, dest) < 12 { return false }
+    }
+    set_tile(m, centre, ".")
+    set_tile(m, dest, "O")
+    play_sound("sfx/push.wav")
+    return true
+}
+
 func edge_check() {
     var p = self.position
     if p.x < 4 { game.leave("w") }
@@ -236,6 +268,7 @@ func update(dt) {
         if facing == "up" { dirv = vec2(0, -1) }
         if facing == "down" { dirv = vec2(0, 1) }
         var full = speed * dt
+        var was := self.position
         if want.x != 0 and want.y != 0 {                 # a diagonal: as fast as straight...
             var step = full * 0.7071
             var before = self.position
@@ -247,6 +280,15 @@ func update(dt) {
             walk(vec2(want.x, 0), full, true)
         } else {
             walk(vec2(0, want.y), full, true)
+        }
+        if (want.x == 0) != (want.y == 0) and game.has_treasure("mitt") and dot(self.position - was, want) < 0.01 {
+            push_t += dt                                 # leaning on something
+            if push_t > 0.3 {
+                push_crate(want)
+                push_t = 0
+            }
+        } else {
+            push_t = 0
         }
         anim_t += dt
         if anim_t > 0.12 {
@@ -277,6 +319,7 @@ func start_poke() {
     if facing == "up" { img = "art/hero_attack_up.bmp" }
     if facing == "left" or facing == "right" { img = "art/hero_attack_side.bmp" }
     self.Sprite.image = img
+    if game.weapon >= 2 { weapon.Sprite.image = "art/ladle.bmp" } else { weapon.Sprite.image = "art/spoon.bmp" }
     show(weapon, true)
     if game.hp == game.hearts_max * 2 and (beam == nil or not beam.alive) {
         beam = spawn("prefabs/beam.scene", self.position + dirv * 14)
@@ -305,7 +348,7 @@ func poke(dt) {
     var tip = self.position + dirv * 14
     for e in find_all("Enemy") {
         if not contains(hit_list, e.id) and distance(e.global_position, tip) < 10 + e.size {
-            if e.hit(1, dirv, "spoon") { push(hit_list, e.id) }
+            if e.hit(game.weapon, dirv, "spoon") { push(hit_list, e.id) }
         }
     }
     if attack_t <= 0 {
