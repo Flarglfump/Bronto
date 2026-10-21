@@ -63,7 +63,7 @@ func hold(image) {
     show(held, true)
     show(weapon, false)
     attack_t = 0
-    self.Sprite.image = "art/hero_hold.bmp"
+    self.Sprite.image = look() + "hold.bmp"
     self.scale = vec2(1, 1)
 }
 
@@ -300,11 +300,18 @@ func update(dt) {
     draw_frame()
 }
 
+# Pip's pictures, in the outfit he has on: "art/hero_" (apron), "art/hero1_" (jacket), "art/hero2_" (royal coat).
+func look() {
+    if game.outfit >= 2 { return "art/hero2_" }
+    if game.outfit == 1 { return "art/hero1_" }
+    return "art/hero_"
+}
+
 func draw_frame() {
-    var img = "art/hero_down_"
+    var img = look() + "down_"
     var flip = false
-    if facing == "up" { img = "art/hero_up_" }
-    if facing == "left" or facing == "right" { img = "art/hero_side_" }
+    if facing == "up" { img = look() + "up_" }
+    if facing == "left" or facing == "right" { img = look() + "side_" }
     if facing == "left" { flip = true }
     self.Sprite.image = img + step_frame + ".bmp"
     if flip { self.scale = vec2(-1, 1) } else { self.scale = vec2(1, 1) }
@@ -315,11 +322,11 @@ func start_poke() {
     attack_t = 0.26
     hit_list = []
     play_sound("sfx/swing.wav", 0.7)
-    var img = "art/hero_attack_down.bmp"
-    if facing == "up" { img = "art/hero_attack_up.bmp" }
-    if facing == "left" or facing == "right" { img = "art/hero_attack_side.bmp" }
+    var img = look() + "attack_down.bmp"
+    if facing == "up" { img = look() + "attack_up.bmp" }
+    if facing == "left" or facing == "right" { img = look() + "attack_side.bmp" }
     self.Sprite.image = img
-    if game.weapon >= 2 { weapon.Sprite.image = "art/ladle.bmp" } else { weapon.Sprite.image = "art/spoon.bmp" }
+    weapon.Sprite.image = game.weapon_image()
     show(weapon, true)
     if game.hp == game.hearts_max * 2 and (beam == nil or not beam.alive) {
         beam = spawn("prefabs/beam.scene", self.position + dirv * 14)
@@ -348,7 +355,7 @@ func poke(dt) {
     var tip = self.position + dirv * 14
     for e in find_all("Enemy") {
         if not contains(hit_list, e.id) and distance(e.global_position, tip) < 10 + e.size {
-            if e.hit(game.weapon, dirv, "spoon") { push(hit_list, e.id) }
+            if e.hit(game.attack(), dirv, "spoon") { push(hit_list, e.id) }
         }
     }
     if attack_t <= 0 {

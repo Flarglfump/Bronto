@@ -1,12 +1,12 @@
 # Pantry Quest - room ow_8_3 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
 #
 #   IIIIIII..IIIIIII
-#   II..........IIII
-#   II.............I
+#   II........WWWIII
+#   II........WCW..I
 #   II....,.,......I
 #   ............,...
-#   ................
-#   ....,,...,II,...
+#   ........I.......
+#   ....,,.II,.I,...
 #   I..............I
 #   I..............I
 #   I...III........I
@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_8_3\", music = \"overworld\", region = \"FROSTY FIELDS\""
+    vars = "id = \"ow_8_3\", music = \"overworld\", region = \"FROSTY FIELDS\", tier = 1"
 
 entity
   Name
@@ -34,22 +34,19 @@ entity
     rows = 11
     legend = ".,TrW~bCs=fIFKX:YpPLGSg"
     solid = "TrW~bIKXYPLGSg"
-    tiles = "IIIIIII..IIIIIIIII..........IIIIII.............III....,.,......I............,.......................,,...,II,...I..............II..............II...III........IIIIIIII..IIIIIII"
+    tiles = "IIIIIII..IIIIIIIII........WWWIIIII........WCW..III....,.,......I............,...........I...........,,.II,.I,...I..............II..............II...III........IIIIIIII..IIIIIII"
     layer = -10
   Parent
     entity = 0
 
 entity
   Name
-    text = "Enemy"
+    text = "Warp"
   Transform
-    position = 56 136
-  Sprite
-    image = "art/jelly_0.bmp"
-    layer = 3
+    position = 184 40
   Script
-    file = "scripts/enemies/jelly.bs"
-    vars = ""
+    file = "scripts/warp.bs"
+    vars = "to = \"cave_spoon2\", pos = vec2(128, 216)"
   Parent
     entity = 0
 
@@ -57,12 +54,12 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 200 56
+    position = 56 120
   Sprite
-    image = "art/plum_0.bmp"
+    image = "art/jelly_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
   Parent
     entity = 0

@@ -75,7 +75,7 @@ entity
     layer = 2
   Script
     file = "scripts/npc.bs"
-    vars = "line1 = \"BARON GORGE TORE UP THE RECIPE!\", line2 = \"TAKE MY SPOON, LITTLE COOK.\""
+    vars = "line1 = \"BARON GORGE TORE UP THE RECIPE!\", line2 = \"TAKE MY SPOON, LITTLE COOK.\", spoon_needed = true, ready1 = \"LOST? STEP ON A CARD, AND\", ready2 = \"I'LL TELL YOU WHAT I KNOW.\""
   Parent
     entity = 0
 
@@ -90,5 +90,33 @@ entity
   Script
     file = "scripts/pickup.bs"
     vars = "kind = \"spoon\", flag = \"spoon\""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "HintCard"
+  Transform
+    position = 64 128
+  Sprite
+    image = "art/hint_card.bmp"
+    layer = 1
+  Script
+    file = "scripts/hint.bs"
+    vars = "kind = \"next\""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "HintCard"
+  Transform
+    position = 192 128
+  Sprite
+    image = "art/hint_card.bmp"
+    layer = 1
+  Script
+    file = "scripts/hint.bs"
+    vars = "kind = \"upgrade\""
   Parent
     entity = 0

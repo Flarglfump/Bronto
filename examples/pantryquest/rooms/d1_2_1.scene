@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"d1_2_1\", music = \"cellar\", stays_clear = true, shut = \"ns\""
+    vars = "id = \"d1_2_1\", music = \"cellar\", stays_clear = true, tier = 1, shut = \"ns\""
 
 entity
   Name

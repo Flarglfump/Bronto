@@ -14,7 +14,9 @@ var beans = 0
 var keys = 0
 var bombs = 0
 var bombs_max = 8
-var weapon = 0              # 0 none, 1 wooden spoon, 2 silver ladle (hits twice as hard)
+var weapon = 0              # 0 none, 1 wooden spoon, 2 copper spoon, 3 silver ladle, 4 golden ladle (attack())
+var outfit = 0              # 0 apron, 1 chef's jacket (hits hurt half as much), 2 royal coat (a quarter)
+var hint_i = -1             # the upgrade the old chef told of last
 var items = []              # "bombs", "cutter", "skewers", "chili", "whisk"
 var treasures = []          # things carried that work by themselves: "plank", "mitt", "tray"
 var b_item = ""             # the one on the B button (Z)
@@ -118,7 +120,7 @@ func save_game() {
     var r = resume_point()
     var place = area_title()
     if place == "" { place = find("Banner").last }
-    var data = [["version", 1], ["room", r[0]], ["pos", r[1]], ["place", place], ["time", floor(play_time)],
+    var data = [["version", 2], ["outfit", outfit], ["room", r[0]], ["pos", r[1]], ["place", place], ["time", floor(play_time)],
                 ["hearts_max", hearts_max], ["beans", beans], ["keys", keys], ["bombs", bombs],
                 ["bombs_max", bombs_max], ["weapon", weapon], ["items", items], ["b_item", b_item], ["treasures", treasures],
                 ["pages", pages], ["flags", flags], ["visited", visited], ["maps", maps], ["compasses", compasses],
@@ -129,10 +131,13 @@ func save_game() {
 func load_game() {
     var data = load_data("slot" + slot)
     if data == nil { return false }
+    var version = 1
     for pair in data {
         var k = pair[0]
         var v = pair[1]
-        if k == "room" { start_room = v }
+        if k == "version" { version = v }
+        elif k == "outfit" { outfit = v }
+        elif k == "room" { start_room = v }
         elif k == "pos" { start_pos = v }
         elif k == "time" { play_time = v }
         elif k == "hearts_max" { hearts_max = v }
@@ -152,8 +157,15 @@ func load_game() {
         elif k == "area_start" { area_start = v }
         elif k == "area_pos" { area_pos = v }
     }
+    if version < 2 and weapon == 2 { weapon = 3 }      # (a first-version file: 2 was the silver ladle)
     hp = hearts_max * 2
     return true
+}
+
+# How hard a poke hits, with the spoon or ladle Pip has.
+func attack() {
+    var power = [0, 1, 1.5, 2, 3]
+    return power[clamp(weapon, 0, 4)]
 }
 
 # ---- rooms --------------------------------------------------------------------
@@ -379,7 +391,8 @@ func set_fade(a) {
 
 # ---- the hero's health ------------------------------------------------------------
 func damage(half_hearts) {
-    hp -= half_hearts
+    var guard = [1, 0.5, 0.25]
+    hp -= half_hearts * guard[clamp(outfit, 0, 2)]
     play_sound("sfx/hurt.wav")
     if hp <= 0 {
         hp = 0
@@ -435,8 +448,20 @@ func collect(kind, thing) {
         bombs = min(bombs + 4, bombs_max)
         hold("art/bomb.bmp", 1.2)
     } elif kind == "spoon" {
-        weapon = 1
+        weapon = max(weapon, 1)
         hold("art/spoon.bmp", 1.6)
+    } elif kind == "copper_spoon" {
+        weapon = max(weapon, 2)
+        hold("art/spoon_copper.bmp", 1.6)
+    } elif kind == "golden_ladle" {
+        weapon = max(weapon, 4)
+        hold("art/ladle_gold.bmp", 1.6)
+    } elif kind == "jacket" {
+        outfit = max(outfit, 1)
+        hold("art/jacket.bmp", 1.6)
+    } elif kind == "coat" {
+        outfit = max(outfit, 2)
+        hold("art/coat.bmp", 1.6)
     } elif kind == "cutter" {
         give("cutter")
         b_item = "cutter"
@@ -462,7 +487,7 @@ func collect(kind, thing) {
         if not contains(treasures, kind) { push(treasures, kind) }
         hold("art/" + kind + ".bmp", 1.6)
     } elif kind == "ladle" {
-        weapon = 2
+        weapon = max(weapon, 3)
         hold("art/ladle.bmp", 1.6)
     } elif kind == "whisk" {
         give("whisk")
@@ -505,6 +530,48 @@ func whisk() {
     play_sound("sfx/whisk.wav")
     warp(c.exit_room(a), c.exit_pos(a), "down")
     return true
+}
+
+# The picture of Pip's spoon or ladle (for his hand and the HUD).
+func weapon_image() {
+    var images = ["art/spoon.bmp", "art/spoon.bmp", "art/spoon_copper.bmp", "art/ladle.bmp", "art/ladle_gold.bmp"]
+    return images[clamp(weapon, 0, 4)]
+}
+
+# ---- hints (the old chef in the first cave: scripts/hint.bs) ------------------------
+# The next cellar to clear (the first whose page Pip hasn't found), and how to find it.
+func hint_next() {
+    var data = find("Hints")
+    if has_flag("won") { return ["THE KINGDOM IS FED! GO AND", "EXPLORE, LITTLE CHEF."] }
+    for n in range(1, 9) {
+        if not has_flag("page:d" + n) {
+            var h = data.cellar(n)
+            if h[2] and not contains(items, "bombs") { return ["FIRST, GET POPCORN BOMBS:", "THE SHOPS SELL THEM."] }
+            return [h[0], h[1]]
+        }
+    }
+    var last = data.cellar(9)
+    return [last[0], last[1]]
+}
+
+# One upgrade out in the land Pip can reach now (and hasn't taken): a
+# different one each time he asks.
+func hint_upgrade() {
+    var open = []
+    var left = 0
+    for u in find("Hints").upgrades() {
+        if not has_flag(u[0]) {
+            left += 1
+            var can = hearts_max >= u[2]
+            if u[1] == "bombs" and not contains(items, "bombs") { can = false }
+            if u[1] == "fire" and not contains(items, "bombs") and not contains(items, "chili") { can = false }
+            if can { push(open, u) }
+        }
+    }
+    if left == 0 { return ["YOU'VE FOUND EVERY UPGRADE", "OUT THERE. WELL DONE!"] }
+    if len(open) == 0 { return ["NOTHING YOU CAN REACH YET.", "COME BACK STRONGER!"] }
+    hint_i = (hint_i + 1) % len(open)
+    return [open[hint_i][3], open[hint_i][4]]
 }
 
 func give(item) {
@@ -551,6 +618,31 @@ func win() {
     set_fade(0.6)
     play_music("title")
     spawn("prefabs/ending.scene", vec2(128, 152))
+}
+
+# ---- how tough things are, by stage ------------------------------------------------
+# A room's `tier` is its stage of the game (scripts/room.bs). Ordinary enemies
+# and everything enemies throw get tougher with it - to keep up with the
+# spoons and ladles, jackets and heart pies Pip finds along the way. (The
+# guardians are tuned one by one, for the spoon or ladle Pip is likely to
+# carry by then; only their touch and throws scale.) Health keeps pace with
+# the spoons and ladles, damage with the heart pies and the chef's jacket -
+# the royal coat stays a real reward.
+#
+#   stage      1    2    3    4    5    6    7    8    9
+#   health    x1   x1  x1.5 x1.5  x2   x2  x2.5  x3  x3.5   (rounded up)
+#   damage    x1   x1   x1  x1.5  x2   x2  x2.5  x3   x3    (rounded up)
+func stage_of(room) {
+    if room == nil or not room.alive or room.name != "Room" { return 0 }
+    return clamp(room.tier, 0, 9)
+}
+func enemy_hp(base, room) {
+    var mult = [1, 1, 1, 1.5, 1.5, 2, 2, 2.5, 3, 3.5]
+    return ceil(base * mult[stage_of(room)])
+}
+func enemy_damage(base, room) {
+    var mult = [1, 1, 1, 1, 1.5, 2, 2, 2.5, 3, 3]
+    return ceil(base * mult[stage_of(room)])
 }
 
 # Something an enemy might leave behind.

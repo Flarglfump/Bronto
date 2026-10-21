@@ -103,6 +103,7 @@ def room_scene(room, source):
     room_vars = ['id = "%s"' % name, 'music = "%s"' % room.get('music', '')]
     if kind == 'dungeon':
         room_vars.append('stays_clear = true')
+        room_vars.append('tier = %s' % re.match(r'd(\d+)_', name).group(1))     # its stage of the game: the cellar's number
     room_vars += room['vars']
     out = ['# Pantry Quest - room %s (made by tools/make_rooms.py from tools/%s: edit it there)' % (name, source), '#']
     out += ['#   ' + r for r in rows]

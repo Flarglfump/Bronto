@@ -731,11 +731,11 @@ static void pq_fight_all(const char *room, int total, int pieces) {
 static void test_pantryquest_bosses(void) {
     pq_fight("d2_2_1", 6, "dizzy");             /* the Big Dill */
     pq_fight("d3_1_0", 8, NULL);                /* the Spice Wraith */
-    pq_fight("d4_2_0", 8, "up rise");           /* the Jammerwock */
+    pq_fight("d4_2_0", 10, "up rise");           /* the Jammerwock */
     pq_fight_all("d5_2_0", 12, 4);              /* the Gumdrop King */
-    pq_fight_all("d6_2_0", 6, 8);               /* the Lucky Cookie */
-    pq_fight("d7_2_0", 8, "stuck");             /* the Sugar Golem */
-    pq_fight_all("d8_1_0", 12, 4);              /* the Noodle Hydra */
+    pq_fight_all("d6_2_0", 10, 8);               /* the Lucky Cookie */
+    pq_fight("d7_2_0", 12, "stuck");             /* the Sugar Golem */
+    pq_fight_all("d8_1_0", 20, 4);              /* the Noodle Hydra */
 }
 
 /* Pantry Quest: Pip walks in eight directions - a diagonal as fast as
@@ -1067,7 +1067,7 @@ static void test_pantryquest_baron(void) {
     CHECK(!br_entity_alive(&W, baron));
     CHECK_EQ_INT((int)most_phase, 3);
     CHECK(fed > 0);
-    CHECK(hits_open >= 21);
+    CHECK(hits_open >= 39);
     steps(2);
     CHECK(br_script_get_string(&W, game, "music_name", music, sizeof(music)) && strcmp(music, "cellar") == 0);
     pq_end();
@@ -1081,6 +1081,106 @@ static void test_pantryquest_baron(void) {
     pq_press(BR_KEY_ENTER);
     CHECK(br_script_scene_request(&W, scene, sizeof(scene)) && strcmp(scene, "title.scene") == 0);
     pq_end();
+}
+
+/* Upgrades: a copper spoon waits in its cave until Pip has five hearts;
+ * each spoon or ladle hits harder; the chef's jacket halves every hurt, the
+ * royal coat quarters it. */
+static void pq_hero_at(float x, float y) {
+    br_transform *t = (br_transform *)br_get(&W, named("Hero"), ID.transform);
+    if (t) { t->position.x = x; t->position.y = y; }
+}
+static void test_pantryquest_upgrades(void) {
+    static const double two[1] = { 2 };
+    br_entity game;
+    double hp;
+    int hearts;
+    for (hearts = 4; hearts <= 5; ++hearts) {
+        char more[48];
+        snprintf(more, sizeof(more), "hearts_max = %d", hearts);
+        if (!pq_load("main.scene")) { teardown(); return; }
+        game = named("Game");
+        snprintf(((br_script *)br_get(&W, game, SCRIPT))->vars, sizeof(((br_script *)0)->vars),
+                 "start_room = \"cave_spoon2\", start_pos = vec2(128, 200), weapon = 1, %s", more);
+        steps(40);
+        hold_key(BR_KEY_UP, 40);
+        steps(150);
+        CHECK_EQ_INT((int)pq_num(game, "weapon"), hearts == 5 ? 2 : 1);
+        pq_end();
+    }
+    /* how hard he hits, and how much a hit hurts */
+    game = pq_start("ow_7_7", 120, 168, "weapon = 4, outfit = 1");
+    hp = pq_num(game, "hp");
+    CHECK(br_script_call(&W, game, "damage", two, 1));
+    CHECK(pq_num(game, "hp") == hp - 1);               /* a whole heart's hit, halved */
+    hp = pq_num(game, "hp");
+    CHECK(pq_num(game, "weapon") == 4);
+    CHECK(br_script_call(&W, game, "attack", NULL, 0));
+    br_script_set_number(&W, game, "outfit", 2);
+    CHECK(br_script_call(&W, game, "damage", two, 1));
+    CHECK(pq_num(game, "hp") == hp - 0.5);
+    pq_end();
+}
+
+/* The old chef's hints: on the "WHERE NEXT?" card, the first cellar whose page
+ * Pip hasn't found (or, for a hidden one, to get bombs first); on the
+ * "UPGRADES?" card, an upgrade he can reach now, a different one each time. */
+static void pq_card(br_entity game, float x, char *said, size_t size) {
+    pq_hero_at(128, 120);                              /* off the cards... */
+    steps(3);
+    pq_hero_at(x, 192);                                /* ...and onto one */
+    steps(3);
+    br_script_get_string(&W, game, "say1", said, size);
+}
+static void test_pantryquest_hints(void) {
+    char said[64];
+    br_entity game;
+    game = pq_start("cave_chef", 128, 200, "hearts_max = 3, flags = [\"spoon\"]");
+    pq_card(game, 64, said, sizeof(said));
+    CHECK(strcmp(said, "THE COLD CELLAR, JUST NORTH") == 0);
+    pq_card(game, 192, said, sizeof(said));
+    CHECK(strcmp(said, "A HEART PIE: FAR NORTHWEST,") == 0);
+    pq_card(game, 192, said, sizeof(said));
+    CHECK(strcmp(said, "A HEART PIE: NORTH,") == 0);
+    pq_end();
+    game = pq_start("cave_chef", 128, 200, "hearts_max = 3, flags = [\"page:d1\", \"page:d2\", \"page:d3\", \"page:d4\", "
+                    "\"page:d5\", \"page:d6\", \"ow:pie1\", \"ow:pie2\", \"ow:pie3\", \"pie2\"]");
+    pq_card(game, 64, said, sizeof(said));
+    CHECK(strcmp(said, "FIRST, GET POPCORN BOMBS:") == 0);     /* the Sugar Mill is behind a cracked cliff */
+    pq_card(game, 192, said, sizeof(said));
+    CHECK(strcmp(said, "NOTHING YOU CAN REACH YET.") == 0);    /* the rest need bombs, fire or more hearts */
+    pq_end();
+    game = pq_start("cave_chef", 128, 200, "hearts_max = 3, start_items = \"bombs\", flags = [\"page:d1\", \"page:d2\", "
+                    "\"page:d3\", \"page:d4\", \"page:d5\", \"page:d6\"]");
+    pq_card(game, 64, said, sizeof(said));
+    CHECK(strcmp(said, "THE SUGAR MILL: A CRACKED") == 0);
+    pq_end();
+}
+
+/* Enemies get tougher with the stage of the game: a toast knight in the Jam
+ * Jar (stage 4) against one in the Banquet Hall (stage 9). */
+static void pq_toast(const char *room, double *hp, double *damage) {
+    char image[32];
+    uint32_t i;
+    *hp = *damage = -1;
+    pq_start(room, 128, 200, "");
+    for (i = 0; i < W.pools[ID.name].count; ++i) {
+        br_entity e = W.pools[ID.name].entities[i];
+        if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)i * W.pools[ID.name].stride))->text, "Enemy") == 0 &&
+            br_script_get_string(&W, e, "image", image, sizeof(image)) && strcmp(image, "art/toast_") == 0) {
+            *hp = pq_num(e, "hp");
+            *damage = pq_num(e, "damage");
+            break;
+        }
+    }
+    pq_end();
+}
+static void test_pantryquest_stages(void) {
+    double hp, damage;
+    pq_toast("d4_2_3", &hp, &damage);
+    CHECK(hp == 3 && damage == 3);                     /* 2 and 2, x1.5 */
+    pq_toast("d9_2_3", &hp, &damage);
+    CHECK(hp == 7 && damage == 6);                     /* x3.5 and x3 */
 }
 
 static void test_pantryquest_files_and_settings(void) {
@@ -1465,6 +1565,9 @@ void suite_script(void) {
     RUN(test_pantryquest_banquet_puzzles);
     RUN(test_pantryquest_banquet_waves);
     RUN(test_pantryquest_baron);
+    RUN(test_pantryquest_upgrades);
+    RUN(test_pantryquest_hints);
+    RUN(test_pantryquest_stages);
     RUN(test_pantryquest_eight_ways);
     RUN(test_pantryquest_files_and_settings);
     RUN(test_check_and_errors);

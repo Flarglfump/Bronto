@@ -2665,7 +2665,19 @@ tile('cave_wall',
      "DDDDDGDDDDDDGDDD",
      "GDDDDDDDDDDDDDDG",
      "kkkkkkkkkkkkkkkk")
-S['tile_secret_cliff'] = S['tile_cliff']   # bombable: looks like any other cliff
+def cracked(rows, crack='k', edge=None):
+    """A tile with a crack down it: a wall or cliff a bomb can open. `edge`: a light lip
+    along the crack, so it shows on dark rock."""
+    g = [list(r) for r in rows]
+    line = [(7, 1), (7, 2), (8, 3), (8, 4), (7, 5), (6, 6), (6, 7), (7, 8), (8, 9), (9, 10), (9, 11),
+            (8, 12), (8, 13), (5, 7), (4, 8), (10, 10), (11, 9), (12, 9)]
+    if edge:
+        for (x, y) in line:
+            if x + 1 < 16 and (x + 1, y) not in line: g[y][x + 1] = edge
+    for (x, y) in line:
+        g[y][x] = crack
+    return [''.join(r) for r in g]
+S['tile_secret_cliff'] = cracked(S['tile_cliff'], 'k', 't')   # bombable: a crack down it
 tile('cave_floor',
      "kkkkkkkkkkkkkkkk",
      "kkkkkkkkkkkkkkkk",
@@ -2683,7 +2695,12 @@ tile('cave_floor',
      "kkkkkkkkkkkkkkkk",
      "kkDkkkkkkkkkkkkk",
      "kkkkkkkkkkkkkkkk")
-S['tile_secret_lettuce'] = S['tile_lettuce']
+def dried(rows):
+    """A bush gone dry and brown in places: the fire chili burns it away."""
+    swap = {'L': 'T', 'l': 'E', 'd': 'n'}
+    return [''.join(swap.get(ch, ch) if (ch == 'd' or (x + y) % 3 == 0) else ch for x, ch in enumerate(r))
+            for y, r in enumerate(rows)]
+S['tile_secret_lettuce'] = dried(S['tile_lettuce'])     # burnable: dry, brown patches
 tile('path',
      "TqqqqqqqqqqqqqqT",
      "TqqqqqqqqqqqqqqT",
@@ -2895,7 +2912,7 @@ tile('d_shutter',
      "kGGGGGGGGGGGGGGk",
      "kDDDDDDDDDDDDDDk",
      "kkkkkkkkkkkkkkkk")
-S['tile_d_secret'] = S['tile_d_wall']
+S['tile_d_secret'] = cracked(S['tile_d_wall'], 'k')   # bombable: a crack down it
 tile('d_statue',
      "......kkkk......",
      ".....kGggGk.....",
@@ -3021,6 +3038,56 @@ DUNGEON_TILES = ['d_floor', 'd_wall', 'd_crate', 'd_soup', 'd_stairs', 'd_locked
                  'd_statue', 'd_void', 'd_doorway', 'd_plate', 'd_brazier', 'd_table', 'd_carpet']
 # (d_statue's transparent corners show the floor colour under it in the tileset)
 
+
+
+# the old chef's hint cards (scripts/hint.bs)
+sprite('hint_card',
+       "................",
+       "..kkkkkkkkkkkk..",
+       "..keeeeeeeeeek..",
+       "..keeekkkkeeek..",
+       "..keekrrrrkeek..",
+       "..keekrkkrrkek..",
+       "..keeekkkrrkek..",
+       "..keeeekrrkeek..",
+       "..keeeekrrkeek..",
+       "..keeeeekkeeek..",
+       "..keeeekrrkeek..",
+       "..keeeekrrkeek..",
+       "..keeeeekkeeek..",
+       "..kEEEEEEEEEEk..",
+       "..kkkkkkkkkkkk..",
+       "................")
+
+# ============================================================ upgrades: the copper spoon and golden ladle, the
+# chef's jacket and royal coat - and Pip dressed in each (his coat: the white below his collar)
+def recolor(rows, swap):
+    return [''.join(swap.get(ch, ch) for ch in r) for r in rows]
+S['spoon_copper'] = recolor(S['spoon'], {'t': 'o', 'n': 'O', 'e': 'y', 'E': 'Y', 'N': 'R'})
+S['ladle_gold'] = recolor(S['ladle'], {'g': 'y', 'G': 'Y'})
+sprite('jacket',
+       "................",
+       "....kkk..kkk....",
+       "...kwwwkkwwwk...",
+       "..kwwwwwwwwwwk..",
+       ".kwwwwkbbkwwwwk.",
+       ".kwwwgkwwkgwwwk.",
+       ".kwwk.kwbk.kwwk.",
+       ".kwwk.kwwk.kwwk.",
+       ".kwwk.kwbk.kwwk.",
+       ".kggk.kwwk.kggk.",
+       ".kkk..kwbk..kkk.",
+       "......kwwk......",
+       "......kggk......",
+       "......kkkk......",
+       "................",
+       "................")
+S['jacket'] = recolor(S['jacket'], {'w': 'c', 'g': 'b', 'b': 'w'})
+S['coat'] = recolor(S['jacket'], {'c': 'm', 'b': 'R', 'w': 'y'})
+for name in [n for n in list(S) if n.startswith('hero_')]:
+    for level, colour in ((1, 'c'), (2, 'm')):
+        S[name.replace('hero_', 'hero%d_' % level, 1)] = [''.join(colour if (y >= 10 and ch == 'w') else ch for ch in r)
+                                                          for y, r in enumerate(S[name])]
 
 # ============================================================ writing images
 def check(name, rows):

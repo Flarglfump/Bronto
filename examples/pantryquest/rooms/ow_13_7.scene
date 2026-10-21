@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_13_7\", music = \"overworld\", region = \"CANDY MEADOWS\""
+    vars = "id = \"ow_13_7\", music = \"overworld\", region = \"CANDY MEADOWS\", tier = 5"
 
 entity
   Name
@@ -45,11 +45,11 @@ entity
   Transform
     position = 56 88
   Sprite
-    image = "art/tomato_0.bmp"
+    image = "art/corn_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+    vars = "hp = 1, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
   Parent
     entity = 0
 
@@ -59,11 +59,11 @@ entity
   Transform
     position = 184 136
   Sprite
-    image = "art/jelly_0.bmp"
+    image = "art/burger_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/jelly.bs"
-    vars = ""
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
   Parent
     entity = 0
 
@@ -73,10 +73,10 @@ entity
   Transform
     position = 104 104
   Sprite
-    image = "art/tomato_0.bmp"
+    image = "art/corn_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+    vars = "hp = 1, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
   Parent
     entity = 0

@@ -19,6 +19,7 @@ var flash_t = 0
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     home = self.position
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)

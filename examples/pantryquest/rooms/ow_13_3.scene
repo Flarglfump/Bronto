@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_13_3\", music = \"overworld\", region = \"SUGAR DESERT\""
+    vars = "id = \"ow_13_3\", music = \"overworld\", region = \"SUGAR DESERT\", tier = 7"
 
 entity
   Name
@@ -59,11 +59,11 @@ entity
   Transform
     position = 120 72
   Sprite
-    image = "art/meatball_0.bmp"
+    image = "art/ant_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/meatball.bs"
-    vars = ""
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 1, size = 5, damage = 1, image = \"art/ant_\", speed = 96"
   Parent
     entity = 0
 
@@ -73,11 +73,11 @@ entity
   Transform
     position = 168 88
   Sprite
-    image = "art/meatball_0.bmp"
+    image = "art/ant_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/meatball.bs"
-    vars = ""
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 1, size = 5, damage = 1, image = \"art/ant_\", speed = 96"
   Parent
     entity = 0
 

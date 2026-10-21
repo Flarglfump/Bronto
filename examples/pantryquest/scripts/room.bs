@@ -18,6 +18,8 @@ var id = ""                 # its file name: "ow_7_7", "d1_2_3", "cave_chef"
 var region = ""             # the part of the land it is in ("LETTUCE WOODS"): shown as Pip comes in
 var title = ""              # a name of its own to show instead (an unbuilt cellar's)
 var music = ""              # the track while Pip is here ("" = silence)
+var tier = 0                # its stage of the game (1 to 9): a cellar's number, or on the land the
+                            #   cellar in its region; 0 for caves. Enemies get tougher with it (game.enemy_hp)
 var shut = ""               # sides whose shutters close while enemies remain, e.g. "s" or "ns"
 var stays_clear = false     # once cleared, its enemies don't come back (the cellars)
 var sealed = ""             # sides shut (by shutters) until the room's puzzle is solved

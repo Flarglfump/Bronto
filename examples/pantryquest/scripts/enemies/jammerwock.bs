@@ -2,10 +2,11 @@
 # two pools of its room. It rises out of the pool spot nearest Pip, spits
 # jam at him, and sinks again - only while it is up can it be hit, so Pip
 # has to wait at the edge for it. Each hit sends it under. From half its
-# strength on it spits five blobs, not three, and comes up sooner. Eight hits.
+# strength on it spits five blobs, not three, and comes up sooner. Ten points of health
+# (seven pokes with the copper spoon).
 
-var hp = 8
-var hp_max = 8
+var hp = 10
+var hp_max = 10
 var title = "JAMMERWOCK"
 var subtitle = "KEEPER OF THE JAM JAR"
 var size = 12
@@ -22,6 +23,7 @@ var alpha = 1
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)
 }

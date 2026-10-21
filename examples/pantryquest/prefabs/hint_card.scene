@@ -1,0 +1,14 @@
+# Pantry Quest - a hint card on the old chef's floor (scripts/hint.bs; kind = "next" or "upgrade") (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "HintCard"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/hint_card.bmp"
+    layer = 1
+  Script
+    file = "scripts/hint.bs"
+    vars = ""

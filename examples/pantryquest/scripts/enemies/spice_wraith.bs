@@ -23,6 +23,7 @@ var alpha = 0
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)
     set_alpha(0)

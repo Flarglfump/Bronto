@@ -17,7 +17,7 @@ func update(dt) {
         return
     }
     for e in find_all("Enemy") {
-        if distance(e.global_position, p) < 7 + e.size and e.hit(1, normalize(vel), "beam") {
+        if distance(e.global_position, p) < 7 + e.size and e.hit(game.attack(), normalize(vel), "beam") {
             burst()
             return
         }

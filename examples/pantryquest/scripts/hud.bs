@@ -97,7 +97,7 @@ func update(dt) {
         b_item.Sprite.image = b
         b_item.Sprite.tint = rgb(255, 255, 255)
     }
-    if game.weapon >= 2 { a_item.Sprite.image = "art/ladle.bmp" } else { a_item.Sprite.image = "art/spoon.bmp" }
+    a_item.Sprite.image = game.weapon_image()
     if game.weapon > 0 { a_item.Sprite.tint = rgb(255, 255, 255) } else { a_item.Sprite.tint = rgb(255, 255, 255, 0) }
     for i in 16 {
         var h = hearts[i]
@@ -106,7 +106,7 @@ func update(dt) {
         } else {
             h.Sprite.tint = rgb(255, 255, 255)
             if game.hp >= (i + 1) * 2 { h.Sprite.image = "art/hud_heart_full.bmp" }
-            elif game.hp == i * 2 + 1 { h.Sprite.image = "art/hud_heart_half.bmp" }
+            elif game.hp > i * 2 { h.Sprite.image = "art/hud_heart_half.bmp" }    # (any part of a heart: a jacket or coat leaves quarters)
             else { h.Sprite.image = "art/hud_heart_empty.bmp" }
         }
     }

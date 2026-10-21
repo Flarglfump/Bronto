@@ -2,14 +2,14 @@
 #
 #   WWWWWWWWWWWWWWWW
 #   WWWWWWWWWWWWWWWW
-#   WWWWWW.,.,,,,,,,
-#   W,,,,,r,,,,,.,,,
-#   ,,.,,,,,,,,,,,,W
+#   W,,.,WWWr,rWWW,,
+#   W,,,,WXW,,WWWW,,
 #   ,,,,,,,,,,,,,,,W
-#   ,,,,,,WWW,,,.,,W
-#   W,,WWWWWWW,,,,,W
-#   W,,WWWWW,.,,,,,W
-#   W,,,,,,,,,,,,,,W
+#   ,,,,,,,,,,,,,,,W
+#   ,,,WW,,,,,,,.,,W
+#   W,,WWW,,.,,WWW,W
+#   W,,,,,,,,.,WWW,W
+#   W,,,,,,,,,,,,,WW
 #   WWWWWWW,,WWWWWWW
 bronto_scene 1
 
@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_8_0\", music = \"overworld\", region = \"CHOCOLATE MOUNTAINS\""
+    vars = "id = \"ow_8_0\", music = \"overworld\", region = \"CHOCOLATE MOUNTAINS\", tier = 8"
 
 entity
   Name
@@ -34,8 +34,19 @@ entity
     rows = 11
     legend = ".,TrW~bCs=fIFKX:YpPLGSg"
     solid = "TrW~bIKXYPLGSg"
-    tiles = "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW.,.,,,,,,,W,,,,,r,,,,,.,,,,,.,,,,,,,,,,,,W,,,,,,,,,,,,,,,W,,,,,,WWW,,,.,,WW,,WWWWWWW,,,,,WW,,WWWWW,.,,,,,WW,,,,,,,,,,,,,,WWWWWWWW,,WWWWWWW"
+    tiles = "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW,,.,WWWr,rWWW,,W,,,,WXW,,WWWW,,,,,,,,,,,,,,,,,W,,,,,,,,,,,,,,,W,,,WW,,,,,,,.,,WW,,WWW,,.,,WWW,WW,,,,,,,,.,WWW,WW,,,,,,,,,,,,,WWWWWWWWW,,WWWWWWW"
     layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Warp"
+  Transform
+    position = 104 56
+  Script
+    file = "scripts/warp.bs"
+    vars = "to = \"cave_ladle\", pos = vec2(128, 216), hidden = true"
   Parent
     entity = 0
 
@@ -43,13 +54,41 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 184 88
+    position = 104 136
   Sprite
-    image = "art/breadstick_0.bmp"
+    image = "art/toast_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, damage = 2, image = \"art/breadstick_\", speed = 34"
+    vars = "hp = 2, damage = 2, image = \"art/toast_\", speed = 34, front_guard = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 200 104
+  Sprite
+    image = "art/carrot_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 2, image = \"art/carrot_\", speed = 38, shot = \"prefabs/carrot_coin.scene\", shot_speed = 120, shot_chance = 0.3"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 56 72
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
   Parent
     entity = 0
 
@@ -59,24 +98,10 @@ entity
   Transform
     position = 136 88
   Sprite
-    image = "art/bat_0.bmp"
+    image = "art/toast_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/bat.bs"
-    vars = ""
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Enemy"
-  Transform
-    position = 184 136
-  Sprite
-    image = "art/bat_0.bmp"
-    layer = 3
-  Script
-    file = "scripts/enemies/bat.bs"
-    vars = ""
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 2, image = \"art/toast_\", speed = 34, front_guard = true"
   Parent
     entity = 0

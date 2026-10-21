@@ -11,12 +11,36 @@ ending.
 - **The Pantry Plains:** 128 screens in ten regions: the start plains, the Lettuce Woods,
   Blueberry Lake, the Frosty Fields, the Fortune Cookie Field, the Chocolate Mountains,
   the Pickle Marsh, the Sugar Desert, the Candy Meadows and the Juice Coast.
-  - **26 caves:** the old chef with the spoon, five shops, nine chefs with hints, eight
-    secret bean stashes behind cracked cliffs and suspicious bushes (a popcorn bomb
-    finds them), and two heart-pie caves.
+  - **30 caves:** the old chef with the spoon (and hints), five shops, nine chefs with
+    hints, eight secret bean stashes, two heart-pie caves, and four upgrades.
+  - **Secrets show if you look:** a cliff a bomb can open has a crack down it, a bush
+    that hides a cave is dry and brown in patches (the fire chili burns it away, and so
+    does a bomb), and a cellar wall a bomb can open is cracked too.
   - **Two healing springs**, and three heart pies hidden out in the land.
+  - **Upgrades**, each in a cave of its own:
+    - spoons and ladles, each hitting harder than the last: the **copper spoon** (a cave
+      in the Frosty Fields, once Pip has five hearts), the **silver ladle** (the Soup
+      Cauldron's treasure) and the **golden ladle** (behind a cracked cliff in the
+      mountains, for ten hearts). A poke does 1, 1.5, 2 and 3;
+    - outfits: the **chef's jacket** (behind a dry bush in the Lettuce Woods) halves every
+      hurt, and the **royal coat** (behind a cracked cliff on the Juice Coast, for eight
+      hearts) quarters it. Pip wears it: blue, then red.
+  - **Hints:** once Pip has the spoon, the old chef in the first cave puts out two cards.
+    Step on **WHERE NEXT?** and he names the next cellar to clear (the first whose page is
+    still missing, or the Banquet Hall), or says to get bombs first if it is hidden. Step
+    on **UPGRADES?** and he tells of an upgrade out in the land Pip can reach now (a heart
+    pie, a spoon or ladle, a jacket or coat), a different one each time.
   - **The doors of all nine cellars.** Two are hidden behind cracked cliffs, and the
     last, Baron Gorge's Banquet Hall, waits at the top of the Chocolate Mountains.
+- **Stages:** each cellar is a stage of the game (its number), and each region of the land
+  takes the stage of the cellar in it. Later stages bring tougher kinds of enemy (the
+  plains' tomatoes near home; chili imps in the woods, sugar ants in the desert, carrot
+  soldiers and toast knights in the mountains), more of them to a screen, and stronger
+  versions of the same ones. An enemy's health grows with the stage (up to x3.5, keeping
+  pace with the spoons and ladles) and so does the damage it and its shots do (up to x3,
+  keeping pace with the heart pies and the chef's jacket). The guardians are tuned one by
+  one for the spoon or ladle Pip is likely to have by then. Bombs, skewers and the fire
+  chili hit harder as his spoon or ladle does.
 - **The Cold Cellar** (in the Frosty Fields): nine rooms. It has locked doors and keys,
   shutters that close until the enemies are beaten, and a bombable wall with a stash
   behind it. Its treasure is the **pizza cutter**, and its guardian is the **Gelatin
@@ -87,7 +111,7 @@ ending.
 | | Keys (at first: SETTINGS changes them) | |
 |---|---|---|
 | Walk | arrows or WASD | Eight directions; Pip slides along walls and round corners |
-| Poke with the spoon | X (or Space) | At full health the spoon also throws a spark |
+| Poke with the spoon | X (or Space) | At full health it also throws a spark (as strong as a poke) |
 | Use the B item | Z (or J) | Popcorn bombs, the pizza cutter, the skewer bow, the fire chili, the whisk |
 | Pocket Pantry | Enter (or I) | Choose the B item there; treasures you carry are down the right edge |
 | Pause | Escape (or P) | Resume, save, settings, quit to the title |
@@ -153,6 +177,8 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
     wave) and its puzzle: pressure plates (tile `B`), braziers (`brazier.bs`, over tile
     `Q`), a gong (`gong.bs`), or carrying enough pages. A room's `sealed` sides stay shut
     until it is solved; pickups with `on_solve` appear then.
+  - `hint.bs` is the old chef's hint cards; `game.bs` works the hints out (`hint_next`,
+    `hint_upgrade`) from `hint_data.bs`, which `tools/design_overworld.py` writes.
   - `enemies/baron.bs` is Baron Gorge, all three courses (`cloche.bs` is a dish cover),
     and `ending.bs` the ending card.
   - `warp.bs` is for cave mouths and doors.

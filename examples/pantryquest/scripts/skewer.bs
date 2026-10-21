@@ -1,6 +1,6 @@
 # A skewer from the skewer bow (each costs a bean): it flies straight - over
-# jam and broth too - until it hits a wall or something, and hits twice as
-# hard as a poke. It rings a gong.
+# jam and broth too - until it hits a wall or something, and hits harder
+# than a poke (a point more). It rings a gong.
 
 var vel := vec2(0, 0)
 var game
@@ -24,7 +24,7 @@ func update(dt) {
     }
     for e in find_all("Enemy") {
         if distance(e.global_position, p) < 5 + e.size {
-            e.hit(2, normalize(vel), "skewer")
+            e.hit(game.attack() + 1, normalize(vel), "skewer")
             stop()
             return
         }

@@ -13,6 +13,7 @@ var map
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)     # (thrown harder later in the game)
     hero = find("Hero")
     map = child(self.parent, "Map")
 }

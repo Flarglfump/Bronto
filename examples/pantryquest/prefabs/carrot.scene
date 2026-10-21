@@ -11,4 +11,4 @@ entity
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 4, damage = 2, image = \"art/carrot_\", speed = 38, shot = \"prefabs/carrot_coin.scene\", shot_speed = 120, shot_chance = 0.3"
+    vars = "hp = 2, damage = 2, image = \"art/carrot_\", speed = 38, shot = \"prefabs/carrot_coin.scene\", shot_speed = 120, shot_chance = 0.3"

@@ -57,6 +57,8 @@ func setup(k) {
         body_hp = 1
         self.Sprite.image = "art/gum_small.bmp"
     }
+    if game == nil { game = find("Game") }            # (a new gumdrop is set up before it starts)
+    damage = game.enemy_damage(damage, self.parent)   # (its touch: tougher later in the game)
     if not king { hp = body_hp }
 }
 

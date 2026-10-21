@@ -1,21 +1,22 @@
 # Baron Gorge, who tore the Grand Recipe apart: the last guardian, in three
-# courses. His bar counts all of them down (22 hits).
+# courses. His bar counts all of them down: 40 points of health, 14 + 14 + 12
+# (twenty pokes with the silver ladle, fourteen with the golden one).
 #
-#   1. THE FEAST (8): he sits behind his banquet table, sliding from end to
+#   1. THE FEAST (14): he sits behind his banquet table, sliding from end to
 #      end and flinging dishes three at a time; now and then he rings for a
 #      waiter. Every third throw he leans over the table to slam it - only
 #      then can Pip, waiting just below the table, reach him.
-#   2. GORGE (8): he smashes the table and chases Pip, and every few seconds
+#   2. GORGE (14): he smashes the table and chases Pip, and every few seconds
 #      breathes in so hard he drags Pip (and anything loose) towards him.
 #      His belly turns every hit - but a popcorn bomb pulled into his mouth
 #      goes down whole and stuns him, and then he can be hurt. Bombs drop
 #      in while Pip has few.
-#   3. THE LAST COURSE (6): he hides under one of three dish covers, which
+#   3. THE LAST COURSE (12): he hides under one of three dish covers, which
 #      shuffle (faster as he weakens) and lift: under his, him, and he can
 #      be hit; under the others, a dish thrown, or a meatball.
 
-var hp = 22
-var hp_max = 22
+var hp = 40
+var hp_max = 40
 var title = "BARON GORGE"
 var subtitle = "LORD OF THE BANQUET HALL"
 var size = 14
@@ -42,6 +43,7 @@ var lifted = false
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     appear_t = 1                                       # until his entrance is over (game.boss_arrives)
 }
@@ -207,7 +209,7 @@ func last_course(dt) {
         for i in 3 { covers[i].position = lerp(covers[i].position, cover_spot(i, false), min(1, dt * 8)) }
         if mode_t <= 0 {
             mode = "shuffle"
-            swaps = 5 + floor((6 - hp) / 2) * 2
+            swaps = 5 + floor((12 - hp) / 4) * 2
             next_swap()
         }
     } elif mode == "shuffle" {
@@ -260,7 +262,7 @@ func last_course(dt) {
     if mode != "lift" { self.position = spots[under] + vec2(0, 2) }
 }
 
-func swap_time() { return 0.3 + hp * 0.04 }
+func swap_time() { return 0.3 + hp * 0.02 }
 
 func cover_spot(i, up) {
     if up { return spots[i] + vec2(0, -18) }
@@ -346,11 +348,11 @@ func hit(amount, d, kind) {
     hp -= amount
     flash_t = 0.45
     play_sound("sfx/hit.wav")
-    if phase == 1 and hp <= 14 {
-        hp = 14
+    if phase == 1 and hp <= 26 {
+        hp = 26
         next_phase()
-    } elif phase == 2 and hp <= 6 {
-        hp = 6
+    } elif phase == 2 and hp <= 12 {
+        hp = 12
         next_phase()
     } elif hp <= 0 {
         hp = 0

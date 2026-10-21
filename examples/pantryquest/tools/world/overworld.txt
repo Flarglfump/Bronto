@@ -30,6 +30,7 @@
 room ow_0_0
 music overworld
 var region = "FORTUNE COOKIE FIELD"
+var tier = 6
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTTTTTTTTTT
@@ -42,16 +43,16 @@ TT.G.G..,..G..TT
 TT.........f..TT
 TT.......TTTTTTT
 TTTTTTT..TTTTTTT
-put pickup 11 5 kind = "heart_pie", flag = "ow:pie1"
-put breadstick 8 5
-put burger 7 2
-put bat 4 5
-put bat 10 2
+put pickup 10 8 kind = "heart_pie", flag = "ow:pie1"
+put bat 12 6
+put burger 3 8
+put dumpling 9 5
 end
 
 room ow_1_0
 music overworld
 var region = "FORTUNE COOKIE FIELD"
+var tier = 6
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTTTTTTTTTT
@@ -64,15 +65,15 @@ T........f......
 T...............
 TT...TTTT....TTT
 TTTTTTTTTTT..TTT
-put bat 11 2
-put bat 4 7
-put bat 7 4
-put breadstick 10 4
+put dumpling 11 3
+put dumpling 8 4
+put dumpling 4 7
 end
 
 room ow_2_0
 music overworld
 var region = "FORTUNE COOKIE FIELD"
+var tier = 6
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTWWWTTTTTT
@@ -86,15 +87,15 @@ T...............
 T.............TT
 TTTTTTTTTTTTTTTT
 put warp 8 2 to = "cave_stash1", pos = vec2(128, 216), hidden = true
-put breadstick 7 5
-put burger 4 4
-put burger 4 7
-put bat 8 8
+put bat 5 8
+put burger 9 7
+put burger 12 8
 end
 
 room ow_3_0
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -107,15 +108,16 @@ WW,,WWWW,,,,,,,W
 WW,,,,,.,,,,.,,W
 W,,,,,,,,,,,,,WW
 WWWWWWW,,WWWWWWW
-put breadstick 10 5
-put bat 12 4
-put bat 5 2
-put burger 9 3
+put breadstick 11 8
+put bat 11 4
+put bat 5 8
+put breadstick 9 7
 end
 
 room ow_4_0
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -128,15 +130,16 @@ WW,,,,.,,,,,,,,,
 WW,,,,,,,,,r,,,,
 W,,,,,,,,,,,,,,W
 WWWWWWWWW,,WWWWW
-put bat 4 3
-put burger 3 8
-put burger 5 5
-put bat 10 5
+put carrot 9 6
+put carrot 3 4
+put bat 12 6
+put carrot 6 3
 end
 
 room ow_5_0
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -150,15 +153,16 @@ W,WW,,,,,,,,,,,,
 WWWW,,,,,,,,,,,W
 WWWWWWWWWWW,,WWW
 put warp 5 3 to = "d9_2_4", pos = vec2(128, 200)
-put bat 5 8
-put bat 9 5
-put burger 12 4
-put bat 11 6
+put bat 12 7
+put carrot 8 4
+put toast 3 8
+put breadstick 10 5
 end
 
 room ow_6_0
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -171,14 +175,16 @@ W,,,,,,,,,.,,,,W
 W,,,,,,,,,,,,,,W
 WWW,,,,,,,,,,,,W
 WWW,,WWWWWWWWWWW
-put bat 8 8
-put bat 4 4
-put breadstick 6 6
+put breadstick 7 7
+put bat 11 5
+put bat 12 2
+put breadstick 12 7
 end
 
 room ow_7_0
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -191,35 +197,39 @@ W,.,,,,WWWWW,,,W
 W,,,,,,WWWWW,,,W
 W,,,,,,,,,,,,,,W
 WWWWWWWWW,,WWWWW
-put burger 10 5
-put breadstick 12 2
+put carrot 10 5
+put toast 12 2
 put breadstick 12 6
-put burger 7 2
+put bat 7 2
 end
 
 room ow_8_0
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
-WWWWWW.,.,,,,,,,
-W,,,,,r,,,,,.,,,
-,,.,,,,,,,,,,,,W
+W,,.,WWWr,rWWW,,
+W,,,,WXW,,WWWW,,
 ,,,,,,,,,,,,,,,W
-,,,,,,WWW,,,.,,W
-W,,WWWWWWW,,,,,W
-W,,WWWWW,.,,,,,W
-W,,,,,,,,,,,,,,W
+,,,,,,,,,,,,,,,W
+,,,WW,,,,,,,.,,W
+W,,WWW,,.,,WWW,W
+W,,,,,,,,.,WWW,W
+W,,,,,,,,,,,,,WW
 WWWWWWW,,WWWWWWW
-put breadstick 11 5
-put bat 8 5
-put bat 11 8
+put warp 6 3 to = "cave_ladle", pos = vec2(128, 216), hidden = true
+put toast 6 8
+put carrot 12 6
+put bat 3 4
+put toast 8 5
 end
 
 room ow_9_0
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -232,15 +242,16 @@ WWWWWWW,,,,,.,,,
 WWWWWWW,,,,,,.,,
 WW,,,,,,,,,,WWWW
 WWWWWWWWWWWWWWWW
-put bat 8 6
-put burger 3 6
-put bat 11 2
-put breadstick 7 3
+put bat 7 8
+put toast 8 5
+put toast 4 4
+put carrot 12 3
 end
 
 room ow_10_0
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -253,15 +264,16 @@ WW,,,,,,,,,,,,,W
 ,,,,,,,,,,WWWW,,
 W,,,,,W,,,WWWWWW
 WWWWWWW,,WWWWWWW
-put bat 3 7
-put burger 4 3
-put breadstick 12 5
-put breadstick 9 2
+put carrot 3 6
+put breadstick 10 5
+put toast 7 4
+put carrot 9 2
 end
 
 room ow_11_0
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -274,15 +286,16 @@ W,,,,.,,,,W,,,WW
 ,,,,,,.,,,,,,,WW
 W,,,,,,,,,,,,,,W
 WWWWWWWWWWW,,WWW
-put breadstick 7 6
-put bat 3 4
-put burger 9 3
-put bat 4 2
+put breadstick 10 7
+put bat 6 5
+put toast 3 7
+put carrot 5 8
 end
 
 room ow_12_0
 music overworld
 var region = "PICKLE MARSH"
+var tier = 2
 map
 TTTTTTTgggTTgTgT
 gTggggTgTTggggTT
@@ -303,6 +316,7 @@ end
 room ow_13_0
 music overworld
 var region = "PICKLE MARSH"
+var tier = 2
 map
 gTgTgTggTggTggTg
 TggggTTTgTgTTggg
@@ -315,15 +329,15 @@ g.==...........g
 =......,.,....gT
 g............TgT
 gTg==TTTggTggggg
-put plum 12 6
-put plum 6 3
-put plum 10 4
-put plum 8 2
+put burger 8 5
+put jelly 6 3
+put jelly 11 6
 end
 
 room ow_14_0
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 ~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~
@@ -336,15 +350,16 @@ Tssssssss.ss~~~~
 Tssssssssssss~~~
 TsssssssssTT~~~~
 TTTssTTTTTT~~~~~
-put tomato 5 2
-put tomato 4 7
-put plum 3 4
-put tomato 10 2
+put burger 4 4
+put burger 6 7
+put corn 7 5
+put olive 11 2
 end
 
 room ow_15_0
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 ~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~
@@ -358,15 +373,16 @@ TsssssTs.sss.~~~
 TTTTTTTssTTT~~~~
 TTTTTTTssTTT~~~~
 put warp 4 3 to = "cave_pie2", pos = vec2(128, 216)
-put plum 10 2
-put plum 4 8
-put plum 7 7
-put plum 10 6
+put corn 9 4
+put olive 7 6
+put olive 3 8
+put olive 11 2
 end
 
 room ow_0_1
 music overworld
 var region = "FORTUNE COOKIE FIELD"
+var tier = 6
 map
 TTTTTTT..TTTTTTT
 TTTTTT.........T
@@ -379,15 +395,15 @@ TT............TT
 TT.......f...,TT
 TT............TT
 TTTTTTT..TTTTTTT
-put burger 5 2
-put breadstick 4 5
-put bat 9 3
-put burger 6 6
+put burger 11 2
+put bat 11 7
+put dumpling 5 2
 end
 
 room ow_1_1
 music overworld
 var region = "FORTUNE COOKIE FIELD"
+var tier = 6
 map
 TTTTTTTTTTT..TTT
 TT...WWWWW...T.T
@@ -401,15 +417,16 @@ T..............T
 TT.............T
 TTTTTTT..TTTTTTT
 put warp 7 2 to = "d6_2_4", pos = vec2(128, 200)
-put bat 11 5
-put bat 4 7
-put bat 11 8
+put dumpling 11 5
+put dumpling 4 7
+put dumpling 11 8
 put burger 10 3
 end
 
 room ow_2_1
 music overworld
 var region = "FORTUNE COOKIE FIELD"
+var tier = 6
 map
 TTTTTTTTTTTTTTTT
 T....TTT.......T
@@ -422,15 +439,16 @@ T..G.G.........T
 T...........,..T
 T....TTTTT.....T
 TTTTTTTTTTT..TTT
-put breadstick 4 7
-put breadstick 11 5
-put breadstick 3 3
+put bat 4 7
+put bat 11 5
+put bat 3 3
 put burger 10 3
 end
 
 room ow_3_1
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWW,,WWWWWWW
 WW,,,,,,,,,,,,,W
@@ -444,8 +462,8 @@ WW,,,r,,,,,,,.WW
 WW,,,,,,,,,,,,WW
 WWWWWWWWWWWWWWWW
 put warp 11 3 to = "cave_hint5", pos = vec2(128, 216)
-put burger 8 4
-put burger 6 5
+put carrot 8 4
+put carrot 6 5
 put breadstick 6 2
 put breadstick 3 4
 end
@@ -453,6 +471,7 @@ end
 room ow_4_1
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWW,,WWWWW
 WWWW,,,,,,,,,WWW
@@ -465,15 +484,16 @@ W,,,,,,,,,,,r,,W
 W,,,,,.,,,,,,.,W
 WWWWWWWWW,,,,WWW
 WWWWWWWWWWWWWWWW
-put burger 7 7
-put burger 10 4
-put breadstick 3 2
+put carrot 7 7
+put carrot 10 4
+put toast 3 2
 put breadstick 5 6
 end
 
 room ow_5_1
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWW,,WWW
 WWWW,,,,,,W,,WWW
@@ -486,14 +506,16 @@ W,,,,,,,,,,,,,,W
 W,,,,.,,,,,,,,,W
 WWWWWWW,,,,,,,,W
 WWWWWWW,,WWWWWWW
-put bat 3 6
-put bat 12 4
-put breadstick 9 7
+put toast 10 3
+put carrot 6 7
+put toast 3 6
+put toast 8 2
 end
 
 room ow_6_1
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWW,,WWWWWWWWWWW
 W,,,,,WWWWWWW,WW
@@ -507,14 +529,16 @@ WWrr,,,,,,,.,.,W
 WW,,,,,WWWW,,,,W
 WWWWWWWWWWWWWWWW
 put warp 11 2 to = "cave_stash2", pos = vec2(128, 216), hidden = true
-put burger 3 7
-put burger 5 4
-put bat 9 8
+put carrot 10 5
+put carrot 9 2
+put carrot 10 8
+put carrot 3 5
 end
 
 room ow_7_1
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWW,,WWWWW
 WWWWWWWWW,,,,,,W
@@ -527,15 +551,16 @@ WW,.,,,,,WW,,,,W
 W,,,,,.,,,,,,,,W
 W,,,,,,,,,,,,,,W
 WWWWWWWWWWW,,WWW
-put breadstick 7 3
-put bat 6 8
-put breadstick 4 5
-put burger 8 6
+put breadstick 6 4
+put toast 4 6
+put bat 8 3
+put toast 11 2
 end
 
 room ow_8_1
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWW,,WWWWWWW
 WW,WWWW,,,,,,,WW
@@ -548,14 +573,16 @@ W,,,,,WWWW,.,,,,
 W,,,,,,,,,,,.,,W
 WWW,,,,,,,,,,,WW
 WWWWW,,WWWWWWWWW
-put bat 10 8
-put breadstick 5 2
-put bat 4 7
+put toast 12 6
+put bat 7 3
+put bat 4 6
+put bat 3 8
 end
 
 room ow_9_1
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 W,,,,,,,,,,,,,,W
@@ -569,14 +596,16 @@ W,r,,,rWWW,,,,WW
 W,,,,,WWWWW,,,WW
 WWW,,WWWWWWWWWWW
 put warp 10 3 to = "d8_2_4", pos = vec2(128, 200), hidden = true
-put burger 12 7
-put breadstick 3 5
-put breadstick 5 7
+put bat 4 7
+put breadstick 5 5
+put toast 7 6
+put carrot 12 5
 end
 
 room ow_10_1
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWW,,WWWWWWW
 WW,,,,,,,,WWWWWW
@@ -590,15 +619,16 @@ W,,,,,,,,,,,,.,W
 WWW,,,,,WWWWW,WW
 WWWWWWWWWWWWWWWW
 put warp 11 2 to = "cave_shop4", pos = vec2(128, 216)
-put burger 3 8
-put burger 3 5
+put bat 3 8
+put carrot 3 5
 put breadstick 6 5
-put burger 10 6
+put carrot 10 6
 end
 
 room ow_11_1
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWW,,WWW
 W,,,,,,,,,,,,,,W
@@ -611,15 +641,16 @@ WW,,.,,,WWW,,,WW
 WW,,,,,,,,,.,,WW
 W,,WW,,,,WWW,,,W
 WWWWWWW,,WWWWWWW
-put burger 3 5
-put breadstick 6 6
-put breadstick 12 8
-put bat 9 6
+put carrot 5 7
+put breadstick 12 4
+put breadstick 9 2
+put carrot 11 6
 end
 
 room ow_12_1
 music overworld
 var region = "PICKLE MARSH"
+var tier = 2
 map
 gTTgggg=.TTgTgTg
 TT.............g
@@ -632,15 +663,15 @@ Tg.....=ggggP..g
 g...,,...=gg...T
 TTTTgT.......TTg
 TggTTgTTgTg..ggg
-put burger 3 5
-put plum 11 5
-put burger 5 2
-put plum 6 8
+put burger 9 4
+put jelly 3 8
+put plum 6 7
 end
 
 room ow_13_1
 music overworld
 var region = "PICKLE MARSH"
+var tier = 2
 map
 gTT.=TTgTgTgTTgg
 TTg=..........gT
@@ -654,15 +685,14 @@ gggg,....gg.,P.g
 gTgggg.......TTT
 gTTTgggggTgTTTgT
 put warp 8 3 to = "d2_2_4", pos = vec2(128, 200)
-put burger 6 8
-put jelly 4 3
-put jelly 11 2
-put plum 11 5
+put plum 11 8
+put olive 6 8
 end
 
 room ow_14_1
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 TTTssTTTTTTT~~~~
 TTTsssssssss~~~~
@@ -675,15 +705,15 @@ Tssssssssss~~~~~
 Tssssssssssss~~~
 TssssTTTTss~~~~~
 TTTTTTTTTTT~~~~~
-put plum 8 4
-put tomato 3 8
-put tomato 5 5
-put plum 12 4
+put corn 8 2
+put olive 3 7
+put burger 9 6
 end
 
 room ow_15_1
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 TTTTTTTssTTT~~~~
 TTTTTTTssTss~~~~
@@ -696,15 +726,16 @@ TT.s.sssrss~~~~~
 TTsssss.sss.T~~~
 TTsssssssss~~~~~
 TTTTTTTTTTTT~~~~
-put tomato 11 3
-put tomato 8 3
-put tomato 3 4
-put plum 5 7
+put corn 4 2
+put burger 9 8
+put corn 6 7
+put burger 3 6
 end
 
 room ow_0_2
 music overworld
 var region = "FORTUNE COOKIE FIELD"
+var tier = 6
 map
 TTTTTTT..TTTTTTT
 TTTT...........T
@@ -717,15 +748,16 @@ TTTG.GfG....f..T
 TTT............T
 TTT..TT........T
 TTTTTTT..TTTTTTT
-put breadstick 6 5
-put breadstick 11 5
-put bat 10 2
+put bat 6 5
+put bat 11 5
+put dumpling 10 2
 put burger 8 3
 end
 
 room ow_1_2
 music overworld
 var region = "FORTUNE COOKIE FIELD"
+var tier = 6
 map
 TTTTTTT..TTTTTTT
 TTTT...........T
@@ -738,15 +770,15 @@ TT....,..G.G..TT
 T.,....f......TT
 T.............TT
 TTT..TTTTTTTTTTT
-put breadstick 3 7
-put burger 6 8
-put breadstick 6 4
-put breadstick 8 5
+put bat 8 5
+put burger 3 7
+put bat 7 3
 end
 
 room ow_2_2
 music overworld
 var region = "FORTUNE COOKIE FIELD"
+var tier = 6
 map
 TTTTTTTTTTT..TTT
 T.....WWW.T..TTT
@@ -760,15 +792,15 @@ TT.............T
 TT...T...TT...TT
 TTTTTTT..TTTTTTT
 put warp 7 2 to = "cave_hint8", pos = vec2(128, 216)
-put breadstick 4 6
-put burger 9 6
-put breadstick 6 8
-put bat 6 5
+put bat 5 4
+put burger 5 8
+put bat 10 5
 end
 
 room ow_3_2
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTT......TT
@@ -781,15 +813,14 @@ TT..~~~~~~~~~..T
 TT.............T
 T.............TT
 TTTTTTT..TTTTTTT
-put burger 4 2
-put plum 6 8
-put plum 3 7
-put tomato 3 4
+put plum 12 8
+put plum 5 2
 end
 
 room ow_4_2
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTTTTTTTTTTT
 TTTTTT.........T
@@ -802,15 +833,15 @@ T...............
 T.............TT
 TTTTTTT...T....T
 TTTTTTT..TTTTTTT
-put burger 8 7
-put burger 3 3
-put burger 11 2
-put plum 3 7
+put plum 8 2
+put jelly 3 3
+put burger 11 7
 end
 
 room ow_5_2
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTT..TTTTTTT
 T........TT...TT
@@ -823,15 +854,15 @@ T....~~~==....TT
 T.....f.........
 T.............TT
 TTTTTTT..TTTTTTT
-put burger 8 3
-put plum 10 7
-put burger 10 2
-put tomato 4 4
+put burger 9 7
+put jelly 7 3
+put jelly 10 2
 end
 
 room ow_6_2
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTTTTTTTTTTT
 T..............T
@@ -844,16 +875,16 @@ T.=~~~~~~~~~~...
 ...~~~~~~~~~f..T
 TT.............T
 TTTTTTTTTTT..TTT
-put pickup 3 3 kind = "heart_pie", flag = "ow:pie2"
-put plum 5 2
-put tomato 7 3
-put tomato 11 3
-put burger 9 2
+put pickup 11 3 kind = "heart_pie", flag = "ow:pie2"
+put plum 3 3
+put jelly 5 2
+put jelly 7 3
 end
 
 room ow_7_2
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWW,,WWW
 WW,,WWWWWWW,,WWW
@@ -866,14 +897,16 @@ WW,,,,,,,,,,,,WW
 W,,,,,,,,,,,,,,W
 W,,,,WW,,,,,,,WW
 WWWWWWW,,WWWWWWW
-put burger 11 3
-put burger 5 8
-put bat 7 7
+put carrot 8 3
+put carrot 11 7
+put breadstick 3 2
+put toast 6 7
 end
 
 room ow_8_2
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWW,,WWWWWWWWW
 WWWWW,,,WWWWWW,W
@@ -887,15 +920,16 @@ W,,,,,,,,,,,,,WW
 W,,WWWW,,,,WW,WW
 WWWWWWW,,WWWWWWW
 put warp 11 2 to = "cave_hint6", pos = vec2(128, 216)
-put breadstick 3 7
 put breadstick 3 3
-put burger 10 8
-put bat 8 6
+put breadstick 9 7
+put carrot 8 2
+put carrot 7 5
 end
 
 room ow_9_2
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWW,,WWWWWWWWWWW
 WW,,,,,,,,WWW,,W
@@ -908,15 +942,16 @@ W,,,,,,,,,,,,,,W
 W,,,.,,,,r,,,,,W
 W,,,,,,,,,,,,,,W
 WWWWWWWWWWWWWWWW
-put breadstick 6 2
-put breadstick 10 8
-put bat 5 6
-put breadstick 9 2
+put toast 12 7
+put toast 9 4
+put breadstick 5 3
+put breadstick 7 5
 end
 
 room ow_10_2
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWWWWWWWWWWW
 W,,,,,WWW,,,,,,W
@@ -929,15 +964,16 @@ W,,,,,,,,,,,,,WW
 W,,,,,,,,,.,,,,W
 WWWWWW,,,,,,,,,W
 WWWWWWWWWWWWWWWW
-put breadstick 4 3
-put burger 7 8
-put bat 3 8
-put breadstick 12 5
+put toast 9 2
+put carrot 3 5
+put breadstick 11 5
+put carrot 9 7
 end
 
 room ow_11_2
 music overworld
 var region = "CHOCOLATE MOUNTAINS"
+var tier = 8
 map
 WWWWWWW,,WWWWWWW
 W,,,,,,,,,WWWWWW
@@ -951,15 +987,16 @@ WW,,,,,.,.,,,,,W
 WW,,,,,,,,,,,,,W
 WWWWWWWWWWWWWWWW
 put warp 4 3 to = "cave_stash3", pos = vec2(128, 216), hidden = true
-put bat 10 7
-put breadstick 7 3
-put burger 7 7
-put bat 4 7
+put toast 9 8
+put carrot 5 8
+put toast 11 2
+put bat 3 7
 end
 
 room ow_12_2
 music overworld
 var region = "PICKLE MARSH"
+var tier = 2
 map
 TggTTTTggTT==gTT
 TggTg.....T=.gTT
@@ -972,15 +1009,14 @@ g.............==
 g...,gg.=ggg.,Tg
 g...........=TTg
 TggTgTTgTTg.=ggT
-put jelly 11 4
-put jelly 6 5
-put burger 7 8
-put jelly 4 2
+put olive 11 4
+put plum 6 2
 end
 
 room ow_13_2
 music overworld
 var region = "PICKLE MARSH"
+var tier = 2
 map
 gTggTgTTTTTggggT
 T.....Tggggg..gg
@@ -993,15 +1029,14 @@ Tg............=.
 Tg..........,..g
 g..............g
 ggTTggg==TTTTggT
-put plum 8 7
-put plum 12 6
-put burger 5 3
-put burger 9 2
+put jelly 10 8
+put burger 10 5
 end
 
 room ow_14_2
 music overworld
 var region = "PICKLE MARSH"
+var tier = 2
 map
 ggggTTgTTTgTggTT
 gTgTg...WWW....T
@@ -1015,15 +1050,14 @@ gg..gggg..ggg..g
 gg...gggTT.....T
 gggggggTTggTgTTT
 put warp 9 2 to = "cave_shop5", pos = vec2(128, 216)
-put jelly 6 4
-put burger 12 3
-put jelly 3 4
-put plum 10 5
+put olive 11 4
+put plum 7 4
 end
 
 room ow_15_2
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 TTTTTTTTTTTT~~~~
 TTsssssssTTT~~~~
@@ -1036,15 +1070,15 @@ Tsssssssssss~~~~
 Ts..ssssss.ss~~~
 TTTTssssssss~~~~
 TTTTTTTssTTT~~~~
-put tomato 5 8
-put plum 5 3
-put tomato 11 8
-put tomato 9 4
+put burger 3 3
+put olive 7 2
+put burger 6 4
 end
 
 room ow_0_3
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bbTbTbT..TbbTbbb
 TbTT.....bTTbT.b
@@ -1057,15 +1091,14 @@ bb......bbb....b
 bb.............T
 TT..........TTbb
 bbTTTTbTb..TTTTT
-put burger 5 6
-put plum 4 2
-put plum 3 7
-put burger 6 3
+put plum 5 6
+put imp 4 2
 end
 
 room ow_1_3
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bTT..bbbTbTTbbbT
 T........bTT...T
@@ -1079,15 +1112,15 @@ b....b.........T
 b...bbTbTTTTT..T
 TbbbbTTbbTTTbbbT
 put warp 10 2 to = "cave_stash6", pos = vec2(128, 216), hidden = true
-put plum 3 4
-put tomato 9 7
-put plum 6 3
+put plum 8 2
+put plum 6 5
 put burger 11 8
 end
 
 room ow_2_3
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTT..TTTTTTT
 TT.......T.....T
@@ -1100,15 +1133,14 @@ T..............T
 T..,...........T
 T..............T
 TTTTT..TTTTTTTTT
-put plum 9 8
-put tomato 5 7
-put tomato 11 7
-put tomato 3 2
+put burger 7 8
+put olive 10 8
 end
 
 room ow_3_3
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTT..TTTTTTT
 TT.............T
@@ -1121,14 +1153,14 @@ T....f..........
 T.............TT
 T.............TT
 TTTTTTTTTTTTTTTT
-put plum 3 4
-put tomato 7 3
-put burger 10 2
+put plum 12 7
+put jelly 3 4
 end
 
 room ow_4_3
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTT..TTTTTTT
 TTTT~~~==~~~~~.T
@@ -1142,14 +1174,14 @@ T~~~~~~~~~~~~~.T
 T..............T
 TTTTTTTTTTTTTTTT
 put warp 7 4 to = "d4_2_4", pos = vec2(128, 200)
-put burger 11 4
-put plum 3 3
-put tomato 11 7
+put plum 11 4
+put olive 3 3
 end
 
 room ow_5_3
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTT..TTTTTTT
 T..............T
@@ -1162,14 +1194,14 @@ T.=~~~~~~~~..fTT
 T..=~~~~~~....TT
 T....TTTTT....TT
 TTT..TTTTTTTTTTT
-put burger 12 8
-put plum 12 3
-put burger 10 2
+put burger 12 7
+put olive 11 3
 end
 
 room ow_6_3
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTTTTTT..TTT
 TT....TTTTT...TT
@@ -1184,12 +1216,13 @@ T...TTTTTTTT..TT
 TTTTTTTTTTTTTTTT
 put warp 8 3 to = "cave_hint4", pos = vec2(128, 216)
 put plum 8 8
-put tomato 11 4
+put olive 11 4
 end
 
 room ow_7_3
 music overworld
 var region = "FROSTY FIELDS"
+var tier = 1
 map
 IIIIIII..IIIIIII
 I.............II
@@ -1202,33 +1235,34 @@ I.....,....II..I
 I..............I
 I.........III..I
 IIIIIII..IIIIIII
-put jelly 6 2
-put plum 7 6
-put plum 9 3
+put jelly 3 3
+put plum 7 4
 end
 
 room ow_8_3
 music overworld
 var region = "FROSTY FIELDS"
+var tier = 1
 map
 IIIIIII..IIIIIII
-II..........IIII
-II.............I
+II........WWWIII
+II........WCW..I
 II....,.,......I
 ............,...
-................
-....,,...,II,...
+........I.......
+....,,.II,.I,...
 I..............I
 I..............I
 I...III........I
 IIIIIII..IIIIIII
-put jelly 3 8
-put plum 12 3
+put warp 11 2 to = "cave_spoon2", pos = vec2(128, 216)
+put jelly 3 7
 end
 
 room ow_9_3
 music overworld
 var region = "FROSTY FIELDS"
+var tier = 1
 map
 IIIIIIIIIIIIIIII
 IIIII.....IIIIII
@@ -1241,15 +1275,14 @@ II.II.,.......II
 II............II
 IIII.....IIII..I
 IIIIIII..IIIIIII
-put plum 10 3
-put tomato 4 3
-put tomato 5 8
-put tomato 7 7
+put plum 10 7
+put tomato 12 5
 end
 
 room ow_10_3
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rrrrPPPPrPPPrrPP
 PrPPssssrrrrsssP
@@ -1262,14 +1295,15 @@ Psssrss...sssssr
 rssssPsss.sssssr
 PssrPrsssssssssr
 rrPrrPPssPrrrPPr
-put burger 7 7
-put breadstick 10 6
-put meatball 5 2
+put imp 9 2
+put ant 5 2
+put imp 12 2
 end
 
 room ow_11_3
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rPrrPPPPrrPrrPPr
 Pssssssssssssssr
@@ -1282,14 +1316,15 @@ rsssssss.ss...rr
 rsssPssssss...PP
 PPsssPPsssrsssrr
 PPrrPrrssrPrPPrr
-put breadstick 9 4
-put breadstick 12 8
-put breadstick 8 6
+put burger 4 7
+put imp 5 5
+put burger 9 5
 end
 
 room ow_12_3
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rrPPPPPPPrPssrrP
 PssssssssssssPPr
@@ -1303,15 +1338,15 @@ rsssss...ssssssr
 rPPssrPPPPsssssP
 PPrssPPrPrPPPrrP
 put warp 5 3 to = "cave_hint9", pos = vec2(128, 216)
-put meatball 10 3
+put meatball 7 2
+put imp 10 8
 put burger 4 6
-put burger 5 8
-put meatball 11 7
 end
 
 room ow_13_3
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 PrrrrPPssrPrPrrr
 PsssssssssssrPrr
@@ -1325,14 +1360,15 @@ rsrsssssssssssrr
 rrssssssssssssrP
 rPrssrrrPPPPrrPr
 put meatball 5 5
-put meatball 7 4
-put meatball 10 5
+put ant 7 4
+put ant 10 5
 put meatball 4 3
 end
 
 room ow_14_3
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 PPrPrrrPrPrPPrPr
 rPrrrssssssssssP
@@ -1345,36 +1381,37 @@ sss.ss...srsPssr
 Psssss...ssssPsr
 PssrPPrssssssssP
 PrPPPPPssrPPrPrP
-put breadstick 4 3
-put breadstick 11 5
-put breadstick 8 3
-put burger 3 7
+put imp 3 6
+put ant 6 5
+put imp 12 6
 end
 
 room ow_15_3
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 TTTTTTTssTTT~~~~
-TTTTTTsssTT~~~~~
-TsssTss.ssss~~~~
-Tssssssssss~~~~~
-TsssssTssssss~~~
-Tsssss..ssss~~~~
-Tssss.ssssss~~~~
-Ts.sss.ssss~~~~~
-Tssssssssssss~~~
-TTssssssssss~~~~
+TTsTTTTssTs~~~~~
+TTsWWWssssss~~~~
+TTsWXW.sssss~~~~
+TTssss.sssssT~~~
+TTsssssssss~~~~~
+TT.ss.sssss~~~~~
+TT.ssssssrs~~~~~
+TTsrsssssssss~~~
+TTsssTTssss~~~~~
 TTTTTTTssTT~~~~~
-put plum 10 3
-put tomato 8 5
-put plum 10 8
-put plum 5 5
+put warp 4 3 to = "cave_coat", pos = vec2(128, 216), hidden = true
+put burger 7 3
+put corn 6 8
+put olive 8 6
 end
 
 room ow_0_4
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 TbTbbbTbb..bTbTT
 bTbbTT.........T
@@ -1388,15 +1425,14 @@ bT.....bb.....Tb
 TTTT..........bT
 TbbbbTbTbbTTTbTb
 put warp 5 3 to = "cave_hint3", pos = vec2(128, 216)
-put plum 10 8
-put tomato 12 5
-put plum 7 5
-put plum 4 6
+put burger 12 3
+put imp 6 8
 end
 
 room ow_1_4
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bbTTbbbTTTTTbTbT
 T..............T
@@ -1409,15 +1445,14 @@ b..bb......b...T
 bb..,..........T
 TT.TTbbbb......b
 TTbTTTbbTbbTbbTb
-put plum 5 7
-put plum 10 7
-put tomato 5 4
-put plum 11 5
+put burger 9 6
+put plum 5 3
 end
 
 room ow_2_4
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTT..TTTTTTTTT
 TTTT...T......TT
@@ -1431,14 +1466,14 @@ T............f.T
 TTTTTTTTTTT...TT
 TTTTTTTTTTTTTTTT
 put warp 9 3 to = "cave_shop2", pos = vec2(128, 216)
-put tomato 5 8
-put plum 4 2
-put burger 8 8
+put jelly 9 8
+put burger 5 8
 end
 
 room ow_3_4
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTTTTTTTTTTT
 T..............T
@@ -1459,6 +1494,7 @@ end
 room ow_4_4
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTTTTTTTTTTT
 T........TTT...T
@@ -1471,15 +1507,15 @@ TT.=~~~~~~~..f..
 ...............T
 TTTTTTT........T
 TTTTTTTTTTTTTTTT
-put burger 12 7
-put burger 3 8
-put burger 10 8
-put plum 11 4
+put plum 12 5
+put burger 9 2
+put olive 5 2
 end
 
 room ow_5_4
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTT..TTTTTTTTTTT
 TTT............T
@@ -1492,13 +1528,14 @@ T..............T
 T..............T
 TTTTTTTT.......T
 TTTTTTTTTTTTTTTT
-put burger 12 7
-put tomato 3 6
+put jelly 8 7
+put burger 6 8
 end
 
 room ow_6_4
 music overworld
 var region = "FROSTY FIELDS"
+var tier = 1
 map
 IIIIIIIIIIIIIIII
 IIIII.........II
@@ -1511,13 +1548,13 @@ II..,.........II
 II........,....I
 II.............I
 IIIIIIIII..IIIII
-put tomato 3 7
-put jelly 6 5
+put tomato 10 7
 end
 
 room ow_7_4
 music overworld
 var region = "FROSTY FIELDS"
+var tier = 1
 map
 IIIIIII..IIIIIII
 IIIII....II...II
@@ -1530,13 +1567,13 @@ II..,....III....
 II.......III...I
 II............II
 III..IIIIIIIIIII
-put jelly 12 6
-put tomato 9 3
+put jelly 9 6
 end
 
 room ow_8_4
 music overworld
 var region = "FROSTY FIELDS"
+var tier = 1
 map
 IIIIIII..IIIIIII
 I........II...II
@@ -1549,13 +1586,13 @@ I..,III.........
 II.....,.......I
 II.IIII........I
 IIIIIII..IIIIIII
-put plum 3 8
-put tomato 9 2
+put plum 11 2
 end
 
 room ow_9_4
 music overworld
 var region = "FROSTY FIELDS"
+var tier = 1
 map
 IIIIIII..IIIIIII
 II...........III
@@ -1568,14 +1605,14 @@ I...,..........I
 I..............I
 I.....IIIIIIIIII
 IIIIIIIIIIIIIIII
-put jelly 11 2
-put tomato 12 4
-put plum 7 6
+put jelly 11 6
+put tomato 4 8
 end
 
 room ow_10_4
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rrPPPrPssrrPPrPr
 rrrPPPPssrrsssrP
@@ -1588,15 +1625,16 @@ PsPsss...ss.sssP
 rsssss...PsssssP
 rsssssPrrssssssr
 PPPrPPrPrssrrPPr
-put breadstick 6 4
-put meatball 11 8
-put burger 12 2
-put meatball 8 8
+put meatball 11 3
+put imp 6 4
+put meatball 3 7
+put meatball 6 7
 end
 
 room ow_11_4
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 PPrrrrrssrPPrPrr
 PPsssssssPPPrrrP
@@ -1610,14 +1648,15 @@ rsssssssssssssPP
 PsssssPrPsssssPP
 PrPrrrPPrssrPrrP
 put warp 8 3 to = "d7_2_4", pos = vec2(128, 200), hidden = true
-put burger 3 5
+put imp 3 5
 put burger 5 6
-put burger 5 2
+put imp 5 2
 end
 
 room ow_12_4
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rrPssPPrPPrrrPrP
 rsssssssssssssrr
@@ -1630,14 +1669,15 @@ rsssssrsssPssssP
 PssssssssssssssP
 PrssssssssssssPr
 rrPrPPPPrPrPPPPP
-put meatball 9 6
-put breadstick 7 3
-put meatball 12 7
+put ant 11 2
+put ant 9 5
+put burger 4 4
 end
 
 room ow_13_4
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rrrssPrrrPrPrPPr
 PsssssssPrrPrPsr
@@ -1651,14 +1691,14 @@ rsssssssssss.ssr
 PsssssssssPPPssP
 rPrPPrPrrrPrrrPP
 put burger 3 8
-put breadstick 3 5
+put meatball 3 5
 put meatball 7 3
-put meatball 5 7
 end
 
 room ow_14_4
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 PPPrPPPssrPrrrrr
 PsssssssssssssPP
@@ -1672,8 +1712,8 @@ rsss...s.ssssssP
 rPrPrssssssssssP
 PrrPPrrPPrrrPrrP
 put warp 11 3 to = "cave_stash4", pos = vec2(128, 216), hidden = true
-put meatball 5 5
-put burger 12 8
+put ant 5 5
+put imp 12 8
 put burger 4 8
 put meatball 4 3
 end
@@ -1681,6 +1721,7 @@ end
 room ow_15_4
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 TTTTTTTssTTT~~~~
 TTTTTsssssTT~~~~
@@ -1693,15 +1734,15 @@ Tssrsssssss~~~~~
 Ts..s.sssssss~~~
 TTTTssssssTT~~~~
 TTTTTTTssTT~~~~~
-put plum 7 6
-put tomato 10 5
-put tomato 7 3
-put tomato 5 7
+put corn 10 6
+put olive 12 8
+put corn 4 4
 end
 
 room ow_0_5
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bbTTbbTTTTTbbTbb
 bT.....bbbTbbbbT
@@ -1714,35 +1755,36 @@ TTT.,,.bb......T
 bTT,...........b
 bTb.......bTTbTb
 bbbbbTT..bTTTbbb
-put burger 9 5
-put tomato 11 3
-put tomato 11 7
-put tomato 7 6
+put plum 5 7
+put plum 5 4
 end
 
 room ow_1_5
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
-TbbbTbTbbTTbbbbb
-Tb...bTbTbTTT..T
-........bb.bbb.b
-..,....bbb.....T
-b......bbb......
-TT....TT........
-Tb....TT.,......
-b.....,....b...b
-T.............Tb
-TTTTbb....TbbbTT
-bbbbTTTbbTTTbTbb
-put burger 8 8
-put plum 4 4
-put burger 5 8
+bTTbTTbTbTTTTbbT
+T.......TbTbbbTT
+........bYb,..bb
+.......,....b.TT
+T..bbb......b...
+b....,......b...
+b.......TT..,...
+T...TT.........T
+bb..TTbb......bT
+bTTbTbbTTbbbbbbT
+TTTbbTbbTTbbbTTb
+put warp 9 2 to = "cave_jacket", pos = vec2(128, 216), hidden = true
+put imp 10 5
+put plum 3 3
+put plum 6 3
 end
 
 room ow_2_5
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 TbTTTTbbTbTTTbbb
 bb.........Tbb.b
@@ -1755,15 +1797,15 @@ T.....,.....TTbT
 T....bb.....TTbT
 b.............TT
 TTbbTbT..bTTbTbb
-put burger 3 3
-put plum 11 4
-put plum 6 7
-put burger 3 7
+put plum 11 5
+put imp 10 8
+put burger 5 6
 end
 
 room ow_3_5
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTT..TTTTTTTTT
 TT.....TTT.....T
@@ -1776,15 +1818,15 @@ T...~~~~~~~~~.TT
 T.f,f~~~~~~~..TT
 TTTTTT........TT
 TTTTTTTTTTTTTTTT
-put burger 10 3
-put tomato 12 8
-put tomato 12 4
-put burger 3 8
+put jelly 11 2
+put jelly 7 3
+put olive 3 2
 end
 
 room ow_4_5
 music overworld
 var region = "BLUEBERRY LAKE"
+var tier = 4
 map
 TTTTTTTTTTTTTTTT
 TT...........TTT
@@ -1797,14 +1839,15 @@ T...~~~~~~~~~~.T
 T.,T.~~~~~~~~..T
 TTTTTTTTT......T
 TTTTTTTTT..TTTTT
-put burger 4 3
-put tomato 7 2
-put plum 3 7
+put olive 3 6
+put burger 4 4
+put plum 3 2
 end
 
 room ow_5_5
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTTTTTTTTTTT
 TTTTTTWWW.....TT
@@ -1818,13 +1861,13 @@ T..............T
 TTTT...TTTTTT..T
 TTTTTTTTTTTTTTTT
 put warp 7 2 to = "cave_stash7", pos = vec2(128, 216), hidden = true
-put plum 3 7
-put tomato 10 8
+put plum 11 3
 end
 
 room ow_6_5
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTTTT..TTTTT
 T..............T
@@ -1837,13 +1880,13 @@ T..............T
 T.r.,...,f.....T
 TTTT...........T
 TTTTTTT..TTTTTTT
-put plum 7 3
-put plum 12 4
+put plum 10 5
 end
 
 room ow_7_5
 music overworld
 var region = "FROSTY FIELDS"
+var tier = 1
 map
 III..IIIIIIIIIII
 III..IIIIIIIIIII
@@ -1864,6 +1907,7 @@ end
 room ow_8_5
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTT..TTTTTTT
 TT....T..TT...TT
@@ -1876,13 +1920,13 @@ T......fff....TT
 TT.....TT.....TT
 TT.........TTTTT
 TTTTTTTTTTTTTTTT
-put tomato 8 3
-put plum 4 5
+put tomato 11 8
 end
 
 room ow_9_5
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTTTTTTTTTTT
 TT............TT
@@ -1895,13 +1939,13 @@ T...fff.....r.TT
 T.r....,.f....TT
 T.....T...TT..TT
 TTTTTTT..TTTTTTT
-put plum 8 7
-put plum 11 3
+put plum 10 3
 end
 
 room ow_10_5
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rPPPrPPrrssPrPrr
 PrrrPrsssssrPrsP
@@ -1914,14 +1958,16 @@ Pss....ss.sssssP
 rsssPsss.sssssPr
 PrPsssssssssssPP
 PrrssPrPrrrPPrPr
-put meatball 12 5
-put burger 9 8
-put breadstick 11 7
+put meatball 9 8
+put imp 7 2
+put imp 11 3
+put meatball 4 5
 end
 
 room ow_11_5
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 PPPPrPrrrssrPrPP
 rsssPPPPrssrPPPP
@@ -1934,15 +1980,16 @@ rsss.ssssss.ssss
 PssssP.sssssssss
 rPrPrrssssssssPr
 PrPPrrrrPPPrPPPr
-put breadstick 8 6
-put burger 5 5
-put burger 6 7
-put meatball 12 8
+put burger 12 7
+put imp 10 4
+put ant 12 2
+put burger 4 8
 end
 
 room ow_12_5
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rPPrrrrrrrrrPrPr
 PssrPrPrrWWWssPr
@@ -1956,15 +2003,16 @@ ssss..sssPsssssr
 PPrrrrPrrssssssr
 PrPrrPrPPPPrrrPr
 put warp 10 2 to = "cave_shop3", pos = vec2(128, 216)
-put meatball 11 8
-put breadstick 9 6
-put burger 12 4
-put burger 7 4
+put ant 6 7
+put imp 12 7
+put imp 4 8
+put imp 7 4
 end
 
 room ow_13_5
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rPPrrrPrrrPrrPrP
 rrsssssssssssssP
@@ -1977,15 +2025,16 @@ rPssPsssssssPsrP
 rrsssssssrs.sssr
 rrrssssssssssssr
 PrPPPrPssPPrPPrP
-put meatball 10 2
-put burger 3 7
-put meatball 3 3
-put breadstick 9 6
+put ant 4 6
+put imp 3 3
+put meatball 9 6
+put burger 10 3
 end
 
 room ow_14_5
 music overworld
 var region = "CANDY MEADOWS"
+var tier = 5
 map
 LLLLLLLLLLLLLLLL
 LLLL...LLL.....L
@@ -1998,15 +2047,16 @@ LL.L.L.ffL.L...L
 L.....ffff.....L
 L..............L
 LLLLLLL..LLLLLLL
-put tomato 8 7
-put jelly 8 3
-put plum 10 2
-put tomato 12 5
+put jelly 4 5
+put corn 10 7
+put burger 10 3
+put corn 6 8
 end
 
 room ow_15_5
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 TTTTTTTssTTT~~~~
 TTsssssssss~~~~~
@@ -2019,15 +2069,16 @@ Tsssssssssss~~~~
 TsssssTrsssss~~~
 TTTTTTssssTT~~~~
 TTTTTTTTTTTT~~~~
-put plum 12 8
-put plum 3 4
-put tomato 7 7
-put tomato 5 3
+put olive 12 8
+put olive 3 4
+put burger 7 7
+put burger 5 3
 end
 
 room ow_0_6
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 TbbTTTb..bbTTTbT
 Tb.bbTT.....TbTb
@@ -2040,14 +2091,14 @@ TTT..b..,.bb..bT
 bTb.....bb....bb
 bbT............b
 bbbTTbbbbbTbbTTT
-put burger 9 7
+put imp 9 7
 put plum 3 6
-put tomato 8 5
 end
 
 room ow_1_6
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bbbTTTbbbbTbTbbT
 TTbT...........b
@@ -2062,13 +2113,13 @@ TbTb..........bT
 bTTTTTT..TbbTbbb
 put warp 7 3 to = "d3_2_4", pos = vec2(128, 200)
 put plum 6 8
-put tomato 11 8
-put burger 4 5
+put imp 11 8
 end
 
 room ow_2_6
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 TTTTbTT..bTTbTTT
 T....TT...TbTb.T
@@ -2081,14 +2132,14 @@ Tb.bTTbb.......b
 TT..TTbb.......b
 bT............bT
 bbTbbTTTb..bbTbb
-put plum 11 4
-put plum 5 2
-put tomato 3 8
+put plum 3 4
+put plum 9 7
 end
 
 room ow_3_6
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bTTTbTbTTbTTTbbb
 b.....bbbb.....T
@@ -2101,14 +2152,15 @@ bT..TT.TT..,..bb
 T...TT........bb
 T..........bT..T
 TbT..bbbbbbbTbTT
-put burger 12 7
-put burger 5 2
-put plum 11 2
+put imp 11 7
+put plum 9 8
+put plum 4 2
 end
 
 room ow_4_6
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTTTT..TTTTT
 T.............TT
@@ -2121,13 +2173,13 @@ T.f........f...T
 T...ffff.....,.T
 T..............T
 TTTTTTTTTTTTTTTT
-put plum 8 8
-put tomato 6 7
+put plum 4 7
 end
 
 room ow_5_6
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTTTTT....T
@@ -2140,14 +2192,14 @@ T.TT..T.......TT
 T.TT..TT......TT
 T.............TT
 TTTTTTT..TTTTTTT
-put plum 5 8
-put tomato 12 3
-put tomato 8 4
+put plum 10 4
+put tomato 4 7
 end
 
 room ow_6_6
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTT..TTTTTTT
 TTb.....,....bTT
@@ -2168,6 +2220,7 @@ end
 room ow_7_6
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTT..TTTTTTT
 TTff.......ffTTT
@@ -2188,6 +2241,7 @@ end
 room ow_8_6
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 WWWWWWWWWWWWWWWW
 W~~~~~~~~~~~~~~W
@@ -2208,6 +2262,7 @@ end
 room ow_9_6
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTT..TTTTTTT
 T..WWW.........T
@@ -2221,13 +2276,13 @@ T..,......f....T
 T...TTTTT......T
 TTTTTTTTTTTTTTTT
 put warp 4 2 to = "cave_stash5", pos = vec2(128, 216), hidden = true
-put tomato 5 7
-put tomato 8 6
+put tomato 12 3
 end
 
 room ow_10_6
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 rPrssPPPrrPPPrPr
 Pssssssssssssssr
@@ -2241,14 +2296,16 @@ Psssssssssssssss
 PPrrsssssssssssP
 rrPrPrPrPPrrrrrr
 put warp 9 3 to = "cave_hint2", pos = vec2(128, 216)
-put breadstick 11 3
-put burger 7 5
-put breadstick 11 8
+put burger 7 2
+put imp 8 6
+put imp 3 7
+put burger 11 7
 end
 
 room ow_11_6
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 PrrrPrPPrPPrPrPr
 PPPrrsssssssrrrr
@@ -2261,13 +2318,15 @@ sss.ssssssssssPr
 sssss.s.s.ssPsrP
 PsssssrrPsssssPP
 PPPPrPrrrPrPrPPP
-put breadstick 11 2
-put meatball 3 8
+put ant 7 8
+put imp 9 4
+put ant 12 6
 end
 
 room ow_12_6
 music overworld
 var region = "CANDY MEADOWS"
+var tier = 5
 map
 LLLLLLLLLLLLLLLL
 LLL........LLLLL
@@ -2280,7 +2339,7 @@ LL.ff........f..
 LL......f.....LL
 L..........LLLLL
 LLL..LLLLLLLLLLL
-put jelly 9 4
+put burger 9 4
 put burger 6 5
 put burger 8 6
 end
@@ -2288,6 +2347,7 @@ end
 room ow_13_6
 music overworld
 var region = "CANDY MEADOWS"
+var tier = 5
 map
 LLLLLLL..LLLLLLL
 L..............L
@@ -2301,15 +2361,16 @@ LL............LL
 LL.LLLLLL....LLL
 LLLLLLLLLLL..LLL
 put warp 6 3 to = "d5_2_4", pos = vec2(128, 200)
-put tomato 4 8
-put burger 11 2
-put plum 8 5
-put jelly 10 8
+put jelly 11 5
+put jelly 3 4
+put corn 9 3
+put burger 9 6
 end
 
 room ow_14_6
 music overworld
 var region = "CANDY MEADOWS"
+var tier = 5
 map
 LLLLLLL..LLLLLLL
 L..............L
@@ -2322,14 +2383,15 @@ LLL.L...ff....LL
 L......ff......L
 LLLLLLLLL.....LL
 LLLLLLLLL..LLLLL
-put burger 4 4
-put jelly 7 6
-put burger 3 2
+put burger 5 8
+put burger 4 5
+put jelly 8 6
 end
 
 room ow_15_6
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 TTTTTTTTTTTT~~~~
 TTTTTTsssss~~~~~
@@ -2342,15 +2404,15 @@ Tssssssssss~~~~~
 Tsssssssssss~~~~
 Tsssssssssss~~~~
 TTTTTTTTTTT~~~~~
-put plum 5 3
-put tomato 10 4
-put plum 9 8
-put tomato 3 5
+put olive 8 4
+put burger 3 8
+put olive 6 2
 end
 
 room ow_0_7
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bbbTTTbTTbbTTTTb
 TT....TbT..TbTTb
@@ -2364,14 +2426,14 @@ TbbbbTTT,.......
 TTbbbbTbbbTbbbTb
 TTTbTbTbbTbbbbTb
 put warp 7 2 to = "cave_pie1", pos = vec2(128, 216), hidden = true
-put burger 12 3
-put plum 9 8
-put plum 10 2
+put plum 12 2
+put imp 11 7
 end
 
 room ow_1_7
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 TTbbTbT..bTbTTTT
 T........TbbTTbT
@@ -2384,15 +2446,15 @@ T..........bb..b
 ...bb..,,......T
 bTbTTTTbbbTTbbTT
 TbbTTTTbTbbbbbbT
-put tomato 6 3
-put tomato 9 5
-put burger 3 6
-put tomato 6 7
+put plum 5 4
+put plum 8 4
+put plum 11 2
 end
 
 room ow_2_7
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bbTTbbTbT..bTbTT
 b..............b
@@ -2405,13 +2467,14 @@ bT.......b,.....
 TT...TTbbbbbTbbb
 bTbTTbbTbTbbbbTb
 bbTTbTTbbbbTbbTb
-put tomato 3 7
-put plum 11 6
+put plum 9 6
+put burger 6 4
 end
 
 room ow_3_7
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bbT..bbTbTbbbTTb
 b.......bTTTbTTT
@@ -2424,13 +2487,14 @@ TT..bb.........T
 bTb....TbTT....b
 bbbTTTTTbbTTTTbb
 bTTTTbbTTTTTbTTb
-put plum 11 5
-put plum 3 8
+put burger 5 8
+put plum 7 6
 end
 
 room ow_4_7
 music overworld
 var region = "LETTUCE WOODS"
+var tier = 3
 map
 bbTTTbTTTTbTbTTb
 Tb.........TbbTb
@@ -2443,13 +2507,14 @@ Tb.......bb.....
 TbTbbbbbb......b
 TbTTbbbTbTbbTTbT
 bTbbbTTbTTbbbTbT
-put tomato 8 3
-put tomato 12 5
+put burger 8 3
+put burger 12 5
 end
 
 room ow_5_7
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTT..TTTTTTT
 T..WWW........TT
@@ -2469,6 +2534,7 @@ end
 room ow_6_7
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 WWWWWWW..TTTTTTT
 WWWWXWW....,..bT
@@ -2489,6 +2555,7 @@ end
 room ow_7_7
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 WWWWWWW..WWWWWWW
 WWWWCWW..WWWWWWW
@@ -2507,6 +2574,7 @@ end
 room ow_8_7
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTT..TTTTTTT
 TT.......,..WWWW
@@ -2528,6 +2596,7 @@ end
 room ow_9_7
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTTTTTTTTTTT
 TT..........TTTT
@@ -2546,6 +2615,7 @@ end
 room ow_10_7
 music overworld
 var region = "PANTRY PLAINS"
+var tier = 1
 map
 TTTTTTTTTTTTTTTT
 T....WWWTTTTT..T
@@ -2559,13 +2629,13 @@ TTTTTfff..rTT..T
 TTTTTTTTTTTTTTTT
 TTTTTTTTTTTTTTTT
 put warp 6 2 to = "cave_stash8", pos = vec2(128, 216), hidden = true
-put plum 3 3
-put tomato 4 7
+put plum 6 8
 end
 
 room ow_11_7
 music overworld
 var region = "SUGAR DESERT"
+var tier = 7
 map
 PPPrPPrPPPrrrrrP
 PPsssrPrrPPrPrrP
@@ -2578,14 +2648,16 @@ rss...ss.sssssss
 rss...rrPrrrrsss
 rPrrrPPPrPPPrPPP
 PPrPPrrPrrrrPrrP
-put breadstick 6 4
-put meatball 10 2
-put breadstick 5 8
+put ant 6 2
+put burger 11 7
+put burger 9 4
+put ant 4 8
 end
 
 room ow_12_7
 music overworld
 var region = "CANDY MEADOWS"
+var tier = 5
 map
 LLL..LLLLLLLLLLL
 LL....LLLL....LL
@@ -2599,14 +2671,16 @@ L.L.L...f......L
 LLLLLLLLLLLLLLLL
 LLLLLLLLLLLLLLLL
 put warp 9 3 to = "cave_hint7", pos = vec2(128, 216)
-put plum 3 6
-put burger 6 8
-put jelly 12 8
+put corn 3 6
+put jelly 6 8
+put burger 12 8
+put burger 12 5
 end
 
 room ow_13_7
 music overworld
 var region = "CANDY MEADOWS"
+var tier = 5
 map
 LLLLLLLLLLL..LLL
 LLLL..........LL
@@ -2619,14 +2693,15 @@ L.............LL
 ...f....f.......
 LLLLLLLLLLLLLLLL
 LLLLLLLLLLLLLLLL
-put tomato 3 5
-put jelly 11 8
-put tomato 6 6
+put corn 3 5
+put burger 11 8
+put corn 6 6
 end
 
 room ow_14_7
 music overworld
 var region = "CANDY MEADOWS"
+var tier = 5
 map
 LLLLLLLLL..LLLLL
 L..............L
@@ -2639,15 +2714,16 @@ L............f.L
 ....L....f.....L
 LLLLLLLLLLLLLLLL
 LLLLLLLLLLLLLLLL
-put tomato 11 4
-put burger 5 4
-put burger 3 8
-put tomato 12 7
+put corn 5 7
+put burger 12 6
+put burger 8 6
+put jelly 6 4
 end
 
 room ow_15_7
 music overworld
 var region = "JUICE COAST"
+var tier = 5
 map
 TTTTTTTTTTTT~~~~
 TTssssTTTTTT~~~~
@@ -2661,8 +2737,8 @@ TssTTTTTsssss~~~
 TTTTTTTTTTT~~~~~
 TTTTTTTTTTT~~~~~
 put pickup 3 3 kind = "heart_pie", flag = "ow:pie3"
-put tomato 9 8
-put plum 8 5
-put plum 6 2
-put plum 5 6
+put burger 9 8
+put olive 8 5
+put olive 6 2
+put olive 5 6
 end

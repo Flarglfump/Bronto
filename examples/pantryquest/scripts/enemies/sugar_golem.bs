@@ -3,10 +3,11 @@
 # was standing - then lands with a thump that flings sugar out all round
 # (eight grains; twelve once it is down to half). Landing sinks it into the
 # floor for a moment, and only then can it be hurt; its cubes turn every
-# other hit. Eight hits.
+# other hit. Twelve points of health (eight pokes with the copper spoon,
+# four with the golden ladle).
 
-var hp = 8
-var hp_max = 8
+var hp = 12
+var hp_max = 12
 var title = "SUGAR GOLEM"
 var subtitle = "KEEPER OF THE SUGAR MILL"
 var size = 13
@@ -24,6 +25,7 @@ var flash_t = 0
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     ground = self.position
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)

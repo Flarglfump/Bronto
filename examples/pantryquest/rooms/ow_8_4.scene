@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_8_4\", music = \"overworld\", region = \"FROSTY FIELDS\""
+    vars = "id = \"ow_8_4\", music = \"overworld\", region = \"FROSTY FIELDS\", tier = 1"
 
 entity
   Name
@@ -43,26 +43,12 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 56 136
+    position = 184 40
   Sprite
     image = "art/plum_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
     vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Enemy"
-  Transform
-    position = 152 40
-  Sprite
-    image = "art/tomato_0.bmp"
-    layer = 3
-  Script
-    file = "scripts/enemies/walker.bs"
-    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
   Parent
     entity = 0

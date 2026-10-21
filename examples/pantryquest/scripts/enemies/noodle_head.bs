@@ -1,12 +1,12 @@
 # One of the Noodle Hydra's heads (scripts/enemies/noodle_hydra.bs). On its
-# neck it spits a drop of broth at Pip every couple of seconds; three hits
-# break it off, and then it flies loose round the room - biting, spitting
+# neck it spits a drop of broth at Pip every couple of seconds; five points
+# of damage break it off, and then it flies loose round the room - biting, spitting
 # now and then, and beyond hurting - until the pot goes down.
 
 var pot
 var slot = 0
 var attached = true
-var hp = 3
+var hp = 5
 var size = 7
 var damage = 1
 var game
@@ -19,6 +19,7 @@ var turn_t = 0
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
 }
 

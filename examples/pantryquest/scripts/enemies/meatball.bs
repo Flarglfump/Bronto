@@ -21,6 +21,8 @@ var flash_t = 0
 
 func start() {
     game = find("Game")
+    hp = game.enemy_hp(hp, self.parent)                # (tougher later in the game)
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     map = child(self.parent, "Map")
     appear_t = 0.3 + random(0.6)

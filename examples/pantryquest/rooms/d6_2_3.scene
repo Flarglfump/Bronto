@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"d6_2_3\", music = \"cellar\", stays_clear = true"
+    vars = "id = \"d6_2_3\", music = \"cellar\", stays_clear = true, tier = 6"
 
 entity
   Name
@@ -50,7 +50,7 @@ entity
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 3, damage = 1, image = \"art/dumpling_\", speed = 40"
+    vars = "hp = 2, damage = 1, image = \"art/dumpling_\", speed = 40"
   Parent
     entity = 0
 
@@ -64,7 +64,7 @@ entity
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 3, damage = 1, image = \"art/dumpling_\", speed = 40"
+    vars = "hp = 2, damage = 1, image = \"art/dumpling_\", speed = 40"
   Parent
     entity = 0
 

@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_0_0\", music = \"overworld\", region = \"FORTUNE COOKIE FIELD\""
+    vars = "id = \"ow_0_0\", music = \"overworld\", region = \"FORTUNE COOKIE FIELD\", tier = 6"
 
 entity
   Name
@@ -43,7 +43,7 @@ entity
   Name
     text = "Pickup"
   Transform
-    position = 184 88
+    position = 168 136
   Sprite
     image = "art/bean.bmp"
     layer = 1
@@ -57,13 +57,13 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 136 88
+    position = 200 104
   Sprite
-    image = "art/breadstick_0.bmp"
+    image = "art/bat_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, damage = 2, image = \"art/breadstick_\", speed = 34"
+    file = "scripts/enemies/bat.bs"
+    vars = ""
   Parent
     entity = 0
 
@@ -71,7 +71,7 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 120 40
+    position = 56 136
   Sprite
     image = "art/burger_0.bmp"
     layer = 3
@@ -85,26 +85,12 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 72 88
+    position = 152 88
   Sprite
-    image = "art/bat_0.bmp"
+    image = "art/dumpling_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/bat.bs"
-    vars = ""
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Enemy"
-  Transform
-    position = 168 40
-  Sprite
-    image = "art/bat_0.bmp"
-    layer = 3
-  Script
-    file = "scripts/enemies/bat.bs"
-    vars = ""
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/dumpling_\", speed = 40"
   Parent
     entity = 0

@@ -10,6 +10,7 @@ var hero
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
 }
 

@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_6_3\", music = \"overworld\", region = \"BLUEBERRY LAKE\""
+    vars = "id = \"ow_6_3\", music = \"overworld\", region = \"BLUEBERRY LAKE\", tier = 4"
 
 entity
   Name
@@ -70,10 +70,10 @@ entity
   Transform
     position = 184 72
   Sprite
-    image = "art/tomato_0.bmp"
+    image = "art/olive_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+    vars = "hp = 2, damage = 1, image = \"art/olive_\", speed = 36, shot = \"prefabs/seed.scene\", shot_speed = 120, aim = true"
   Parent
     entity = 0

@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"d5_2_4\", music = \"cellar\", stays_clear = true, exit_s = \"ow_13_6\", exit_pos = vec2(104, 136), exit_face = \"down\""
+    vars = "id = \"d5_2_4\", music = \"cellar\", stays_clear = true, tier = 5, exit_s = \"ow_13_6\", exit_pos = vec2(104, 136), exit_face = \"down\""
 
 entity
   Name

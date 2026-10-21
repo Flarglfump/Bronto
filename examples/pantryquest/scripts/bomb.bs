@@ -22,7 +22,7 @@ func burst() {
         if length(d) < 26 + e.size {
             var dir := vec2(0, 1)
             if length(d) > 0 { dir = normalize(d) }
-            e.hit(4, dir, "bomb")
+            e.hit(2 + 2 * game.attack(), dir, "bomb")      # 4, then 5, 6 and 8 as his spoon and ladles get better
         }
     }
     game.blast(p)

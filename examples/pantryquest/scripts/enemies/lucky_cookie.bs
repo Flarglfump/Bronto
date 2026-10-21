@@ -2,10 +2,11 @@
 # floating after Pip inside a ring of eight crumbs that swells and shrinks
 # as it turns. While any crumb is left the cookie's shell turns every hit;
 # knock them all away (one hit each) and it can be hurt - and starts
-# flinging fortune slips, three at a time. Six hits.
+# flinging fortune slips, three at a time. Ten points of health (seven
+# pokes with the copper spoon, five with the silver ladle).
 
-var hp = 6
-var hp_max = 6
+var hp = 10
+var hp_max = 10
 var title = "LUCKY COOKIE"
 var subtitle = "KEEPER OF THE FORTUNE HALL"
 var size = 13
@@ -21,6 +22,7 @@ var shoot_t = 1.5
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)
 }

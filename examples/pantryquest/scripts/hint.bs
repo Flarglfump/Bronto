@@ -1,0 +1,46 @@
+# A hint card on the floor of the old chef's cave (cave_chef), there once
+# Pip has the spoon. Step on it and the chef tells him where to go next
+# (`kind = "next"`: the next cellar to clear, or what he needs first) or of
+# an upgrade out in the land he can reach now (`kind = "upgrade"`: a heart
+# pie, a spoon or ladle, a jacket or coat - a different one each time).
+# scripts/game.bs works the answers out (hint_next, hint_upgrade) from
+# scripts/hint_data.bs.
+
+var kind = "next"
+var game
+var hero
+var label
+var shown = false
+var on = false
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    label = spawn("prefabs/price.scene", vec2(0, 14), self)
+    if kind == "next" { label.Label.text = "WHERE NEXT?" } else { label.Label.text = "UPGRADES?" }
+    show(game.weapon > 0)
+}
+
+func show(v) {
+    shown = v
+    var a = 0
+    if v { a = 255 }
+    self.Sprite.tint = rgb(255, 255, 255, a)
+    label.Label.color = rgb(255, 248, 236, a)
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    if not shown {
+        if game.weapon > 0 { show(true) }
+        return
+    }
+    var touching = hero.touches(self.global_position, 4)
+    if touching and not on {                           # stepped on: a hint (once, until he steps off)
+        var lines = game.hint_next()
+        if kind == "upgrade" { lines = game.hint_upgrade() }
+        game.say(lines[0], lines[1])
+        play_sound("sfx/menu.wav")
+    }
+    on = touching
+}

@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_5_2\", music = \"overworld\", region = \"BLUEBERRY LAKE\""
+    vars = "id = \"ow_5_2\", music = \"overworld\", region = \"BLUEBERRY LAKE\", tier = 4"
 
 entity
   Name
@@ -43,7 +43,7 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 136 56
+    position = 152 120
   Sprite
     image = "art/burger_0.bmp"
     layer = 3
@@ -57,13 +57,13 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 168 120
+    position = 120 56
   Sprite
-    image = "art/plum_0.bmp"
+    image = "art/jelly_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
   Parent
     entity = 0
 
@@ -73,24 +73,10 @@ entity
   Transform
     position = 168 40
   Sprite
-    image = "art/burger_0.bmp"
+    image = "art/jelly_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Enemy"
-  Transform
-    position = 72 72
-  Sprite
-    image = "art/tomato_0.bmp"
-    layer = 3
-  Script
-    file = "scripts/enemies/walker.bs"
-    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
   Parent
     entity = 0

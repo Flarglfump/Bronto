@@ -40,7 +40,7 @@ func update(dt) {
     }
     for e in find_all("Enemy") {
         if not contains(hit_list, e.id) and distance(e.global_position, self.position) < 6 + e.size {
-            if e.hit(1, dir, "fire") { push(hit_list, e.id) }
+            if e.hit(game.attack(), dir, "fire") { push(hit_list, e.id) }
         }
     }
 }

@@ -1,0 +1,32 @@
+# What the old chef in the first cave tells Pip (scripts/hint.bs asks): where each cellar is, and
+# where the upgrades out in the land are. Made by tools/design_overworld.py - edit it there.
+
+# A cellar's whereabouts: [line 1, line 2, hidden behind a cracked cliff?]
+func cellar(n) {
+    if n == 1 { return ["THE COLD CELLAR, JUST NORTH", "IN THE FROSTY FIELDS.", false] }
+    if n == 2 { return ["THE PICKLE PANTRY, FAR", "NORTHEAST IN THE PICKLE MARSH.", false] }
+    if n == 3 { return ["THE SPICE RACK, WEST, DEEP", "IN THE LETTUCE WOODS.", false] }
+    if n == 4 { return ["THE JAM JAR, ON THE ISLAND", "IN BLUEBERRY LAKE.", false] }
+    if n == 5 { return ["THE CANDY WORKS, EAST", "IN THE CANDY MEADOWS.", false] }
+    if n == 6 { return ["THE FORTUNE HALL, FAR", "NORTHWEST IN THE COOKIE FIELD.", false] }
+    if n == 7 { return ["THE SUGAR MILL: A CRACKED", "CLIFF IN THE SUGAR DESERT.", true] }
+    if n == 8 { return ["THE SOUP CAULDRON: A CRACKED", "CLIFF HIGH IN THE MOUNTAINS.", true] }
+    if n == 9 { return ["BARON GORGE'S HALL, ATOP", "THE CHOCOLATE MOUNTAINS.", false] }
+    return ["", "", false]
+}
+
+# The upgrades out in the land: [flag once taken, what reaching it needs ("", "bombs", "fire"),
+# hearts needed, line 1, line 2]
+func upgrades() {
+    return [
+        ["ow:pie1", "", 0, "A HEART PIE: FAR NORTHWEST,", "OUT IN THE COOKIE FIELD."],
+        ["ow:pie2", "", 0, "A HEART PIE: NORTH,", "OUT BY BLUEBERRY LAKE."],
+        ["ow:pie3", "", 0, "A HEART PIE: FAR EAST,", "OUT ON THE JUICE COAST."],
+        ["up:coat", "bombs", 8, "THE ROYAL COAT: FAR NORTHEAST", "BOMB A CLIFF: JUICE COAST."],
+        ["up:jacket", "fire", 0, "A CHEF'S JACKET: FAR NORTHWEST", "BURN A BUSH IN THE WOODS."],
+        ["up:ladle", "bombs", 10, "THE GOLDEN LADLE: FAR NORTH", "BOMB A CLIFF IN THE MOUNTAINS."],
+        ["pie1", "fire", 0, "A HEART PIE: FAR WEST", "BURN A BUSH IN THE WOODS."],
+        ["pie2", "", 0, "A HEART PIE: FAR NORTHEAST", "A CAVE ON THE JUICE COAST."],
+        ["up:spoon2", "", 5, "A COPPER SPOON: NORTH", "A CAVE IN THE FROSTY FIELDS."]
+    ]
+}

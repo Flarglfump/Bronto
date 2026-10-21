@@ -1,15 +1,15 @@
 # Pantry Quest - room ow_15_3 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
 #
 #   TTTTTTTssTTT~~~~
-#   TTTTTTsssTT~~~~~
-#   TsssTss.ssss~~~~
-#   Tssssssssss~~~~~
-#   TsssssTssssss~~~
-#   Tsssss..ssss~~~~
-#   Tssss.ssssss~~~~
-#   Ts.sss.ssss~~~~~
-#   Tssssssssssss~~~
-#   TTssssssssss~~~~
+#   TTsTTTTssTs~~~~~
+#   TTsWWWssssss~~~~
+#   TTsWXW.sssss~~~~
+#   TTssss.sssssT~~~
+#   TTsssssssss~~~~~
+#   TT.ss.sssss~~~~~
+#   TT.ssssssrs~~~~~
+#   TTsrsssssssss~~~
+#   TTsssTTssss~~~~~
 #   TTTTTTTssTT~~~~~
 bronto_scene 1
 
@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_15_3\", music = \"overworld\", region = \"JUICE COAST\""
+    vars = "id = \"ow_15_3\", music = \"overworld\", region = \"JUICE COAST\", tier = 5"
 
 entity
   Name
@@ -34,22 +34,19 @@ entity
     rows = 11
     legend = ".,TrW~bCs=fIFKX:YpPLGSg"
     solid = "TrW~bIKXYPLGSg"
-    tiles = "TTTTTTTssTTT~~~~TTTTTTsssTT~~~~~TsssTss.ssss~~~~Tssssssssss~~~~~TsssssTssssss~~~Tsssss..ssss~~~~Tssss.ssssss~~~~Ts.sss.ssss~~~~~Tssssssssssss~~~TTssssssssss~~~~TTTTTTTssTT~~~~~"
+    tiles = "TTTTTTTssTTT~~~~TTsTTTTssTs~~~~~TTsWWWssssss~~~~TTsWXW.sssss~~~~TTssss.sssssT~~~TTsssssssss~~~~~TT.ss.sssss~~~~~TT.ssssssrs~~~~~TTsrsssssssss~~~TTsssTTssss~~~~~TTTTTTTssTT~~~~~"
     layer = -10
   Parent
     entity = 0
 
 entity
   Name
-    text = "Enemy"
+    text = "Warp"
   Transform
-    position = 168 56
-  Sprite
-    image = "art/plum_0.bmp"
-    layer = 3
+    position = 72 56
   Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+    file = "scripts/warp.bs"
+    vars = "to = \"cave_coat\", pos = vec2(128, 216), hidden = true"
   Parent
     entity = 0
 
@@ -57,13 +54,13 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 136 88
+    position = 120 56
   Sprite
-    image = "art/tomato_0.bmp"
+    image = "art/burger_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
   Parent
     entity = 0
 
@@ -71,13 +68,13 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 168 136
+    position = 104 136
   Sprite
-    image = "art/plum_0.bmp"
+    image = "art/corn_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+    vars = "hp = 1, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
   Parent
     entity = 0
 
@@ -85,12 +82,12 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 88 88
+    position = 136 104
   Sprite
-    image = "art/plum_0.bmp"
+    image = "art/olive_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+    vars = "hp = 2, damage = 1, image = \"art/olive_\", speed = 36, shot = \"prefabs/seed.scene\", shot_speed = 120, aim = true"
   Parent
     entity = 0

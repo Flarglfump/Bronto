@@ -17,8 +17,10 @@ KK::::::::::::KK
 KKKKKKK::KKKKKKK
 put flame 4.5 4
 put flame 10.5 4
-put old_chef 7.5 4 line1 = "BARON GORGE TORE UP THE RECIPE!", line2 = "TAKE MY SPOON, LITTLE COOK."
+put old_chef 7.5 4 line1 = "BARON GORGE TORE UP THE RECIPE!", line2 = "TAKE MY SPOON, LITTLE COOK.", spoon_needed = true, ready1 = "LOST? STEP ON A CARD, AND", ready2 = "I'LL TELL YOU WHAT I KNOW."
 put pickup 7.5 6 kind = "spoon", flag = "spoon"
+put hint_card 3.5 7.5 kind = "next"
+put hint_card 11.5 7.5 kind = "upgrade"
 end
 
 room cave_shop
@@ -63,6 +65,26 @@ put old_chef 7.5 4 line1 = "SHH! THIS IS MY SECRET STASH.", line2 = "TAKE SOME B
 put pickup 6 6.5 kind = "bean5", flag = "stash1"
 put pickup 7.5 6.5 kind = "bean5", flag = "stash2"
 put pickup 9 6.5 kind = "bean5", flag = "stash3"
+end
+
+room cave_coat
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "ONLY A CHEF WITH EIGHT HEARTS", line2 = "MAY WEAR THE ROYAL COAT.", hearts_needed = 8, ready1 = "THE ROYAL COAT! HITS HURT", ready2 = "A QUARTER AS MUCH IN IT."
+put pickup 7.5 6.5 kind = "coat", flag = "up:coat", min_hearts = 8
 end
 
 room cave_hint1
@@ -236,6 +258,46 @@ put flame 10.5 4
 put old_chef 7.5 4 line1 = "PICKLES! THE PANTRY IS", line2 = "OUT IN THE MARSH, NORTHEAST."
 end
 
+room cave_jacket
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "A CHEF'S JACKET, LITTLE COOK:", line2 = "HITS WILL HURT YOU HALF AS MUCH."
+put pickup 7.5 6.5 kind = "jacket", flag = "up:jacket"
+end
+
+room cave_ladle
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "TEN HEARTS, AND THE GOLDEN", line2 = "LADLE IS YOURS.", hearts_needed = 10, ready1 = "THE GOLDEN LADLE! NOTHING", ready2 = "HITS HARDER IN ALL THE LAND."
+put pickup 7.5 6.5 kind = "golden_ladle", flag = "up:ladle", min_hearts = 10
+end
+
 room cave_pie1
 var exit_s = "back"
 map
@@ -362,6 +424,26 @@ put baker 7.5 4 line1 = "FRESH FROM THE MARSH!", line2 = "PICKLED PRICES, TOO."
 put pickup 5 6.5 kind = "key", price = 45
 put pickup 7.5 6.5 kind = "soup", price = 30
 put pickup 10 6.5 kind = "bombs_item", price = 20
+end
+
+room cave_spoon2
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "COME BACK WITH FIVE HEARTS,", line2 = "AND THIS SPOON IS YOURS.", hearts_needed = 5, ready1 = "A COPPER SPOON! IT HITS", ready2 = "HARDER THAN OLD WOOD."
+put pickup 7.5 6.5 kind = "copper_spoon", flag = "up:spoon2", min_hearts = 5
 end
 
 room cave_stash1

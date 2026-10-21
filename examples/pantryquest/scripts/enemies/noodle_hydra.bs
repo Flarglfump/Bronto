@@ -1,11 +1,12 @@
 # The Noodle Hydra, guardian of the Soup Cauldron: an iron pot that no
 # spoon or ladle can dent, with four noodle heads swaying out of it and
-# spitting broth. Three hits break a head off - and it flies loose round the
+# spitting broth. Five points of damage (three pokes with the silver ladle)
+# break a head off - and it flies loose round the
 # room, still biting and spitting, and can't be hurt. When the last head
-# breaks off, the pot topples and the loose heads go with it. Twelve hits.
+# breaks off, the pot topples and the loose heads go with it.
 
-var hp = 12                 # the hits its heads still need
-var hp_max = 12
+var hp = 20                 # the health its heads have left
+var hp_max = 20
 var title = "NOODLE HYDRA"
 var subtitle = "KEEPER OF THE SOUP CAULDRON"
 var size = 13
@@ -21,6 +22,7 @@ var flash_t = 0
 
 func start() {
     game = find("Game")
+    damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)
 }

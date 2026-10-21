@@ -139,17 +139,53 @@ CAVES = {
     (2, 0): ('cave_stash1', True), (6, 1): ('cave_stash2', True), (11, 2): ('cave_stash3', True),
     (14, 4): ('cave_stash4', True), (9, 6): ('cave_stash5', True), (1, 3): ('cave_stash6', True),
     (5, 5): ('cave_stash7', True), (10, 7): ('cave_stash8', True),
+    (8, 3): ('cave_spoon2', False), (1, 5): ('cave_jacket', True), (15, 3): ('cave_coat', True),
+    (8, 0): ('cave_ladle', True),
 }
+# The upgrades out in the land, each in a cave of its own: cave -> (pickup kind, flag, hearts needed,
+#   what the cook says until Pip has them, what the cook says then, what it is (for hints))
+UPGRADES = {
+    'cave_spoon2': ('copper_spoon', 'up:spoon2', 5, ("COME BACK WITH FIVE HEARTS,", "AND THIS SPOON IS YOURS."),
+                    ("A COPPER SPOON! IT HITS", "HARDER THAN OLD WOOD."), 'A COPPER SPOON'),
+    'cave_jacket': ('jacket', 'up:jacket', 0, None,
+                    ("A CHEF'S JACKET, LITTLE COOK:", "HITS WILL HURT YOU HALF AS MUCH."), "A CHEF'S JACKET"),
+    'cave_coat': ('coat', 'up:coat', 8, ("ONLY A CHEF WITH EIGHT HEARTS", "MAY WEAR THE ROYAL COAT."),
+                  ("THE ROYAL COAT! HITS HURT", "A QUARTER AS MUCH IN IT."), 'THE ROYAL COAT'),
+    'cave_ladle': ('golden_ladle', 'up:ladle', 10, ("TEN HEARTS, AND THE GOLDEN", "LADLE IS YOURS."),
+                   ("THE GOLDEN LADLE! NOTHING", "HITS HARDER IN ALL THE LAND."), 'THE GOLDEN LADLE'),
+}
+# What the old chef in the first cave says of each cellar, when it is the next to clear
+CELLAR_HINTS = {
+    1: ("THE COLD CELLAR, JUST NORTH", "IN THE FROSTY FIELDS."),
+    2: ("THE PICKLE PANTRY, FAR", "NORTHEAST IN THE PICKLE MARSH."),
+    3: ("THE SPICE RACK, WEST, DEEP", "IN THE LETTUCE WOODS."),
+    4: ("THE JAM JAR, ON THE ISLAND", "IN BLUEBERRY LAKE."),
+    5: ("THE CANDY WORKS, EAST", "IN THE CANDY MEADOWS."),
+    6: ("THE FORTUNE HALL, FAR", "NORTHWEST IN THE COOKIE FIELD."),
+    7: ("THE SUGAR MILL: A CRACKED", "CLIFF IN THE SUGAR DESERT."),
+    8: ("THE SOUP CAULDRON: A CRACKED", "CLIFF HIGH IN THE MOUNTAINS."),
+    9: ("BARON GORGE'S HALL, ATOP", "THE CHOCOLATE MOUNTAINS."),
+}
+PLACE = {'G': 'IN THE COOKIE FIELD', 'M': 'IN THE MOUNTAINS', 'B': 'IN THE PICKLE MARSH', 'C': 'ON THE JUICE COAST',
+         'L': 'BY BLUEBERRY LAKE', 'I': 'IN THE FROSTY FIELDS', 'W': 'IN THE WOODS', 'D': 'IN THE SUGAR DESERT',
+         'K': 'IN THE CANDY MEADOWS', 'P': 'ON THE PLAINS'}
+SHORT_REGION = {'G': 'COOKIE FIELD', 'M': 'MOUNTAINS', 'B': 'PICKLE MARSH', 'C': 'JUICE COAST', 'L': 'LAKE',
+                'I': 'FROSTY FIELDS', 'W': 'WOODS', 'D': 'SUGAR DESERT', 'K': 'CANDY MEADOWS', 'P': 'PLAINS'}
 STASH_BEANS = {'cave_stash1': 3, 'cave_stash2': 2, 'cave_stash3': 3, 'cave_stash4': 2, 'cave_stash5': 1,
                'cave_stash6': 2, 'cave_stash7': 1, 'cave_stash8': 2}
 PIE_LINES = {'cave_pie1': ("YOU FOUND MY HIDEAWAY!", "HAVE A SLICE OF HEART PIE."),
              'cave_pie2': ("A LONG WAY OUT HERE, EH?", "THIS PIE WILL KEEP YOU GOING.")}
 SPRINGS = [(3, 4), (12, 0)]                 # hearts to pick up, every visit
 OW_PIES = {(0, 0): 'ow:pie1', (6, 2): 'ow:pie2', (15, 7): 'ow:pie3'}
-ENEMIES = {'P': ['tomato', 'plum'], 'W': ['tomato', 'burger', 'plum'], 'L': ['plum', 'tomato', 'burger'],
-           'M': ['burger', 'breadstick', 'bat'], 'I': ['plum', 'jelly', 'tomato'], 'D': ['meatball', 'burger', 'breadstick'],
-           'G': ['bat', 'breadstick', 'burger'], 'B': ['jelly', 'plum', 'burger'], 'K': ['plum', 'tomato', 'burger', 'jelly'],
-           'C': ['tomato', 'plum']}
+# Each region's stage of the game: the cellar in it (the order Pip is meant to clear them). Its
+# screens' enemies get tougher with it (scripts/game.bs enemy_hp), and there are more of them.
+TIER = {'P': 1, 'I': 1, 'B': 2, 'W': 3, 'L': 4, 'K': 5, 'C': 5, 'G': 6, 'D': 7, 'M': 8}
+# The enemies of each region, for its stage: the plains' tomatoes and plums near home, the cellars'
+# kinds out where those cellars are (chili imps in the woods, ants in the desert...)
+ENEMIES = {'P': ['tomato', 'plum'], 'I': ['plum', 'jelly', 'tomato'], 'B': ['plum', 'olive', 'jelly', 'burger'],
+           'W': ['burger', 'plum', 'plum', 'imp'], 'L': ['burger', 'plum', 'jelly', 'olive'], 'K': ['corn', 'burger', 'jelly'],
+           'C': ['burger', 'olive', 'corn'], 'G': ['dumpling', 'bat', 'burger'], 'D': ['ant', 'meatball', 'burger', 'imp'],
+           'M': ['carrot', 'bat', 'breadstick', 'toast']}
 
 # ---------------------------------------------------------------- building a screen
 STYLE = {  # floor, sprinkle, border tiles
@@ -497,8 +533,7 @@ def build_room(x, y, opens, world_edges, seed):
             room.puts.append(('pickup', None, None, 'kind = "heart"'))
     # enemies
     if (x, y) not in SPRINGS:
-        dist = abs(x - 7) + abs(y - 7)
-        count = 1 + min(3, dist // 3) + (1 if rnd.random() < 0.4 else 0)
+        count = 1 + min(3, (TIER[room.r] + 1) // 3) + (1 if rnd.random() < 0.4 else 0)
         for _ in range(min(count, 4)):
             room.puts.append(('enemy', None, None, rnd.choice(ENEMIES[room.r])))
     room.opens = opens
@@ -547,6 +582,14 @@ def cave_room(name):
         puts.append('put baker 7.5 4 line1 = "%s", line2 = "%s"' % (l1, l2))
         for (kind, price), c in zip(SHOP_STOCK[name], (5, 7.5, 10)):
             puts.append('put pickup %g 6.5 kind = "%s", price = %d' % (c, kind, price))
+    elif name in UPGRADES:
+        kind, flag, hearts, wait, ready, _ = UPGRADES[name]
+        if hearts:
+            puts.append('put old_chef 7.5 4 line1 = "%s", line2 = "%s", hearts_needed = %d, ready1 = "%s", ready2 = "%s"'
+                        % (wait[0], wait[1], hearts, ready[0], ready[1]))
+        else:
+            puts.append('put old_chef 7.5 4 line1 = "%s", line2 = "%s"' % ready)
+        puts.append('put pickup 7.5 6.5 kind = "%s", flag = "%s"%s' % (kind, flag, ', min_hearts = %d' % hearts if hearts else ''))
     elif name in HINTS:
         l1, l2 = HINTS[name]
         puts.append('put old_chef 7.5 4 line1 = "%s", line2 = "%s"' % (l1, l2))
@@ -604,6 +647,7 @@ def write(rooms, caves_old, seed):
             out.append('room %s' % n)
             out.append('music overworld')
             out.append('var region = "%s"' % REGION_NAME[reg(x, y)].upper())   # shown as Pip comes in
+            out.append('var tier = %d' % TIER[reg(x, y)])                       # its stage: how tough its enemies are
             out.append('map')
             out += m
             out += puts
@@ -640,7 +684,48 @@ def write(rooms, caves_old, seed):
               'put old_chef 7.5 3 line1 = "%s", line2 = "IS STILL BEING DUG. LATER!"' % title[:30],
               'end', '']
     open(GAME + '/tools/world/cellars_unbuilt.txt', 'w').write('\n'.join(s))
+    write_hints(rooms)
     return problems
+
+def where(x, y):
+    """Which way a screen is from the start (7, 7): "FAR NORTHWEST", "EAST"..."""
+    dx, dy = x - 7, y - 7
+    ns = 'NORTH' if dy < -1 else 'SOUTH' if dy > 1 else ''
+    ew = 'WEST' if dx < -1 else 'EAST' if dx > 1 else ''
+    far = 'FAR ' if max(abs(dx), abs(dy)) >= 6 else ''
+    return (far + ns + ew) if (ns or ew) else 'NEAR HOME'
+
+def write_hints(rooms):
+    """scripts/hint_data.bs: what the old chef in the first cave can tell Pip."""
+    ups = []      # [flag, need, hearts, line1, line2]
+    for (x, y), flag in sorted(OW_PIES.items(), key=lambda kv: kv[1]):
+        ups.append((flag, '', 0, 'A HEART PIE: %s,' % where(x, y), 'OUT %s.' % PLACE[reg(x, y)]))
+    for (x, y), (cave, hidden) in sorted(CAVES.items(), key=lambda kv: kv[1][0]):
+        if cave in PIE_LINES: what, flag, hearts = 'A HEART PIE', cave.replace('cave_', ''), 0
+        elif cave in UPGRADES: what, flag, hearts = UPGRADES[cave][5], UPGRADES[cave][1], UPGRADES[cave][2]
+        else: continue
+        region, place = SHORT_REGION[reg(x, y)], PLACE[reg(x, y)]
+        if hidden and reg(x, y) == 'W': need, how = 'fire', 'BURN A BUSH %s.' % place
+        elif hidden: need, how = 'bombs', 'BOMB A CLIFF %s.' % place
+        else: need, how = '', 'A CAVE %s.' % place
+        if len(how) > 31: how = how.split(' ', 3)[0] + ' ' + how.split(' ')[1] + ' ' + how.split(' ')[2] + ': ' + region + '.'
+        ups.append((flag, need, hearts, '%s: %s' % (what, where(x, y)), how))
+    out = ['# What the old chef in the first cave tells Pip (scripts/hint.bs asks): where each cellar is, and',
+           '# where the upgrades out in the land are. Made by tools/design_overworld.py - edit it there.', '',
+           '# A cellar\'s whereabouts: [line 1, line 2, hidden behind a cracked cliff?]', 'func cellar(n) {']
+    for n in sorted(CELLAR_HINTS):
+        hidden = any(v[0] == n and v[2] for v in CELLARS.values())
+        a, b = CELLAR_HINTS[n]
+        out.append('    if n == %d { return ["%s", "%s", %s] }' % (n, a, b, 'true' if hidden else 'false'))
+    out += ['    return ["", "", false]', '}', '',
+            '# The upgrades out in the land: [flag once taken, what reaching it needs ("", "bombs", "fire"),',
+            '# hearts needed, line 1, line 2]', 'func upgrades() {', '    return [']
+    for i, (flag, need, hearts, a, b) in enumerate(ups):
+        for line in (a, b):
+            if len(line) > 31: raise SystemExit('hint too long: ' + line)
+        out.append('        ["%s", "%s", %d, "%s", "%s"]%s' % (flag, need, hearts, a, b, ',' if i < len(ups) - 1 else ''))
+    out += ['    ]', '}', '']
+    open(GAME + '/scripts/hint_data.bs', 'w').write('\n'.join(out))
 
 if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if a != '--force']

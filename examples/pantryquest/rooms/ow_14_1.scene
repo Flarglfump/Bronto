@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_14_1\", music = \"overworld\", region = \"JUICE COAST\""
+    vars = "id = \"ow_14_1\", music = \"overworld\", region = \"JUICE COAST\", tier = 5"
 
 entity
   Name
@@ -43,13 +43,13 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 136 72
+    position = 136 40
   Sprite
-    image = "art/plum_0.bmp"
+    image = "art/corn_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+    vars = "hp = 1, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
   Parent
     entity = 0
 
@@ -57,13 +57,13 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 56 136
+    position = 56 120
   Sprite
-    image = "art/tomato_0.bmp"
+    image = "art/olive_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+    vars = "hp = 2, damage = 1, image = \"art/olive_\", speed = 36, shot = \"prefabs/seed.scene\", shot_speed = 120, aim = true"
   Parent
     entity = 0
 
@@ -71,26 +71,12 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 88 88
+    position = 152 104
   Sprite
-    image = "art/tomato_0.bmp"
+    image = "art/burger_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Enemy"
-  Transform
-    position = 200 72
-  Sprite
-    image = "art/plum_0.bmp"
-    layer = 3
-  Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
   Parent
     entity = 0

@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_3_0\", music = \"overworld\", region = \"CHOCOLATE MOUNTAINS\""
+    vars = "id = \"ow_3_0\", music = \"overworld\", region = \"CHOCOLATE MOUNTAINS\", tier = 8"
 
 entity
   Name
@@ -43,7 +43,7 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 168 88
+    position = 184 136
   Sprite
     image = "art/breadstick_0.bmp"
     layer = 3
@@ -57,7 +57,7 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 200 72
+    position = 184 72
   Sprite
     image = "art/bat_0.bmp"
     layer = 3
@@ -71,7 +71,7 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 88 40
+    position = 88 136
   Sprite
     image = "art/bat_0.bmp"
     layer = 3
@@ -85,12 +85,12 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 152 56
+    position = 152 120
   Sprite
-    image = "art/burger_0.bmp"
+    image = "art/breadstick_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+    vars = "hp = 2, damage = 2, image = \"art/breadstick_\", speed = 34"
   Parent
     entity = 0

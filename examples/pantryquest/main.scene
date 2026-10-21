@@ -662,3 +662,11 @@ entity
     size = 126 4
     color = #d8343a00
     layer = 59
+
+entity
+  Name
+    text = "Hints"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/hint_data.bs"

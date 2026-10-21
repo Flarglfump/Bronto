@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"d8_4_1\", music = \"cellar\", stays_clear = true, shut = \"w\""
+    vars = "id = \"d8_4_1\", music = \"cellar\", stays_clear = true, tier = 8, shut = \"w\""
 
 entity
   Name
@@ -50,7 +50,7 @@ entity
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 4, damage = 2, image = \"art/carrot_\", speed = 38, shot = \"prefabs/carrot_coin.scene\", shot_speed = 120, shot_chance = 0.3"
+    vars = "hp = 2, damage = 2, image = \"art/carrot_\", speed = 38, shot = \"prefabs/carrot_coin.scene\", shot_speed = 120, shot_chance = 0.3"
   Parent
     entity = 0
 
@@ -64,7 +64,7 @@ entity
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 4, damage = 2, image = \"art/carrot_\", speed = 38, shot = \"prefabs/carrot_coin.scene\", shot_speed = 120, shot_chance = 0.3"
+    vars = "hp = 2, damage = 2, image = \"art/carrot_\", speed = 38, shot = \"prefabs/carrot_coin.scene\", shot_speed = 120, shot_chance = 0.3"
   Parent
     entity = 0
 
