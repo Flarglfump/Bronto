@@ -357,7 +357,7 @@ bool br_engine_frame(br_engine *e) {
 void br_engine_quit(br_engine *e) { e->running = false; }
 
 bool br_gamepad_rumble(br_engine *e, int pad, float lo, float hi, float seconds) {
-    if (pad < 0 || pad >= BR_MAX_GAMEPADS || !e->platform->set_gamepad_rumble) return false;
+    if (pad < 0 || pad >= BR_MAX_GAMEPADS || !e->platform || !e->platform->set_gamepad_rumble) return false;
     lo = br_clampf(lo, 0, 1);
     hi = br_clampf(hi, 0, 1);
     if (!e->platform->set_gamepad_rumble(pad, lo, hi)) return false;

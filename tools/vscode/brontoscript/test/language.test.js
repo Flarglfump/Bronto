@@ -104,6 +104,8 @@ test('quick check: no false alarms on real scripts, catches slips', () => {
     assert.ok(bad.some(p => /never closed/.test(p.message)));
     assert.ok(lang.quickCheck('func f() {\n}\nprint(1)\n').some(p => p.line === 2 && /top of a script/.test(p.message)));
     assert.deepStrictEqual(lang.quickCheck('func f() {\n    print("jmup()") # nope()\n    self.hit(1)\n}\n'), []);
+    assert.deepStrictEqual(lang.quickCheck('var names = ["A",\n             "B"]\nvar n = max(1,\n    2)\n'), []);   // lists and calls over lines
+    assert.deepStrictEqual(lang.quickCheck('func f() {\n    if button_pressed("a") or axis("lt") > 0.5 { rumble(1, 0.2) }\n}\n'), []);
 });
 
 test('types: declarations, completion after : and ->, hover, signatures', () => {

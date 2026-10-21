@@ -533,6 +533,142 @@
    "returns": "vec2"
   },
   {
+   "name": "button_down",
+   "signature": "button_down(name, pad = any)",
+   "doc": "Whether a gamepad button is held, on that pad (0 to 3) or any: a b x y, lb rb, lt rt (the triggers), back start guide, ls rs (the sticks pressed in), up down left right (the d-pad); PlayStation names (\"cross\", \"circle\"...) and \"l1\", \"r2\", \"select\", \"menu\" work too. Every pad has the same Xbox-style layout.",
+   "params": [
+    "name",
+    "pad"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "number"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "button_pressed",
+   "signature": "button_pressed(name, pad = any)",
+   "doc": "Whether a gamepad button went down this step, on that pad or any (names as button_down()).",
+   "params": [
+    "name",
+    "pad"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "number"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "button_released",
+   "signature": "button_released(name, pad = any)",
+   "doc": "Whether a gamepad button came up this step, on that pad or any (names as button_down()).",
+   "params": [
+    "name",
+    "pad"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "number"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "axis",
+   "signature": "axis(name, pad = any)",
+   "doc": "A stick's \"left_x\", \"left_y\", \"right_x\", \"right_y\" (-1 to 1; +y is down) or a trigger's \"lt\", \"rt\" (0 to 1), with the dead zone taken off. Without a pad, the one pushed furthest.",
+   "params": [
+    "name",
+    "pad"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "number"
+   ],
+   "returns": "number"
+  },
+  {
+   "name": "stick",
+   "signature": "stick(which = \"left\", pad = any)",
+   "doc": "The \"left\" or \"right\" stick as a vec2, each part -1 to 1 (+y is down), with the dead zone taken off.",
+   "params": [
+    "which",
+    "pad"
+   ],
+   "min": 0,
+   "param_types": [
+    "string",
+    "number"
+   ],
+   "returns": "vec2"
+  },
+  {
+   "name": "gamepad_connected",
+   "signature": "gamepad_connected(pad = any)",
+   "doc": "Whether that gamepad (0 to 3) is plugged in, or (without one) any.",
+   "params": [
+    "pad"
+   ],
+   "min": 0,
+   "param_types": [
+    "number"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "gamepad_count",
+   "signature": "gamepad_count()",
+   "doc": "How many gamepads are plugged in.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "number"
+  },
+  {
+   "name": "gamepad_name",
+   "signature": "gamepad_name(pad = first)",
+   "doc": "What a gamepad calls itself (\"\" if there is none); without a pad, the first one plugged in.",
+   "params": [
+    "pad"
+   ],
+   "min": 0,
+   "param_types": [
+    "number"
+   ],
+   "returns": "string"
+  },
+  {
+   "name": "last_button",
+   "signature": "last_button()",
+   "doc": "The name of a gamepad button pressed this step on any pad (\"\" if none), as button_down() takes it: for letting players choose their buttons.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "string"
+  },
+  {
+   "name": "rumble",
+   "signature": "rumble(strength, seconds, pad = all)",
+   "doc": "Shakes a gamepad (or every one): strength 0 to 1, for that long; 0 stops it. True if a pad could.",
+   "params": [
+    "strength",
+    "seconds",
+    "pad"
+   ],
+   "min": 2,
+   "param_types": [
+    "number",
+    "number",
+    "number"
+   ],
+   "returns": "bool"
+  },
+  {
    "name": "time",
    "signature": "time()",
    "doc": "Seconds since the game started.",

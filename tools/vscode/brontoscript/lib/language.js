@@ -284,6 +284,7 @@ function quickCheck(text) {
     const stack = [];
     for (let i = 0; i < lines.length; ++i) {
         const code = stripStrings(stripComment(lines[i]));
+        const continued = stack.some(o => o.c !== '{');        // (inside a list or call that began on an earlier line)
         for (let k = 0; k < code.length; ++k) {
             const c = code[k];
             if (c === '{' || c === '(' || c === '[') stack.push({ c, line: i, character: k });
@@ -301,7 +302,7 @@ function quickCheck(text) {
             if (!known.has(name)) problems.push({ line: i, character: m.index + m[1].length, length: name.length, message: `unknown function '${name}'` });
         }
         const top = /^\s*(?!var\b|func\b|@strict\b|#|$|\}|\{)(\S+)/.exec(lines[i]);
-        if (top && depthBefore(lines, i) === 0) problems.push({ line: i, character: lines[i].indexOf(top[1]), length: top[1].length, message: "only 'var' and 'func' can be at the top of a script (put code inside start())" });
+        if (top && !continued && depthBefore(lines, i) === 0) problems.push({ line: i, character: lines[i].indexOf(top[1]), length: top[1].length, message: "only 'var' and 'func' can be at the top of a script (put code inside start())" });
     }
     for (const open of stack) problems.push({ line: open.line, character: open.character, length: 1, message: `this '${open.c}' is never closed` });
     return problems;

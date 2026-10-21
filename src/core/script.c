@@ -2418,6 +2418,163 @@ static sc_value bi_mouse_position(ARGS) {
     UNUSED_ARGS;
     return e ? sc_vec(e->input.mouse_x, e->input.mouse_y) : sc_vec(0, 0);
 }
+/* Gamepads: every controller in the same Xbox-style layout (input.h). Buttons
+ * by name - "a" "b" "x" "y", "lb" "rb", "lt" "rt" (the triggers, as buttons),
+ * "back" "start" "guide", "ls" "rs" (the sticks, pressed in), "up" "down"
+ * "left" "right" (the d-pad) - with the other usual names too (PlayStation's
+ * "cross" "circle"..., "l1" "r2", "select" "menu"...). Without a pad number,
+ * any pad. */
+#define SC_PAD_LT BR_PAD_BUTTON_COUNT                   /* the triggers, after the real buttons */
+#define SC_PAD_RT (BR_PAD_BUTTON_COUNT + 1)
+#define SC_PAD_ANY_COUNT (BR_PAD_BUTTON_COUNT + 2)
+static const char *const k_pad_button_names[SC_PAD_ANY_COUNT] = {
+    "a", "b", "x", "y", "lb", "rb", "back", "start", "guide", "ls", "rs", "up", "right", "down", "left", "lt", "rt"
+};
+static int sc_pad_button_named(const char *name) {
+    static const struct { const char *alias; int b; } aliases[] = {
+        { "cross", BR_PAD_A }, { "circle", BR_PAD_B }, { "square", BR_PAD_X }, { "triangle", BR_PAD_Y },
+        { "left_bumper", BR_PAD_LEFT_BUMPER }, { "right_bumper", BR_PAD_RIGHT_BUMPER }, { "l1", BR_PAD_LEFT_BUMPER },
+        { "r1", BR_PAD_RIGHT_BUMPER }, { "left_trigger", SC_PAD_LT }, { "right_trigger", SC_PAD_RT }, { "l2", SC_PAD_LT },
+        { "r2", SC_PAD_RT }, { "select", BR_PAD_BACK }, { "view", BR_PAD_BACK }, { "share", BR_PAD_BACK },
+        { "menu", BR_PAD_START }, { "options", BR_PAD_START }, { "home", BR_PAD_GUIDE }, { "left_stick", BR_PAD_LEFT_STICK },
+        { "right_stick", BR_PAD_RIGHT_STICK }, { "l3", BR_PAD_LEFT_STICK }, { "r3", BR_PAD_RIGHT_STICK },
+        { "dpad_up", BR_PAD_DPAD_UP }, { "dpad_right", BR_PAD_DPAD_RIGHT }, { "dpad_down", BR_PAD_DPAD_DOWN },
+        { "dpad_left", BR_PAD_DPAD_LEFT },
+    };
+    size_t i;
+    for (i = 0; i < BR_ARRAY_COUNT(k_pad_button_names); ++i) if (sc_strieq(name, k_pad_button_names[i])) return (int)i;
+    for (i = 0; i < BR_ARRAY_COUNT(aliases); ++i) if (sc_strieq(name, aliases[i].alias)) return aliases[i].b;
+    return -1;
+}
+/* The pad argument at a[i] (-1: none given, any pad). */
+static int sc_pad_arg(sc_vm *vm, sc_value *a, int n, int i, int line, const char *what) {
+    int pad;
+    if (n <= i || a[i].t == V_NIL) return -1;
+    pad = (int)sc_need_num(vm, &a[i], line, what);
+    if (pad < 0 || pad >= BR_MAX_GAMEPADS) sc_fail(vm, line, "gamepads are numbered 0 to %d", BR_MAX_GAMEPADS - 1);
+    return pad;
+}
+/* which: 0 down, 1 pressed this step, 2 released this step */
+static bool sc_pad_button_on(const br_input *in, int pad, int b, int which) {
+    const br_gamepad_state *p = &in->pads[pad];
+    if (b >= BR_PAD_BUTTON_COUNT) {
+        int t = b - SC_PAD_LT;
+        return which == 0 ? p->triggers[t] : which == 1 ? p->trigger_pressed[t] : p->trigger_released[t];
+    }
+    return which == 0 ? p->buttons[b] : which == 1 ? p->pressed[b] : p->released[b];
+}
+static bool sc_pad_button_state(sc_vm *vm, sc_value *a, int n, int line, int which, const char *what) {
+    br_engine *e = sc_engine(vm);
+    const char *name = sc_need_str(vm, &a[0], line, "a gamepad button");
+    int b = sc_pad_button_named(name), pad = sc_pad_arg(vm, a, n, 1, line, what), p;
+    if (b < 0) sc_fail(vm, line, "there is no gamepad button called \"%s\" (a b x y, lb rb lt rt, back start guide, ls rs, up down left right)", name);
+    if (!e) return false;
+    for (p = 0; p < BR_MAX_GAMEPADS; ++p)
+        if ((pad < 0 || pad == p) && sc_pad_button_on(&e->input, p, b, which)) return true;
+    return false;
+}
+static sc_value bi_button_down(ARGS) { return sc_bool(sc_pad_button_state(vm, a, n, line, 0, "button_down()")); }
+static sc_value bi_button_pressed(ARGS) { return sc_bool(sc_pad_button_state(vm, a, n, line, 1, "button_pressed()")); }
+static sc_value bi_button_released(ARGS) { return sc_bool(sc_pad_button_state(vm, a, n, line, 2, "button_released()")); }
+/* axis(name[, pad]): a stick's "left_x" "left_y" "right_x" "right_y" (-1 to 1; +y is down), or a trigger's
+ * "lt" "rt" (0 to 1), past the dead zone. Without a pad, the one pushed furthest. */
+static sc_value bi_axis(ARGS) {
+    static const struct { const char *name; int axis; } names[] = {
+        { "left_x", BR_PAD_AXIS_LEFT_X }, { "left_y", BR_PAD_AXIS_LEFT_Y }, { "right_x", BR_PAD_AXIS_RIGHT_X },
+        { "right_y", BR_PAD_AXIS_RIGHT_Y }, { "lt", BR_PAD_AXIS_LEFT_TRIGGER }, { "rt", BR_PAD_AXIS_RIGHT_TRIGGER },
+        { "left_trigger", BR_PAD_AXIS_LEFT_TRIGGER }, { "right_trigger", BR_PAD_AXIS_RIGHT_TRIGGER },
+        { "l2", BR_PAD_AXIS_LEFT_TRIGGER }, { "r2", BR_PAD_AXIS_RIGHT_TRIGGER },
+    };
+    br_engine *e = sc_engine(vm);
+    const char *name = sc_need_str(vm, &a[0], line, "an axis");
+    int ax = -1, pad = sc_pad_arg(vm, a, n, 1, line, "axis()"), p;
+    float best = 0;
+    size_t i;
+    for (i = 0; i < BR_ARRAY_COUNT(names); ++i) if (sc_strieq(name, names[i].name)) ax = names[i].axis;
+    if (ax < 0) sc_fail(vm, line, "there is no axis called \"%s\" (left_x left_y right_x right_y, lt rt)", name);
+    if (!e) return sc_num(0);
+    for (p = 0; p < BR_MAX_GAMEPADS; ++p) {
+        float v;
+        if (pad >= 0 && pad != p) continue;
+        v = br_pad_axis(&e->input, p, (br_gamepad_axis)ax);
+        if (fabsf(v) > fabsf(best)) best = v;
+    }
+    return sc_num(best);
+}
+/* stick([which[, pad]]): "left" (the default) or "right" stick as a vec2, each part -1 to 1 (+y down). */
+static sc_value bi_stick(ARGS) {
+    br_engine *e = sc_engine(vm);
+    const char *which = n > 0 ? sc_need_str(vm, &a[0], line, "\"left\" or \"right\"") : "left";
+    int base = BR_PAD_AXIS_LEFT_X, pad = sc_pad_arg(vm, a, n, 1, line, "stick()"), p;
+    float bx = 0, by = 0;
+    if (sc_strieq(which, "left")) base = BR_PAD_AXIS_LEFT_X;
+    else if (sc_strieq(which, "right")) base = BR_PAD_AXIS_RIGHT_X;
+    else sc_fail(vm, line, "stick() takes \"left\" or \"right\", not \"%s\"", which);
+    if (!e) return sc_vec(0, 0);
+    for (p = 0; p < BR_MAX_GAMEPADS; ++p) {
+        float x, y;
+        if (pad >= 0 && pad != p) continue;
+        x = br_pad_axis(&e->input, p, (br_gamepad_axis)base);
+        y = br_pad_axis(&e->input, p, (br_gamepad_axis)(base + 1));
+        if (x * x + y * y > bx * bx + by * by) { bx = x; by = y; }
+    }
+    return sc_vec(bx, by);
+}
+/* gamepad_connected([pad]): that pad, or (without one) any. */
+static sc_value bi_gamepad_connected(ARGS) {
+    br_engine *e = sc_engine(vm);
+    int pad = sc_pad_arg(vm, a, n, 0, line, "gamepad_connected()"), p;
+    if (!e) return sc_bool(false);
+    for (p = 0; p < BR_MAX_GAMEPADS; ++p)
+        if ((pad < 0 || pad == p) && br_pad_connected(&e->input, p)) return sc_bool(true);
+    return sc_bool(false);
+}
+static sc_value bi_gamepad_count(ARGS) {
+    br_engine *e = sc_engine(vm);
+    int p, count = 0;
+    UNUSED_ARGS;
+    if (e) for (p = 0; p < BR_MAX_GAMEPADS; ++p) count += br_pad_connected(&e->input, p);
+    return sc_num(count);
+}
+/* gamepad_name([pad]): what the controller calls itself ("" if none); without a pad, the first connected. */
+static sc_value bi_gamepad_name(ARGS) {
+    br_engine *e = sc_engine(vm);
+    int pad = sc_pad_arg(vm, a, n, 0, line, "gamepad_name()"), p;
+    if (e) for (p = 0; p < BR_MAX_GAMEPADS; ++p) {
+        if ((pad < 0 || pad == p) && br_pad_connected(&e->input, p)) {
+            const char *name = br_pad_name(&e->input, p);
+            return sc_string(vm, name, strlen(name));
+        }
+    }
+    return sc_string(vm, "", 0);
+}
+/* last_button(): the name of a gamepad button pressed this step on any pad ("" if none), as
+ * button_down() takes it: for letting players choose their buttons. */
+static sc_value bi_last_button(ARGS) {
+    br_engine *e = sc_engine(vm);
+    int p, b;
+    UNUSED_ARGS;
+    if (e) for (p = 0; p < BR_MAX_GAMEPADS; ++p)
+        for (b = 0; b < SC_PAD_ANY_COUNT; ++b)
+            if (sc_pad_button_on(&e->input, p, b, 1)) return sc_string(vm, k_pad_button_names[b], strlen(k_pad_button_names[b]));
+    return sc_string(vm, "", 0);
+}
+/* rumble(strength, seconds[, pad]): shakes the pad (or every pad): strength 0 to 1; 0 stops it.
+ * True if a pad could. */
+static sc_value bi_rumble(ARGS) {
+    br_engine *e = sc_engine(vm);
+    double strength = NUM(0, "rumble()'s strength"), seconds = NUM(1, "rumble()'s seconds");
+    int pad = sc_pad_arg(vm, a, n, 2, line, "rumble()"), p;
+    bool any = false;
+    if (!e) return sc_bool(false);
+    for (p = 0; p < BR_MAX_GAMEPADS; ++p) {
+        if (pad >= 0 && pad != p) continue;
+        if (pad < 0 && !br_pad_connected(&e->input, p)) continue;
+        if (br_gamepad_rumble(e, p, (float)strength, (float)strength * 0.6f, (float)seconds)) any = true;
+    }
+    return sc_bool(any);
+}
+
 static sc_value bi_time(ARGS) { br_engine *e = sc_engine(vm); UNUSED_ARGS; return sc_num(e ? e->time : 0); }
 
 /* ---- the world ---- */
@@ -2912,6 +3069,11 @@ static const sc_builtin k_builtin_table[] = {
     { "key_released", 1, 1, bi_key_released, "s>b" },
     { "mouse_down", 0, 1, bi_mouse_down, "n>b" }, { "mouse_pressed", 0, 1, bi_mouse_pressed, "n>b" },
     { "mouse_position", 0, 0, bi_mouse_position, ">v" }, { "time", 0, 0, bi_time, ">n" },
+    { "button_down", 1, 2, bi_button_down, "sn>b" }, { "button_pressed", 1, 2, bi_button_pressed, "sn>b" },
+    { "button_released", 1, 2, bi_button_released, "sn>b" }, { "axis", 1, 2, bi_axis, "sn>n" },
+    { "stick", 0, 2, bi_stick, "sn>v" }, { "gamepad_connected", 0, 1, bi_gamepad_connected, "n>b" },
+    { "gamepad_count", 0, 0, bi_gamepad_count, ">n" }, { "gamepad_name", 0, 1, bi_gamepad_name, "n>s" },
+    { "last_button", 0, 0, bi_last_button, ">s" }, { "rumble", 2, 3, bi_rumble, "nnn>b" },
     { "find", 1, 1, bi_find, "s>e" }, { "find_all", 1, 1, bi_find_all, "s>L" }, { "destroy", 1, 1, bi_destroy, "e>-" },
     { "spawn", 1, 3, bi_spawn, "spq>e" }, { "children", 1, 1, bi_children, "e>L" }, { "child", 2, 2, bi_child, "es>e" },
     { "has", 2, 2, bi_has, "es>b" }, { "add", 2, 2, bi_add, "es>c" },

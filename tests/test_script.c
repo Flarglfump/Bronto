@@ -1389,6 +1389,113 @@ static void test_pantryquest_files_and_settings(void) {
     br_save_set_folder(NULL);
 }
 
+/* Gamepads in scripts: buttons by name (and other names), the triggers as
+ * buttons, sticks and axes, which pad, choosing a button, and rumble. */
+static void pad_frame(const br_event *evs, int count) {
+    int i;
+    br_input_begin_frame(&g_engine.input);
+    for (i = 0; i < count; ++i) br_input_handle_event(&g_engine.input, &evs[i]);
+    br_input_end_events(&g_engine.input);
+    steps(1);
+}
+static br_event pad_event(uint32_t type, int pad, int code, float value) {
+    br_event e = br_event_make(type);
+    e.u.gamepad.pad = pad;
+    e.u.gamepad.button = code;
+    e.u.gamepad.axis = code;
+    e.u.gamepad.value = value;
+    e.u.gamepad.name = "Test Pad";
+    return e;
+}
+static void test_gamepad_input(void) {
+    br_entity e;
+    char text[64];
+    float lo = 0, hi = 0;
+    br_event ev[4];
+    setup();
+    g_engine.platform = br_platform_headless();
+    {
+        br_gamepad_raw raw;
+        memset(&raw, 0, sizeof(raw));
+        raw.connected = true;                                      /* (so the headless pad can rumble) */
+        br_headless_set_gamepad(0, &raw);
+    }
+    write_script("pad.bs",
+        "var down = 0\nvar pressed = 0\nvar released = 0\nvar on_one = 0\nvar lt = 0\nvar mx = 0\nvar my = 0\nvar rt = 0\n"
+        "var count = 0\nvar name = \"\"\nvar last = \"\"\nvar dpad = 0\nvar shook = 0\nvar right = 0\n"
+        "func update(dt) {\n"
+        "    if button_down(\"a\") { down += 1 }\n"
+        "    if button_pressed(\"cross\") { pressed += 1 }\n"
+        "    if button_released(\"A\", 0) { released += 1 }\n"
+        "    if button_pressed(\"a\", 1) { on_one += 1 }\n"
+        "    if button_pressed(\"l2\") { lt += 1 }\n"
+        "    if button_down(\"left\") { dpad += 1 }\n"
+        "    var s = stick()\n"
+        "    mx = s.x\n"
+        "    my = s.y\n"
+        "    right = stick(\"right\", 0).x\n"
+        "    rt = axis(\"rt\")\n"
+        "    count = gamepad_count()\n"
+        "    name = gamepad_name()\n"
+        "    var b = last_button()\n"
+        "    if b != \"\" { last = b }\n"
+        "    if button_pressed(\"start\") and rumble(1, 0.5) { shook += 1 }\n"
+        "    if not gamepad_connected(2) and gamepad_connected() { count += 10 }\n"
+        "}\n");
+    e = scripted("Pad", "pad.bs", NULL, br_v2(0, 0));
+    steps(1);
+    CHECK(num(e, "count") == 0 && num(e, "mx") == 0);           /* no pads yet */
+    ev[0] = pad_event(BR_EVENT_GAMEPAD_CONNECTED, 0, 0, 0);
+    ev[1] = pad_event(BR_EVENT_GAMEPAD_BUTTON_DOWN, 0, BR_PAD_A, 0);
+    pad_frame(ev, 2);
+    CHECK(num(e, "down") == 1 && num(e, "pressed") == 1 && num(e, "on_one") == 0);
+    CHECK(num(e, "count") == 11);
+    CHECK(br_script_get_string(&W, e, "name", text, sizeof(text)) && strcmp(text, "Test Pad") == 0);
+    CHECK(br_script_get_string(&W, e, "last", text, sizeof(text)) && strcmp(text, "a") == 0);
+    pad_frame(NULL, 0);
+    CHECK(num(e, "down") == 2 && num(e, "pressed") == 1);         /* held: pressed only once */
+    ev[0] = pad_event(BR_EVENT_GAMEPAD_BUTTON_UP, 0, BR_PAD_A, 0);
+    ev[1] = pad_event(BR_EVENT_GAMEPAD_AXIS, 0, BR_PAD_AXIS_LEFT_TRIGGER, 0.9f);
+    ev[2] = pad_event(BR_EVENT_GAMEPAD_AXIS, 0, BR_PAD_AXIS_LEFT_X, 1.0f);
+    ev[3] = pad_event(BR_EVENT_GAMEPAD_AXIS, 0, BR_PAD_AXIS_RIGHT_TRIGGER, 0.5f);
+    pad_frame(ev, 4);
+    CHECK(num(e, "released") == 1 && num(e, "down") == 2 && num(e, "lt") == 1);
+    CHECK(num(e, "mx") == 1 && num(e, "my") == 0 && num(e, "right") == 0);
+    CHECK_NEAR(num(e, "rt"), 0.375, 1e-6);                       /* (0.5, past the 0.2 dead zone, rescaled) */
+    CHECK(br_script_get_string(&W, e, "last", text, sizeof(text)) && strcmp(text, "lt") == 0);
+    ev[0] = pad_event(BR_EVENT_GAMEPAD_BUTTON_DOWN, 1, BR_PAD_A, 0);    /* a second pad */
+    ev[1] = pad_event(BR_EVENT_GAMEPAD_BUTTON_DOWN, 1, BR_PAD_DPAD_LEFT, 0);
+    ev[2] = pad_event(BR_EVENT_GAMEPAD_BUTTON_DOWN, 0, BR_PAD_START, 0);
+    pad_frame(ev, 3);
+    CHECK(num(e, "on_one") == 1 && num(e, "pressed") == 2 && num(e, "dpad") == 1);   /* "a" without a pad: any */
+    CHECK(num(e, "count") == 12 && num(e, "shook") == 1);
+    br_headless_get_rumble(0, &lo, &hi);
+    CHECK(lo == 1 && hi > 0);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    {   /* mistakes: a button that isn't, a pad that can't be, and the wrong number of arguments */
+        br_entity bad;
+        write_script("pad_bad.bs", "func update(dt) {\n    if button_down(\"z\") { print(1) }\n}\n");
+        bad = scripted("Bad", "pad_bad.bs", NULL, br_v2(0, 0));
+        steps(1);
+        CHECK(br_script_error_count(&W) >= 1 && strstr(br_script_last_error(&W), "no gamepad button called \"z\""));
+        br_entity_destroy(&W, bad);
+        write_script("pad_bad2.bs", "func update(dt) {\n    var v = axis(\"left_x\", 7)\n}\n");
+        bad = scripted("Bad2", "pad_bad2.bs", NULL, br_v2(0, 0));
+        steps(1);
+        CHECK(strstr(br_script_last_error(&W), "gamepads are numbered 0 to 3") != NULL);
+        br_entity_destroy(&W, bad);
+        CHECK(!br_script_check("func update(dt) {\n    rumble(1)\n}\n", "x.bs", text, sizeof(text)) && strstr(text, "rumble() takes 2 to 3"));
+    }
+    br_gamepad_rumble(&g_engine, 0, 0, 0, 0);
+    {
+        br_gamepad_raw raw;
+        memset(&raw, 0, sizeof(raw));
+        br_headless_set_gamepad(0, &raw);
+    }
+    teardown();
+}
+
 typedef struct counter_state { int starts, updates, hits; } counter_state;
 static int g_destroyed;
 static void cb_start(br_world *w, br_entity e, void *s) { BR_UNUSED(w); BR_UNUSED(e); ((counter_state *)s)->starts++; }
@@ -1697,6 +1804,7 @@ void suite_script(void) {
     RUN(test_runtime_errors);
     RUN(test_physics_callbacks_and_messages);
     RUN(test_spawn_destroy_input);
+    RUN(test_gamepad_input);
     RUN(test_tiles_substr_big_spawn);
     RUN(test_spawn_then_set);
     RUN(test_c_behaviour_and_reload);

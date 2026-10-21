@@ -117,6 +117,11 @@ typedef struct br_gamepad_state {
     bool pressed[BR_PAD_BUTTON_COUNT];
     bool released[BR_PAD_BUTTON_COUNT];
     float axes[BR_PAD_AXIS_COUNT];
+    /* The triggers as buttons (0 left, 1 right): down past half way, up again
+     * below 0.4; worked out by br_input_end_events. */
+    bool triggers[2];
+    bool trigger_pressed[2];
+    bool trigger_released[2];
 } br_gamepad_state;
 
 typedef struct br_input {
@@ -167,6 +172,7 @@ bool br_mouse_released(const br_input *in, br_mouse_button b);
 bool  br_pad_connected(const br_input *in, int pad);
 bool  br_pad_down(const br_input *in, int pad, br_gamepad_button b);
 bool  br_pad_pressed(const br_input *in, int pad, br_gamepad_button b);
+bool  br_pad_released(const br_input *in, int pad, br_gamepad_button b);
 float br_pad_axis(const br_input *in, int pad, br_gamepad_axis a); /* deadzone applied */
 
 /* Actions: named, rebindable logical inputs ("jump", "move_left"...). */

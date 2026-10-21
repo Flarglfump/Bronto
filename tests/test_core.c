@@ -416,6 +416,33 @@ static void test_actions_and_gamepad(void) {
 
     br_input_clear_bindings(&in, jump);
     CHECK_EQ_INT(in.actions[jump].binding_count, 0);
+
+    /* the triggers as buttons: down past half way, up again below 0.4 */
+    ax.u.gamepad.pad = 0; ax.u.gamepad.axis = BR_PAD_AXIS_RIGHT_TRIGGER;
+    br_input_begin_frame(&in);
+    ax.u.gamepad.value = 0.45f; feed(&in, ax);
+    br_input_end_events(&in);
+    CHECK(!in.pads[0].triggers[1] && !in.pads[0].trigger_pressed[1]);
+    br_input_begin_frame(&in);
+    ax.u.gamepad.value = 0.7f; feed(&in, ax);
+    br_input_end_events(&in);
+    CHECK(in.pads[0].triggers[1] && in.pads[0].trigger_pressed[1] && !in.pads[0].triggers[0]);
+    br_input_begin_frame(&in);
+    ax.u.gamepad.value = 0.45f; feed(&in, ax);                 /* (not below 0.4 yet: still down) */
+    br_input_end_events(&in);
+    CHECK(in.pads[0].triggers[1] && !in.pads[0].trigger_pressed[1]);
+    br_input_begin_frame(&in);
+    ax.u.gamepad.value = 0.1f; feed(&in, ax);
+    br_input_end_events(&in);
+    CHECK(!in.pads[0].triggers[1] && in.pads[0].trigger_released[1]);
+    bt.type = BR_EVENT_GAMEPAD_BUTTON_DOWN; bt.u.gamepad.pad = 0; bt.u.gamepad.button = BR_PAD_B;
+    br_input_begin_frame(&in);
+    feed(&in, bt);
+    br_input_end_events(&in);
+    br_input_begin_frame(&in);
+    bt.type = BR_EVENT_GAMEPAD_BUTTON_UP; feed(&in, bt);
+    br_input_end_events(&in);
+    CHECK(br_pad_released(&in, 0, BR_PAD_B) && !br_pad_down(&in, 0, BR_PAD_B));
 }
 
 void suite_input(void) {

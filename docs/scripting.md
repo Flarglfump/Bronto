@@ -133,6 +133,29 @@ range(n) range(a, b[, step])`.
 `last_key()` gives the name of a key pressed this step (`""` if none) in the form
 `key_down()` takes, for letting players choose their own keys.
 
+**Gamepads:** every controller has the same Xbox-style layout, whatever it is (on a
+PlayStation pad, A is cross; on a Steam Deck, the Deck's own buttons). Up to four are
+numbered 0 to 3; without a pad number, these look at every pad.
+- `button_down(name[, pad]) button_pressed(name[, pad]) button_released(name[, pad])`.
+  Buttons: `"a" "b" "x" "y"`, `"lb" "rb"` (bumpers), `"lt" "rt"` (the triggers, as
+  buttons: down past half way), `"back" "start" "guide"`, `"ls" "rs"` (the sticks
+  pressed in), `"up" "down" "left" "right"` (the d-pad). The usual other names work
+  too: `"cross" "circle" "square" "triangle"`, `"l1" "r1" "l2" "r2" "l3" "r3"`,
+  `"select" "view" "menu" "options" "home"`, `"dpad_up"`...
+- `stick("left")` / `stick("right")` is a stick as a `vec2` (-1 to 1, +y down), and
+  `axis(name[, pad])` one axis: `"left_x" "left_y" "right_x" "right_y"`, or `"lt" "rt"`
+  (0 to 1). Both take off the dead zone, so a stick at rest is exactly 0.
+- `gamepad_connected([pad])`, `gamepad_count()`, `gamepad_name([pad])`.
+- `last_button()` gives the name of a button pressed this step (`""` if none), as
+  `button_down()` takes it, for letting players choose their own buttons.
+- `rumble(strength, seconds[, pad])` shakes the pad (0 to 1; 0 stops it).
+
+```
+var move := stick()                          # the left stick, any pad
+if key_down("left") or button_down("left") { move.x = -1 }
+if key_pressed("space") or button_pressed("a") { jump() }
+```
+
 **The world:**
 - `find(name)` returns the first entity with that name, or nil. `find_all(name)` returns a list.
 - `children(e)` returns its direct children; `child(e, "Gun")` the one with that name, or nil.

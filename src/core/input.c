@@ -18,6 +18,8 @@ void br_input_begin_frame(br_input *in) {
     for (i = 0; i < BR_MAX_GAMEPADS; ++i) {
         memset(in->pads[i].pressed, 0, sizeof(in->pads[i].pressed));
         memset(in->pads[i].released, 0, sizeof(in->pads[i].released));
+        memset(in->pads[i].trigger_pressed, 0, sizeof(in->pads[i].trigger_pressed));
+        memset(in->pads[i].trigger_released, 0, sizeof(in->pads[i].trigger_released));
     }
     in->mouse_dx = in->mouse_dy = 0;
     in->wheel_x = in->wheel_y = 0;
@@ -34,6 +36,8 @@ void br_input_reset(br_input *in) {
     for (i = 0; i < BR_MAX_GAMEPADS; ++i) {
         for (b = 0; b < BR_PAD_BUTTON_COUNT; ++b)
             if (in->pads[i].buttons[b]) { in->pads[i].buttons[b] = false; in->pads[i].released[b] = true; }
+        for (b = 0; b < 2; ++b)
+            if (in->pads[i].triggers[b]) { in->pads[i].triggers[b] = false; in->pads[i].trigger_released[b] = true; }
         memset(in->pads[i].axes, 0, sizeof(in->pads[i].axes));
     }
     in->mods = 0;
@@ -158,6 +162,9 @@ bool br_pad_down(const br_input *in, int pad, br_gamepad_button b) {
 bool br_pad_pressed(const br_input *in, int pad, br_gamepad_button b) {
     return valid_pad(pad) && (int)b >= 0 && b < BR_PAD_BUTTON_COUNT && in->pads[pad].pressed[b];
 }
+bool br_pad_released(const br_input *in, int pad, br_gamepad_button b) {
+    return valid_pad(pad) && (int)b >= 0 && b < BR_PAD_BUTTON_COUNT && in->pads[pad].released[b];
+}
 float br_pad_axis(const br_input *in, int pad, br_gamepad_axis a) {
     float v, dz;
     if (!valid_pad(pad) || (int)a < 0 || a >= BR_PAD_AXIS_COUNT) return 0;
@@ -258,6 +265,14 @@ static bool binding_tapped(const br_input *in, const br_binding *b) {
 
 void br_input_end_events(br_input *in) {
     int i, j;
+    for (i = 0; i < BR_MAX_GAMEPADS; ++i) {                /* the triggers as buttons */
+        br_gamepad_state *p = &in->pads[i];
+        for (j = 0; j < 2; ++j) {
+            float v = p->connected ? p->axes[BR_PAD_AXIS_LEFT_TRIGGER + j] : 0;
+            if (!p->triggers[j] && v >= 0.5f) { p->triggers[j] = true; p->trigger_pressed[j] = true; }
+            else if (p->triggers[j] && v < 0.4f) { p->triggers[j] = false; p->trigger_released[j] = true; }
+        }
+    }
     for (i = 0; i < in->action_count; ++i) {
         br_action_def *d = &in->actions[i];
         bool down = false, tapped = false;
