@@ -1,0 +1,57 @@
+# The map of the land, from the pause menu: art/world_map.bmp (a pixel for
+# each tile, the regions in their colours) with the areas' names over it
+# (art/map_names.bmp: tools/make_map.py draws both), the cellar doors Pip has
+# found (numbered, red; gold once cleared), where he is (blinking) and, in fog,
+# the screens he hasn't been to.
+# The game stays paused while it's open; Escape, Enter or the pause key
+# closes it.
+
+var game
+var controls
+var you
+var t = 0
+var opened = 0
+
+# A spot on the map (in its pixels) as a place in this view.
+func at(p) { return vec2(-128 + p.x, -66 + p.y) }
+
+func start() {
+    game = find("Game")
+    controls = find("Settings")
+    var data = find("MapData")
+    for y in 8 {                                       # the fog: screens not yet seen
+        for x in 16 {
+            if not contains(game.land, x + "_" + y) {
+                spawn("prefabs/map_fog.scene", at(vec2(x * 16 + 8, y * 11 + 5.5)), self)
+            }
+        }
+    }
+    for d in data.doors() {                            # the cellar doors found
+        if contains(game.land, d[3]) {
+            var icon = spawn("prefabs/map_icon.scene", at(vec2(d[1], d[2] - 4)), self)
+            var kind = "red"
+            if find("HUD").cleared(d[0]) { kind = "gold" }
+            icon.Sprite.image = "art/map_" + d[0] + "_" + kind + ".bmp"
+        }
+    }
+    var ring = spawn("prefabs/map_mark.scene", at(game.map_spot()), self)   # (a dark ring, so he shows on anything)
+    ring.Shape.size = vec2(6, 6)
+    ring.Shape.color = rgb(42, 26, 16)
+    ring.Shape.layer = 88
+    you = spawn("prefabs/map_mark.scene", at(game.map_spot()), self)
+    you.Shape.size = vec2(4, 4)
+    you.Shape.layer = 89
+    child(self, "Where").Label.text = "YOU ARE " + game.place_name()
+    child(self, "Pages").Label.text = "RECIPE PAGES FOUND: " + game.pages + " OF 8"
+    child(self, "Keys").Label.text = controls.key_label(controls.keys[7][0]) + ": BACK"
+}
+
+func update(dt) {
+    t += dt
+    opened += 1
+    if floor(t * 4) % 2 == 0 { you.Shape.color = rgb(255, 248, 236) } else { you.Shape.color = rgb(216, 52, 58) }
+    if opened > 2 and (controls.nav("back") or controls.nav("ok") or controls.pressed("pause")) {
+        play_sound("sfx/menu.wav")
+        destroy(self)
+    }
+}

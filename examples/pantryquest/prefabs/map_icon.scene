@@ -1,0 +1,11 @@
+# Pantry Quest - a cellar's number on the map of the land (scripts/map_view.bs picks art/map_<n>_<red|gold>.bmp)
+bronto_scene 1
+
+entity
+  Name
+    text = "MapIcon"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/map_1_red.bmp"
+    layer = 87

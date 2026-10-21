@@ -779,5 +779,7 @@ if __name__ == '__main__':
     seed = int(args[0]) if args else 7
     rooms, caves_old, spans = design(seed)
     probs = write(rooms, caves_old, seed)
+    import make_map                          # the maps of the land, drawn again from it
+    make_map.main()
     print('%d problems' % len(probs))
     for p in probs: print('  ', p)

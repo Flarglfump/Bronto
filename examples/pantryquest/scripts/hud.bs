@@ -1,5 +1,7 @@
-# The strip along the top: where Pip is (with the cellar map and compass),
-# his beans, keys and bombs, the items on B and A, and his hearts.
+# The strip along the top: where Pip is (on the land, a little colour map of
+# it - art/minimap.bmp, from tools/make_map.py - with the cellar doors he has
+# found; in a cellar, its rooms, with the map and compass), his beans, keys
+# and bombs, the items on B and A, and his hearts.
 
 var game
 var hearts = []
@@ -13,6 +15,9 @@ var map_box
 var cells = []
 var map_sig = ""            # what the cellar map was last drawn from
 var boss_cell               # the compass's mark
+var mini                    # the land's minimap
+var marks = []              # the cellar doors on it
+var marks_sig = ""
 var t = 0
 
 func start() {
@@ -27,6 +32,7 @@ func start() {
     a_item = find("AItem")
     dot = find("MapDot")
     map_box = find("MapBox")
+    mini = find("MiniMap")
 }
 
 func icon(item) {
@@ -45,6 +51,37 @@ func icon(item) {
 func cell_pos(xy) {
     var p = game.split(xy, "_")
     return vec2(8 + num(p[0]) * 8 + 4 + 12, 16 + num(p[1]) * 6 + 3 + 1)
+}
+
+# A spot on the map of the land (in its pixels, a pixel a tile) on the minimap.
+func mini_pos(spot) { return vec2(8 + spot.x / 4, 16 + spot.y * 4 / 11) }
+
+# Is a cellar done? (Its page found; the Banquet Hall: the game won.)
+func cleared(n) {
+    if n == 9 { return game.has_flag("won") }
+    return game.has_flag("page:d" + n)
+}
+
+# The doors of the cellars whose screens Pip has seen: red, or gold once cleared.
+func draw_land_marks() {
+    if game.state == "boot" { return }               # (the map's data starts after the HUD)
+    var sig = len(game.land) + ":" + game.pages + ":" + game.has_flag("won")
+    if sig == marks_sig { return }
+    clear_marks()
+    marks_sig = sig
+    for d in find("MapData").doors() {
+        if contains(game.land, d[3]) {
+            var m = spawn("prefabs/map_mark.scene", mini_pos(vec2(d[1], d[2])))
+            if cleared(d[0]) { m.Shape.color = rgb(255, 216, 74) } else { m.Shape.color = rgb(216, 52, 58) }
+            push(marks, m)
+        }
+    }
+}
+
+func clear_marks() {
+    for m in marks { destroy(m) }
+    marks = []
+    marks_sig = ""
 }
 
 func clear_cells() {
@@ -110,17 +147,22 @@ func update(dt) {
             else { h.Sprite.image = "art/hud_heart_empty.bmp" }
         }
     }
-    # the map: the overworld is 16 x 8 rooms in the 64 x 32 box; a cellar, its rooms seen so far
-    if game.area == "ow" {
-        dot.position = vec2(8 + game.rx * 4 + 2, 16 + game.ry * 4 + 2)
-        map_box.Shape.color = rgb(200, 164, 104)          # the land: biscuit brown on the recipe card
-    } elif game.area == "cave" {
-        map_box.Shape.color = rgb(200, 164, 104)
+    # the map: the land is 16 x 8 screens in the 64 x 32 box (4 x 4 pixels a screen); a cellar, its rooms seen so far
+    t += dt
+    if game.area == "ow" or game.area == "cave" {
+        mini.Sprite.tint = rgb(255, 255, 255)
+        dot.position = mini_pos(game.map_spot())
+        if floor(t * 4) % 2 == 0 { dot.Shape.color = rgb(255, 248, 236) } else { dot.Shape.color = rgb(216, 52, 58) }
+        dot.Shape.size = vec2(3, 3)
+        draw_land_marks()
     } else {
+        mini.Sprite.tint = rgb(255, 255, 255, 0)
+        clear_marks()
+        dot.Shape.color = rgb(126, 224, 90)
+        dot.Shape.size = vec2(4, 4)
         map_box.Shape.color = rgb(58, 38, 26)             # a cellar: dark chocolate
         dot.position = vec2(8 + game.rx * 8 + 4 + 12, 16 + game.ry * 6 + 3 + 1)
     }
-    t += dt
     if game.area != "ow" and game.area != "cave" {
         draw_cellar_map()
     } elif len(cells) > 0 {

@@ -1,0 +1,13 @@
+# Pantry Quest - a screen of the land not yet seen, on the map (scripts/map_view.bs)
+bronto_scene 1
+
+entity
+  Name
+    text = "MapFog"
+  Transform
+    position = 0 0
+  Shape
+    kind = rect
+    size = 16 11
+    color = #2a1a10d8
+    layer = 84

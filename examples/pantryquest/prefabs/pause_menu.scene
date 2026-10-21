@@ -89,7 +89,7 @@ entity
   Name
     text = "Option0"
   Transform
-    position = 0 -24
+    position = 0 -30
   Label
     text = ""
     size = 1
@@ -102,7 +102,7 @@ entity
   Name
     text = "Option1"
   Transform
-    position = 0 -8
+    position = 0 -16
   Label
     text = ""
     size = 1
@@ -115,7 +115,7 @@ entity
   Name
     text = "Option2"
   Transform
-    position = 0 8
+    position = 0 -2
   Label
     text = ""
     size = 1
@@ -128,7 +128,20 @@ entity
   Name
     text = "Option3"
   Transform
-    position = 0 24
+    position = 0 12
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Option4"
+  Transform
+    position = 0 26
   Label
     text = ""
     size = 1
@@ -141,7 +154,7 @@ entity
   Name
     text = "Cursor"
   Transform
-    position = -60 -24
+    position = -60 -30
     rotation = 90
   Sprite
     image = "art/spoon.bmp"

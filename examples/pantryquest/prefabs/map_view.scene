@@ -1,0 +1,225 @@
+# Pantry Quest - the map of the land (scripts/map_view.bs), from the pause menu
+bronto_scene 1
+
+entity
+  Name
+    text = "MapView"
+  Transform
+    position = 0 0
+  Shape
+    kind = rect
+    size = 256 176
+    color = #2a1a10ff
+    layer = 80
+  Script
+    file = "scripts/map_view.bs"
+
+entity
+  Name
+    text = "Frame"
+  Transform
+    position = 0 -22
+  Shape
+    kind = rect
+    size = 260 92
+    color = #8a5a32ff
+    layer = 81
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 0 -22
+  Sprite
+    image = "art/world_map.bmp"
+    layer = 82
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Names"
+  Transform
+    position = 0 -22
+  Sprite
+    image = "art/map_names.bmp"
+    layer = 85
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonL"
+  Transform
+    position = -88 -78
+  Sprite
+    image = "art/banner_l.bmp"
+    layer = 88
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonMid"
+  Transform
+    position = 0 -78
+    scale = 41 1
+  Sprite
+    image = "art/banner_mid.bmp"
+    layer = 87
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonR"
+  Transform
+    position = 88 -78
+  Sprite
+    image = "art/banner_r.bmp"
+    layer = 88
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "HeadingShadow"
+  Transform
+    position = 1 -78
+  Label
+    text = "THE PANTRY KINGDOM"
+    size = 1
+    color = #4a141cff
+    layer = 89
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Heading"
+  Transform
+    position = 0 -79
+  Label
+    text = "THE PANTRY KINGDOM"
+    size = 1
+    color = #fff0d0ff
+    layer = 90
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Where"
+  Transform
+    position = 0 32
+  Label
+    text = ""
+    size = 1
+    color = #fff0d0ff
+    layer = 86
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "YouMark"
+  Transform
+    position = -98 48
+  Shape
+    kind = rect
+    size = 4 4
+    color = #d83a3aff
+    layer = 86
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "YouText"
+  Transform
+    position = -78 48
+  Label
+    text = "YOU"
+    size = 1
+    color = #a07850ff
+    layer = 86
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "CellarKey"
+  Transform
+    position = -42 48
+    scale = 2 2
+  Sprite
+    image = "art/map_1_red.bmp"
+    layer = 86
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "CellarText"
+  Transform
+    position = -10 48
+  Label
+    text = "CELLAR"
+    size = 1
+    color = #a07850ff
+    layer = 86
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "DoneKey"
+  Transform
+    position = 30 48
+    scale = 2 2
+  Sprite
+    image = "art/map_1_gold.bmp"
+    layer = 86
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "DoneText"
+  Transform
+    position = 66 48
+  Label
+    text = "CLEARED"
+    size = 1
+    color = #a07850ff
+    layer = 86
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pages"
+  Transform
+    position = 0 64
+  Label
+    text = ""
+    size = 1
+    color = #a07850ff
+    layer = 86
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Keys"
+  Transform
+    position = 0 80
+  Label
+    text = "ESC: BACK"
+    size = 1
+    color = #a07850ff
+    layer = 86
+  Parent
+    entity = 0

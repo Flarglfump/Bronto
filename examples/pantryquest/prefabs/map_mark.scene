@@ -1,0 +1,13 @@
+# Pantry Quest - a mark on a map: Pip, or a cellar's door (scripts/hud.bs, scripts/map_view.bs colour and size it)
+bronto_scene 1
+
+entity
+  Name
+    text = "MapMark"
+  Transform
+    position = 0 0
+  Shape
+    kind = rect
+    size = 2 2
+    color = #d83a3aff
+    layer = 43

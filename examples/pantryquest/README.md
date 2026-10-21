@@ -111,6 +111,13 @@ ending.
   pie and a page of the recipe (in the Banquet Hall, the Grand Recipe), and the page
   takes Pip back out of the cellar's door.
 
+**Maps.** On the land, the HUD shows a little colour map of the whole kingdom (each region in
+its own colour), with Pip blinking where he is and the cellar doors he has found: red, or
+gold once cleared. In a cellar it shows that cellar's rooms instead, with its map and
+compass. The pause menu's **MAP** shows the land a pixel a tile, with the areas' names,
+the cellar doors found (numbered), where Pip is, and fog over the screens he hasn't been
+to yet.
+
 | | Keys (at first: SETTINGS changes them) | |
 |---|---|---|
 | Walk | arrows or WASD | Eight directions; Pip slides along walls and round corners |
@@ -180,6 +187,7 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
     wave) and its puzzle: pressure plates (tile `B`), braziers (`brazier.bs`, over tile
     `Q`), a gong (`gong.bs`), or carrying enough pages. A room's `sealed` sides stay shut
     until it is solved; pickups with `on_solve` appear then.
+  - `map_view.bs` is the pause menu's map of the land; `hud.bs` draws the minimap.
   - `hint.bs` is the old chef's hint cards; `game.bs` works the hints out (`hint_next`,
     `hint_upgrade`) from `hint_data.bs`, which `tools/design_overworld.py` writes.
   - `enemies/baron.bs` is Baron Gorge, all three courses (`cloche.bs` is a dish cover),
@@ -214,6 +222,11 @@ standard library only:
   with its own `name` and `tint`), and `cellars_unbuilt.txt` a stand-in entrance room for any
   cellar without its own file (none, now that all nine are built). It also writes `scripts/cellars.bs`, which tells the game each cellar's rooms,
   its guardian's room and its way out (for the HUD's map and compass).
+- `make_map.py` draws the maps from the land: `art/world_map.bmp` (a pixel a tile, the
+  regions' open ground in their colours), `art/map_names.bmp` (the areas' names in a tiny
+  pixel font), the cellar numbers, the HUD's `art/minimap.bmp`, and `scripts/map_data.bs`
+  (where each cellar's door is). `design_overworld.py` runs it; run it yourself after
+  `make_art.py` changes a tile.
 - `design_overworld.py --force` lays the whole land out again from its plan (the
   regions, where every cellar and cave goes, what is in each cave), keeping the
   hand-made screens around the start. It checks that every screen's edges meet its

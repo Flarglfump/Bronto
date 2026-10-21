@@ -48,7 +48,7 @@ entity
     kind = rect
     size = 4 4
     color = #7ee05aff
-    layer = 43
+    layer = 44
 
 entity
   Name
@@ -670,3 +670,20 @@ entity
     position = 0 0
   Script
     file = "scripts/hint_data.bs"
+
+entity
+  Name
+    text = "MiniMap"
+  Transform
+    position = 40 32
+  Sprite
+    image = "art/minimap.bmp"
+    layer = 42
+
+entity
+  Name
+    text = "MapData"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/map_data.bs"

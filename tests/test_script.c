@@ -1209,6 +1209,16 @@ static void test_pantryquest_files_and_settings(void) {
     pq_press(BR_KEY_ESCAPE);
     CHECK(named("PauseMenu") != BR_ENTITY_NULL);
     pq_press(BR_KEY_DOWN);
+    pq_press(BR_KEY_ENTER);                                       /* MAP: where Pip is, the rest in fog */
+    CHECK(named("MapView") != BR_ENTITY_NULL);
+    {
+        const br_label *where = (const br_label *)br_get(&W, named("Where"), ID.label);
+        CHECK(where && strcmp(where->text, "YOU ARE ON THE PANTRY PLAINS") == 0);
+        CHECK_EQ_INT(pq_count("MapFog"), 127);                   /* a new game: only the first screen seen */
+    }
+    pq_press(BR_KEY_ENTER);                                       /* (closes it, and only it) */
+    CHECK(named("MapView") == BR_ENTITY_NULL && named("PauseMenu") != BR_ENTITY_NULL);
+    pq_press(BR_KEY_DOWN);
     pq_press(BR_KEY_ENTER);                                       /* SAVE GAME */
     CHECK(br_script_get_string(&W, named("Game"), "state", text, sizeof(text)) && strcmp(text, "pause") == 0);
     {

@@ -1,10 +1,11 @@
-# The pause menu (Escape, or the player's pause key): carry on, save the game
-# to its file, change the settings, or go back to the title. The game waits
+# The pause menu (Escape, or the player's pause key): carry on, look at the
+# map of the land, save the game to its file, change the settings, or go back
+# to the title. The game waits
 # while it's open.
 
 var game
 var controls
-var main_options = ["RESUME", "SAVE GAME", "SETTINGS", "QUIT TO TITLE"]
+var main_options = ["RESUME", "MAP", "SAVE GAME", "SETTINGS", "QUIT TO TITLE"]
 var quit_options = ["SAVE AND QUIT", "QUIT WITHOUT SAVING", "BACK"]
 var mode = "main"           # main, or quit (asking whether to save first)
 var choice = 0
@@ -12,11 +13,12 @@ var rows = []
 var cursor
 var note
 var info
+var settle = 0
 
 func start() {
     game = find("Game")
     controls = find("Settings")
-    for i in 4 { push(rows, child(self, "Option" + i)) }
+    for i in 5 { push(rows, child(self, "Option" + i)) }
     cursor = child(self, "Cursor")
     note = child(self, "Note")
     info = child(self, "Info")
@@ -32,7 +34,7 @@ func options() {
 
 func show() {
     var list = options()
-    for i in 4 {
+    for i in 5 {
         if i < len(list) { rows[i].Label.text = list[i] } else { rows[i].Label.text = "" }
         if i == choice { rows[i].Label.color = rgb(142, 26, 42) } else { rows[i].Label.color = rgb(98, 56, 26) }
     }
@@ -46,7 +48,14 @@ func close() {
 }
 
 func update(dt) {
-    if len(find_all("SettingsMenu")) > 0 { return }      # the settings are open over it
+    if len(find_all("SettingsMenu")) > 0 or len(find_all("MapView")) > 0 {   # the settings or the map are open over it
+        settle = 2
+        return
+    }
+    if settle > 0 {                                  # (not the key that just closed them)
+        settle -= 1
+        return
+    }
     var n = len(options())
     if controls.nav("up") {
         choice = (choice + n - 1) % n
@@ -61,7 +70,7 @@ func update(dt) {
     if controls.nav("back") or controls.pressed("pause") {
         if mode == "quit" {
             mode = "main"
-            choice = 3
+            choice = 4
             show()
         } else {
             close()
@@ -72,6 +81,9 @@ func update(dt) {
     if mode == "main" {
         if choice == 0 { close() }
         elif choice == 1 {
+            spawn("prefabs/map_view.scene", vec2(128, 152))
+            play_sound("sfx/menu.wav")
+        } elif choice == 2 {
             if game.save_game() {
                 note.Label.text = "GAME SAVED!"
                 play_sound("sfx/buy.wav")
@@ -79,7 +91,7 @@ func update(dt) {
                 note.Label.text = "START FROM THE TITLE TO SAVE"
                 play_sound("sfx/tink.wav")
             }
-        } elif choice == 2 {
+        } elif choice == 3 {
             spawn("prefabs/settings_menu.scene", vec2(128, 152))
             play_sound("sfx/menu.wav")
         } else {
@@ -101,7 +113,7 @@ func update(dt) {
             load_scene("title.scene")
         } else {
             mode = "main"
-            choice = 3
+            choice = 4
             show()
         }
     }

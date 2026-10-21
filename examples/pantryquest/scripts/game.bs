@@ -23,6 +23,7 @@ var b_item = ""             # the one on the B button (Z)
 var pages = 0               # pages of the Grand Recipe
 var flags = []              # what's been done: doors opened, items taken...
 var visited = []            # cellar rooms seen (for the HUD map)
+var land = []               # screens of the land Pip has been to ("x_y"): the pause map shows the rest in fog
 var maps = []               # cellars whose map Pip has ("d1"...): the HUD shows every room
 var compasses = []          # cellars whose compass he has: the HUD shows where the guardian is
 
@@ -53,6 +54,7 @@ var warp_pos := vec2(0, 0)
 var warp_face = "up"
 var ret_name = ""           # where a cave's way out leads back to
 var ret_pos := vec2(0, 0)
+var cave_region = ""        # the region a cave opens onto (for the map)
 var hold_t = 0
 var dead_t = 0
 var music_name = ""
@@ -120,7 +122,7 @@ func save_game() {
     var r = resume_point()
     var place = area_title()
     if place == "" { place = find("Banner").last }
-    var data = [["version", 2], ["outfit", outfit], ["room", r[0]], ["pos", r[1]], ["place", place], ["time", floor(play_time)],
+    var data = [["version", 3], ["outfit", outfit], ["land", land], ["room", r[0]], ["pos", r[1]], ["place", place], ["time", floor(play_time)],
                 ["hearts_max", hearts_max], ["beans", beans], ["keys", keys], ["bombs", bombs],
                 ["bombs_max", bombs_max], ["weapon", weapon], ["items", items], ["b_item", b_item], ["treasures", treasures],
                 ["pages", pages], ["flags", flags], ["visited", visited], ["maps", maps], ["compasses", compasses],
@@ -132,11 +134,16 @@ func load_game() {
     var data = load_data("slot" + slot)
     if data == nil { return false }
     var version = 1
+    var has_land = false
     for pair in data {
         var k = pair[0]
         var v = pair[1]
         if k == "version" { version = v }
         elif k == "outfit" { outfit = v }
+        elif k == "land" {
+            land = v
+            has_land = true
+        }
         elif k == "room" { start_room = v }
         elif k == "pos" { start_pos = v }
         elif k == "time" { play_time = v }
@@ -158,6 +165,11 @@ func load_game() {
         elif k == "area_pos" { area_pos = v }
     }
     if version < 2 and weapon == 2 { weapon = 3 }      # (a first-version file: 2 was the silver ladle)
+    if not has_land {                                  # (a file from before the map: no fog on it)
+        for y in 8 {
+            for x in 16 { push(land, x + "_" + y) }
+        }
+    }
     hp = hearts_max * 2
     return true
 }
@@ -224,6 +236,40 @@ func set_place(name) {
     rx = num(p[1])
     ry = num(p[2])
     if area != "ow" and not contains(visited, name) { push(visited, name) }
+    if area == "ow" and not contains(land, p[1] + "_" + p[2]) { push(land, p[1] + "_" + p[2]) }
+}
+
+# Where Pip is on the map of the land (art/world_map.bmp, a pixel a tile): on
+# the land, his very spot; in a cave, its mouth; in a cellar, its door.
+func map_spot() {
+    var name = room_name
+    var pos = hero.position
+    if area == "cave" {
+        name = ret_name
+        pos = ret_pos
+    } elif area != "ow" {
+        var c = find("Cellars")
+        name = c.exit_room(area)
+        pos = c.exit_pos(area)
+    }
+    var p = split(name, "_")
+    if len(p) < 3 { return vec2(7 * 16 + 8, 7 * 11 + 6) }
+    return vec2(num(p[1]) * 16 + pos.x / 16, num(p[2]) * 11 + (pos.y - 64) / 16)
+}
+
+# What the map calls where Pip is.
+func place_name() {
+    if area == "cave" {
+        if cave_region == "" { return "IN A CAVE" }
+        return "IN A CAVE, " + in_or_on(cave_region)
+    }
+    if area == "ow" { return in_or_on(room.region) }
+    return "IN " + find("Cellars").name(area)
+}
+
+func in_or_on(region) {
+    if region == "SUGAR ROAD" or region == "PANTRY PLAINS" or region == "JUICE COAST" { return "ON THE " + region }
+    return "IN THE " + region
 }
 
 func music_for_room() {
@@ -292,6 +338,7 @@ func warp(name, pos, face) {
     if substr(name, 0, 4) == "cave" and area != "cave" {
         ret_name = room_name
         ret_pos = hero.position + vec2(0, 16)
+        cave_region = room.region
     }
     warp_name = name
     warp_pos = pos
