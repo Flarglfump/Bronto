@@ -4,6 +4,12 @@
  *   editor [scene file]        open a scene (or start with a sample one)
  *   editor [project folder]    open a project (its main.scene, if it has one)
  *   editor --headless          scripted self-test with screenshots
+ *   editor --build <target> [project folder] [--out folder]
+ *                              the Build menu without a window: pack the project (default: the
+ *                              current folder) into a game for linux, macos, windows, web or host
+ *                              (this computer), into its builds/<target>/ or the --out folder.
+ *                              Exits 0 when built; mistakes in scripts and other problems go to
+ *                              stderr and exit 1. (make game GAME=... runs it.)
  *   editor --write-icon f.png [size]   save the app icon (the VS Code extension uses it)
  *
  * Shortcuts (Ctrl, or Cmd on a Mac):
@@ -1009,6 +1015,25 @@ static int test_panels(br_engine *e) {
     return failures;
 }
 
+/* ---- --build: the Build menu from the command line ------------------------------------ */
+
+static int run_build(br_engine *e, ed_target t) {
+    editor *ed = &ED;
+    char out[ED_PATH_MAX];
+    frames(e, 1);                                          /* (the editor scene opens the project) */
+    if (!ed_build(ed, t, out, sizeof(out))) {             /* (the problem is on stderr already; this sums it up) */
+        const char *why = ed->status;
+        char *console = strstr(ed->status, " - see the console");
+        if (console) *console = 0;
+        if (strncmp(why, "Build: ", 7) == 0) why += 7;
+        fflush(stdout);
+        fprintf(stderr, "editor --build: %s\n", why[0] ? why : "the build failed");
+        return 1;
+    }
+    printf("%s\n", ed->status);
+    return 0;
+}
+
 static int run_headless(br_engine *e) {
     editor *ed = &ED;
     int failures = 0;
@@ -1120,6 +1145,8 @@ int main(int argc, char **argv) {
     br_engine *e = BR_NEW(br_engine);
     br_engine_config cfg = br_engine_default_config();
     int i, rc = 0;
+    bool build = false;
+    ed_target target = ED_TARGET_LINUX;
     if (argc >= 3 && strcmp(argv[1], "--write-icon") == 0) {    /* the icon as a PNG, then done */
         br_image icon;
         int size = argc > 3 ? atoi(argv[3]) : 256;
@@ -1133,7 +1160,26 @@ int main(int argc, char **argv) {
     }
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--headless") == 0) ED.headless = true;
-        else g_open_path = argv[i];
+        else if (strcmp(argv[i], "--build") == 0) {
+            if (i + 1 >= argc || !ed_target_from_name(argv[i + 1], &target)) {
+                fprintf(stderr, "usage: editor --build linux|macos|windows|web|host [project folder] [--out folder]\n");
+                br_free(e);
+                return 2;
+            }
+            build = ED.build_cli = true;
+            ++i;
+        } else if (strcmp(argv[i], "--out") == 0 && i + 1 < argc) {
+            snprintf(ED.build_out, sizeof(ED.build_out), "%s", argv[++i]);
+        } else g_open_path = argv[i];
+    }
+    if (build) {
+        setvbuf(stdout, NULL, _IOLBF, 0);                  /* (in order with stderr's lines) */
+        if (!g_open_path) g_open_path = ".";
+        if (!br_fs_is_dir(g_open_path)) {
+            fprintf(stderr, "editor --build: %s isn't a project folder\n", g_open_path);
+            br_free(e);
+            return 2;
+        }
     }
     cfg.title = "Bronto Editor";
     cfg.width = 1280;
@@ -1146,11 +1192,12 @@ int main(int argc, char **argv) {
     cfg.clear_color = br_rgb(30, 34, 40);
     cfg.initial_scene = &k_editor;
     cfg.on_init = on_init;
-    if (ED.headless) cfg.platform = br_platform_headless();
-    ED.console_capturing = br_capture_start(true);        /* the Console tab; the terminal still gets it all */
+    if (ED.headless || build) cfg.platform = br_platform_headless();
+    if (!build) ED.console_capturing = br_capture_start(true);   /* the Console tab; the terminal still gets it all */
     if (!br_engine_init(e, &cfg)) { br_capture_stop(); br_free(e); return 1; }
 
-    if (ED.headless) rc = run_headless(e);
+    if (build) rc = run_build(e, target);
+    else if (ED.headless) rc = run_headless(e);
     else br_engine_loop(e, NULL);       /* the editor scene does the rest */
 
     br_engine_shutdown(e);

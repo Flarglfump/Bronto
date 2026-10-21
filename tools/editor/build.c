@@ -48,6 +48,16 @@ ed_target ed_host_target(void) {
 
 const char *ed_target_name(ed_target t) { return t < ED_TARGET_COUNT ? k_target_names[t] : "?"; }
 
+bool ed_target_from_name(const char *name, ed_target *t) {
+    int i;
+    if (strcmp(name, "host") == 0 || strcmp(name, "native") == 0) { *t = ed_host_target(); return true; }
+    for (i = 0; i < ED_TARGET_COUNT; ++i) {
+        if (strcmp(name, k_target_dirs[i]) == 0) { *t = (ed_target)i; return true; }
+    }
+    if (strcmp(name, "mac") == 0 || strcmp(name, "osx") == 0) { *t = ED_TARGET_MACOS; return true; }
+    return false;
+}
+
 /* The folder the editor's program is in (where bronto_player is too). */
 static bool editor_dir(char *out, size_t size) {
     char exe[BP];
@@ -283,13 +293,18 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
         if (t == ED_TARGET_WEB) ed_status(ed, "Build: no web player beside the editor - build it with \"make web\" (needs LLVM's clang)");
         else if (t == ed_host_target()) ed_status(ed, "Build: bronto_player isn't beside the editor - build it with \"make tools\"");
         else ed_status(ed, "Build: no %s player - build bronto_player on %s and copy it to players/ beside the editor", ed_target_name(t), ed_target_name(t));
-        fprintf(stderr, "[ERROR] build: %s\n", ed->status);
+        if (!ed->build_cli) fprintf(stderr, "[ERROR] build: %s\n", ed->status);   /* (--build says it itself) */
         return false;
     }
     file_name_of(ed->project.name, name, sizeof(name));
-    br_path_join(dir, sizeof(dir), root, ed->project.build_dir);
-    {
+    if (ed->build_out[0]) {                                 /* --build --out: that folder */
+        if (!make_dirs(ed->build_out) || !br_fs_absolute(ed->build_out, dir, sizeof(dir))) {
+            fprintf(stderr, "[ERROR] build: can't make the folder %s\n", ed->build_out);
+            return false;
+        }
+    } else {                                                /* the project's builds/<target> */
         char sub[BP];
+        br_path_join(dir, sizeof(dir), root, ed->project.build_dir);
         br_path_join(sub, sizeof(sub), dir, k_target_dirs[t]);
         snprintf(dir, sizeof(dir), "%s", sub);
     }

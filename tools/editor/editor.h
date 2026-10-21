@@ -242,6 +242,8 @@ typedef struct editor {
     char status[200];
     double status_time;
     bool headless;
+    bool build_cli;                    /* running as editor --build (no window) */
+    char build_out[ED_PATH_MAX];       /* --build --out: the folder the game goes in ("": the project's builds/<target>) */
     br_image badge;                    /* the icon, small, for the toolbar */
     struct { char script_editor[256]; } prefs;   /* saved in the user's settings folder */
     char settings_field[256];
@@ -365,7 +367,8 @@ bool ed_find_player(editor *ed, ed_target t, char *out, size_t size);   /* the p
 void ed_project_reload(editor *ed);         /* reads project.bronto (and applies strict typing) */
 bool ed_project_save(editor *ed, const br_project *p);
 int  ed_check_scripts(editor *ed, int *scripts);   /* mistakes, printed to the console */
-bool ed_build(editor *ed, ed_target t, char *out, size_t size);   /* out: the game made */
+bool ed_build(editor *ed, ed_target t, char *out, size_t size);
+bool ed_target_from_name(const char *name, ed_target *t);   /* "linux", "macos", "windows", "web", "host" */   /* out: the game made */
 void ed_cmd_build(editor *ed, ed_target t, bool run);
 void ed_open_builds_folder(editor *ed);
 void ed_open_save_folder(editor *ed);      /* where the game keeps saved data (save.h) */

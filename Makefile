@@ -7,6 +7,10 @@
 #   make towerdefense  build and play the Pop Defense sample
 #   make editor     build and run the scene editor (tools/editor)
 #   make tools      build the editor, bscheck (checks .bs scripts) and bronto_player (runs games)
+#   make game GAME=examples/pantryquest [TARGET=host|linux|macos|windows|web]
+#                   pack a project into a game people can run (the editor's Build menu,
+#                   as editor --build): build/games/<project>/<target>/ (host: this computer)
+#   make pantryquest   the same for Pantry Quest, for this computer
 #   make vscode     package the VS Code extension (tools/vscode) into build/*.vsix (needs python3)
 #   make vscode-icon  redraw the extension's icon from the editor's app icon (after changing it)
 #   make examples   build the examples (build/examples/*)
@@ -86,7 +90,7 @@ EDITOR   := $(BUILD)/editor
 BSCHECK  := $(BUILD)/bscheck
 PLAYER   := $(BUILD)/bronto_player
 
-.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player audio-test evdev-test vscode vscode-test vscode-icon web web-test web-check
+.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player audio-test evdev-test vscode vscode-test vscode-icon web web-test web-check game pantryquest
 
 all: lib
 
@@ -162,6 +166,22 @@ $(EDITOR): $(wildcard tools/editor/*.c) $(wildcard tools/editor/*.h) tools/web/w
 
 editor: $(EDITOR)
 	$(EDITOR) $(SCENE)
+
+# A project packed into a game (the editor's Build menu, from the command line):
+# the player for this computer is built here; for macos / windows, the player built
+# there goes in $(BUILD)/players/ (bronto_player-macos, bronto_player-windows.exe);
+# for the web, "make web" builds it first.
+GAME   ?= examples/pantryquest
+TARGET ?= host
+GAMES  := $(BUILD)/games
+
+GAME_TARGET := $(if $(filter host,$(TARGET)),$(if $(filter bsd,$(PLATFORM)),linux,$(PLATFORM)),$(TARGET))
+
+game: $(EDITOR) $(PLAYER) $(if $(filter web,$(GAME_TARGET)),web)
+	$(EDITOR) --build $(GAME_TARGET) $(GAME) --out $(GAMES)/$(notdir $(abspath $(GAME)))/$(GAME_TARGET)
+
+pantryquest:
+	@$(MAKE) --no-print-directory game GAME=examples/pantryquest TARGET=$(TARGET)
 
 # The VS Code extension for .bs scripts: package it, and test it with node.
 vscode:

@@ -172,6 +172,8 @@ name and strength stay at the bottom of the screen.
 build/bronto_player examples/pantryquest                     # from its files (make tools)
 build/editor examples/pantryquest                            # in the editor: open main.scene and press Play
 build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make web)
+make pantryquest                                             # a game for this computer: build/games/pantryquest/<system>/
+make pantryquest TARGET=web                                  # one web page: build/games/pantryquest/web/index.html
 ```
 
 `make web` also builds `build/web/pantryquest/index.html`.

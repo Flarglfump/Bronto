@@ -20,6 +20,9 @@ make snake         # build and play Snake
 make towerdefense  # build and play Pop Defense (tower defense)
 make editor        # build and run the scene editor (make editor SCENE=level.scene)
 make tools         # the editor, bscheck and bronto_player (which the editor's Build menu needs)
+make game GAME=examples/pantryquest   # pack a project into a game: build/games/pantryquest/<system>/
+                   #   (TARGET=web|linux|macos|windows; default: this computer)
+make pantryquest   # the same for Pantry Quest
 make test          # build libbronto.a and run the test suite
 make examples      # build examples/ into build/examples/
 make sanitize      # tests under AddressSanitizer + UndefinedBehaviorSanitizer
@@ -122,7 +125,8 @@ the rules.
   new one.
 - **Build menu:** a game for this computer (or others, given their players) in one file,
   after checking every script; **Project Settings** for the game's name, first scene, screen
-  size and strict typing. See [Building games](#building-games).
+  size and strict typing. See [Building games](#building-games). The same build runs
+  without a window: `editor --build <target> <project> [--out folder]` (or `make game`).
 - **Physics and scripts** run when you press Play. **Colliders** outlines every collider,
   and script errors appear in the status bar and the console.
 - **Right-click menus** everywhere: hierarchy rows and empty space, objects and empty
