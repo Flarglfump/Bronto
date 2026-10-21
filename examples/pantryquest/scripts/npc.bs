@@ -1,0 +1,7 @@
+# Someone in a cave, with something to say.
+var line1 = ""
+var line2 = ""
+
+func start() {
+    find("Game").say(line1, line2)
+}

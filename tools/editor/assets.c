@@ -245,7 +245,7 @@ void ed_assets_play(editor *ed, const char *rel) {
 bool ed_field_accepts(const br_component_desc *c, const br_field *f, const char *rel) {
     ed_asset_kind k = ed_asset_kind_of(rel, false);
     if (f->type != BR_FIELD_STRING) return false;
-    if (strcmp(f->name, "image") == 0) return k == ED_ASSET_IMAGE;
+    if (strcmp(f->name, "image") == 0 || strcmp(f->name, "tileset") == 0) return k == ED_ASSET_IMAGE;
     if (strcmp(f->name, "file") == 0) return strcmp(c->name, "Script") == 0 ? k == ED_ASSET_SCRIPT : k == ED_ASSET_SOUND;
     return false;
 }

@@ -1,0 +1,10 @@
+# Pantry Quest - a way into a cave, stairs or a cellar (Script vars: to, pos, face, hidden)
+bronto_scene 1
+
+entity
+  Name
+    text = "Warp"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/warp.bs"

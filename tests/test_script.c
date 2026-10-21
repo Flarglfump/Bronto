@@ -294,6 +294,243 @@ static void test_spawn_destroy_input(void) {
     teardown();
 }
 
+/* Tilemaps from scripts, substr(), and spawning a big prefab (a room: a
+ * root with more than 64 children). */
+static void test_tiles_substr_big_spawn(void) {
+    br_entity runner, map;
+    br_tilemap *m;
+    setup();
+    {   /* the prefab: a root, 100 children (written by hand, as the generator would) */
+        char *text = (char *)br_alloc(20000);
+        size_t at = 0;
+        int i;
+        at += (size_t)snprintf(text + at, 20000 - at, "bronto_scene 1\nentity\n  Name\n    text = \"Room\"\n  Transform\n    position = 0 0\n");
+        for (i = 0; i < 100; ++i)
+            at += (size_t)snprintf(text + at, 20000 - at, "entity\n  Name\n    text = \"Bit\"\n  Transform\n    position = %d 0\n  Parent\n    entity = 0\n", i);
+        CHECK(br_file_write_all(test_path("room_test.scene"), text, at));
+        br_free(text);
+    }
+    map = br_entity_create(&W);
+    snprintf(((br_name *)br_add(&W, map, ID.name, NULL))->text, 32, "Map");
+    ((br_transform *)br_add(&W, map, ID.transform, NULL))->position = br_v2(16, 8);
+    m = (br_tilemap *)br_add(&W, map, ID.tilemap, NULL);      /* 2 x 1 cells of 16: x 0..32, y 0..16 */
+    m->columns = 2;
+    m->rows = 1;
+    strcpy(m->tiles, ".#");
+    strcpy(m->solid, "#");
+    write_script("tiles.bs",
+        "var a = \"\"\nvar solid_left = true\nvar solid_right = false\nvar c := vec2(0, 0)\nvar part = \"\"\nvar kids = 0\n"
+        "func start() {\n"
+        "    var m = find(\"Map\")\n"
+        "    a = tile_at(m, vec2(4, 4)) + tile_at(m, vec2(20, 4)) + tile_at(m, vec2(40, 4)) + \"|\"\n"
+        "    solid_left = tile_solid(m, vec2(4, 4))\n"
+        "    solid_right = tile_solid(m, vec2(20, 4))\n"
+        "    c = tile_center(m, vec2(20, 4))\n"
+        "    set_tile(m, vec2(4, 4), \"#\")\n"
+        "    part = substr(\"recipe\", 2, 3) + substr(\"recipe\", -2) + substr(\"ab\", 5)\n"
+        "    var room = spawn(\"room_test.scene\", vec2(10, 20), self)\n"
+        "    kids = len(children(room))\n"
+        "}\n");
+    runner = scripted("Runner", "tiles.bs", NULL, br_v2(0, 0));
+    steps(1);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    {
+        char buf[64];
+        CHECK(br_script_get_string(&W, runner, "a", buf, sizeof(buf)) && strcmp(buf, ".#|") == 0);
+        CHECK(br_script_get_string(&W, runner, "part", buf, sizeof(buf)) && strcmp(buf, "cippe") == 0);
+    }
+    CHECK(num(runner, "solid_left") == 0 && num(runner, "solid_right") == 1);
+    CHECK(strcmp(((br_tilemap *)br_get(&W, map, ID.tilemap))->tiles, "##") == 0);
+    CHECK(num(runner, "kids") == 100);
+    CHECK_EQ_INT(br_world_entity_count(&W), 103);            /* map, runner, room + 100: all parented */
+    teardown();
+}
+
+/* A spawned entity's script is ready at once: the spawner can set its
+ * variables and call it before its start() runs (next step). */
+static void test_spawn_then_set(void) {
+    br_entity maker;
+    setup();
+    write_script("ball.bs", "var speed = 1\nvar seen = 0\nvar told = \"\"\nfunc start() {\n    seen = speed\n}\nfunc tell(s) {\n    told = s\n}\n");
+    {
+        const char text[] = "bronto_scene 1\nentity\n  Name\n    text = \"Ball\"\n  Transform\n    position = 0 0\n  Script\n    file = \"ball.bs\"\n    vars = \"speed = 2\"\n";
+        CHECK(br_file_write_all(test_path("ball.scene"), text, sizeof(text) - 1));
+    }
+    write_script("maker.bs", "var before = 0\nfunc start() {\n    var b = spawn(\"ball.scene\", vec2(5, 5))\n    before = b.speed\n    b.speed = 7\n    b.tell(\"hi\")\n}\n");
+    maker = scripted("Maker", "maker.bs", NULL, br_v2(0, 0));
+    steps(3);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    CHECK(num(maker, "before") == 2);                                  /* the prefab's vars were applied */
+    {
+        br_entity ball = W.pools[ID.name].entities[1];
+        char buf[16];
+        CHECK(num(ball, "seen") == 7);                                  /* start() saw what the maker set */
+        CHECK(br_script_get_string(&W, ball, "told", buf, sizeof(buf)) && strcmp(buf, "hi") == 0);
+    }
+    teardown();
+}
+
+/* Saved data from scripts: save_data / load_data and friends, and lists in
+ * Script.vars (both read values the same way). */
+static void test_saved_data(void) {
+    char folder[BR_PATH_MAX];
+    br_entity e, v;
+    int errors;
+    setup();
+    br_path_join(folder, sizeof(folder), g_out_dir, "script_saves");
+    br_save_set_folder(folder);
+    br_save_delete("progress.txt");
+    br_save_delete("damaged.txt");
+    write_script("saver.bs",
+                 "var pass = 0\nvar missing = 0\nvar names = 0\nvar after = 0\n"
+                 "func start() {\n"
+                 "    var v = [3, \"ow_7_7\", vec2(-128.5, 152), true, nil, [1, [2, []]], \"say \\\"hi\\\" \\\\ \\n done\", 0.1, -7]\n"
+                 "    if not save_data(\"progress\", v) { return }\n"
+                 "    var got = load_data(\"progress\")\n"
+                 "    if str(got) == str(v) and got[2].x == -128.5 and got[6] == v[6] and got[7] == 0.1 and len(got[5][1][1]) == 0 { pass = 1 }\n"
+                 "    missing = load_data(\"nothing\", 42)\n"
+                 "    if load_data(\"nothing\") == nil and has_data(\"progress\") and not has_data(\"nothing\") { missing += 1 }\n"
+                 "    names = len(data_names())\n"
+                 "    if data_names()[0] == \"damaged\" and data_names()[1] == \"progress\" { names += 10 }\n"
+                 "    if load_data(\"damaged\", \"fallback\") == \"fallback\" { names += 100 }\n"
+                 "    delete_data(\"progress\")\n"
+                 "    if not has_data(\"progress\") and load_data(\"progress\", 5) == 5 { after = 1 }\n"
+                 "}\n");
+    CHECK(br_save_write("damaged.txt", "[1, 2", 5));
+    e = scripted("Saver", "saver.bs", NULL, br_v2(0, 0));
+    steps(2);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    CHECK(num(e, "pass") == 1);
+    CHECK(num(e, "missing") == 43);
+    CHECK(num(e, "names") == 112);                       /* damaged and progress, in order; a damaged file gives the default */
+    CHECK(num(e, "after") == 1);
+    {
+        size_t size;
+        char *text;
+        write_script("saver2.bs", "func start() { save_data(\"plain\", [1, \"a\", vec2(2, 3)]) }\n");
+        scripted("Saver2", "saver2.bs", NULL, br_v2(0, 0));
+        steps(2);
+        text = (char *)br_save_read("plain.txt", &size);      /* readable text, like code */
+        CHECK(text && strcmp(text, "[1, \"a\", vec2(2, 3)]\n") == 0);
+        br_free(text);
+        br_save_delete("plain.txt");
+    }
+    /* what can't be saved, and names that aren't allowed: errors */
+    errors = br_script_error_count(&W);
+    write_script("bad_save.bs", "func start() { save_data(\"me\", [self]) }\n");
+    scripted("BadSave", "bad_save.bs", NULL, br_v2(0, 0));
+    steps(2);
+    CHECK_EQ_INT(br_script_error_count(&W), errors + 1);
+    CHECK(strstr(br_script_last_error(&W), "can't save an entity") != NULL);
+    write_script("bad_name.bs", "func start() { load_data(\"../up\") }\n");
+    scripted("BadName", "bad_name.bs", NULL, br_v2(0, 0));
+    steps(2);
+    CHECK_EQ_INT(br_script_error_count(&W), errors + 2);
+    CHECK(strstr(br_script_last_error(&W), "can't name saved data") != NULL);
+    /* lists (and negative vec2s) in Script.vars */
+    write_script("holder.bs", "var items: list = []\nvar spot := vec2(0, 0)\nvar ok = 0\n"
+                              "func start() { if len(items) == 3 and items[1] == \"two\" and items[2][0] == -1 and spot.y == -4 { ok = 1 } }\n");
+    v = scripted("Holder", "holder.bs", "items = [\"one\", \"two\", [-1]], spot = vec2(3, -4)", br_v2(0, 0));
+    steps(2);
+    CHECK(num(v, "ok") == 1);
+    CHECK_EQ_INT(br_script_error_count(&W), errors + 2);
+    br_save_delete("damaged.txt");
+    br_fs_remove(folder);
+    br_save_set_folder(NULL);
+    teardown();
+}
+
+/* Pantry Quest (examples/pantryquest, a project made of scenes and scripts):
+ * Pip walks into the first cave, takes the spoon, and walks back out. */
+static br_entity named(const char *name) {
+    uint32_t i;
+    for (i = 0; i < W.pools[ID.name].count; ++i)
+        if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)i * W.pools[ID.name].stride))->text, name) == 0)
+            return W.pools[ID.name].entities[i];
+    return BR_ENTITY_NULL;
+}
+static void hold_key(br_key k, int n) {
+    g_engine.input.keys[k] = true;
+    steps(n);
+    g_engine.input.keys[k] = false;
+}
+static void test_pantryquest_example(void) {
+    char err[200], room[32];
+    br_entity game, hero;
+    double weapon = -1;
+    const br_transform *t;
+    setup();
+    br_assets_set_root("examples/pantryquest/");
+    CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
+    game = named("Game");
+    hero = named("Hero");
+    steps(40);                                             /* the first room fades in */
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "ow_7_7") == 0);
+    CHECK(named("Map") != BR_ENTITY_NULL);
+    hold_key(BR_KEY_LEFT, 35);                             /* to the cave mouth's column (x 72)... */
+    t = (const br_transform *)br_get(&W, hero, ID.transform);
+    CHECK(t && t->position.x > 69 && t->position.x < 75);
+    hold_key(BR_KEY_UP, 70);                               /* ...and up into it */
+    steps(40);
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "cave_chef") == 0);
+    hold_key(BR_KEY_UP, 45);                               /* the spoon */
+    CHECK(br_script_get_number(&W, game, "weapon", &weapon) && weapon == 1);
+    steps(110);                                            /* holds it up, then can move again */
+    CHECK(br_script_get_string(&W, game, "state", room, sizeof(room)) && strcmp(room, "play") == 0);
+    hold_key(BR_KEY_DOWN, 90);                             /* and out again */
+    steps(40);
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "ow_7_7") == 0);
+    t = (const br_transform *)br_get(&W, hero, ID.transform);
+    CHECK(t && br_absf(t->position.x - 72) < 2 && t->position.y > 100);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+
+/* Pantry Quest: sliding into a cellar room whose shutter closes behind Pip
+ * leaves him clear of the doorway, free to walk (he used to be shut in). */
+static void test_pantryquest_shutter(void) {
+    char err[200], room[32];
+    br_entity game, hero;
+    br_script *sc;
+    const br_transform *t;
+    float x, y;
+    setup();
+    br_assets_set_root("examples/pantryquest/");
+    CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
+    game = named("Game");
+    hero = named("Hero");
+    sc = (br_script *)br_get(&W, game, SCRIPT);
+    CHECK(sc != NULL);
+    if (!sc) { teardown(); return; }
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"d1_2_2\", start_pos = vec2(40, 152), weapon = 1");
+    steps(40);
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "d1_2_2") == 0);
+    hold_key(BR_KEY_LEFT, 40);                             /* out through the west doorway... */
+    steps(80);                                             /* ...into the cutter room, whose east shutter closes */
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "d1_1_2") == 0);
+    CHECK(br_script_get_string(&W, game, "state", room, sizeof(room)) && strcmp(room, "play") == 0);
+    t = (const br_transform *)br_get(&W, hero, ID.transform);
+    CHECK(t && t->position.x <= 216);                      /* past the doorway's two tiles */
+    if (!t) { teardown(); return; }
+    x = t->position.x;
+    y = t->position.y;
+    hold_key(BR_KEY_UP, 10);                               /* and he can walk */
+    t = (const br_transform *)br_get(&W, hero, ID.transform);
+    CHECK(t && t->position.y < y - 4);
+    hold_key(BR_KEY_LEFT, 10);
+    t = (const br_transform *)br_get(&W, hero, ID.transform);
+    CHECK(t && t->position.x < x - 4);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+
 typedef struct counter_state { int starts, updates, hits; } counter_state;
 static int g_destroyed;
 static void cb_start(br_world *w, br_entity e, void *s) { BR_UNUSED(w); BR_UNUSED(e); ((counter_state *)s)->starts++; }
@@ -577,6 +814,9 @@ void suite_script(void) {
     RUN(test_extension_knows_builtins);
     RUN(test_tree_from_scripts);
     RUN(test_platformer_example);
+    RUN(test_saved_data);
+    RUN(test_pantryquest_example);
+    RUN(test_pantryquest_shutter);
     RUN(test_check_and_errors);
     RUN(test_types_checked);
     RUN(test_types_at_run_time);
@@ -585,6 +825,8 @@ void suite_script(void) {
     RUN(test_runtime_errors);
     RUN(test_physics_callbacks_and_messages);
     RUN(test_spawn_destroy_input);
+    RUN(test_tiles_substr_big_spawn);
+    RUN(test_spawn_then_set);
     RUN(test_c_behaviour_and_reload);
     RUN(test_garbage);
 }

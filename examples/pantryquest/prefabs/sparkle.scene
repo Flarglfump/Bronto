@@ -1,0 +1,15 @@
+# Pantry Quest - an effect: sparkle
+bronto_scene 1
+
+entity
+  Name
+    text = "Effect"
+  Transform
+    position = 0 0
+    scale = 1 1
+  Sprite
+    image = "art/pop.bmp"
+    layer = 7
+  Script
+    file = "scripts/effect.bs"
+    vars = "first = \"art/pop.bmp\", second = \"art/pop.bmp\", life = 0.15"

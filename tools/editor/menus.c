@@ -453,6 +453,7 @@ static void build_menu(editor *ed) {
         else ed_status(ed, "All %d script%s are fine%s", scripts, scripts == 1 ? "" : "s", ed->project.strict_typing ? " (strict typing)" : "");
     }
     if (item(ed, "Open Builds Folder", NULL, true)) ed_open_builds_folder(ed);
+    if (item(ed, "Open Save Folder", NULL, true)) ed_open_save_folder(ed);
     if (item(ed, "Project Settings...", NULL, true)) ed_project_settings_open(ed);
     br_ui_menu_end(&ed->ui);
 }

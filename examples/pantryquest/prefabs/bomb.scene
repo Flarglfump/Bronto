@@ -1,0 +1,13 @@
+# Pantry Quest - a popcorn bomb, sizzling
+bronto_scene 1
+
+entity
+  Name
+    text = "Bomb"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/bomb.bmp"
+    layer = 2
+  Script
+    file = "scripts/bomb.bs"

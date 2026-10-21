@@ -1,0 +1,30 @@
+# A popcorn bomb: it sizzles for a moment, then bursts - hurting anything
+# near, and opening cracked walls.
+
+var fuse = 1.1
+var game
+
+func start() { game = find("Game") }
+
+func update(dt) {
+    if game.state != "play" { return }
+    fuse -= dt
+    if fuse < 0.4 and floor(fuse * 20) % 2 == 0 { self.Sprite.tint = rgb(255, 160, 120) } else { self.Sprite.tint = rgb(255, 255, 255) }
+    if fuse <= 0 { burst() }
+}
+
+func burst() {
+    var p = self.global_position
+    play_sound("sfx/pop.wav")
+    var fx = spawn("prefabs/explosion.scene", self.position, self.parent)
+    for e in find_all("Enemy") {
+        var d = e.global_position - p
+        if length(d) < 26 + e.size {
+            var dir := vec2(0, 1)
+            if length(d) > 0 { dir = normalize(d) }
+            e.hit(4, dir, "bomb")
+        }
+    }
+    game.blast(p)
+    destroy(self)
+}

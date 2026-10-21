@@ -1,0 +1,13 @@
+# Pantry Quest - the pizza cutter, thrown
+bronto_scene 1
+
+entity
+  Name
+    text = "Cutter"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/cutter.bmp"
+    layer = 6
+  Script
+    file = "scripts/cutter.bs"

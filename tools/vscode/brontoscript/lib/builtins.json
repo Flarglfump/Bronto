@@ -787,6 +787,150 @@
    "min": 0,
    "param_types": [],
    "returns": "void"
+  },
+  {
+   "name": "tile_at",
+   "signature": "tile_at(map, point)",
+   "doc": "The character in the Tilemap cell under a world point (\"\" outside the map).",
+   "params": [
+    "map",
+    "point"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "vec2"
+   ],
+   "returns": "string"
+  },
+  {
+   "name": "set_tile",
+   "signature": "set_tile(map, point, char)",
+   "doc": "Changes the Tilemap cell under a world point; false outside the map.",
+   "params": [
+    "map",
+    "point",
+    "char"
+   ],
+   "min": 3,
+   "param_types": [
+    "entity",
+    "vec2",
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "tile_solid",
+   "signature": "tile_solid(map, point)",
+   "doc": "Is the Tilemap cell under a world point one of the map's solid characters? (false outside the map)",
+   "params": [
+    "map",
+    "point"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "vec2"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "tile_center",
+   "signature": "tile_center(map, point)",
+   "doc": "The world position of the centre of the Tilemap cell under a point.",
+   "params": [
+    "map",
+    "point"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "vec2"
+   ],
+   "returns": "vec2"
+  },
+  {
+   "name": "substr",
+   "signature": "substr(text, start, count = rest)",
+   "doc": "Part of a string: count characters from start (a negative start counts from the end).",
+   "params": [
+    "text",
+    "start",
+    "count"
+   ],
+   "min": 2,
+   "param_types": [
+    "string",
+    "number",
+    "number"
+   ],
+   "returns": "string"
+  },
+  {
+   "name": "save_data",
+   "signature": "save_data(name, value)",
+   "doc": "Keeps a value (a number, string, true/false, nil, vec2, or a list of those) for the next time the game runs, as name.txt in the game's folder for saved data. Returns false if it couldn't be written.",
+   "params": [
+    "name",
+    "value"
+   ],
+   "min": 2,
+   "param_types": [
+    "string",
+    "any"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "load_data",
+   "signature": "load_data(name, default = nil)",
+   "doc": "The value save_data() kept under this name, or the default if there is none (or the file is damaged).",
+   "params": [
+    "name",
+    "default"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "any"
+   ],
+   "returns": "any"
+  },
+  {
+   "name": "has_data",
+   "signature": "has_data(name)",
+   "doc": "Is there saved data by this name?",
+   "params": [
+    "name"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "delete_data",
+   "signature": "delete_data(name)",
+   "doc": "Forgets the saved data by this name. True if it's gone (or never was).",
+   "params": [
+    "name"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "data_names",
+   "signature": "data_names()",
+   "doc": "The names of all the game's saved data, in order.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "list[string]"
   }
  ],
  "properties": [
@@ -943,6 +1087,17 @@
   ],
   "Parent": [
    "entity"
+  ],
+  "Tilemap": [
+   "tileset",
+   "tile_size",
+   "columns",
+   "rows",
+   "legend",
+   "solid",
+   "tiles",
+   "layer",
+   "tint"
   ]
  },
  "callbacks": [

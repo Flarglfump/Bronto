@@ -1,0 +1,13 @@
+# Pantry Quest - something to pick up (Script vars: kind, flag, price, on_clear, timeout)
+bronto_scene 1
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"

@@ -1,0 +1,80 @@
+# Chili bat: a hot pepper with wings. Flutters about the room over anything
+# in its way, speeding up and slowing down, and now and then lands to rest.
+
+var hp = 1
+var size = 5
+var damage = 1
+var top_speed = 70
+var game
+var hero
+var appear_t = 0
+var heading = 0
+var spd = 0
+var mode = "fly"            # fly, rest
+var mode_t = 0
+var turn_t = 0
+var anim_t = 0
+var frame = 0
+var stun_t = 0
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    appear_t = 0.3 + random(0.6)
+    self.Sprite.image = "art/cloud_0.bmp"
+    heading = random(360)
+    mode_t = 1 + random(2)
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    if appear_t > 0 {
+        appear_t -= dt
+        if appear_t < 0.15 { self.Sprite.image = "art/cloud_1.bmp" }
+        if appear_t <= 0 { self.Sprite.image = "art/bat_0.bmp" }
+        return
+    }
+    if stun_t > 0 {
+        stun_t -= dt
+        return
+    }
+    mode_t -= dt
+    if mode == "fly" {
+        spd = min(top_speed, spd + 60 * dt)
+        turn_t -= dt
+        if turn_t <= 0 {
+            heading += random(-90, 90)
+            turn_t = 0.3 + random(0.5)
+        }
+        var p = self.position + from_angle(heading, spd * dt)
+        if p.x < 24 or p.x > 232 { heading = 180 - heading }
+        elif p.y < 24 or p.y > 152 { heading = -heading }
+        else { self.position = p }
+        if mode_t <= 0 {
+            mode = "rest"
+            mode_t = 0.6 + random(1.2)
+        }
+        anim_t += dt
+        if anim_t > 0.08 {
+            anim_t = 0
+            frame = 1 - frame
+            self.Sprite.image = "art/bat_" + frame + ".bmp"
+        }
+    } else {
+        spd = 0
+        self.Sprite.image = "art/bat_1.bmp"
+        if mode_t <= 0 {
+            mode = "fly"
+            mode_t = 1.5 + random(2.5)
+        }
+    }
+    if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+func hit(amount, d, kind) {
+    if appear_t > 0 { return false }
+    play_sound("sfx/hit.wav")
+    game.enemy_killed(self)
+    destroy(self)
+    return true
+}

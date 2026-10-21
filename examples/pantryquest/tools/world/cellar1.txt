@@ -1,0 +1,161 @@
+# The Cold Cellar (the first cellar, "d1"): each room is 12 x 7 tiles inside
+# walls two tiles thick; make_rooms.py builds the walls and the doorways.
+#
+#   .  tiled floor   O  crate   ~  soup   P  pepper-mill statue   S  stairs
+#
+#   doors n=... s=... e=... w=...   each side: open, locked, bomb (a cracked wall), or nothing (wall)
+#   var shut = "ns"                  sides whose shutters close until every enemy is gone
+#
+# Map of the cellar (columns 1-3, rows 0-4):
+#
+#             [2,0 recipe]
+#             [2,1 boss   ]
+#   [1,2 cutter][2,2 meatballs][3,2 secret]
+#   [1,3 bats ] [2,3 hub      ][3,3 soldiers]
+#             [2,4 entrance]  - the door south goes back outside
+
+room d1_2_4
+music cellar
+doors n=open s=open
+var exit_s = "ow_7_5"
+var exit_pos = vec2(120, 152)
+var exit_face = "down"
+inside
+............
+..P......P..
+............
+............
+............
+..P......P..
+............
+end
+
+room d1_2_3
+music cellar
+doors n=locked s=open w=open e=open
+inside
+............
+.O........O.
+............
+.....OO.....
+............
+.O........O.
+............
+put jelly 4 3
+put jelly 11 4
+put jelly 3 6
+put jelly 9 2
+end
+
+room d1_1_3
+music cellar
+doors e=open
+inside
+............
+.~~~~..~~~~.
+.~........~.
+.~...OO...~.
+.~........~.
+.~~~~..~~~~.
+............
+put bat 5 4
+put bat 10 5
+put bat 4 7
+put pickup 7.5 4 kind = "key", flag = "d1:key1"
+end
+
+room d1_3_3
+music cellar
+doors w=open n=bomb
+inside
+............
+..O......O..
+............
+............
+............
+..O......O..
+............
+put breadstick 5 4
+put breadstick 10 4
+put breadstick 10 7
+put pickup 8 5 kind = "key", flag = "d1:key2", on_clear = true
+end
+
+room d1_3_2
+music cellar
+doors s=bomb
+inside
+OOOOO..OOOOO
+O..........O
+O..........O
+............
+O..........O
+O..........O
+OOOOO..OOOOO
+put pickup 6 5 kind = "bean5", flag = "d1:stash1"
+put pickup 7.5 5 kind = "heart", flag = "d1:stash2"
+put pickup 9 5 kind = "bean5", flag = "d1:stash3"
+end
+
+room d1_2_2
+music cellar
+doors s=locked w=open n=locked
+inside
+............
+.PP......PP.
+............
+....~~~~....
+............
+.PP......PP.
+............
+put meatball 3 3
+put meatball 12 7
+put meatball 11 3
+end
+
+room d1_1_2
+music cellar
+doors e=open
+var shut = "e"
+inside
+............
+............
+...O....O...
+............
+...O....O...
+............
+............
+put breadstick 4 4
+put breadstick 11 6
+put pickup 7.5 5 kind = "cutter", flag = "d1:cutter", on_clear = true
+end
+
+room d1_2_1
+music cellar
+doors s=locked n=open
+var shut = "ns"
+inside
+............
+............
+............
+............
+............
+............
+............
+put gelatin 11 5
+put pickup 7.5 5 kind = "heart_pie", flag = "d1:heart", on_clear = true
+end
+
+room d1_2_0
+music cellar
+doors s=open
+inside
+............
+............
+.....PP.....
+............
+............
+............
+............
+put pickup 7.5 4 kind = "page", flag = "d1:page"
+end

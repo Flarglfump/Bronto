@@ -1,0 +1,15 @@
+# Pantry Quest - an effect: puff
+bronto_scene 1
+
+entity
+  Name
+    text = "Effect"
+  Transform
+    position = 0 0
+    scale = 1 1
+  Sprite
+    image = "art/puff_0.bmp"
+    layer = 7
+  Script
+    file = "scripts/effect.bs"
+    vars = "first = \"art/puff_0.bmp\", second = \"art/puff_1.bmp\", life = 0.3"

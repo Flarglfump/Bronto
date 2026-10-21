@@ -1,0 +1,80 @@
+# The Gelatin Giant, guardian of the first cellar. It wobbles back and
+# forth on its side of the room and spits sprinkles at Pip, three at a
+# time. Six pokes (or a few bombs) melt it.
+
+var hp = 6
+var size = 13
+var damage = 2
+var game
+var hero
+var appear_t = 0
+var home := vec2(0, 0)
+var t = 0
+var shoot_t = 2
+var mouth_t = 0
+var flash_t = 0
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    home = self.position
+    appear_t = 0.8
+    self.Sprite.tint = rgb(255, 255, 255, 0)
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    if appear_t > 0 {
+        appear_t -= dt
+        self.Sprite.tint = rgb(255, 255, 255, clamp((0.8 - appear_t) / 0.8, 0, 1) * 255)
+        if appear_t <= 0 {
+            self.Sprite.tint = rgb(255, 255, 255)
+            play_sound("sfx/roar.wav")
+            game.play_music("boss")
+        }
+        return
+    }
+    t += dt
+    self.position = home + vec2(sin(t * 50) * 24, sin(t * 113) * 4)
+    if flash_t > 0 {
+        flash_t -= dt
+        if floor(flash_t * 24) % 2 == 0 { self.Sprite.tint = rgb(255, 120, 120) } else { self.Sprite.tint = rgb(255, 255, 255) }
+        if flash_t <= 0 { self.Sprite.tint = rgb(255, 255, 255) }
+    }
+    shoot_t -= dt
+    if shoot_t <= 0 {
+        shoot_t = 1.6 + random(1.4)
+        mouth_t = 0.5
+        var mouth = self.position + vec2(-6, 6)
+        var aim = angle(hero.position - (self.parent.global_position + mouth))
+        for spread in [-18, 0, 18] {
+            var s = spawn("prefabs/sprinkle.scene", mouth, self.parent)
+            s.vel = from_angle(aim + spread, 90)
+        }
+    }
+    if mouth_t > 0 {
+        mouth_t -= dt
+        self.Sprite.image = "art/gelatin_1.bmp"
+    } else {
+        self.Sprite.image = "art/gelatin_0.bmp"
+    }
+    if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+func hit(amount, d, kind) {
+    if appear_t > 0 or flash_t > 0.2 { return false }
+    if kind == "cutter" { return false }
+    hp -= amount
+    flash_t = 0.5
+    if hp <= 0 {
+        play_sound("sfx/boss_die.wav")
+        for off in [vec2(-8, -8), vec2(8, -6), vec2(0, 6), vec2(-10, 8), vec2(10, 8)] {
+            spawn("prefabs/puff.scene", self.position + off, self.parent)
+        }
+        game.play_music("cellar")
+        destroy(self)
+        return true
+    }
+    play_sound("sfx/hit.wav")
+    return true
+}

@@ -2,6 +2,7 @@
 #include "bronto/log.h"
 #include "bronto/assets.h"
 #include "bronto/components.h"
+#include "bronto/save.h"
 
 #include <string.h>
 
@@ -168,6 +169,7 @@ bool br_engine_init(br_engine *e, const br_engine_config *cfg) {
     e->config = cfg ? *cfg : br_engine_default_config();
     fill_defaults(&e->config);
     e->user = e->config.user;
+    br_save_set_game(e->config.save_name ? e->config.save_name : e->config.title);   /* saved data's folder */
 
     e->platform = e->config.platform ? e->config.platform : br_platform_native();
     if (!e->platform) {

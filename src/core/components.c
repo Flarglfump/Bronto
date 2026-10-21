@@ -71,6 +71,19 @@ static const br_field k_sound_fields[] = {
 };
 static const br_sound_src k_sound_default = { "", 1, false, true, 0, false };
 
+static const br_field k_tilemap_fields[] = {
+    BR_FIELD(br_tilemap, tileset, BR_FIELD_STRING, 0, 0),
+    BR_FIELD(br_tilemap, tile_size, BR_FIELD_INT, 1, 256),
+    BR_FIELD(br_tilemap, columns, BR_FIELD_INT, 1, 256),
+    BR_FIELD(br_tilemap, rows, BR_FIELD_INT, 1, 256),
+    BR_FIELD(br_tilemap, legend, BR_FIELD_STRING, 0, 0),
+    BR_FIELD(br_tilemap, solid, BR_FIELD_STRING, 0, 0),
+    BR_FIELD(br_tilemap, tiles, BR_FIELD_STRING, 0, 0),
+    BR_FIELD(br_tilemap, layer, BR_FIELD_INT, -100, 100),
+    BR_FIELD(br_tilemap, tint, BR_FIELD_COLOR, 0, 0),
+};
+static const br_tilemap k_tilemap_default = { "", 16, 16, 11, "", "", "", -10, { 255, 255, 255, 255 } };
+
 #define DESC(name, T, fields, def) { name, sizeof(T), fields, (int)BR_ARRAY_COUNT(fields), def }
 static const br_component_desc k_descs[] = {
     DESC("Name", br_name, k_name_fields, &k_name_default),
@@ -81,9 +94,11 @@ static const br_component_desc k_descs[] = {
     DESC("Motion", br_motion, k_motion_fields, &k_motion_default),
     DESC("Bounds", br_bounds, k_bounds_fields, &k_bounds_default),
     DESC("Sound", br_sound_src, k_sound_fields, &k_sound_default),
+    DESC("Tilemap", br_tilemap, k_tilemap_fields, &k_tilemap_default),
 };
 static const br_component_desc *const k_desc_list[] = {
     &k_descs[0], &k_descs[1], &k_descs[2], &k_descs[3], &k_descs[4], &k_descs[5], &k_descs[6], &k_descs[7],
+    &k_descs[8],
 };
 
 const br_component_desc *const *br_builtin_descs(int *count) {
@@ -100,10 +115,12 @@ bool br_builtin_ids_of(const br_world *w, br_builtin_ids *ids) {
     ids->motion = br_component_find(w, "Motion");
     ids->bounds = br_component_find(w, "Bounds");
     ids->sound = br_component_find(w, "Sound");
+    ids->tilemap = br_component_find(w, "Tilemap");
     return ids->transform != BR_COMPONENT_INVALID && ids->shape != BR_COMPONENT_INVALID &&
            ids->sprite != BR_COMPONENT_INVALID && ids->label != BR_COMPONENT_INVALID &&
            ids->motion != BR_COMPONENT_INVALID && ids->bounds != BR_COMPONENT_INVALID &&
-           ids->name != BR_COMPONENT_INVALID && ids->sound != BR_COMPONENT_INVALID;
+           ids->name != BR_COMPONENT_INVALID && ids->sound != BR_COMPONENT_INVALID &&
+           ids->tilemap != BR_COMPONENT_INVALID;
 }
 
 /* ---- motion ---------------------------------------------------------------- */
@@ -215,6 +232,11 @@ static br_vec2 local_half_extent(const br_world *w, const br_builtin_ids *id, br
     const br_shape *s = (const br_shape *)br_get(w, e, id->shape);
     const br_sprite *sp = (const br_sprite *)br_get(w, e, id->sprite);
     const br_label *l = (const br_label *)br_get(w, e, id->label);
+    const br_tilemap *tm = (const br_tilemap *)br_get(w, e, id->tilemap);
+    if (tm) {
+        h.x = BR_MAX(h.x, (float)(tm->columns * tm->tile_size) / 2);
+        h.y = BR_MAX(h.y, (float)(tm->rows * tm->tile_size) / 2);
+    }
     if (s) { h.x = BR_MAX(h.x, br_absf(s->size.x) / 2); h.y = BR_MAX(h.y, br_absf(s->size.y) / 2); }
     if (sp) {
         const br_image *img = br_asset_image(sp->image);
@@ -274,7 +296,7 @@ bool br_builtin_hit(const br_world *w, br_entity e, br_vec2 p) {
 
 /* ---- drawing ------------------------------------------------------------------ */
 
-typedef struct draw_item { br_entity e; int layer; int what; uint32_t depth; } draw_item;   /* parents under their children */   /* what: 0 shape, 1 sprite, 2 label */
+typedef struct draw_item { br_entity e; int layer; int what; uint32_t depth; } draw_item;   /* parents under their children */   /* what: 0 shape, 1 sprite, 2 label, 3 tilemap */
 
 static draw_item *g_items;
 static uint32_t g_item_cap;
@@ -331,6 +353,97 @@ static void draw_sprite(br_renderer *r, const br_transform *t, const br_sprite *
     }
 }
 
+static void draw_tilemap(br_renderer *r, const br_transform *t, const br_tilemap *m) {
+    const br_image *img = br_asset_image(m->tileset);
+    int ts = m->tile_size, per_row, x, y;
+    size_t count;
+    float left, top;
+    if (!img || ts <= 0 || (per_row = img->width / ts) <= 0) return;
+    count = strlen(m->tiles);
+    left = -(float)(m->columns * ts) / 2;
+    top = -(float)(m->rows * ts) / 2;
+    for (y = 0; y < m->rows; ++y) {
+        for (x = 0; x < m->columns; ++x) {
+            size_t at = (size_t)y * (size_t)m->columns + (size_t)x;
+            const char *found;
+            int index;
+            br_recti src;
+            if (at >= count) return;
+            if (!m->tiles[at] || !(found = strchr(m->legend, m->tiles[at]))) continue;
+            index = (int)(found - m->legend);
+            src = br_recti_make((index % per_row) * ts, (index / per_row) * ts, ts, ts);
+            if (src.y + ts > img->height) continue;
+            br_draw_sprite(r, img, &src, to_world(t, br_v2(left + (float)(x * ts) + (float)ts / 2, top + (float)(y * ts) + (float)ts / 2)),
+                           br_v2((float)ts / 2, (float)ts / 2), t->scale, t->rotation * (BR_PI / 180.0f), m->tint);
+        }
+    }
+}
+
+/* The cell under a world point (false: outside the map). */
+static bool tilemap_cell(const br_world *w, br_entity e, const br_tilemap *m, br_vec2 p, int *col, int *row) {
+    br_transform t = br_world_transform(w, e);
+    float a = -t.rotation * (BR_PI / 180.0f), c = cosf(a), s = sinf(a), lx, ly;
+    br_vec2 d = br_v2_sub(p, t.position);
+    float sx = br_absf(t.scale.x) > 1e-6f ? t.scale.x : 1e-6f, sy = br_absf(t.scale.y) > 1e-6f ? t.scale.y : 1e-6f;
+    int cx, cy;
+    if (m->tile_size <= 0) return false;
+    lx = (d.x * c - d.y * s) / sx + (float)(m->columns * m->tile_size) / 2;
+    ly = (d.x * s + d.y * c) / sy + (float)(m->rows * m->tile_size) / 2;
+    cx = (int)floorf(lx / (float)m->tile_size);
+    cy = (int)floorf(ly / (float)m->tile_size);
+    if (col) *col = cx;
+    if (row) *row = cy;
+    return cx >= 0 && cy >= 0 && cx < m->columns && cy < m->rows;
+}
+
+static br_tilemap *tilemap_of(const br_world *w, br_entity e) {
+    br_component id = br_component_find(w, "Tilemap");
+    return id == BR_COMPONENT_INVALID ? NULL : (br_tilemap *)br_get(w, e, id);
+}
+
+char br_tilemap_get(const br_world *w, br_entity map, br_vec2 point, int *col, int *row) {
+    const br_tilemap *m = tilemap_of(w, map);
+    int cx = -1, cy = -1;
+    size_t at;
+    bool inside = m && tilemap_cell(w, map, m, point, &cx, &cy);
+    if (col) *col = cx;
+    if (row) *row = cy;
+    if (!inside) return 0;
+    at = (size_t)cy * (size_t)m->columns + (size_t)cx;
+    return at < strlen(m->tiles) ? m->tiles[at] : 0;
+}
+
+bool br_tilemap_set(br_world *w, br_entity map, br_vec2 point, char c) {
+    br_tilemap *m = tilemap_of(w, map);
+    int cx, cy;
+    size_t at, len;
+    if (!m || !c || !tilemap_cell(w, map, m, point, &cx, &cy)) return false;
+    at = (size_t)cy * (size_t)m->columns + (size_t)cx;
+    if (at >= BR_TILEMAP_MAX) return false;
+    len = strlen(m->tiles);
+    while (len < at) m->tiles[len++] = ' ';               /* a short map grows, empty cells between */
+    m->tiles[at] = c;
+    if (at == len) m->tiles[at + 1] = 0;
+    return true;
+}
+
+bool br_tilemap_solid(const br_world *w, br_entity map, br_vec2 point) {
+    const br_tilemap *m = tilemap_of(w, map);
+    char c = m ? br_tilemap_get(w, map, point, NULL, NULL) : 0;
+    return c && strchr(m->solid, c) != NULL;
+}
+
+bool br_tilemap_cell_center(const br_world *w, br_entity map, int col, int row, br_vec2 *out) {
+    const br_tilemap *m = tilemap_of(w, map);
+    br_transform t;
+    float ts;
+    if (!m) return false;
+    t = br_world_transform(w, map);
+    ts = (float)m->tile_size;
+    *out = to_world(&t, br_v2(-(float)m->columns * ts / 2 + ((float)col + 0.5f) * ts, -(float)m->rows * ts / 2 + ((float)row + 0.5f) * ts));
+    return true;
+}
+
 static void draw_label(br_renderer *r, const br_transform *t, const br_label *l) {
     float size = l->size * br_absf(t->scale.x);
     br_vec2 m = br_measure_text(l->text, size);
@@ -340,12 +453,13 @@ static void draw_label(br_renderer *r, const br_transform *t, const br_label *l)
 void br_builtin_draw(const br_world *w, br_renderer *r) {
     br_builtin_ids id;
     uint32_t n = 0, i, k;
-    br_component kinds[3];
+    br_component kinds[4];
     if (!br_builtin_ids_of(w, &id)) return;
     kinds[0] = id.shape;
     kinds[1] = id.sprite;
     kinds[2] = id.label;
-    for (k = 0; k < 3; ++k) {                     /* everything visible that has a Transform */
+    kinds[3] = id.tilemap;
+    for (k = 0; k < 4; ++k) {                     /* everything visible that has a Transform */
         const br_component_pool *p = &w->pools[kinds[k]];
         for (i = 0; i < p->count; ++i) {
             br_entity e = p->entities[i];
@@ -362,7 +476,8 @@ void br_builtin_draw(const br_world *w, br_renderer *r) {
             g_items[n].what = (int)k;
             g_items[n].depth = br_depth(w, e);
             g_items[n].layer = k == 0 ? ((const br_shape *)data)->layer
-                             : k == 1 ? ((const br_sprite *)data)->layer : ((const br_label *)data)->layer;
+                             : k == 1 ? ((const br_sprite *)data)->layer
+                             : k == 2 ? ((const br_label *)data)->layer : ((const br_tilemap *)data)->layer;
             ++n;
         }
     }
@@ -373,7 +488,8 @@ void br_builtin_draw(const br_world *w, br_renderer *r) {
         const br_transform *t = &wt;
         if (it->what == 0) draw_shape(r, t, (const br_shape *)br_get(w, it->e, id.shape));
         else if (it->what == 1) draw_sprite(r, t, (const br_sprite *)br_get(w, it->e, id.sprite));
-        else draw_label(r, t, (const br_label *)br_get(w, it->e, id.label));
+        else if (it->what == 2) draw_label(r, t, (const br_label *)br_get(w, it->e, id.label));
+        else draw_tilemap(r, t, (const br_tilemap *)br_get(w, it->e, id.tilemap));
     }
 }
 

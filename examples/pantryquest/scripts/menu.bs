@@ -1,0 +1,51 @@
+# The inventory: the game waits while it's open. Left and right choose the
+# item for B; Enter closes it.
+
+var game
+var slots = []
+var cursor
+var choice = 0
+var owned = []
+
+func start() {
+    game = find("Game")
+    cursor = child(self, "Cursor")
+    for i in 4 { push(slots, child(self, "Slot" + i)) }
+    owned = []
+    for item in game.items { push(owned, item) }
+    for i in 4 {
+        if i < len(owned) {
+            slots[i].Sprite.image = find("HUD").icon(owned[i])
+            if owned[i] == game.b_item { choice = i }
+        } else {
+            slots[i].Sprite.tint = rgb(255, 255, 255, 0)
+        }
+    }
+    child(self, "Pages").Label.text = "RECIPE PAGES  " + game.pages + " / 8"
+    if len(owned) == 0 { cursor.Shape.outline = rgb(0, 0, 0, 0) }
+    place()
+}
+
+func place() {
+    cursor.position = slots[choice].position
+}
+
+func update(dt) {
+    if len(owned) > 0 {
+        if key_pressed("left") or key_pressed("a") {
+            choice = (choice + len(owned) - 1) % len(owned)
+            play_sound("sfx/menu.wav")
+        }
+        if key_pressed("right") or key_pressed("d") {
+            choice = (choice + 1) % len(owned)
+            play_sound("sfx/menu.wav")
+        }
+        game.b_item = owned[choice]
+        place()
+    }
+    if key_pressed("enter") or key_pressed("escape") {
+        game.state = "play"
+        play_sound("sfx/menu.wav")
+        destroy(self)
+    }
+}

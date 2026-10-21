@@ -1,0 +1,11 @@
+# Pantry Quest - the boss music, looping (the game swaps these prefabs)
+bronto_scene 1
+
+entity
+  Name
+    text = "Music"
+  Sound
+    file = "music/boss.wav"
+    volume = 0.55
+    loop = true
+    play_on_start = true

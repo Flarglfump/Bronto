@@ -57,7 +57,7 @@
 
 typedef struct br_script {
     char file[96];
-    char vars[160];
+    char vars[256];
     /* runtime only (not saved): the running instance */
     void *instance;
 } br_script;

@@ -14,8 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define VALUE_MAX 1100      /* longest formatted value (strings up to 512 chars) */
-#define LINE_MAX_LEN 1200
+#define VALUE_MAX 4400      /* longest formatted value (a Tilemap's 2048 cells, escaped) */
+#define LINE_MAX_LEN 4500
 
 /* ---- a growable string ----------------------------------------------------- */
 

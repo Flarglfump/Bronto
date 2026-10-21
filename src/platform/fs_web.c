@@ -54,6 +54,8 @@ bool br_fs_rename(const char *from, const char *to) {
     return bw_fs_rename(from, to) == 0;
 }
 
+bool br_fs_replace(const char *from, const char *to) { return bw_fs_rename(from, to) == 0; }   /* replaces, as POSIX does */
+
 bool br_fs_remove(const char *path) { return bw_fs_remove(path) == 0; }
 
 bool br_fs_executable_path(char *out, size_t size) {   /* a page has no program file */

@@ -1,0 +1,13 @@
+# Pantry Quest - a stove flame in a cave
+bronto_scene 1
+
+entity
+  Name
+    text = "Flame"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/flame_0.bmp"
+    layer = 2
+  Script
+    file = "scripts/flame.bs"

@@ -1,0 +1,151 @@
+# Pantry Quest - the title screen (scripts/title.bs): Enter starts the game (main.scene).
+bronto_scene 1
+
+entity
+  Name
+    text = "Title"
+  Transform
+    position = 128 40
+  Label
+    text = "PANTRY QUEST"
+    size = 2
+    color = #ffd84aff
+    layer = 20
+  Script
+    file = "scripts/title.bs"
+
+entity
+  Name
+    text = "Background"
+  Transform
+    position = 128 120
+  Shape
+    kind = rect
+    size = 256 240
+    color = #2b1d17ff
+    layer = -20
+
+entity
+  Name
+    text = "Shadow"
+  Transform
+    position = 129 42
+  Label
+    text = "PANTRY QUEST"
+    size = 2
+    color = #8e1a2aff
+    layer = 19
+
+entity
+  Name
+    text = "Subtitle"
+  Transform
+    position = 128 62
+  Label
+    text = "A LITTLE COOK'S BIG ADVENTURE"
+    size = 1
+    color = #fff8ecff
+    layer = 20
+
+entity
+  Name
+    text = "Press"
+  Transform
+    position = 0 138
+  Label
+    text = "PRESS ENTER"
+    size = 1
+    color = #ffe678ff
+    layer = 20
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Ground"
+  Transform
+    position = 128 200
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 5
+    legend = ".,TrW~bCs=fIFKX:Yp"
+    solid = ""
+    tiles = "TT.TT.TTTT.TT.TT..r.....,..b...f.f....,.....r.....,.f......,..f.TTbTTTTTTTTTTbTT"
+    layer = -15
+
+entity
+  Name
+    text = "Pip"
+  Transform
+    position = 128 118
+    scale = 2 2
+  Sprite
+    image = "art/hero_down_0.bmp"
+    layer = 5
+
+entity
+  Name
+    text = "Tomato"
+  Transform
+    position = 48 128
+  Sprite
+    image = "art/tomato_0.bmp"
+    layer = 4
+
+entity
+  Name
+    text = "Burger"
+  Transform
+    position = 208 128
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 4
+
+entity
+  Name
+    text = "Jelly"
+  Transform
+    position = 78 150
+  Sprite
+    image = "art/jelly_0.bmp"
+    layer = 4
+
+entity
+  Name
+    text = "Bat"
+  Transform
+    position = 182 96
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 4
+
+entity
+  Name
+    text = "Page"
+  Transform
+    position = 128 84
+  Sprite
+    image = "art/page.bmp"
+    layer = 4
+
+entity
+  Name
+    text = "Music"
+  Sound
+    file = "music/title.wav"
+    volume = 0.55
+    loop = true
+    play_on_start = true
+
+entity
+  Name
+    text = "StoryBG"
+  Transform
+    position = 128 120
+  Shape
+    kind = rect
+    size = 256 240
+    color = #00000000
+    layer = 10

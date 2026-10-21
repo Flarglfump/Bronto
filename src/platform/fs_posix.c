@@ -5,6 +5,7 @@
  */
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -56,6 +57,21 @@ bool br_fs_mkdir(const char *path) {
 bool br_fs_rename(const char *from, const char *to) {
     if (br_fs_exists(to)) return false;                       /* rename() would overwrite it */
     return rename(from, to) == 0;
+}
+
+bool br_fs_replace(const char *from, const char *to) {
+    int fd = open(from, O_RDONLY);
+    if (fd < 0) return false;
+    fsync(fd);                                                /* its data reaches the disk before the swap */
+    close(fd);
+    return rename(from, to) == 0;                             /* atomic, replacing `to` */
+}
+
+static bool fs_getenv(const char *name, char *out, size_t size) {
+    const char *v = getenv(name);
+    if (!v || !v[0] || strlen(v) >= size) return false;
+    snprintf(out, size, "%s", v);
+    return true;
 }
 
 bool br_fs_remove(const char *path) { return remove(path) == 0; }

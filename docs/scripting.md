@@ -29,7 +29,8 @@ Only two things can appear at the top level of a file:
 - `var name = value` declares a variable. Each entity running the script has its own copy,
   and the value is kept between calls. **Script › vars** in the inspector overrides the
   starting values for one entity, for example `speed = 120, name = "Rex", wrap = true`
-  (only literal values: numbers, strings, `true`/`false`/`nil`, `vec2(x, y)`).
+  (only literal values: numbers, strings, `true`/`false`/`nil`, `vec2(x, y)` and lists of
+  these, such as `path = [vec2(0, 0), vec2(64, 0)]`).
 - `func name(a, b) { ... }` declares a function.
 - `@strict`, on the first line only, makes types required (see [Types](#types)).
 
@@ -135,7 +136,9 @@ range(n) range(a, b[, step])`.
 - `children(e)` returns its direct children; `child(e, "Gun")` the one with that name, or nil.
 - `spawn("prefabs/bullet.scene", position[, parent])` adds a copy of a scene file's entities
   and returns the first one. With a parent, they become its children, and position is in
-  its space.
+  its space. The new entities' scripts are ready at once. You can set their variables and
+  call their functions straight away (`var b = spawn(...)` then `b.speed = 200`). Their
+  `start()` runs before their first update, on the next step.
 - `destroy(e)` removes an entity, and its children, at the end of the step.
 - `has(e, "Shape")`, `add(e, "Motion")` (returns the component) and `remove_component(e, "Motion")`.
 - `send(e, "function", args...)` calls a function on another entity's script if it has one,
@@ -144,6 +147,43 @@ range(n) range(a, b[, step])`.
 - `load_scene("levels/2.scene")` ends this scene and starts that one (after this step).
   `quit()` ends the game. In the editor's Play, load_scene shows the other scene until Stop,
   and quit stops playing.
+
+**Saved data** (kept between runs of the game, in its own folder for saved data: see
+[Saved data](../README.md#saved-data)):
+- `save_data("progress", value)` keeps a value under a name, and returns false if it
+  couldn't be written. The value can be a number, a string, `true`/`false`, `nil`, a
+  vec2, or a list of these (lists inside lists too). Saving an entity is an error. Names
+  are up to 60 letters, digits, spaces and `_-.()`.
+- `load_data("progress"[, default])` returns the saved value, or the default (nil if
+  none is given) when there isn't one. A file that has been damaged also gives the
+  default, with a warning in the log.
+- `has_data(name)`, `delete_data(name)`, and `data_names()` (every name, in order).
+
+```
+func save_game() {
+    save_data("slot1", [hearts, beans, room_name, flags])
+}
+func load_game() {
+    var s = load_data("slot1")
+    if s == nil { return false }
+    hearts = s[0]; beans = s[1]; room_name = s[2]; flags = s[3]
+    return true
+}
+```
+
+Each name is a text file (`slot1.txt`) holding the value written as BrontoScript, such
+as `[3, 12, "ow_7_7", ["spoon", "d1:key1"]]`.
+
+**Tilemaps** (a `Tilemap` component: a grid of tiles from one image, one character per cell):
+- `tile_at(map, point)` returns the character in the cell under a world point, or `""`
+  outside the map.
+- `set_tile(map, point, "#")` changes that cell and returns false outside the map.
+- `tile_solid(map, point)` tells whether that cell's character is one of the map's `solid`
+  ones (outside the map: false). Walls for scripted movement work this way.
+- `tile_center(map, point)` returns the world position of the centre of that cell.
+
+**Text:** `substr(text, start[, count])` returns part of a string; a negative start counts
+from the end. `text[i]` is one character.
 
 **Physics:**
 - `apply_force(e, force[, point])` pushes over the next step. `apply_impulse(e, impulse[, point])`

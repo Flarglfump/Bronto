@@ -1,0 +1,47 @@
+# The title screen. After a few seconds the story scrolls up over it; Enter
+# (or Space) starts the game.
+var t = 0
+var phase = "title"         # title, story
+var labels = []
+var lines = ["LONG AGO, IN THE PANTRY KINGDOM,", "EVERY FEAST WAS COOKED FROM", "THE GRAND RECIPE.", "",
+             "BUT GREEDY BARON GORGE TORE IT", "INTO EIGHT PAGES, AND HID THEM", "ALL OVER THE LAND.", "",
+             "PIP, A YOUNG COOK, PICKED UP", "A WOODEN SPOON AND SET OUT", "TO FIND THEM.", "", "",
+             "ARROWS OR WASD - WALK", "X - SPOON     Z - ITEM", "ENTER - INVENTORY"]
+var panel
+var press
+
+func start() {
+    panel = find("StoryBG")
+    press = child(self, "Press")
+    for i in len(lines) {
+        var l = spawn("prefabs/story_line.scene", vec2(128, 260 + i * 12))
+        l.Label.text = lines[i]
+        l.Label.layer = 12
+        push(labels, l)
+    }
+}
+
+func update(dt) {
+    t += dt
+    if floor(t * 2) % 2 == 0 { press.Label.color = rgb(255, 230, 120) } else { press.Label.color = rgb(255, 230, 120, 0) }
+    if phase == "title" and t > 7 {
+        phase = "story"
+        t = 0
+    }
+    if phase == "story" {
+        panel.Shape.color = rgb(0, 0, 0, min(t, 1) * 225)
+        var last = labels[len(labels) - 1]
+        if last.y > 200 {
+            for l in labels { l.y -= 16 * dt }
+        } elif t > 30 {
+            phase = "title"
+            t = 0
+            panel.Shape.color = rgb(0, 0, 0, 0)
+            for i in len(labels) { labels[i].y = 260 + i * 12 }
+        }
+    }
+    if key_pressed("enter") or key_pressed("space") {
+        play_sound("sfx/buy.wav")
+        load_scene("main.scene")
+    }
+}

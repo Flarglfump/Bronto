@@ -1,0 +1,100 @@
+# Meatball: rolls slowly from tile to tile - until Pip is in line with it.
+# Then it charges, fast, until something stops it.
+
+var hp = 1
+var size = 6
+var damage = 1
+var speed = 28
+var charge_speed = 130
+var game
+var hero
+var map
+var appear_t = 0
+var dir := vec2(1, 0)
+var target := vec2(0, 0)
+var moving = false
+var charging = false
+var anim_t = 0
+var frame = 0
+var stun_t = 0
+var flash_t = 0
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    map = child(self.parent, "Map")
+    appear_t = 0.3 + random(0.6)
+    self.Sprite.image = "art/cloud_0.bmp"
+}
+
+func free(p) {
+    if p.x < 24 or p.x > 232 or p.y < 24 or p.y > 152 { return false }
+    return not tile_solid(map, self.parent.global_position + p)
+}
+
+func snap(p) { return vec2(floor(p.x / 16) * 16 + 8, floor(p.y / 16) * 16 + 8) }
+
+func update(dt) {
+    if game.state != "play" { return }
+    if appear_t > 0 {
+        appear_t -= dt
+        if appear_t < 0.15 { self.Sprite.image = "art/cloud_1.bmp" }
+        if appear_t <= 0 {
+            self.Sprite.image = "art/meatball_0.bmp"
+            self.position = snap(self.position)
+        }
+        return
+    }
+    if flash_t > 0 { flash_t -= dt }
+    if stun_t > 0 {
+        stun_t -= dt
+    } elif moving {
+        var to = target - self.position
+        var step = speed * dt
+        if charging { step = charge_speed * dt }
+        if length(to) <= step {
+            self.position = target
+            moving = false
+        } else {
+            self.position += normalize(to) * step
+        }
+    } else {
+        var d = hero.position - self.global_position
+        var line := vec2(0, 0)
+        if abs(d.x) < 6 { line = vec2(0, sign(d.y)) }
+        if abs(d.y) < 6 { line = vec2(sign(d.x), 0) }
+        if (line.x != 0 or line.y != 0) and free(self.position + line * 16) {
+            dir = line
+            charging = true
+        } else {
+            charging = false
+            if random() < 0.3 or not free(self.position + dir * 16) {
+                var dirs = [vec2(0, 1), vec2(0, -1), vec2(1, 0), vec2(-1, 0)]
+                dir = dirs[floor(random(4))]
+            }
+        }
+        if free(self.position + dir * 16) {
+            target = self.position + dir * 16
+            moving = true
+        }
+    }
+    anim_t += dt
+    if anim_t > 0.25 or (charging and anim_t > 0.08) {
+        anim_t = 0
+        frame = 1 - frame
+        self.Sprite.image = "art/meatball_" + frame + ".bmp"
+    }
+    if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+func hit(amount, d, kind) {
+    if appear_t > 0 or flash_t > 0 { return false }
+    if kind == "cutter" {
+        stun_t = 1.5
+        return true
+    }
+    play_sound("sfx/hit.wav")
+    game.enemy_killed(self)
+    destroy(self)
+    return true
+}

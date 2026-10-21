@@ -40,8 +40,10 @@ if not exist build\obj mkdir build\obj
 if not exist build\wasm mkdir build\wasm
 if not exist build\web mkdir build\web
 for %%f in (src\platform\web\*.c) do clang %WCFLAGS% -fno-builtin -c %%f -o build\wasm\%%~nf.o || goto :error
+rem The longjmp exception tag: see src\platform\web\tag.s.
+clang --target=wasm32 -mexception-handling -c src\platform\web\tag.s -o build\wasm\tag.o || goto :error
 clang %WCFLAGS% -c src\bronto.c -o build\wasm\bronto.o || goto :error
-set WRT=build\wasm\libc.o build\wasm\malloc.o build\wasm\math.o build\wasm\memfs.o build\wasm\sjlj.o build\wasm\start.o build\wasm\stdio.o build\wasm\bronto.o
+set WRT=build\wasm\libc.o build\wasm\malloc.o build\wasm\math.o build\wasm\memfs.o build\wasm\sjlj.o build\wasm\start.o build\wasm\tag.o build\wasm\stdio.o build\wasm\bronto.o
 clang %WCFLAGS% %WLDFLAGS% tools\player\main.c %WRT% -o build\web\bronto_player.wasm || goto :error
 copy /Y tools\web\bronto.js build\web\ >nul
 copy /Y tools\web\shell.html build\web\ >nul

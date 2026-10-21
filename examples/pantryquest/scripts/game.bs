@@ -1,0 +1,505 @@
+# Pantry Quest - the game itself: what Pip carries, where he is, and moving
+# between rooms. One "Game" entity in main.scene runs this; everything else
+# asks it (find("Game")).
+#
+# The world is made of rooms, each a scene file in rooms/: "ow_7_7" is the
+# overworld room at column 7, row 7; "d1_2_4" a room of the first cellar;
+# "cave_chef" a cave. A room is spawned at the top of the play area (y = 64,
+# under the HUD); walking off its edge slides the next one in, and stairs
+# and doorways fade to another room.
+
+var hearts_max = 3          # heart containers
+var hp = 6                  # in half hearts
+var beans = 0
+var keys = 0
+var bombs = 0
+var bombs_max = 8
+var weapon = 0              # 0 none, 1 wooden spoon
+var items = []              # "bombs", "cutter"
+var b_item = ""             # the one on the B button (Z)
+var pages = 0               # pages of the Grand Recipe
+var flags = []              # what's been done: doors opened, items taken...
+var visited = []            # cellar rooms seen (for the HUD map)
+
+var area = "ow"             # "ow", "d1", or "cave"
+var rx = 7
+var ry = 7
+var room_name = ""
+var room                    # the room's root entity
+var map                     # its Tilemap
+var state = "boot"          # boot, play, slide, fade_out, fade_in, hold, menu, dead, over, won
+var start_room = "ow_7_7"   # (for testing a room in the editor: set these in Game's Script vars,
+var start_items = ""        #  e.g. start_room = "d1_2_4", start_pos = vec2(128, 200), start_items = "bombs,cutter")
+var start_pos := vec2(120, 168)
+var area_start = "ow_7_7"   # where Continue goes after a game over
+var area_pos := vec2(120, 168)
+
+var hero
+var fade
+var next_room
+var slide_dir := vec2(0, 0)
+var slide_left = 0
+var slide_total = 1
+var hero_from := vec2(0, 0)
+var hero_to := vec2(0, 0)
+var fade_t = 0
+var warp_name = ""
+var warp_pos := vec2(0, 0)
+var warp_face = "up"
+var ret_name = ""           # where a cave's way out leads back to
+var ret_pos := vec2(0, 0)
+var hold_t = 0
+var dead_t = 0
+var music_name = ""
+var music
+var say1 = ""
+var say2 = ""
+var say_t = 0
+var beep_t = 0
+var won_t = 0
+var holding_page = false
+var note1 = ""              # a message for when the next room has faded in
+var note2 = ""
+
+var booted = 0
+
+func start() {
+    hero = find("Hero")
+    fade = find("Fade")
+    state = "boot"
+}
+
+# The first steps: every script in the scene has started before the first room comes in.
+func boot() {
+    booted += 1
+    if booted < 2 { return }
+    for item in split(start_items, ",") {
+        if item != "" { give(item) }
+    }
+    enter(start_room, start_pos, "up")
+    state = "fade_in"
+    fade_t = 0
+}
+
+# ---- rooms --------------------------------------------------------------------
+func split(s, sep) {
+    var out = []
+    var cur = ""
+    for i in len(s) {
+        if s[i] == sep {
+            push(out, cur)
+            cur = ""
+        } else {
+            cur += s[i]
+        }
+    }
+    push(out, cur)
+    return out
+}
+
+func room_file(name) { return "rooms/" + name + ".scene" }
+
+# Makes `name` the current room (spawned at the top of the play area).
+func enter(name, pos, face) {
+    if room != nil { destroy(room) }
+    room = spawn(room_file(name), vec2(0, 64))
+    map = child(room, "Map")
+    set_place(name)
+    if area == "ow" {                               # where Continue goes after a game over:
+        area_start = start_room                     # the overworld's start, or the cellar's door
+        area_pos = start_pos
+    } elif area != "cave" {
+        area_start = name
+        area_pos = pos
+    }
+    hero.position = pos
+    hero.face(face)
+    music_for_room()
+    say("", "")
+}
+
+func set_place(name) {
+    room_name = name
+    if substr(name, 0, 4) == "cave" {
+        area = "cave"
+        return
+    }
+    var p = split(name, "_")
+    area = p[0]
+    rx = num(p[1])
+    ry = num(p[2])
+    if area != "ow" and not contains(visited, name) { push(visited, name) }
+}
+
+func music_for_room() {
+    var want = room.music
+    if want == "" { want = "none" }
+    play_music(want)
+}
+
+# A track by name ("overworld", "cellar", "boss"...); a name starting with
+# "none" just stops the music.
+func play_music(name) {
+    if name == music_name { return }
+    music_name = name
+    if music != nil { destroy(music) }
+    music = nil
+    if substr(name, 0, 4) != "none" { music = spawn("prefabs/music_" + name + ".scene", vec2(0, 0)) }
+}
+
+# The hero walked off the play area towards `side` ("n", "s", "e" or "w").
+func leave(side) {
+    if state != "play" { return }
+    var ex = exit_of(side)
+    if ex == "back" {
+        warp(ret_name, ret_pos, "down")
+        return
+    }
+    if ex != "" {
+        warp(ex, room.exit_pos, room.exit_face)
+        return
+    }
+    if area == "cave" { return }
+    var d := vec2(0, 0)
+    if side == "n" { d = vec2(0, -1) }
+    if side == "s" { d = vec2(0, 1) }
+    if side == "w" { d = vec2(-1, 0) }
+    if side == "e" { d = vec2(1, 0) }
+    var name = area + "_" + (rx + d.x) + "_" + (ry + d.y)
+    next_room = spawn(room_file(name), vec2(d.x * 256, 64 + d.y * 176))
+    slide_dir = d
+    if d.x != 0 { slide_left = 256 } else { slide_left = 176 }
+    slide_total = slide_left
+    hero_from = hero.position
+    hero_to = hero.position - d * slide_total          # the same place on the screen, then a few steps in
+    # In the cellars he walks on past the doorway (two tiles deep), so that
+    # a shutter closing behind him can't close on his feet.
+    var deep = 0
+    if area != "ow" { deep = 1 }
+    if d.y < 0 { hero_to.y = min(hero_to.y, 232 - deep * 32) }      # arriving at the bottom: 200
+    if d.y > 0 { hero_to.y = max(hero_to.y, 72 + deep * 24) }       # arriving at the top: 96
+    if d.x < 0 { hero_to.x = min(hero_to.x, 240 - deep * 24) }      # arriving on the right: 216
+    if d.x > 0 { hero_to.x = max(hero_to.x, 16 + deep * 24) }       # arriving on the left: 40
+    state = "slide"
+    set_place(name)
+    say("", "")
+}
+
+func exit_of(side) {
+    if side == "n" { return room.exit_n }
+    if side == "s" { return room.exit_s }
+    if side == "e" { return room.exit_e }
+    return room.exit_w
+}
+
+func warp(name, pos, face) {
+    if state != "play" and state != "hold" { return }
+    if substr(name, 0, 4) == "cave" and area != "cave" {
+        ret_name = room_name
+        ret_pos = hero.position + vec2(0, 16)
+    }
+    warp_name = name
+    warp_pos = pos
+    warp_face = face
+    state = "fade_out"
+    fade_t = 0
+    play_sound("sfx/stairs.wav", 0.6)
+}
+
+func update(dt) {
+    if state == "boot" {
+        boot()
+    } elif state == "slide" {
+        var step = min(4, slide_left)
+        slide_left -= step
+        room.position -= slide_dir * step
+        next_room.position -= slide_dir * step
+        hero.position = lerp(hero_from - slide_dir * (slide_total - slide_left), hero_to, 1 - slide_left / slide_total)
+        if slide_left <= 0 {
+            destroy(room)
+            room = next_room
+            next_room = nil
+            room.position = vec2(0, 64)
+            map = child(room, "Map")
+            hero.position = hero_to
+            state = "play"
+            music_for_room()
+            room.entered()
+        }
+    } elif state == "fade_out" {
+        fade_t += dt
+        set_fade(fade_t / 0.3)
+        if fade_t >= 0.3 {
+            enter(warp_name, warp_pos, warp_face)
+            state = "fade_in"
+            fade_t = 0
+        }
+    } elif state == "fade_in" {
+        fade_t += dt
+        set_fade(1 - fade_t / 0.3)
+        if fade_t >= 0.3 {
+            set_fade(0)
+            state = "play"
+            room.entered()
+            if note1 != "" {
+                say(note1, note2)
+                note1 = ""
+            }
+        }
+    } elif state == "hold" {
+        hold_t -= dt
+        if hold_t <= 0 {
+            hero.hold_done()
+            state = "play"
+            after_hold()
+        }
+    } elif state == "dead" {
+        dead_t += dt
+        hero.spin(dead_t)
+        if dead_t > 2.2 {
+            state = "over"
+            set_fade(0.85)
+            spawn("prefabs/game_over.scene", vec2(128, 152))
+            play_sound("sfx/game_over.wav")
+        }
+    } elif state == "play" {
+        if key_pressed("enter") {
+            state = "menu"
+            spawn("prefabs/menu.scene", vec2(128, 152))
+            play_sound("sfx/menu.wav")
+        }
+        if hp <= 2 and hp > 0 {
+            beep_t -= dt
+            if beep_t <= 0 {
+                play_sound("sfx/low_health.wav", 0.5)
+                beep_t = 0.9
+            }
+        }
+    } elif state == "won" {
+        won_t += dt
+    }
+    type_text(dt)
+}
+
+func set_fade(a) {
+    fade.Shape.color = rgb(0, 0, 0, clamp(a, 0, 1) * 255)
+}
+
+# ---- the hero's health ------------------------------------------------------------
+func damage(half_hearts) {
+    hp -= half_hearts
+    play_sound("sfx/hurt.wav")
+    if hp <= 0 {
+        hp = 0
+        state = "dead"
+        dead_t = 0
+        play_music("none_dead")
+    }
+}
+
+func continue_game() {
+    hp = 6
+    for e in find_all("GameOver") { destroy(e) }
+    set_fade(1)
+    music_name = ""
+    enter(area_start, area_pos, "up")
+    state = "fade_in"
+    fade_t = 0
+}
+
+func heal(half_hearts) {
+    hp = min(hp + half_hearts, hearts_max * 2)
+}
+
+# ---- flags --------------------------------------------------------------------------
+func flag(f) {
+    if not contains(flags, f) { push(flags, f) }
+}
+func has_flag(f) { return contains(flags, f) }
+
+# ---- things to pick up -----------------------------------------------------------------
+func collect(kind, thing) {
+    if kind == "bean" {
+        beans = min(beans + 1, 255)
+        play_sound("sfx/bean.wav")
+    } elif kind == "bean5" {
+        beans = min(beans + 5, 255)
+        play_sound("sfx/bean.wav")
+    } elif kind == "heart" {
+        heal(2)
+        play_sound("sfx/heart.wav")
+    } elif kind == "soup" {
+        heal(hearts_max * 2)
+        play_sound("sfx/heart.wav")
+    } elif kind == "key" {
+        keys += 1
+        play_sound("sfx/key.wav")
+    } elif kind == "bomb" {
+        give("bombs")
+        bombs = min(bombs + 4, bombs_max)
+        play_sound("sfx/key.wav")
+    } elif kind == "bombs_item" {
+        give("bombs")
+        bombs = min(bombs + 4, bombs_max)
+        hold("art/bomb.bmp", 1.2)
+    } elif kind == "spoon" {
+        weapon = 1
+        hold("art/spoon.bmp", 1.6)
+    } elif kind == "cutter" {
+        give("cutter")
+        b_item = "cutter"
+        hold("art/cutter.bmp", 1.6)
+    } elif kind == "heart_pie" {
+        hearts_max = min(hearts_max + 1, 16)
+        hp = hearts_max * 2
+        hold("art/heart_pie.bmp", 1.6)
+    } elif kind == "page" {
+        pages += 1
+        hold("art/page.bmp", 3.0)
+        play_music("none_page")
+        play_sound("sfx/page.wav")
+        holding_page = true
+    }
+}
+func give(item) {
+    if not contains(items, item) {
+        push(items, item)
+        if b_item == "" { b_item = item }
+    }
+}
+
+func hold(image, seconds) {
+    state = "hold"
+    hold_t = seconds
+    hero.hold(image)
+    if image != "art/page.bmp" { play_sound("sfx/item.wav") }
+}
+
+func after_hold() {
+    if holding_page {
+        holding_page = false
+        flag("page:" + area)
+        note1 = "RECIPE PAGE " + pages + " OF 8 FOUND!"
+        note2 = "THE DEMO ENDS HERE - THANKS!"
+        area_start = start_room
+        area_pos = start_pos
+        warp("ow_7_5", vec2(120, 152), "down")
+        music_name = ""
+    }
+}
+
+# Something an enemy might leave behind.
+func drop_at(local_pos, parent) {
+    var r = random()
+    var kind = ""
+    if r < 0.28 { kind = "bean" }
+    elif r < 0.34 { kind = "bean5" }
+    elif r < 0.46 { kind = "heart" }
+    elif r < 0.52 and contains(items, "bombs") { kind = "bomb" }
+    if kind == "" { return }
+    var p = spawn("prefabs/pickup.scene", local_pos, parent)
+    p.kind = kind
+    p.timeout = 9
+}
+
+func enemy_killed(e) {
+    play_sound("sfx/enemy_die.wav")
+    spawn("prefabs/puff.scene", e.position, e.parent)
+    drop_at(e.position, e.parent)
+}
+
+# ---- the message at the top of a cave -------------------------------------------------
+func say(a, b) {
+    say1 = a
+    say2 = b
+    say_t = 0
+    find("Say1").Label.text = ""
+    find("Say2").Label.text = ""
+}
+
+func type_text(dt) {
+    if say1 == "" and say2 == "" { return }
+    var total = len(say1) + len(say2)
+    var before = floor(say_t * 20)
+    say_t += dt
+    var shown = min(floor(say_t * 20), total)
+    if shown == before or before >= total { return }
+    find("Say1").Label.text = substr(say1, 0, shown)
+    find("Say2").Label.text = substr(say2, 0, max(0, shown - len(say1)))
+    if shown % 2 == 0 { play_sound("sfx/text.wav", 0.4) }
+}
+
+# ---- doors -----------------------------------------------------------------------------
+# The cells of each side's doorway in a cellar room.
+func door_cells(side) {
+    if side == "n" { return [vec2(7, 0), vec2(8, 0), vec2(7, 1), vec2(8, 1)] }
+    if side == "s" { return [vec2(7, 9), vec2(8, 9), vec2(7, 10), vec2(8, 10)] }
+    if side == "w" { return [vec2(0, 5), vec2(1, 5)] }
+    return [vec2(14, 5), vec2(15, 5)]
+}
+
+func cell_point(c) { return room.global_position + vec2(c.x * 16 + 8, c.y * 16 + 8) }
+
+func set_door(side, tile) {
+    for c in door_cells(side) { set_tile(map, cell_point(c), tile) }
+}
+
+func opposite(side) {
+    if side == "n" { return "s" }
+    if side == "s" { return "n" }
+    if side == "e" { return "w" }
+    return "e"
+}
+
+func neighbour(side) {
+    var x = rx
+    var y = ry
+    if side == "n" { y -= 1 }
+    if side == "s" { y += 1 }
+    if side == "w" { x -= 1 }
+    if side == "e" { x += 1 }
+    return area + "_" + x + "_" + y
+}
+
+# Opens a doorway for good: this room's side, and the other room's matching side.
+func open_door(side) {
+    set_door(side, ",")
+    flag("open:" + room_name + ":" + side)
+    flag("open:" + neighbour(side) + ":" + opposite(side))
+}
+
+func side_of_cell(col, row) {
+    if row <= 1 { return "n" }
+    if row >= 9 { return "s" }
+    if col <= 1 { return "w" }
+    return "e"
+}
+
+# The hero pushed against a locked door at a world point.
+func try_unlock(point) {
+    if keys <= 0 { return false }
+    var local = point - room.global_position
+    keys -= 1
+    open_door(side_of_cell(floor(local.x / 16), floor(local.y / 16)))
+    play_sound("sfx/door.wav")
+    return true
+}
+
+# A bomb went off at a world point: secret walls nearby open.
+func blast(point) {
+    for w in find_all("Warp") {
+        if distance(w.global_position, point) < 28 { w.reveal() }
+    }
+    if area == "ow" or area == "cave" { return }
+    for dx in [-16, 0, 16] {
+        for dy in [-16, 0, 16] {
+            var p = point + vec2(dx, dy)
+            if tile_at(map, p) == "X" {
+                var local = p - room.global_position
+                open_door(side_of_cell(floor(local.x / 16), floor(local.y / 16)))
+                play_sound("sfx/secret.wav")
+                return
+            }
+        }
+    }
+}

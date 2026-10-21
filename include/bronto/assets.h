@@ -61,6 +61,7 @@ typedef struct br_project {
     bool strict_typing;            /* every script as if it started with @strict */
     char icon[256];                /* an image for the window and taskbar ("" = the default) */
     char build_dir[256];           /* where Build puts games, in the project (default builds) */
+    char exclude[256];             /* left out of built games: names in the project, comma-separated ("tools, notes.txt") */
 } br_project;
 
 void br_project_defaults(br_project *p, const char *name);
@@ -70,5 +71,9 @@ bool br_project_parse(const char *text, br_project *p);
  * pack's). Fills in defaults first; false if there is no project file. */
 bool br_project_load(const char *folder, br_project *p);
 bool br_project_save(const char *folder, const br_project *p);
+/* Is `rel` (a path in the project, '/' between parts) left out of built
+ * games? The builds folder and anything listed in `exclude` (and what is
+ * inside them) are. */
+bool br_project_excludes(const br_project *p, const char *rel);
 
 #endif /* BRONTO_ASSETS_H */

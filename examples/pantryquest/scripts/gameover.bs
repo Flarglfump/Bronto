@@ -1,0 +1,9 @@
+# GAME OVER: Enter carries on (from the start of the overworld or the cellar
+# Pip was in), Escape goes back to the title.
+var t = 0
+func update(dt) {
+    t += dt
+    if t < 1 { return }
+    if key_pressed("enter") { find("Game").continue_game() }
+    if key_pressed("escape") { load_scene("title.scene") }
+}

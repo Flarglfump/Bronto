@@ -15,6 +15,8 @@
  *   (physics.h adds RigidBody, Collider and PhysicsWorld; script.h adds Script)
  *   Sound      a WAV file (through the asset cache) played on start, or on
  *              request, once or looping; stopped when the entity goes away
+ *   Tilemap    a grid of tiles from one image (a tileset), one character per
+ *              cell; some characters can be marked solid for scripts to test
  *
  * Shapes, sprites and labels are drawn centred on the transform's position,
  * lowest `layer` first. Games add their own described components next to
@@ -36,6 +38,26 @@ typedef struct br_sprite    { char image[96]; br_color tint; int layer; } br_spr
 typedef struct br_label     { char text[64]; float size; br_color color; int layer; } br_label;
 typedef struct br_motion    { br_vec2 velocity; float spin; } br_motion;
 typedef struct br_bounds    { br_vec2 min, max; bool wrap; } br_bounds;
+/* Tilemap: `columns` x `rows` cells of tile_size pixels, drawn centred on
+ * the Transform like everything else (so its top-left cell is at
+ * -columns * tile_size / 2, -rows * tile_size / 2). `tiles` has one
+ * character per cell, row by row. A character's position in `legend` is
+ * its tile in the tileset image (tiles numbered left to right, then top to
+ * bottom); characters not in the legend (and missing cells) show nothing.
+ * `solid` lists the characters br_tilemap_solid (tile_solid() in scripts)
+ * reports as blocking. */
+#define BR_TILEMAP_MAX 2048
+typedef struct br_tilemap {
+    char tileset[96];
+    int tile_size;
+    int columns, rows;
+    char legend[96];
+    char solid[64];
+    char tiles[BR_TILEMAP_MAX + 1];
+    int layer;
+    br_color tint;
+} br_tilemap;
+
 typedef struct br_sound_src {
     char file[96]; float volume; bool loop; bool play_on_start;
     br_voice voice;             /* runtime only: not saved, reset when added */
@@ -43,7 +65,7 @@ typedef struct br_sound_src {
 } br_sound_src;
 
 typedef struct br_builtin_ids {
-    br_component name, transform, shape, sprite, label, motion, bounds, sound;
+    br_component name, transform, shape, sprite, label, motion, bounds, sound, tilemap;
 } br_builtin_ids;
 
 /* Registers every built-in component and three systems: "builtin_motion"
@@ -70,6 +92,18 @@ void br_builtin_sound_stop(br_world *w, br_entity e);
  * (false without a Transform), and whether a world point is inside it. */
 bool br_builtin_box(const br_world *w, br_entity e, br_vec2 corners[4]);
 bool br_builtin_hit(const br_world *w, br_entity e, br_vec2 point);
+
+/* Tilemaps, by world position (they follow the map's Transform and its
+ * parents). The cell under `point`: its column and row (either may be
+ * NULL), and the character there - 0 when the point is outside the map. */
+char br_tilemap_get(const br_world *w, br_entity map, br_vec2 point, int *col, int *row);
+/* Sets the cell under `point`; false outside the map or without a Tilemap. */
+bool br_tilemap_set(br_world *w, br_entity map, br_vec2 point, char c);
+/* Is the cell under `point` one of the map's solid characters? (Outside: no.) */
+bool br_tilemap_solid(const br_world *w, br_entity map, br_vec2 point);
+/* The world position of the centre of a cell (any column and row, even
+ * outside the map). False without a Tilemap. */
+bool br_tilemap_cell_center(const br_world *w, br_entity map, int col, int row, br_vec2 *out);
 
 /* Frees the draw list's scratch memory (the engine calls this at shutdown). */
 void br_builtin_release(void);

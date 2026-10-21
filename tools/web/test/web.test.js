@@ -188,8 +188,8 @@ test('files a game saves are there the next time it runs', async () => {
         assert.strictEqual(await game.exited, 0);
         assert.strictEqual(out.trim(), want);
     }
-    assert.deepStrictEqual([...kept.keys()], ['saves/runs.txt']);
-    assert.strictEqual(Buffer.from(kept.get('saves/runs.txt')).toString(), '3\n');
+    assert.deepStrictEqual([...kept.keys()], ['saves/Persist Test/runs.txt'], 'one file, in the game\'s folder (no half-written copies left over)');
+    assert.strictEqual(Buffer.from(kept.get('saves/Persist Test/runs.txt')).toString(), '3\n');
 });
 
 test('the console: lines, and exit statuses', async () => {

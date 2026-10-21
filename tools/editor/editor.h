@@ -346,6 +346,7 @@ int  ed_check_scripts(editor *ed, int *scripts);   /* mistakes, printed to the c
 bool ed_build(editor *ed, ed_target t, char *out, size_t size);   /* out: the game made */
 void ed_cmd_build(editor *ed, ed_target t, bool run);
 void ed_open_builds_folder(editor *ed);
+void ed_open_save_folder(editor *ed);      /* where the game keeps saved data (save.h) */
 void ed_project_settings_open(editor *ed);
 void ed_project_dialog(editor *ed, br_rect screen);
 

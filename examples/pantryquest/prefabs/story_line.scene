@@ -1,0 +1,13 @@
+# Pantry Quest - a line of the story on the title screen
+bronto_scene 1
+
+entity
+  Name
+    text = "Story"
+  Transform
+    position = 0 0
+  Label
+    text = ""
+    size = 1
+    color = #fff8ecff
+    layer = 1

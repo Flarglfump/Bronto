@@ -1,0 +1,122 @@
+# Pantry Quest - room cave_shop (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   KKKKKKKKKKKKKKKK
+#   KKKKKKKKKKKKKKKK
+#   KK::::::::::::KK
+#   KK::::::::::::KK
+#   KK::::::::::::KK
+#   KK::::::::::::KK
+#   KK::::::::::::KK
+#   KK::::::::::::KK
+#   KK::::::::::::KK
+#   KK::::::::::::KK
+#   KKKKKKK::KKKKKKK
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"cave_shop\", music = \"\", exit_s = \"back\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:Yp"
+    solid = "TrW~bIKXY"
+    tiles = "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKKKKKKK::KKKKKKK"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Flame"
+  Transform
+    position = 80 72
+  Sprite
+    image = "art/flame_0.bmp"
+    layer = 2
+  Script
+    file = "scripts/flame.bs"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Flame"
+  Transform
+    position = 176 72
+  Sprite
+    image = "art/flame_0.bmp"
+    layer = 2
+  Script
+    file = "scripts/flame.bs"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "NPC"
+  Transform
+    position = 128 72
+  Sprite
+    image = "art/baker.bmp"
+    layer = 2
+  Script
+    file = "scripts/npc.bs"
+    vars = "line1 = \"FRESH FROM THE OVEN!\", line2 = \"TAKE YOUR PICK, LITTLE COOK.\""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 88 112
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"bombs_item\", price = 20"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 128 112
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"soup\", price = 15"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 168 112
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"key\", price = 40"
+  Parent
+    entity = 0

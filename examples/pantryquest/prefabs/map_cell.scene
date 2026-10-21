@@ -1,0 +1,13 @@
+# Pantry Quest - a cellar room on the HUD's map
+bronto_scene 1
+
+entity
+  Name
+    text = "MapCell"
+  Transform
+    position = 0 0
+  Shape
+    kind = rect
+    size = 7 5
+    color = #4060c0ff
+    layer = 41

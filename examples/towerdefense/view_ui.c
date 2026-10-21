@@ -192,7 +192,7 @@ static void draw_info(br_renderer *r, const ui_state *u, ui_widget hover) {
         br_draw_text(r, wrapped, PX + 6, y, 1, br_rgb(255, 120, 110));
         return;
     }
-    if (hover >= UI_SHOP && hover < UI_SHOP + TD_TOWER_TYPE_COUNT) {
+    if (hover >= UI_SHOP && hover < UI_SHOP_END) {
         const td_tower_def *def = td_tower_info((td_tower_type)(hover - UI_SHOP));
         title = def->name;
         snprintf(text, sizeof(text), "%s", def->desc);

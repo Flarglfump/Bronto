@@ -125,7 +125,7 @@ static void sell(play_data *d) {
 }
 
 static void click_panel(play_data *d, br_engine *e, ui_widget w) {
-    if (w >= UI_SHOP && w < UI_SHOP + TD_TOWER_TYPE_COUNT) begin_placing(d, e, w - UI_SHOP);
+    if (w >= UI_SHOP && w < UI_SHOP_END) begin_placing(d, e, w - UI_SHOP);
     else if (w == UI_TARGET) { td_cycle_targeting(&d->game, d->selected, 1); sfx_ui(e, SFX_CLICK); }
     else if (w == UI_UPGRADE || w == UI_UPGRADE + 1) upgrade(d, e, w - UI_UPGRADE);
     else if (w == UI_SELL) sell(d);

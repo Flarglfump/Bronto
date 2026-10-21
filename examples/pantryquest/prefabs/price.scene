@@ -1,0 +1,13 @@
+# Pantry Quest - a price under a shop's wares
+bronto_scene 1
+
+entity
+  Name
+    text = "Price"
+  Transform
+    position = 0 0
+  Label
+    text = "0"
+    size = 1
+    color = #fff8ecff
+    layer = 2

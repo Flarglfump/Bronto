@@ -80,6 +80,7 @@ void ed_project_reload(editor *ed) {
     const char *root = ed->assets.root[0] ? ed->assets.root : ".";
     br_project_load(root, &ed->project);
     if (!ed->project.name[0] && br_fs_absolute(root, abs, sizeof(abs))) snprintf(ed->project.name, sizeof(ed->project.name), "%s", br_path_name(abs));
+    br_save_set_game(ed->project.name);                     /* Play saves where the built game will */
     if (br_script_strict() != ed->project.strict_typing) {
         br_script_set_strict(ed->project.strict_typing);     /* the editor's own Play follows the project */
         br_script_reload(&ed->doc.world);
@@ -173,12 +174,13 @@ static void file_name_of(const char *name, char *out, size_t size) {
     if (!out[0] || out[0] == '.') snprintf(out, size, "Game");
 }
 
-typedef struct pack_ctx { const char *build_dir; } pack_ctx;
+typedef struct pack_ctx { const br_project *project; } pack_ctx;
 
-/* What a game doesn't need: built games, the editor's trash, build output. */
+/* What a game doesn't need: built games, what the project leaves out, build output. */
 static bool pack_filter(const char *rel, bool is_dir, void *user) {
     const pack_ctx *pc = (const pack_ctx *)user;
-    if (is_dir && !strchr(rel, '/') && (strcmp(rel, pc->build_dir) == 0 || strcmp(rel, "build") == 0)) return false;
+    if (br_project_excludes(pc->project, rel)) return false;
+    if (is_dir && strcmp(rel, "build") == 0) return false;
     if (!is_dir && (br_path_has_ext(rel, ".brpak") || br_path_has_ext(rel, ".o"))) return false;
     return true;
 }
@@ -221,7 +223,7 @@ static bool build_web(editor *ed, const char *root, const char *player, const ch
     snprintf(js, sizeof(js), "%s", page_path);
     if (!make_dirs(dir)) { ed_status(ed, "Build: can't make the folder %s", dir); return false; }
     br_path_join(page_path, sizeof(page_path), dir, "index.html");
-    if (!(pack = webpage_pack_project(root, ed->project.build_dir, &pack_size, &st, err, sizeof(err)))) { ed_status(ed, "Build: %s", err); return false; }
+    if (!(pack = webpage_pack_project(root, &ed->project, &pack_size, &st, err, sizeof(err)))) { ed_status(ed, "Build: %s", err); return false; }
     if (!(wasm = br_file_read_all(player, &wasm_size))) { br_free(pack); ed_status(ed, "Build: can't read %s", player); return false; }
     if (ed->project.icon[0]) {                              /* the project's icon, or Bronto's */
         char icon_path[BP];
@@ -290,7 +292,7 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
         br_path_join(sub, sizeof(sub), dir, k_target_dirs[t]);
         snprintf(dir, sizeof(dir), "%s", sub);
     }
-    pc.build_dir = ed->project.build_dir;
+    pc.project = &ed->project;
     if (t == ED_TARGET_WEB) return build_web(ed, root, player, dir, scripts, out, size);
     if (t == ED_TARGET_MACOS) {                             /* Name.app/Contents/{MacOS/Name, Resources/game.brpak, Info.plist} */
         char app[BP], macos[BP + 64], res[BP + 64], plist[BP + 64], file[160];
@@ -347,6 +349,15 @@ void ed_open_builds_folder(editor *ed) {
     if (!br_open_path(ed->engine, dir)) ed_status(ed, "Couldn't open %s", dir);
 }
 
+/* The game's folder for saved data (save.h), which Play and the built game share. */
+void ed_open_save_folder(editor *ed) {
+    char dir[BP];
+    ed_project_reload(ed);
+    if (!br_save_folder(dir, sizeof(dir))) ed_status(ed, "This computer has no folder for saved data");
+    else if (!br_open_path(ed->engine, dir)) ed_status(ed, "Couldn't open %s", dir);
+    else ed_status(ed, "Saved data for %s: %s", br_save_game(), dir);
+}
+
 /* ---- the Project Settings dialog ------------------------------------------------------------ */
 
 void ed_project_settings_open(editor *ed) {
@@ -358,7 +369,7 @@ void ed_project_settings_open(editor *ed) {
 void ed_project_dialog(editor *ed, br_rect screen) {
     br_ui *ui = &ed->ui;
     br_project *p = &ed->project_edit;
-    br_rect box = br_rect_make(floorf(screen.x + (screen.w - 520) / 2), floorf(screen.y + (screen.h - 300) / 2), 520, 300);
+    br_rect box = br_rect_make(floorf(screen.x + (screen.w - 520) / 2), floorf(screen.y + (screen.h - 324) / 2), 520, 324);
     if (!ed->project_visible) return;
     br_fill_rect(ui->r, screen, br_rgba(0, 0, 0, 140));
     br_ui_set_disabled(ui, false);
@@ -381,6 +392,7 @@ void ed_project_dialog(editor *ed, br_rect screen) {
     br_ui_label_colored(ui, "On: every script works as if it began with @strict.", ui->style.text_dim);
     br_ui_text_field(ui, "Icon", p->icon, sizeof(p->icon));
     br_ui_text_field(ui, "Builds folder", p->build_dir, sizeof(p->build_dir));
+    br_ui_text_field(ui, "Leave out", p->exclude, sizeof(p->exclude));
     br_ui_spacing(ui, 8);
     br_ui_columns(ui, 2);
     if (br_ui_button(ui, "Save##project")) {

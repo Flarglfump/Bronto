@@ -38,6 +38,7 @@
 #include "core/ui.c"
 #include "core/path.c"
 #include "core/pack.c"
+#include "core/save.c"
 #include "core/hierarchy.c"
 #include "core/physics.c"
 #include "core/script.c"

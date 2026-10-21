@@ -77,6 +77,23 @@ bool br_fs_rename(const char *from, const char *to) {
     return MoveFileW(a, b) != 0;                                 /* fails if `to` exists */
 }
 
+bool br_fs_replace(const char *from, const char *to) {
+    wchar_t a[BR_PATH_MAX], b[BR_PATH_MAX];
+    if (!fs_to_wide(from, a, BR_PATH_MAX) || !fs_to_wide(to, b, BR_PATH_MAX)) return false;
+    return MoveFileExW(a, b, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+}
+
+/* (GetEnvironmentVariableW, not getenv: a user name may be any letters.) */
+static bool fs_getenv(const char *name, char *out, size_t size) {
+    wchar_t wname[64], value[BR_PATH_MAX];
+    DWORD n;
+    if (!fs_to_wide(name, wname, 64)) return false;
+    n = GetEnvironmentVariableW(wname, value, BR_PATH_MAX);
+    if (n == 0 || n >= BR_PATH_MAX) return false;
+    fs_to_utf8(value, out, (int)size);
+    return out[0] != 0;
+}
+
 bool br_fs_absolute(const char *path, char *out, size_t size) {
     wchar_t w[BR_PATH_MAX], full[BR_PATH_MAX];
     char *p;

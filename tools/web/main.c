@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     if (project) {
         if (!br_fs_is_dir(project)) { fprintf(stderr, "bronto_web: %s isn't a folder\n", project); return 1; }
         br_project_load(project, &proj);
-        if (!(pack = webpage_pack_project(project, proj.build_dir, &pack_size, &st, err, sizeof(err)))) {
+        if (!(pack = webpage_pack_project(project, &proj, &pack_size, &st, err, sizeof(err)))) {
             fprintf(stderr, "bronto_web: can't pack %s: %s\n", project, err);
             return 1;
         }

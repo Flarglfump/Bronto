@@ -1,0 +1,51 @@
+# Pantry Quest - room ow_7_7 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   WWWWWWW..WWWWWWW
+#   WWWWCWW..WWWWWWW
+#   WW.............W
+#   W..r....,...r..W
+#   ..............,.
+#   ....f.....f.....
+#   ................
+#   T..r.....,..r..T
+#   TT............TT
+#   TTTbTTTTTTTTbTTT
+#   TTTTTTTTTTTTTTTT
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"ow_7_7\", music = \"overworld\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:Yp"
+    solid = "TrW~bIKXY"
+    tiles = "WWWWWWW..WWWWWWWWWWWCWW..WWWWWWWWW.............WW..r....,...r..W..............,.....f.....f.....................T..r.....,..r..TTT............TTTTTbTTTTTTTTbTTTTTTTTTTTTTTTTTTT"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Warp"
+  Transform
+    position = 72 24
+  Script
+    file = "scripts/warp.bs"
+    vars = "to = \"cave_chef\", pos = vec2(128, 216)"
+  Parent
+    entity = 0

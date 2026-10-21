@@ -1,0 +1,39 @@
+# A way into somewhere else: a cave mouth, stairs, the cellar door. Pip
+# walks up into it and the game fades to the room `to`, putting him at
+# `pos` facing `face`. A `hidden` one is behind a cracked wall (tile X)
+# until a bomb opens it.
+
+var to = ""
+var pos := vec2(128, 216)
+var face = "up"
+var hidden = false
+var game
+var hero
+var map
+var key = ""
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    map = child(self.parent, "Map")
+    key = "found:" + game.room_name + ":" + to
+    if hidden and game.has_flag(key) { open() }
+}
+
+func open() {
+    hidden = false
+    set_tile(map, self.global_position, "C")
+}
+
+func reveal() {
+    if not hidden { return }
+    open()
+    game.flag(key)
+    play_sound("sfx/secret.wav")
+}
+
+func update(dt) {
+    if hidden or game.state != "play" { return }
+    var d = hero.position - self.global_position
+    if abs(d.x) < 6 and d.y < 4 and d.y > -6 and hero.facing == "up" { game.warp(to, pos, face) }
+}

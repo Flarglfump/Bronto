@@ -1,0 +1,80 @@
+# The strip along the top: where Pip is, his beans, keys and bombs, the
+# items on B and A, and his hearts.
+
+var game
+var hearts = []
+var bean_label
+var key_label
+var bomb_label
+var b_item
+var a_item
+var dot
+var map_box
+var cells = []
+
+func start() {
+    game = find("Game")
+    for i in 16 {
+        push(hearts, find("Heart" + i))
+    }
+    bean_label = find("BeanCount")
+    key_label = find("KeyCount")
+    bomb_label = find("BombCount")
+    b_item = find("BItem")
+    a_item = find("AItem")
+    dot = find("MapDot")
+    map_box = find("MapBox")
+}
+
+func icon(item) {
+    if item == "bombs" { return "art/bomb.bmp" }
+    if item == "cutter" { return "art/cutter.bmp" }
+    return ""
+}
+
+func update(dt) {
+    bean_label.Label.text = "x" + game.beans
+    key_label.Label.text = "x" + game.keys
+    bomb_label.Label.text = "x" + game.bombs
+    var b = icon(game.b_item)
+    if b == "" { b_item.Sprite.tint = rgb(255, 255, 255, 0) } else {
+        b_item.Sprite.image = b
+        b_item.Sprite.tint = rgb(255, 255, 255)
+    }
+    if game.weapon > 0 { a_item.Sprite.tint = rgb(255, 255, 255) } else { a_item.Sprite.tint = rgb(255, 255, 255, 0) }
+    for i in 16 {
+        var h = hearts[i]
+        if i >= game.hearts_max {
+            h.Sprite.tint = rgb(255, 255, 255, 0)
+        } else {
+            h.Sprite.tint = rgb(255, 255, 255)
+            if game.hp >= (i + 1) * 2 { h.Sprite.image = "art/hud_heart_full.bmp" }
+            elif game.hp == i * 2 + 1 { h.Sprite.image = "art/hud_heart_half.bmp" }
+            else { h.Sprite.image = "art/hud_heart_empty.bmp" }
+        }
+    }
+    # the map: the overworld is 16 x 8 rooms in the 64 x 32 box; a cellar, its rooms seen so far
+    if game.area == "ow" {
+        dot.position = vec2(8 + game.rx * 4 + 2, 16 + game.ry * 4 + 2)
+        map_box.Shape.color = rgb(110, 110, 110)
+    } elif game.area == "cave" {
+        map_box.Shape.color = rgb(110, 110, 110)
+    } else {
+        map_box.Shape.color = rgb(0, 0, 0)
+        dot.position = vec2(8 + game.rx * 8 + 4 + 12, 16 + game.ry * 6 + 3 + 1)
+    }
+    if game.area != "ow" and game.area != "cave" and len(cells) != len(game.visited) {
+        for c in cells { destroy(c) }
+        cells = []
+        for name in game.visited {
+            var p = game.split(name, "_")
+            if p[0] == game.area {
+                push(cells, spawn("prefabs/map_cell.scene", vec2(8 + num(p[1]) * 8 + 4 + 12, 16 + num(p[2]) * 6 + 3 + 1)))
+            }
+        }
+    }
+    if game.area == "ow" and len(cells) > 0 {
+        for c in cells { destroy(c) }
+        cells = []
+    }
+}

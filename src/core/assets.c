@@ -181,6 +181,7 @@ bool br_project_parse(const char *text, br_project *p) {
             else if (strcmp(key, "strict_typing") == 0) p->strict_typing = strcmp(v, "true") == 0 || strcmp(v, "1") == 0;
             else if (strcmp(key, "icon") == 0) snprintf(p->icon, sizeof(p->icon), "%s", v);
             else if (strcmp(key, "build_dir") == 0) snprintf(p->build_dir, sizeof(p->build_dir), "%s", v[0] ? v : "builds");
+            else if (strcmp(key, "exclude") == 0) snprintf(p->exclude, sizeof(p->exclude), "%s", v);
         }
     }
     return header;
@@ -199,14 +200,36 @@ bool br_project_load(const char *folder, br_project *p) {
     return ok;
 }
 
+/* Does `rel` name `item` or something inside it? */
+static bool path_under(const char *rel, const char *item, size_t n) {
+    return n > 0 && strncmp(rel, item, n) == 0 && (rel[n] == 0 || rel[n] == '/');
+}
+
+bool br_project_excludes(const br_project *p, const char *rel) {
+    const char *s = p->exclude;
+    if (path_under(rel, p->build_dir, strlen(p->build_dir))) return true;
+    while (*s) {
+        const char *start, *end;
+        while (*s == ',' || *s == ' ') ++s;
+        start = s;
+        while (*s && *s != ',') ++s;
+        end = s;
+        while (end > start && (end[-1] == ' ' || end[-1] == '/')) --end;
+        if (path_under(rel, start, (size_t)(end - start))) return true;
+    }
+    return false;
+}
+
 bool br_project_save(const char *folder, const br_project *p) {
     char path[ASSET_PATH_MAX], text[2048];
     int n = snprintf(text, sizeof(text),
         "bronto_project 1\n"
         "# Asset paths in this project's scenes are relative to this folder.\n"
         "# Project settings (the editor's Build > Project Settings):\n"
-        "name = %s\nmain_scene = %s\nwidth = %d\nheight = %d\nwindow_scale = %d\nstrict_typing = %s\nicon = %s\nbuild_dir = %s\n",
-        p->name, p->main_scene, p->width, p->height, p->window_scale, p->strict_typing ? "true" : "false", p->icon, p->build_dir);
+        "name = %s\nmain_scene = %s\nwidth = %d\nheight = %d\nwindow_scale = %d\nstrict_typing = %s\nicon = %s\nbuild_dir = %s\n"
+        "exclude = %s\n",
+        p->name, p->main_scene, p->width, p->height, p->window_scale, p->strict_typing ? "true" : "false", p->icon, p->build_dir,
+        p->exclude);
     br_path_join(path, sizeof(path), folder ? folder : "", BR_PROJECT_FILE);
     return n > 0 && (size_t)n < sizeof(text) && br_file_write_all(path, text, (size_t)n);
 }

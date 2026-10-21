@@ -1,0 +1,11 @@
+# A short animation that removes itself: `first`, then `second`, over `life` seconds.
+var first = "art/puff_0.bmp"
+var second = "art/puff_1.bmp"
+var life = 0.3
+var t = 0
+
+func update(dt) {
+    t += dt
+    if t > life / 2 { self.Sprite.image = second }
+    if t >= life { destroy(self) }
+}

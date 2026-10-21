@@ -1,0 +1,137 @@
+# Pantry Quest - the inventory (scripts/menu.bs): spawned over the play area while the game waits
+bronto_scene 1
+
+entity
+  Name
+    text = "Menu"
+  Transform
+    position = 0 0
+  Shape
+    kind = rect
+    size = 232 160
+    color = #101828f0
+    outline = #4060c0ff
+    layer = 70
+  Script
+    file = "scripts/menu.bs"
+
+entity
+  Name
+    text = "Heading"
+  Transform
+    position = 0 -64
+  Label
+    text = "INVENTORY"
+    size = 1
+    color = #ffd84aff
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Hint"
+  Transform
+    position = 0 -46
+  Label
+    text = "ITEM FOR B (Z KEY)"
+    size = 1
+    color = #c8c0b8ff
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Cursor"
+  Transform
+    position = -48 -20
+  Shape
+    kind = rect
+    size = 22 22
+    color = #00000000
+    outline = #ffd84aff
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slot0"
+  Transform
+    position = -48 -20
+  Sprite
+    image = "art/bomb.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slot1"
+  Transform
+    position = -16 -20
+  Sprite
+    image = "art/bomb.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slot2"
+  Transform
+    position = 16 -20
+  Sprite
+    image = "art/bomb.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slot3"
+  Transform
+    position = 48 -20
+  Sprite
+    image = "art/bomb.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pages"
+  Transform
+    position = 0 18
+  Label
+    text = "RECIPE PAGES  0 / 8"
+    size = 1
+    color = #fff8ecff
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "PageIcon"
+  Transform
+    position = 0 40
+  Sprite
+    image = "art/page.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Keys"
+  Transform
+    position = 0 66
+  Label
+    text = "< > CHOOSE    ENTER: BACK"
+    size = 1
+    color = #c8c0b8ff
+    layer = 71
+  Parent
+    entity = 0

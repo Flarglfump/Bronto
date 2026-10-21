@@ -9,6 +9,7 @@
 #include "types.h"
 #include "memory.h"
 #include "fs.h"
+#include "save.h"
 #include "capture.h"
 #include "pack.h"
 #include "log.h"

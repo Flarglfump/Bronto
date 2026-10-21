@@ -40,6 +40,11 @@ bool br_fs_exists(const char *path);
 bool br_fs_is_dir(const char *path);
 bool br_fs_mkdir(const char *path);                    /* one level; true if it's already a folder */
 bool br_fs_rename(const char *from, const char *to);   /* refuses to overwrite `to` */
+/* Puts the file `from` in place of `to` (which may exist) in one step, so
+ * `to` is always either the old file or the whole new one, never half of
+ * it: write the new file beside it, then replace. The new file's data is on
+ * the disk first (POSIX fsync, Win32 write-through). */
+bool br_fs_replace(const char *from, const char *to);
 bool br_fs_remove(const char *path);                   /* a file, or an empty folder */
 /* The absolute form of an existing path, with '/' separators ("" = the
  * current directory). False if it doesn't exist. */
@@ -48,6 +53,12 @@ bool br_fs_absolute(const char *path, char *out, size_t size);
  *   Windows %APPDATA%/<app>, macOS ~/Library/Application Support/<app>,
  *   others $XDG_CONFIG_HOME/<app> or ~/.config/<app>. */
 bool br_fs_config_dir(const char *app, char *out, size_t size);
+/* The folder for a program's saved data (save games, high scores), created
+ * if needed. save.h is the easy way to use it.
+ *   Windows %APPDATA%/<app>, macOS ~/Library/Application Support/<app>,
+ *   others $XDG_DATA_HOME/<app> or ~/.local/share/<app>,
+ *   the web /saves/<app> (kept in the browser's storage for the page). */
+bool br_fs_data_dir(const char *app, char *out, size_t size);
 /* The running program's own file (absolute). False where there is none (the web). */
 bool br_fs_executable_path(char *out, size_t size);
 /* Copies a file, replacing `to` if it exists. */

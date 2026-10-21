@@ -1,0 +1,409 @@
+# Pantry Quest - the game: the HUD, Pip, and the Game entity that brings the rooms in
+# (rooms/*.scene) as he walks. Press Play in the editor to play from the first room.
+bronto_scene 1
+
+entity
+  Name
+    text = "Game"
+  Script
+    file = "scripts/game.bs"
+
+entity
+  Name
+    text = "HUD"
+  Transform
+    position = 128 32
+  Shape
+    kind = rect
+    size = 256 64
+    color = #000000ff
+    layer = 40
+  Script
+    file = "scripts/hud.bs"
+
+entity
+  Name
+    text = "MapBox"
+  Transform
+    position = 40 32
+  Shape
+    kind = rect
+    size = 64 32
+    color = #6e6e6eff
+    layer = 41
+
+entity
+  Name
+    text = "MapDot"
+  Transform
+    position = 38 46
+  Shape
+    kind = rect
+    size = 4 4
+    color = #7ee05aff
+    layer = 43
+
+entity
+  Name
+    text = "BeanIcon"
+  Transform
+    position = 92 20
+  Sprite
+    image = "art/hud_bean.bmp"
+    layer = 41
+
+entity
+  Name
+    text = "KeyIcon"
+  Transform
+    position = 92 34
+  Sprite
+    image = "art/hud_key.bmp"
+    layer = 41
+
+entity
+  Name
+    text = "BombIcon"
+  Transform
+    position = 92 48
+  Sprite
+    image = "art/hud_bomb.bmp"
+    layer = 41
+
+entity
+  Name
+    text = "BeanCount"
+  Transform
+    position = 114 20
+  Label
+    text = "x0"
+    size = 1
+    color = #fff8ecff
+    layer = 41
+
+entity
+  Name
+    text = "KeyCount"
+  Transform
+    position = 114 34
+  Label
+    text = "x0"
+    size = 1
+    color = #fff8ecff
+    layer = 41
+
+entity
+  Name
+    text = "BombCount"
+  Transform
+    position = 114 48
+  Label
+    text = "x0"
+    size = 1
+    color = #fff8ecff
+    layer = 41
+
+entity
+  Name
+    text = "BLabel"
+  Transform
+    position = 150 16
+  Label
+    text = "B"
+    size = 1
+    color = #fff8ecff
+    layer = 41
+
+entity
+  Name
+    text = "BBox"
+  Transform
+    position = 150 38
+  Shape
+    kind = rect
+    size = 20 28
+    color = #00000000
+    outline = #4060c0ff
+    layer = 41
+
+entity
+  Name
+    text = "BItem"
+  Transform
+    position = 150 40
+  Sprite
+    image = "art/bomb.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "ALabel"
+  Transform
+    position = 176 16
+  Label
+    text = "A"
+    size = 1
+    color = #fff8ecff
+    layer = 41
+
+entity
+  Name
+    text = "ABox"
+  Transform
+    position = 176 38
+  Shape
+    kind = rect
+    size = 20 28
+    color = #00000000
+    outline = #4060c0ff
+    layer = 41
+
+entity
+  Name
+    text = "AItem"
+  Transform
+    position = 176 40
+  Sprite
+    image = "art/spoon.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "LifeLabel"
+  Transform
+    position = 224 20
+  Label
+    text = "-LIFE-"
+    size = 1
+    color = #d8343aff
+    layer = 41
+
+entity
+  Name
+    text = "Heart0"
+  Transform
+    position = 196 48
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart1"
+  Transform
+    position = 204 48
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart2"
+  Transform
+    position = 212 48
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart3"
+  Transform
+    position = 220 48
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart4"
+  Transform
+    position = 228 48
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart5"
+  Transform
+    position = 236 48
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart6"
+  Transform
+    position = 244 48
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart7"
+  Transform
+    position = 252 48
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart8"
+  Transform
+    position = 196 40
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart9"
+  Transform
+    position = 204 40
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart10"
+  Transform
+    position = 212 40
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart11"
+  Transform
+    position = 220 40
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart12"
+  Transform
+    position = 228 40
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart13"
+  Transform
+    position = 236 40
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart14"
+  Transform
+    position = 244 40
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Heart15"
+  Transform
+    position = 252 40
+  Sprite
+    image = "art/hud_heart_full.bmp"
+    tint = #ffffff00
+    layer = 42
+
+entity
+  Name
+    text = "Say1"
+  Transform
+    position = 128 86
+  Label
+    text = ""
+    size = 1
+    color = #fff8ecff
+    layer = 45
+
+entity
+  Name
+    text = "Say2"
+  Transform
+    position = 128 98
+  Label
+    text = ""
+    size = 1
+    color = #fff8ecff
+    layer = 45
+
+entity
+  Name
+    text = "Fade"
+  Transform
+    position = 128 152
+  Shape
+    kind = rect
+    size = 256 176
+    color = #000000ff
+    layer = 60
+
+entity
+  Name
+    text = "Hero"
+  Transform
+    position = 120 168
+  Sprite
+    image = "art/hero_up_0.bmp"
+    layer = 5
+  Script
+    file = "scripts/hero.bs"
+
+entity
+  Name
+    text = "Weapon"
+  Transform
+    position = 0 13
+  Sprite
+    image = "art/spoon.bmp"
+    tint = #ffffff00
+    layer = 6
+  Parent
+    entity = 36
+
+entity
+  Name
+    text = "Held"
+  Transform
+    position = 0 -15
+  Sprite
+    image = "art/page.bmp"
+    tint = #ffffff00
+    layer = 6
+  Parent
+    entity = 36

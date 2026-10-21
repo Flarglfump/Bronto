@@ -92,7 +92,7 @@ Makefile's `$(WEB)/%.wasm` rule shows the flags. Then make its page with
 | Touch | Touches arrive as the left mouse button. |
 | Gamepads | Through the browser's Gamepad API, in the usual Xbox-style layout, with rumble where the browser supports it. |
 | Sound | WebAudio. Browsers only start sound after a click or key press, which is why the page opens with a **Play** button. |
-| Saved files | Files the game writes (a high score, a save game) are kept in the browser's local storage for that page, and are there on the next visit. The game's own files come from its pack and are read-only. |
+| Saved files | Saved data (`save.h`, and `save_data` in scripts) and any other files the game writes are kept in the browser's local storage for that page, and are there on the next visit. Saved data lives in `/saves/<game>`. The game's own files come from its pack and are read-only. |
 | Clipboard | Copying puts text on the system clipboard. Pasting gives the text of the last paste into the page (browsers don't let pages read the clipboard freely). |
 | Window title, icon, fullscreen, cursor | Set the tab's title and icon, the page's fullscreen mode, and the cursor over the canvas. |
 | Folder dialogs, starting programs | Not available on the web (`br_pick_folder` reports no dialog; `br_launch` fails). `br_open_path` opens web addresses in a new tab. |
@@ -113,6 +113,7 @@ src/platform/web/memfs.c     the in-memory file system behind fopen and fs.h
 src/platform/web/malloc.c    the memory allocator
 src/platform/web/math.c      maths (the transcendental functions come from the browser)
 src/platform/web/sjlj.c      what setjmp/longjmp need (clang turns them into WebAssembly exceptions)
+src/platform/web/tag.s       the exception tag longjmp throws with (LLVM 20 and later expect the C library to define it)
 src/platform/web/start.c     main(), and leaving it when the browser takes over the loop
 src/platform/web/bw.h        everything the C side imports from bronto.js, in one list
 src/platform/platform_web.c  the platform backend: canvas, input, audio, gamepads

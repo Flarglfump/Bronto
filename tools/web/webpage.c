@@ -89,22 +89,23 @@ bool webpage_find_runtime(const char *dir, char *wasm, char *runtime_js, char *s
 }
 
 /* ---- packing a project ---- */
-typedef struct wp_filter { const char *skip_dir; } wp_filter;
+typedef struct wp_filter { const br_project *project; } wp_filter;
 
 static bool wp_pack_filter(const char *rel, bool is_dir, void *user) {
     const wp_filter *f = (const wp_filter *)user;
-    if (is_dir && !strchr(rel, '/') && ((f->skip_dir && strcmp(rel, f->skip_dir) == 0) || strcmp(rel, "build") == 0)) return false;
+    if (f->project && br_project_excludes(f->project, rel)) return false;
+    if (is_dir && strcmp(rel, "build") == 0) return false;
     if (!is_dir && (br_path_has_ext(rel, ".brpak") || br_path_has_ext(rel, ".o") || br_path_has_ext(rel, ".tmp"))) return false;
     return true;
 }
 
-void *webpage_pack_project(const char *folder, const char *skip_dir, size_t *size, br_pack_stats *stats,
+void *webpage_pack_project(const char *folder, const br_project *project, size_t *size, br_pack_stats *stats,
                            char *err, size_t err_size) {
     char tmp[WP_PATH];
     wp_filter f;
     void *data;
     static unsigned counter;
-    f.skip_dir = skip_dir;
+    f.project = project;
     *size = 0;
     /* br_pack_create writes a file: a hidden one in the project (packs leave hidden files out), read back */
     snprintf(tmp, sizeof(tmp), "%s/.bronto-web-%u.tmp", folder[0] ? folder : ".", ++counter);

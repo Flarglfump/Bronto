@@ -1,0 +1,10 @@
+bronto_project 1
+# Pantry Quest: an adventure in the Pantry Kingdom. Open this folder in the editor.
+name = Pantry Quest
+main_scene = title.scene
+width = 256
+height = 240
+window_scale = 3
+icon = art/icon.bmp
+# the tools that make the art, sounds and rooms aren't part of the game
+exclude = tools

@@ -1,0 +1,73 @@
+# Anything Pip can pick up. `kind` says what (bean, bean5, heart, key, bomb,
+# bombs_item, spoon, cutter, heart_pie, page, soup); `flag`, if set, makes it
+# a one-off that stays taken; `price` makes it something to buy; `on_clear`
+# keeps it hidden until every enemy in the room is gone; `timeout` (drops)
+# makes it vanish after a while.
+
+var kind = "bean"
+var flag = ""
+var price = 0
+var on_clear = false
+var timeout = 0
+var game
+var hero
+var shown = true
+var label
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    if flag != "" and game.has_flag(flag) {
+        destroy(self)
+        return
+    }
+    var images = ["bean", "art/bean.bmp", "bean5", "art/bean_gold.bmp", "heart", "art/heart.bmp", "key", "art/key.bmp",
+                  "bomb", "art/bomb.bmp", "bombs_item", "art/bomb.bmp", "spoon", "art/spoon.bmp", "cutter", "art/cutter.bmp",
+                  "heart_pie", "art/heart_pie.bmp", "page", "art/page.bmp", "soup", "art/soup.bmp"]
+    for i in range(0, len(images), 2) {
+        if images[i] == kind { self.Sprite.image = images[i + 1] }
+    }
+    if price > 0 {
+        label = spawn("prefabs/price.scene", vec2(0, 16), self)
+        label.Label.text = "" + price
+    }
+    if on_clear { show(false) }
+}
+
+func show(on) {
+    shown = on
+    if on { self.Sprite.tint = rgb(255, 255, 255) } else { self.Sprite.tint = rgb(255, 255, 255, 0) }
+}
+
+func visible() { return shown }
+
+func update(dt) {
+    if game.state != "play" { return }
+    if not shown {
+        if on_clear and len(find_all("Enemy")) == 0 {
+            show(true)
+            play_sound("sfx/key.wav", 0.6)
+        }
+        return
+    }
+    if timeout > 0 {
+        timeout -= dt
+        if timeout < 2 and floor(timeout * 10) % 2 == 0 { self.Sprite.tint = rgb(255, 255, 255, 60) } else { self.Sprite.tint = rgb(255, 255, 255) }
+        if timeout <= 0 {
+            destroy(self)
+            return
+        }
+    }
+    if hero.touches(self.global_position, 3) { take() }
+}
+
+func take() {
+    if price > 0 {
+        if game.beans < price { return }
+        game.beans -= price
+        play_sound("sfx/buy.wav")
+    }
+    if flag != "" { game.flag(flag) }
+    game.collect(kind, self)
+    destroy(self)
+}

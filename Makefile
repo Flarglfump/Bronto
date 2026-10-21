@@ -164,6 +164,8 @@ run-examples: examples tools
 	@mkdir -p $(BUILD)/run
 	@cd $(BUILD)/run && for e in $(abspath $(EXAMPLES) $(EDITOR)); do echo "== $$e --headless"; $$e --headless || exit 1; done
 	@echo "== $(abspath $(PLAYER)) examples/platformer --headless"; $(PLAYER) examples/platformer --headless --frames 180
+	@echo "== $(abspath $(PLAYER)) examples/pantryquest --headless"; $(PLAYER) examples/pantryquest --headless --frames 120 && \
+	 $(PLAYER) examples/pantryquest/main.scene --headless --frames 300
 
 clean:
 	rm -rf build build-asan
@@ -186,7 +188,7 @@ WASM_CFLAGS := --target=wasm32 $(CSTD) $(WARN) -O2 -ffp-contract=off -Iinclude \
                -mbulk-memory -mnontrapping-fptoint -msign-ext -mexception-handling -mllvm -wasm-enable-sjlj
 WASM_LDFLAGS := --target=wasm32 -nostdlib -Wl,--no-entry -Wl,--stack-first -Wl,-z,stack-size=4194304 -Wl,--strip-debug
 WEB_LIB_SRC := $(CORE_SRC) $(PLAT_SRC) $(wildcard src/platform/web/*.c)
-WEB_LIB_OBJ := $(patsubst src/%.c,$(WASM_OBJ)/%.o,$(WEB_LIB_SRC))
+WEB_LIB_OBJ := $(patsubst src/%.c,$(WASM_OBJ)/%.o,$(WEB_LIB_SRC)) $(WASM_OBJ)/platform/web/tag.o
 WEB_PLAYER  := $(WEB)/bronto_player.wasm
 WEB_TOOL    := $(BUILD)/bronto_web
 WEB_RUNTIME := $(WEB)/bronto.js $(WEB)/shell.html
@@ -218,6 +220,10 @@ $(WASM_OBJ)/%.o: src/%.c $(wildcard include/bronto/*.h) $(wildcard src/platform/
 # The C library itself: -fno-builtin, or the compiler turns the insides of
 # calloc into a call to calloc (and the like).
 $(WASM_OBJ)/platform/web/%.o: WASM_CFLAGS += -fno-builtin
+# The longjmp exception tag: see tag.s.
+$(WASM_OBJ)/platform/web/tag.o: src/platform/web/tag.s | $(WASM_OBJ)/toolchain.ok
+	@mkdir -p $(dir $@)
+	$(WASM_CC) --target=wasm32 -mexception-handling -c $< -o $@
 $(WASM_OBJ)/platform/platform_native.o: src/platform/platform_web.c
 $(WASM_OBJ)/platform/fs.o: src/platform/fs_web.c
 
@@ -274,6 +280,7 @@ $(BUILD)/libc_check: tests/web/libc_check.c
 
 web-test: $(WEB_TESTS) $(WEB)/libc_check.wasm $(BUILD)/libc_check $(WEB)/persist.wasm $(PLAYER) $(EXAMPLES) web
 	node tools/web/run_node.js $(WEB_TESTS) --mkdir build/test_out --dir examples/platformer=examples/platformer \
+	     --dir examples/pantryquest=examples/pantryquest \
 	     --file tools/vscode/brontoscript/lib/builtins.json=tools/vscode/brontoscript/lib/builtins.json -- --out build/test_out
 	@rm -rf $(BUILD)/libc_check.out && mkdir -p $(BUILD)/libc_check.out
 	@$(BUILD)/libc_check $(BUILD)/libc_check.out > $(BUILD)/libc_check.native.txt

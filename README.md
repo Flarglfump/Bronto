@@ -62,7 +62,8 @@ Defense:
 
 Controls: arrows / WASD / gamepad d-pad or left stick to move, P / Esc / Start to pause,
 Enter or A to start, M to mute the music, F11 for fullscreen. Controllers rumble on a
-bonus and on death (Windows and Linux). `snake --autopilot` lets the AI play. `snake --headless` plays a game with no
+bonus and on death (Windows and Linux). The high score is kept with the game's
+[saved data](#saved-data). `snake --autopilot` lets the AI play. `snake --headless` plays a game with no
 window and writes screenshots and a WAV file. See
 [examples/snake/README.md](examples/snake/README.md) for the code tour.
 
@@ -163,7 +164,9 @@ func on_trigger(other) { if other.name == "Coin" { destroy(other) } }
 ```
 
 `examples/platformer` is a complete level made this way, with no C code: open it with
-**Load Project** and press Play. The language is
+**Load Project** and press Play. `examples/pantryquest` is a whole adventure game made the
+same way: a top-down quest through rooms built from Tilemaps, with caves, a shop, a cellar
+with keys and a boss, and its own art, sounds and music. The language is
 described in [docs/scripting.md](docs/scripting.md). When speed matters, a script can
 instead be a behaviour written in C (`br_script_register_behaviour`).
 
@@ -197,12 +200,51 @@ The editor's **Build** menu turns a project into a game that runs without the ed
   Open in Browser** does both. It uses the web player that `make web` puts beside the
   editor (see [docs/web.md](docs/web.md)).
 - **Project Settings** (saved in `project.bronto`): the game's name, the scene it starts
-  with, its screen size and window scale, strict typing, an icon and the builds folder.
+  with, its screen size and window scale, strict typing, an icon, the builds folder, and what to leave out of builds
+  (`exclude = tools, notes.txt`: folders and files the pack skips).
+
+- **Open Save Folder** shows where the game keeps its [saved data](#saved-data). The editor's
+  Play uses the same folder as the built game.
 
 `bronto_player <project folder>` also runs a project straight from its files, and
 `--headless --frames N` runs it with no window (for tests). Scripts move between scenes
 with `load_scene("levels/2.scene")` and end the game with `quit()`; in the editor's Play,
 those swap the scene until Stop and stop playing.
+
+## Saved data
+
+Games keep save games, high scores and options in one place per game, the place each
+system has for a user's data. `save.h` gives every game the same calls, on every system:
+
+| System | Where |
+|---|---|
+| Windows | `%APPDATA%\<game>` (`C:\Users\you\AppData\Roaming\<game>`) |
+| macOS | `~/Library/Application Support/<game>` |
+| Linux / BSD | `$XDG_DATA_HOME/<game>`, or `~/.local/share/<game>` |
+| Web | the browser's storage for the game's page (localStorage) |
+
+`<game>` is the game's name: `br_engine_config.save_name`, or else its title. For a project
+from the editor it is the project's name, so the editor's Play and the built game share
+it. **Build › Open Save Folder** in the editor opens the folder.
+
+```c
+br_save_write("slot1.sav", &state, sizeof(state));     /* replaces the whole file, safely */
+size_t size;
+void *data = br_save_read("slot1.sav", &size);           /* NULL if there's none; br_free it */
+br_save_exists("slot1.sav");  br_save_delete("slot1.sav");  br_save_list(&files);
+```
+
+- **Safe:** a save is written beside the old one and then swapped in, in one step (and on
+  the disk before the swap). A crash or power cut part-way through leaves the old save,
+  never half of the new one. On the web, the browser's storage always holds one whole
+  copy.
+- **Names, not paths:** names are file names of up to 64 letters, digits, spaces and
+  `_-.()`. Anything else is refused, so a name can't reach outside the game's folder.
+- **Scripts** use the same folder with `save_data("slot1", value)` and `load_data("slot1")`.
+  The value can be a number, string, true/false, vec2 or list, and is kept as readable text
+  ([docs/scripting.md](docs/scripting.md)).
+- **Elsewhere:** `br_save_set_folder()`, or the `BRONTO_SAVE_DIR` environment variable, keeps
+  saved data in another folder: for tests, or a copy of a game that runs from a USB stick.
 
 ## Platforms
 
@@ -264,6 +306,7 @@ examples/bounce/     every system in a small toy
 examples/snake/      sample game: Snake
 examples/towerdefense/  sample game: Pop Defense (tower defense)
 examples/platformer/    a level built only from the editor: physics + scripts, no C
+examples/pantryquest/   an adventure game made of scenes, Tilemaps, prefabs and scripts, no C
 tools/editor/        the visual scene editor
 tools/bscheck/       checks .bs scripts from the command line
 tools/player/        bronto_player: runs games (the editor's Build packs projects into it)
@@ -288,13 +331,14 @@ docs/web.md          web builds
 | Window | `window.h` | Viewport and scale modes, mouse mapping, window state and control, the app icon (`br_window_set_icon`: window, taskbar and Dock), and the system clipboard (`br_clipboard_set` / `br_clipboard_get`: Win32 `CF_UNICODETEXT`, macOS `NSPasteboard`, X11 `CLIPBOARD` selection; a private one in headless and web builds) |
 | Platform | `platform.h` | Table of function pointers that each OS backend implements |
 | Scene files | `serialize.h` | Saves and loads worlds as readable text. Every *described* component (a list of its fields with names and types, `ecs.h`) is saved field by field. Loading skips unknown components and fields with a warning, and is all-or-nothing on errors |
-| Built-in components | `components.h` | Name, Transform, Shape, Sprite, Label, Motion, Bounds and Sound, with motion, audio and layered draw systems: enough to make and play simple scenes |
+| Built-in components | `components.h` | Name, Transform, Shape, Sprite, Label, Motion, Bounds, Sound and Tilemap (a grid of tiles from one tileset image, one character per cell, with solid characters for scripts to test), with motion, audio and layered draw systems: enough to make and play simple scenes |
 | Scene tree | `hierarchy.h` | Parent component, local and world transforms, reparenting that keeps the on-screen position, children, subtrees and cascading destruction. Scene files store entity references (`BR_FIELD_ENTITY`) as positions in the file, reconnected on load |
 | Physics | `physics.h` | RigidBody (dynamic, static, kinematic), Collider (box or circle; friction, bounce, trigger, layers) and PhysicsWorld (gravity). Sort-and-sweep broad phase; circle and oriented-box contacts with clipping; a sequential-impulse solver, warm-started so stacks settle. Contact and trigger events, raycasts and point queries |
 | Scripts | `script.h` | The Script component. BrontoScript is interpreted from `.bs` files, re-read when they change, with a garbage-collected heap. Errors give a file and line and stop only that script. C behaviours can be registered by name |
-| Assets | `assets.h` | Image and sound cache: each file is loaded once, at a stable address, with relative paths resolved against the project folder (the nearest folder holding `project.bronto`, else the scene's own). Forgetting a sound silences it first. Project settings (`br_project`: name, main scene, screen size, strict typing) live in `project.bronto` |
+| Assets | `assets.h` | Image and sound cache: each file is loaded once, at a stable address, with relative paths resolved against the project folder (the nearest folder holding `project.bronto`, else the scene's own). Forgetting a sound silences it first. Project settings (`br_project`: name, main scene, screen size, strict typing, what built games leave out) live in `project.bronto` |
 | Packs | `pack.h` | A project folder in one file, or added to the end of a program (a built game). Once mounted, `br_file_read_all` finds files in it first, so the asset cache, scenes and scripts need no changes |
-| File system | `fs.h` | List folders (folders first, sorted), stat, make folders, rename without overwriting, remove; path string helpers. POSIX and Win32 backends in the platform layer |
+| File system | `fs.h` | List folders (folders first, sorted), stat, make folders, rename without overwriting, replace in one step, remove; the user's folders for settings and saved data; path string helpers. POSIX and Win32 backends in the platform layer |
+| Saved data | `save.h` | A game's save files, by name, in the system's place for them (`%APPDATA%`, `~/Library/Application Support`, `~/.local/share`, the browser's storage), written safely; `save_data` / `load_data` for scripts |
 | Output capture | `capture.h` | Redirects the program's own stdout and stderr into a buffer it reads back each frame (the editor's console), optionally still echoing to the terminal. Pipes plus a reader thread, in POSIX and Win32 backends in the platform layer; not available on the web (output goes to the browser's console) |
 | GUI | `ui.h` | Immediate-mode widgets: buttons, checkboxes, number fields you drag or type into, vec2 and colour fields, text fields, drop-downs, list rows, collapsible sections, scrolling panels, clickable custom-drawn areas with double-click, drag and drop, and right-click context menus (submenus, ticks, shortcuts, keyboard navigation). The editor uses it, and so can games |
 | Engine | `engine.h` | Fixed-timestep loop, frame limiter, per-frame arena; `br_engine_frame()` runs one frame, `br_engine_loop()` runs them until the game ends (on the web it hands them to the browser) |
@@ -386,7 +430,7 @@ networking and golden-image tests practical. Two rules keep it that way:
 
 ## Roadmap
 
-1. PNG decoder, sprite sheets and animation, tilemaps
+1. PNG decoder, sprite sheets and animation (tilemaps are in)
 2. Joints, one-way platforms and continuous collision for fast bodies; a script debugger
 3. Editor: multi-select, copy/paste between scenes, nested prefabs that update, game-specific components
 4. Web: touch controls beyond the mouse, and a smaller page (compressing the pack)

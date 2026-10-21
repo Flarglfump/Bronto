@@ -1,0 +1,41 @@
+# Pantry Quest - GAME OVER (scripts/gameover.bs)
+bronto_scene 1
+
+entity
+  Name
+    text = "GameOver"
+  Transform
+    position = 0 -20
+  Label
+    text = "GAME OVER"
+    size = 2
+    color = #d8343aff
+    layer = 80
+  Script
+    file = "scripts/gameover.bs"
+
+entity
+  Name
+    text = "Choice1"
+  Transform
+    position = 0 40
+  Label
+    text = "ENTER - CONTINUE"
+    size = 1
+    color = #fff8ecff
+    layer = 80
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Choice2"
+  Transform
+    position = 0 56
+  Label
+    text = "ESC - BACK TO THE TITLE"
+    size = 1
+    color = #c8c0b8ff
+    layer = 80
+  Parent
+    entity = 0

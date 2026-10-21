@@ -1,0 +1,294 @@
+# Pip, the young cook. Arrows or WASD walk; X (or K, or Space) pokes with the
+# spoon; Z (or J) uses the item on B; Enter opens the inventory.
+#
+# Movement keeps to a half-tile grid, as in the old adventure games: turning
+# a corner first lines Pip up with the next row or column, so he slips
+# through gaps a tile wide. Walls are the room Tilemap's solid tiles; only
+# his feet (the lower half of the sprite) collide.
+
+var speed = 84
+var facing = "down"
+var dirv := vec2(0, 1)
+var anim_t = 0
+var step_frame = 0
+var attack_t = 0            # > 0 while the spoon is out
+var hurt_t = 0              # > 0: just hit, can't be hurt again
+var knock := vec2(0, 0)
+var knock_t = 0
+var cooldown = 0
+var hit_list = []           # enemies this poke already hit
+var game
+var weapon
+var held
+var beam                    # the spoon's flying spark (at full health)
+var cutter                  # the pizza cutter, while it's out
+
+func start() {
+    game = find("Game")
+    weapon = child(self, "Weapon")
+    held = child(self, "Held")
+    show(weapon, false)
+    show(held, false)
+}
+
+func show(e, on) {
+    if on { e.Sprite.tint = rgb(255, 255, 255) } else { e.Sprite.tint = rgb(255, 255, 255, 0) }
+}
+
+func face(f) {
+    facing = f
+    if f == "up" { dirv = vec2(0, -1) }
+    if f == "down" { dirv = vec2(0, 1) }
+    if f == "left" { dirv = vec2(-1, 0) }
+    if f == "right" { dirv = vec2(1, 0) }
+    attack_t = 0
+    knock_t = 0
+    show(weapon, false)
+    draw_frame()
+}
+
+# ---- what the game asks of him ----------------------------------------------------
+func hold(image) {
+    held.Sprite.image = image
+    show(held, true)
+    show(weapon, false)
+    attack_t = 0
+    self.Sprite.image = "art/hero_hold.bmp"
+    self.scale = vec2(1, 1)
+}
+
+func hold_done() {
+    show(held, false)
+    draw_frame()
+}
+
+func spin(t) {
+    var f = floor(t * 10) % 4
+    var names = ["down", "left", "up", "right"]
+    if t > 1.6 {
+        self.Sprite.tint = rgb(140, 140, 140)
+        return
+    }
+    facing = names[f]
+    draw_frame()
+}
+
+# Something hurt him (half hearts), coming from a world point.
+func hurt(amount, from) {
+    if hurt_t > 0 or game.state != "play" { return false }
+    hurt_t = 1.0
+    game.damage(amount)
+    var d = self.position - from
+    if abs(d.x) > abs(d.y) { knock = vec2(sign(d.x), 0) } else { knock = vec2(0, sign(d.y)) }
+    if knock.x == 0 and knock.y == 0 { knock = dirv * -1 }
+    knock_t = 0.13
+    attack_t = 0
+    show(weapon, false)
+    return true
+}
+
+# Does his pot lid stop a shot flying with velocity v? (Facing it, not poking.)
+func blocks(v) {
+    if attack_t > 0 or game.state != "play" { return false }
+    return dot(normalize(v), dirv) < -0.7
+}
+
+# Is a world point within `r` of him?
+func touches(p, r) {
+    var d = p - self.position
+    return abs(d.x) < 6 + r and abs(d.y) < 6 + r
+}
+
+# ---- walking --------------------------------------------------------------------------
+func solid_at(p) {
+    if tile_solid(game.map, p) {
+        if tile_at(game.map, p) == "L" and game.try_unlock(p) { return false }
+        return true
+    }
+    return false
+}
+
+# Would his feet fit with his centre at p?
+func fits(p) {
+    return not (solid_at(p + vec2(-7, 1)) or solid_at(p + vec2(6, 1)) or solid_at(p + vec2(-7, 7)) or solid_at(p + vec2(6, 7)))
+}
+
+# Moves up to `dist` pixels along d (a unit vector on one axis), lining up on the other first.
+func walk(d, dist) {
+    var p = self.position
+    if d.x != 0 {
+        var off = (p.y - 64) % 8
+        if off != 0 {
+            if off < 4 { p.y -= min(off, dist) } else { p.y += min(8 - off, dist) }
+            if fits(p) {
+                self.position = p
+                return
+            }
+            p = self.position
+        }
+    } else {
+        var off = p.x % 8
+        if off != 0 {
+            if off < 4 { p.x -= min(off, dist) } else { p.x += min(8 - off, dist) }
+            if fits(p) {
+                self.position = p
+                return
+            }
+            p = self.position
+        }
+    }
+    var moved = 0
+    while moved < dist {
+        var stepn = min(1, dist - moved)
+        var q = p + d * stepn
+        if not fits(q) { break }
+        p = q
+        moved += stepn
+    }
+    self.position = p
+}
+
+func edge_check() {
+    var p = self.position
+    if p.x < 4 { game.leave("w") }
+    elif p.x > 252 { game.leave("e") }
+    elif p.y < 68 { game.leave("n") }
+    elif p.y > 236 { game.leave("s") }
+}
+
+# ---- every step --------------------------------------------------------------------------
+func update(dt) {
+    if game.state != "play" {
+        if game.state != "hold" and game.state != "dead" { self.Sprite.tint = rgb(255, 255, 255) }
+        return
+    }
+    if hurt_t > 0 {
+        hurt_t -= dt
+        if floor(hurt_t * 20) % 2 == 0 { self.Sprite.tint = rgb(255, 120, 120) } else { self.Sprite.tint = rgb(255, 255, 255) }
+        if hurt_t <= 0 { self.Sprite.tint = rgb(255, 255, 255) }
+    }
+    if cooldown > 0 { cooldown -= dt }
+    if knock_t > 0 {                                     # (being knocked back never takes him out of the room)
+        knock_t -= dt
+        walk(knock, 4)
+        self.position = vec2(clamp(self.x, 8, 248), clamp(self.y, 72, 232))
+        return
+    }
+    if attack_t > 0 {
+        poke(dt)
+        return
+    }
+    if (key_pressed("x") or key_pressed("k") or key_pressed("space")) and game.weapon > 0 and cooldown <= 0 {
+        start_poke()
+        return
+    }
+    if key_pressed("z") or key_pressed("j") { use_item() }
+
+    var want := vec2(0, 0)
+    if key_down("left") or key_down("a") { want.x -= 1 }
+    if key_down("right") or key_down("d") { want.x += 1 }
+    if key_down("up") or key_down("w") { want.y -= 1 }
+    if key_down("down") or key_down("s") { want.y += 1 }
+    var d := vec2(0, 0)
+    if want.x != 0 and want.y != 0 {
+        if facing == "left" or facing == "right" { d = vec2(0, want.y) } else { d = vec2(want.x, 0) }
+    } elif want.x != 0 {
+        d = vec2(want.x, 0)
+    } elif want.y != 0 {
+        d = vec2(0, want.y)
+    }
+    if d.x != 0 or d.y != 0 {
+        if d.x < 0 { facing = "left" }
+        if d.x > 0 { facing = "right" }
+        if d.y < 0 { facing = "up" }
+        if d.y > 0 { facing = "down" }
+        dirv = d
+        walk(d, speed * dt)
+        anim_t += dt
+        if anim_t > 0.12 {
+            anim_t = 0
+            step_frame = 1 - step_frame
+        }
+        edge_check()
+    }
+    draw_frame()
+}
+
+func draw_frame() {
+    var img = "art/hero_down_"
+    var flip = false
+    if facing == "up" { img = "art/hero_up_" }
+    if facing == "left" or facing == "right" { img = "art/hero_side_" }
+    if facing == "left" { flip = true }
+    self.Sprite.image = img + step_frame + ".bmp"
+    if flip { self.scale = vec2(-1, 1) } else { self.scale = vec2(1, 1) }
+}
+
+# ---- the spoon ------------------------------------------------------------------------------
+func start_poke() {
+    attack_t = 0.26
+    hit_list = []
+    play_sound("sfx/swing.wav", 0.7)
+    var img = "art/hero_attack_down.bmp"
+    if facing == "up" { img = "art/hero_attack_up.bmp" }
+    if facing == "left" or facing == "right" { img = "art/hero_attack_side.bmp" }
+    self.Sprite.image = img
+    show(weapon, true)
+    if game.hp == game.hearts_max * 2 and (beam == nil or not beam.alive) {
+        beam = spawn("prefabs/beam.scene", self.position + dirv * 14)
+        beam.vel = dirv * 200
+        beam.rotation = angle(dirv) + 90
+    }
+    place_weapon()
+}
+
+func place_weapon() {
+    var reach = 13
+    if attack_t > 0.2 or attack_t < 0.06 { reach = 9 }
+    var at = dirv * reach
+    if facing == "left" { at = vec2(reach, 0) }          # (the hero is flipped: his children are too)
+    if facing == "down" { at += vec2(-1, 0) }
+    if facing == "left" or facing == "right" { at += vec2(0, 3) }
+    weapon.position = at
+    if facing == "up" { weapon.rotation = 0 }
+    if facing == "down" { weapon.rotation = 180 }
+    if facing == "right" or facing == "left" { weapon.rotation = 90 }
+}
+
+func poke(dt) {
+    attack_t -= dt
+    place_weapon()
+    var tip = self.position + dirv * 14
+    for e in find_all("Enemy") {
+        if not contains(hit_list, e.id) and distance(e.global_position, tip) < 10 + e.size {
+            if e.hit(1, dirv, "spoon") { push(hit_list, e.id) }
+        }
+    }
+    if attack_t <= 0 {
+        show(weapon, false)
+        cooldown = 0.05
+        draw_frame()
+    }
+}
+
+# ---- the B item --------------------------------------------------------------------------------
+func use_item() {
+    var item = game.b_item
+    if item == "bombs" {
+        if game.bombs <= 0 or len(find_all("Bomb")) >= 1 { return }
+        game.bombs -= 1
+        spawn("prefabs/bomb.scene", self.position + dirv * 16 - game.room.global_position, game.room)
+        play_sound("sfx/bomb_place.wav")
+    } elif item == "cutter" {
+        if cutter != nil and cutter.alive { return }
+        var d := dirv
+        var want := vec2(0, 0)
+        if key_down("left") or key_down("a") { want.x -= 1 }
+        if key_down("right") or key_down("d") { want.x += 1 }
+        if key_down("up") or key_down("w") { want.y -= 1 }
+        if key_down("down") or key_down("s") { want.y += 1 }
+        if want.x != 0 or want.y != 0 { d = normalize(want) }
+        cutter = spawn("prefabs/cutter.scene", self.position + d * 8)
+        cutter.dir = d
+    }
+}

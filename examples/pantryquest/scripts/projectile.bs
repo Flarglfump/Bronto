@@ -1,0 +1,40 @@
+# Something an enemy threw or spat: a seed, a toothpick, a sprinkle. It
+# flies straight (`vel`, set by whoever threw it) until it leaves the room,
+# hits a wall, or reaches Pip - whose pot lid stops the small ones.
+
+var vel := vec2(0, 0)
+var damage = 1
+var blockable = true        # can Pip's lid stop it?
+var walls = true            # does a wall stop it?
+var game
+var hero
+var map
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    map = child(self.parent, "Map")
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    self.position += vel * dt
+    var p = self.position
+    if p.x < -8 or p.x > 264 or p.y < -8 or p.y > 184 {
+        destroy(self)
+        return
+    }
+    var g = self.global_position
+    if walls and tile_solid(map, g) {
+        destroy(self)
+        return
+    }
+    if hero.touches(g, 2) {
+        if blockable and hero.blocks(vel) {
+            play_sound("sfx/tink.wav", 0.7)
+            destroy(self)
+        } elif hero.hurt(damage, g) {
+            destroy(self)
+        }
+    }
+}

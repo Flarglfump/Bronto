@@ -1,0 +1,13 @@
+# Pantry Quest - someone in a cave (Script vars: line1, line2)
+bronto_scene 1
+
+entity
+  Name
+    text = "NPC"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/baker.bmp"
+    layer = 2
+  Script
+    file = "scripts/npc.bs"

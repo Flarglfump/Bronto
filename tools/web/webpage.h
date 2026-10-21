@@ -35,9 +35,9 @@ bool webpage_find_runtime(const char *dir, char *wasm, char *runtime_js, char *s
 bool webpage_write(const webpage *page, const char *runtime_js_path, const char *shell_path, const char *out_path,
                    char *err, size_t err_size);
 
-/* A project folder as a pack in memory, leaving out builds and other
- * things a game doesn't need (`skip_dir`: the project's builds folder). */
-void *webpage_pack_project(const char *folder, const char *skip_dir, size_t *size, br_pack_stats *stats,
+/* A project folder as a pack in memory, leaving out what a game doesn't
+ * need: its builds folder and the project's `exclude` list. */
+void *webpage_pack_project(const char *folder, const br_project *project, size_t *size, br_pack_stats *stats,
                            char *err, size_t err_size);
 
 #endif /* BRONTO_WEBPAGE_H */

@@ -1,0 +1,210 @@
+# The Pantry Plains (the overworld): one room per block, 16 x 11 tiles.
+# tools/make_rooms.py turns these into rooms/<name>.scene.
+#
+#   .  biscuit ground     ,  crumbs          f  flowers       s  sugar sand
+#   T  broccoli tree      r  cookie boulder  b  lettuce bush  W  chocolate cliff
+#   ~  blueberry juice    =  bridge          I  ice           C  cave mouth
+#   F  the cellar door    X  a cracked cliff (a bomb opens it)
+#
+# Edges: a room's open edges must meet its neighbours' (north and south
+# through columns 7-8, east and west through rows 4-6).
+#
+#   put <prefab> <column> <row> [script vars]   - a thing from prefabs/, at a tile (halves allowed)
+#   var <name> = <value>                         - a variable of the room's script (scripts/room.bs)
+
+room ow_7_7
+music overworld
+map
+WWWWWWW..WWWWWWW
+WWWWCWW..WWWWWWW
+WW.............W
+W..r....,...r..W
+..............,.
+....f.....f.....
+................
+T..r.....,..r..T
+TT............TT
+TTTbTTTTTTTTbTTT
+TTTTTTTTTTTTTTTT
+put warp 4 1 to = "cave_chef", pos = vec2(128, 216)
+end
+
+room ow_6_7
+music overworld
+map
+WWWWWWW..TTTTTTT
+WWWWXWW....,..bT
+T..............T
+T..~~~~~~~.....T
+T.~~~~~~~~~.....
+T..~~~~~~~~.....
+T...~~~~~~......
+T.....,........T
+Tb....r.....r..T
+TTb..........bTT
+TTTTTTTTTTTTTTTT
+put warp 4 1 to = "cave_secret", pos = vec2(128, 216), hidden = true
+put tomato 12 3
+put tomato 9 8
+end
+
+room ow_8_7
+music overworld
+map
+TTTTTTT..TTTTTTT
+TT.......,..WWWW
+T.....r.....WWWW
+T...........WCWW
+..........,....W
+...............W
+...r...........W
+T........r.....W
+TT.f..........TT
+TTTTbTTTTTTbTTTT
+TTTTTTTTTTTTTTTT
+put warp 13 3 to = "cave_shop", pos = vec2(128, 216)
+put tomato 5 5
+put tomato 9 3
+put plum 10 7
+end
+
+room ow_6_6
+music overworld
+map
+TTTTTTTTTTTTTTTT
+TTb.....,....bTT
+T...r......r...T
+T.....TTTT.....T
+T....TbbbbT.....
+T....TbbbbT.....
+T.....TTTT......
+T..r.......r...T
+T.....,........T
+TTb.........bTTT
+TTTTTTT..TTTTTTT
+put burger 3 5
+put burger 12 8
+put tomato 8 2
+end
+
+room ow_7_6
+music overworld
+map
+TTTTTTT..TTTTTTT
+TTff.......ffTTT
+T......,.......T
+T..b.........b.T
+................
+.......ss.......
+................
+T..b.........b.T
+T.......,......T
+TTff.......ffTTT
+TTTTTTT..TTTTTTT
+put tomato 4 5
+put plum 11 5
+put tomato 8 8
+end
+
+room ow_8_6
+music overworld
+map
+WWWWWWWWWWWWWWWW
+W~~~~~~~~~~~~~~W
+W~~~~~~~~~~~~~~W
+T..............W
+.......r.......W
+..~~~====~~~...W
+..~~~~~~~~~~...W
+T.......r......W
+TT.............W
+TTTTTb.....bTTTT
+TTTTTTT..TTTTTTT
+put burger 10 3
+put burger 6 7
+put tomato 12 8
+end
+
+room ow_7_5
+music overworld
+map
+IIIIIIIIIIIIIIII
+IIIIIIIIIIIIIIII
+III..IIIIII..III
+II.....III.....I
+I......F.......I
+I..............I
+I...b......b...I
+I..............I
+I.....,........I
+IIIIIII..IIIIIII
+IIIIIII..IIIIIII
+put warp 7 4 to = "d1_2_4", pos = vec2(128, 200)
+put plum 3 6
+put plum 12 6
+end
+
+# ---- caves (overworld tiles: K rock, : floor) ----
+room cave_chef
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "BARON GORGE TORE UP THE RECIPE!", line2 = "TAKE MY SPOON, LITTLE COOK."
+put pickup 7.5 6 kind = "spoon", flag = "spoon"
+end
+
+room cave_shop
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put baker 7.5 4 line1 = "FRESH FROM THE OVEN!", line2 = "TAKE YOUR PICK, LITTLE COOK."
+put pickup 5 6.5 kind = "bombs_item", price = 20
+put pickup 7.5 6.5 kind = "soup", price = 15
+put pickup 10 6.5 kind = "key", price = 40
+end
+
+room cave_secret
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! THIS IS MY SECRET STASH.", line2 = "TAKE SOME BEANS - YOU FOUND IT!"
+put pickup 6 6.5 kind = "bean5", flag = "stash1"
+put pickup 7.5 6.5 kind = "bean5", flag = "stash2"
+put pickup 9 6.5 kind = "bean5", flag = "stash3"
+end

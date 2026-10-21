@@ -1,0 +1,13 @@
+# Pantry Quest - the spark Pip's spoon throws at full health
+bronto_scene 1
+
+entity
+  Name
+    text = "Beam"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/spoon.bmp"
+    layer = 6
+  Script
+    file = "scripts/beam.bs"

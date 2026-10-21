@@ -1,0 +1,87 @@
+# Jelly: a wobbly blob of the cellar. Hops quickly from tile to tile, then
+# sits still for a moment. One poke (or the pizza cutter) pops it.
+
+var hp = 1
+var size = 5
+var damage = 1
+var speed = 70
+var game
+var hero
+var map
+var appear_t = 0
+var target := vec2(0, 0)
+var moving = false
+var wait_t = 0
+var anim_t = 0
+var frame = 0
+var stun_t = 0
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    map = child(self.parent, "Map")
+    appear_t = 0.3 + random(0.6)
+    self.Sprite.image = "art/cloud_0.bmp"
+    wait_t = random(1)
+}
+
+func free(p) {
+    if p.x < 24 or p.x > 232 or p.y < 24 or p.y > 152 { return false }
+    return not tile_solid(map, self.parent.global_position + p)
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    if appear_t > 0 {
+        appear_t -= dt
+        if appear_t < 0.15 { self.Sprite.image = "art/cloud_1.bmp" }
+        if appear_t <= 0 {
+            self.Sprite.image = "art/jelly_0.bmp"
+            self.position = vec2(floor(self.x / 16) * 16 + 8, floor(self.y / 16) * 16 + 8)
+        }
+        return
+    }
+    if stun_t > 0 {
+        stun_t -= dt
+    } elif moving {
+        var to = target - self.position
+        var step = speed * dt
+        if length(to) <= step {
+            self.position = target
+            moving = false
+            wait_t = 0.15 + random(0.9)
+        } else {
+            self.position += normalize(to) * step
+        }
+    } elif wait_t > 0 {
+        wait_t -= dt
+    } else {
+        var dirs = [vec2(0, 1), vec2(0, -1), vec2(1, 0), vec2(-1, 0)]
+        var d = dirs[floor(random(4))]
+        if random() < 0.4 {                                  # now and then, towards Pip
+            var to = hero.position - self.global_position
+            if abs(to.x) > abs(to.y) { d = vec2(sign(to.x), 0) } else { d = vec2(0, sign(to.y)) }
+        }
+        if free(self.position + d * 16) {
+            target = self.position + d * 16
+            moving = true
+        } else {
+            wait_t = 0.2
+        }
+    }
+    anim_t += dt
+    if anim_t > 0.15 {
+        anim_t = 0
+        frame = 1 - frame
+        self.Sprite.image = "art/jelly_" + frame + ".bmp"
+    }
+    if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+func hit(amount, d, kind) {
+    if appear_t > 0 { return false }
+    play_sound("sfx/hit.wav")
+    game.enemy_killed(self)
+    destroy(self)
+    return true
+}

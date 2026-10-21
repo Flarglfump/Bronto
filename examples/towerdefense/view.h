@@ -34,7 +34,8 @@ void view_draw_balloon(br_renderer *r, td_balloon_type type, bool camo, br_vec2 
 typedef enum ui_widget {
     UI_NONE = 0,
     UI_SHOP,                /* + tower type */
-    UI_TARGET = UI_SHOP + TD_TOWER_TYPE_COUNT,
+    UI_SHOP_END = UI_SHOP + TD_TOWER_TYPE_COUNT,   /* one past the last shop button */
+    UI_TARGET = UI_SHOP_END,
     UI_UPGRADE,             /* + path */
     UI_SELL = UI_UPGRADE + TD_PATHS,
     UI_DESELECT,

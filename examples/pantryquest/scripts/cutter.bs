@@ -1,0 +1,56 @@
+# The pizza cutter: thrown, it spins out, then comes back to Pip's hand.
+# It stuns most things it hits, slices the weakest, and brings back what
+# it touches on the ground.
+
+var dir := vec2(1, 0)
+var speed = 150
+var out_dist = 84
+var gone = 0
+var back = false
+var game
+var hero
+var carried
+var sound_t = 0
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    self.rotation += 900 * dt
+    sound_t -= dt
+    if sound_t <= 0 {
+        play_sound("sfx/cutter.wav", 0.5)
+        sound_t = 0.17
+    }
+    if not back {
+        self.position += dir * speed * dt
+        gone += speed * dt
+        var p = self.position
+        if gone >= out_dist or p.x < 4 or p.x > 252 or p.y < 68 or p.y > 236 or tile_solid(game.map, p) { back = true }
+    } else {
+        var to = hero.position - self.position
+        if length(to) < 8 {
+            if carried != nil and carried.alive { carried.take() }
+            destroy(self)
+            return
+        }
+        self.position += normalize(to) * speed * 1.1 * dt
+    }
+    for e in find_all("Enemy") {
+        if distance(e.global_position, self.position) < 6 + e.size {
+            if e.hit(1, dir, "cutter") { back = true }
+        }
+    }
+    if carried == nil {
+        for p in find_all("Pickup") {
+            if p.price == 0 and p.visible() and distance(p.global_position, self.position) < 10 {
+                carried = p
+                back = true
+            }
+        }
+    }
+    if carried != nil and carried.alive { carried.global_position = self.position }
+}

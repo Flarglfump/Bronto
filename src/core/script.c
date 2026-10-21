@@ -29,6 +29,7 @@
 #include "bronto/assets.h"
 #include "bronto/engine.h"
 #include "bronto/fs.h"
+#include "bronto/save.h"
 #include "bronto/log.h"
 #include "bronto/memory.h"
 
@@ -1029,6 +1030,7 @@ static sc_ty sc_sig_type(char c) {
     case 'e': return sc_ty_make(TY_ENT, 0);  case 'c': return sc_ty_make(TY_COMP, 0);
     case 'L': return sc_ty_make(TY_LIST, TY_ENT);
     case 'R': return sc_ty_make(TY_LIST, TY_INT);
+    case 'W': return sc_ty_make(TY_LIST, TY_STR);
     case '-': return sc_ty_make(TY_VOID, 0);
     default:  return sc_ty_make(TY_NONE, 0);   /* a (any), x / t / p / q: checked below */
     }
@@ -1449,7 +1451,7 @@ typedef struct sc_instance {
     const br_behaviour *beh;
     void *state;                    /* the behaviour's */
     sc_value *globals;
-    bool started, failed;
+    bool ready, started, failed;    /* ready: its variables are set (others can use it); started: start() ran */
     int slot;                       /* in rt->instances */
 } sc_instance;
 
@@ -1792,7 +1794,7 @@ static sc_value sc_eval_method(sc_vm *vm, sc_node *n) {
     if (n->count > 16) sc_fail(vm, n->line, "too many arguments");
     if (obj.t != V_ENT) sc_fail(vm, n->line, "%s has no function %s()", sc_type_name(&obj), n->name);
     target = sc_instance_of(vm->rt, obj.as.e);
-    if (!target || !target->prog || target->failed || !target->started)
+    if (!target || !target->prog || target->failed || !target->ready)
         sc_fail(vm, n->line, "%s has no running script to call %s() on", sc_entity_name(vm->rt, obj.as.e)[0] ? sc_entity_name(vm->rt, obj.as.e) : "that entity", n->name);
     if ((fn = sc_find_func(target->prog, n->name)) < 0) sc_fail(vm, n->line, "%s has no function %s()", target->prog->name, n->name);
     for (i = 0; i < n->count; ++i) args[i] = sc_eval(vm, n->items[i]);
@@ -2119,7 +2121,7 @@ static sc_value sc_get_member(sc_vm *vm, const sc_value *obj, const char *name, 
             return v;
         }
         other = sc_instance_of(rt, e);                         /* other.health: its script's variable */
-        if (other && other->prog && other->started) {
+        if (other && other->prog && other->ready && !other->failed) {
             int g = sc_find_global(other->prog, name);
             if (g >= 0) return other->globals[g];
         }
@@ -2185,7 +2187,7 @@ static void sc_set_member(sc_vm *vm, const sc_value *obj, const char *name, cons
         if (strcmp(name, "alive") == 0 || strcmp(name, "id") == 0) sc_fail(vm, line, "%s can't be changed", name);
         if (isupper((unsigned char)name[0])) sc_fail(vm, line, "set a component's fields, like self.%s.color", name);
         other = sc_instance_of(rt, e);
-        if (other && other->prog && other->started) {
+        if (other && other->prog && other->ready && !other->failed) {
             int g = sc_find_global(other->prog, name);
             if (g >= 0) {
                 if (other->prog->globals[g].ty.t) sc_check_value(vm, other->prog->globals[g].ty, val, line, name);
@@ -2427,37 +2429,55 @@ static sc_value bi_destroy(ARGS) {
     else if (a[0].t != V_ENT) sc_fail(vm, line, "destroy() needs an entity, not %s", sc_type_name(&a[0]));
     return sc_nil();
 }
+static sc_instance *sc_instance_create(sc_runtime *rt, br_entity e, const br_script *s);
+static void sc_make_ready(sc_runtime *rt, sc_instance *inst, const br_script *s);
+
 static sc_value bi_spawn(ARGS) {
     sc_runtime *rt = vm->rt;
     const char *path = sc_need_str(vm, &a[0], line, "spawn()");
     char full[BR_PATH_MAX * 2], err[200];
-    br_entity made[64];
+    br_entity *made;
+    sc_value first;
     size_t size;
     char *text;
-    int count, i;
+    const char *p;
+    int count, i, cap = 1;
     snprintf(full, sizeof(full), "%s%s", path[0] == '/' ? "" : br_assets_root(), path);
     if (!(text = (char *)br_file_read_all(full, &size))) sc_fail(vm, line, "spawn(): can't read %s", path);
-    count = br_world_from_text(rt->w, text, made, 64, err, sizeof(err));
+    for (p = text; (p = strstr(p, "entity")) != NULL; p += 6) ++cap;   /* at least one per entity in the file */
+    if (!(made = (br_entity *)br_alloc((size_t)cap * sizeof(br_entity)))) { br_free(text); sc_fail(vm, line, "out of memory"); }
+    count = br_world_from_text(rt->w, text, made, (uint32_t)cap, err, sizeof(err));
     br_free(text);
-    if (count < 0) sc_fail(vm, line, "spawn(): %s: %s", path, err);
-    if (count == 0) return sc_nil();
+    if (count < 0) { br_free(made); sc_fail(vm, line, "spawn(): %s: %s", path, err); }
+    if (count == 0) { br_free(made); return sc_nil(); }
+    if (count > cap) count = cap;
     if (n > 2 && a[2].t != V_NIL) {                        /* under a parent: pos is in its space */
         br_entity parent = sc_need_entity(vm, &a[2], line, "spawn() parent");
-        for (i = 0; i < count && i < 64; ++i)
+        for (i = 0; i < count; ++i)
             if (br_parent_of(rt->w, made[i]) == BR_ENTITY_NULL) br_set_parent(rt->w, made[i], parent, false);
     }
     if (n > 1 && a[1].t != V_NIL) {                       /* move it so the first entity lands at pos */
         br_vec2 at = sc_need_vec(vm, &a[1], line, "spawn() position");
         br_transform *t0 = (br_transform *)br_get(rt->w, made[0], rt->ids.transform);
         br_vec2 shift = t0 ? br_v2_sub(at, t0->position) : br_v2(0, 0);
-        for (i = 0; i < count && i < 64; ++i) {           /* the file's roots; their children follow */
+        for (i = 0; i < count; ++i) {                      /* the file's roots; their children follow */
             br_transform *t = (br_transform *)br_get(rt->w, made[i], rt->ids.transform);
-            br_entity p = br_parent_of(rt->w, made[i]);
-            bool root = p == BR_ENTITY_NULL || (n > 2 && a[2].t == V_ENT && p == a[2].as.e);
+            br_entity pe = br_parent_of(rt->w, made[i]);
+            bool root = pe == BR_ENTITY_NULL || (n > 2 && a[2].t == V_ENT && pe == a[2].as.e);
             if (t && root) t->position = br_v2_add(t->position, shift);
         }
     }
-    return sc_ent(made[0]);
+    if (rt->script_id != BR_COMPONENT_INVALID) {           /* their variables now, so the caller can set them */
+        for (i = 0; i < count; ++i) {
+            br_script *sc = (br_script *)br_get(rt->w, made[i], rt->script_id);
+            if (!sc) continue;
+            if (!sc->instance) sc->instance = sc_instance_create(rt, made[i], sc);
+            if (sc->instance) sc_make_ready(rt, (sc_instance *)sc->instance, sc);
+        }
+    }
+    first = sc_ent(made[0]);
+    br_free(made);
+    return first;
 }
 static sc_value bi_children(ARGS) {
     br_entity e = sc_need_entity(vm, &a[0], line, "children()"), kids[256];
@@ -2531,6 +2551,49 @@ static sc_value bi_entity_at(ARGS) {
     BR_UNUSED(n);
     return e == BR_ENTITY_NULL ? sc_nil() : sc_ent(e);
 }
+/* Tilemaps: the map entity and a world point. */
+static sc_value bi_tile_at(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "tile_at()");
+    char c = br_tilemap_get(vm->rt->w, e, sc_need_vec(vm, &a[1], line, "tile_at() point"), NULL, NULL);
+    BR_UNUSED(n);
+    return sc_string(vm, &c, c ? 1 : 0);
+}
+static sc_value bi_set_tile(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "set_tile()");
+    br_vec2 p = sc_need_vec(vm, &a[1], line, "set_tile() point");
+    const char *t = sc_need_str(vm, &a[2], line, "set_tile()");
+    BR_UNUSED(n);
+    if (strlen(t) != 1) sc_fail(vm, line, "set_tile() wants one character, not \"%s\"", t);
+    return sc_bool(br_tilemap_set(vm->rt->w, e, p, t[0]));
+}
+static sc_value bi_tile_solid(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "tile_solid()");
+    BR_UNUSED(n);
+    return sc_bool(br_tilemap_solid(vm->rt->w, e, sc_need_vec(vm, &a[1], line, "tile_solid() point")));
+}
+static sc_value bi_tile_center(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "tile_center()");
+    br_vec2 p = sc_need_vec(vm, &a[1], line, "tile_center() point"), c;
+    int col, row;
+    BR_UNUSED(n);
+    br_tilemap_get(vm->rt->w, e, p, &col, &row);
+    if (!br_tilemap_cell_center(vm->rt->w, e, col, row, &c)) sc_fail(vm, line, "tile_center(): the entity has no Tilemap");
+    return sc_vec(c.x, c.y);
+}
+/* substr(text, start[, count]): part of a string; a negative start counts from the end. */
+static sc_value bi_substr(ARGS) {
+    const char *t = sc_need_str(vm, &a[0], line, "substr()");
+    double len = (double)strlen(t), start = NUM(1, "substr() start"), count = n > 2 ? NUM(2, "substr() count") : len;
+    start = floor(start);
+    if (start < 0) start += len;
+    if (start < 0) start = 0;
+    if (start > len) start = len;
+    count = floor(count);
+    if (count < 0) count = 0;
+    if (start + count > len) count = len - start;
+    return sc_string(vm, t + (size_t)start, (size_t)count);
+}
+
 static sc_value bi_play_sound(ARGS) {
     br_engine *e = sc_engine(vm);
     const br_sound *s;
@@ -2555,16 +2618,239 @@ static sc_value bi_send(ARGS) {
     br_entity e = sc_need_entity(vm, &a[0], line, "send()");
     fn_name = sc_need_str(vm, &a[1], line, "send()");
     target = sc_instance_of(vm->rt, e);
-    if (!target || !target->prog || target->failed || !target->started || (fn = sc_find_func(target->prog, fn_name)) < 0) return sc_nil();
+    if (!target || !target->prog || target->failed || !target->ready || (fn = sc_find_func(target->prog, fn_name)) < 0) return sc_nil();
     return sc_call_func(vm, target, fn, a + 2, n - 2, line);
+}
+
+/* ---- values as text: saved data, and Script.vars ----
+ * Written as BrontoScript literals, so a saved file reads like code:
+ * [3, "ow_7_7", vec2(128, 152), true, nil]. Entities and components can't
+ * be written (they mean nothing in another run). */
+#define SC_TEXT_DEPTH 64
+
+typedef struct sc_text { char *p; size_t len, cap; bool failed; } sc_text;
+
+static void sc_text_add(sc_text *t, const char *s, size_t n) {
+    if (t->failed) return;
+    if (t->len + n + 1 > t->cap) {
+        size_t cap = t->cap ? t->cap * 2 : 256;
+        char *g;
+        while (cap < t->len + n + 1) cap *= 2;
+        if (!(g = (char *)br_realloc(t->p, cap))) { t->failed = true; return; }
+        t->p = g;
+        t->cap = cap;
+    }
+    memcpy(t->p + t->len, s, n);
+    t->len += n;
+    t->p[t->len] = 0;
+}
+static void sc_text_str(sc_text *t, const char *s) { sc_text_add(t, s, strlen(s)); }
+
+/* NULL when written, else why it can't be. */
+static const char *sc_write_value(sc_text *t, const sc_value *v, int depth) {
+    char num[64];
+    uint32_t i;
+    if (depth > SC_TEXT_DEPTH) return "lists inside lists too deeply (or a list inside itself)";
+    switch (v->t) {
+    case V_NIL: sc_text_str(t, "nil"); return NULL;
+    case V_BOOL: sc_text_str(t, v->as.b ? "true" : "false"); return NULL;
+    case V_NUM:
+        if (!isfinite(v->as.n)) return "a number that isn't finite";
+        snprintf(num, sizeof(num), "%.17g", v->as.n);
+        sc_text_str(t, num);
+        return NULL;
+    case V_VEC:
+        if (!isfinite(v->as.v.x) || !isfinite(v->as.v.y)) return "a vec2 that isn't finite";
+        snprintf(num, sizeof(num), "vec2(%.17g, %.17g)", v->as.v.x, v->as.v.y);
+        sc_text_str(t, num);
+        return NULL;
+    case V_STR:
+        sc_text_str(t, "\"");
+        for (i = 0; i < v->as.s->len; ++i) {
+            char c = v->as.s->chars[i];
+            if (c == '"' || c == '\\') { sc_text_str(t, "\\"); sc_text_add(t, &c, 1); }
+            else if (c == '\n') sc_text_str(t, "\\n");
+            else if (c == '\t') sc_text_str(t, "\\t");
+            else sc_text_add(t, &c, 1);
+        }
+        sc_text_str(t, "\"");
+        return NULL;
+    case V_LIST:
+        sc_text_str(t, "[");
+        for (i = 0; i < v->as.l->count; ++i) {
+            const char *why;
+            if (i) sc_text_str(t, ", ");
+            if ((why = sc_write_value(t, &v->as.l->items[i], depth + 1)) != NULL) return why;
+        }
+        sc_text_str(t, "]");
+        return NULL;
+    case V_ENT: return "an entity";
+    case V_COMP: return "a component";
+    default: return "something unknown";
+    }
+}
+
+static bool sc_heap_string(sc_runtime *rt, const char *s, size_t len, sc_value *out) {   /* unescaping \n \t \" \\ */
+    char *buf = (char *)br_alloc(len + 1);
+    size_t i, n = 0;
+    if (!buf) return false;
+    for (i = 0; i < len; ++i) {
+        char c = s[i];
+        if (c == '\\' && i + 1 < len) {
+            c = s[++i];
+            c = c == 'n' ? '\n' : c == 't' ? '\t' : c;
+        }
+        buf[n++] = c;
+    }
+    *out = sc_nil();
+    out->t = V_STR;
+    out->as.s = sc_str_alloc(&rt->heap, buf, n, false);
+    br_free(buf);
+    return out->as.s != NULL;
+}
+
+static bool sc_read_value(sc_runtime *rt, sc_lexer *L, sc_token t, sc_value *out, int depth);
+
+static bool sc_read_number(sc_lexer *L, sc_token t, double *out) {
+    double sign = 1;
+    if (t.t == T_MINUS) { sign = -1; t = sc_next(L); }
+    if (t.t != T_NUM) return false;
+    *out = sign * t.num;
+    return true;
+}
+
+static bool sc_read_list(sc_runtime *rt, sc_lexer *L, sc_value *out, int depth) {
+    sc_list *l = sc_list_alloc(&rt->heap);
+    if (!l) return false;
+    *out = sc_nil();
+    out->t = V_LIST;
+    out->as.l = l;
+    for (;;) {
+        sc_token t = sc_next(L);
+        sc_value item;
+        if (t.t == T_RBRACKET) return true;              /* [] and [a, b,] */
+        if (!sc_read_value(rt, L, t, &item, depth + 1)) return false;
+        if (l->count == l->cap) {
+            uint32_t cap = l->cap ? l->cap * 2 : 8;
+            sc_value *g = (sc_value *)br_realloc(l->items, sizeof(sc_value) * cap);
+            if (!g) return false;
+            rt->heap.bytes += sizeof(sc_value) * (cap - l->cap);
+            rt->heap.since_gc += sizeof(sc_value) * (cap - l->cap);
+            l->items = g;
+            l->cap = cap;
+        }
+        l->items[l->count++] = item;
+        t = sc_next(L);
+        if (t.t == T_RBRACKET) return true;
+        if (t.t != T_COMMA) return false;
+    }
+}
+
+/* One literal, starting with the token `t`. */
+static bool sc_read_value(sc_runtime *rt, sc_lexer *L, sc_token t, sc_value *out, int depth) {
+    double x, y;
+    if (depth > SC_TEXT_DEPTH) return false;
+    switch (t.t) {
+    case T_NIL: *out = sc_nil(); return true;
+    case T_TRUE: case T_FALSE: *out = sc_bool(t.t == T_TRUE); return true;
+    case T_NUM: case T_MINUS:
+        if (!sc_read_number(L, t, &x)) return false;
+        *out = sc_num(x);
+        return true;
+    case T_STR: return sc_heap_string(rt, t.start, (size_t)t.len, out);
+    case T_LBRACKET: return sc_read_list(rt, L, out, depth);
+    case T_NAME:
+        if (t.len != 4 || strncmp(t.start, "vec2", 4) != 0 || sc_next(L).t != T_LPAREN) return false;
+        if (!sc_read_number(L, sc_next(L), &x) || sc_next(L).t != T_COMMA) return false;
+        if (!sc_read_number(L, sc_next(L), &y) || sc_next(L).t != T_RPAREN) return false;
+        *out = sc_vec(x, y);
+        return true;
+    default: return false;
+    }
+}
+
+/* ---- saved data: save_data("slot1", value) keeps it in slot1.txt in the
+ * game's folder for saved data (save.h) ---- */
+static const char *sc_data_file(sc_vm *vm, const sc_value *name, int line, const char *what, char *out, size_t size) {
+    const char *n = sc_need_str(vm, name, line, what);
+    snprintf(out, size, "%s.txt", n);
+    if (strlen(n) + 4 > BR_SAVE_NAME_MAX || !br_save_name_ok(out))
+        sc_fail(vm, line, "%s: \"%s\" can't name saved data (use up to 60 letters, digits, spaces and _-.())", what, n);
+    return out;
+}
+static sc_value bi_save_data(ARGS) {
+    char file[BR_SAVE_NAME_MAX + 8];
+    sc_text t;
+    const char *why;
+    bool ok;
+    BR_UNUSED(n);
+    sc_data_file(vm, &a[0], line, "save_data()", file, sizeof(file));
+    memset(&t, 0, sizeof(t));
+    if ((why = sc_write_value(&t, &a[1], 0)) != NULL) {
+        br_free(t.p);
+        sc_fail(vm, line, "save_data(): can't save %s", why);
+    }
+    sc_text_str(&t, "\n");
+    if (t.failed) { br_free(t.p); sc_fail(vm, line, "out of memory"); }
+    ok = br_save_write(file, t.p, t.len);
+    br_free(t.p);
+    return sc_bool(ok);
+}
+static sc_value bi_load_data(ARGS) {
+    char file[BR_SAVE_NAME_MAX + 8], msg[200];
+    size_t size;
+    char *text;
+    sc_lexer L;
+    sc_value v;
+    sc_data_file(vm, &a[0], line, "load_data()", file, sizeof(file));
+    if (!(text = (char *)br_save_read(file, &size))) return n > 1 ? a[1] : sc_nil();
+    L.p = text;
+    L.line = 1;
+    L.depth = 0;
+    {
+        sc_token t;
+        do { t = sc_next(&L); } while (t.t == T_NEWLINE);
+        if (sc_read_value(vm->rt, &L, t, &v, 0)) {
+            do { t = sc_next(&L); } while (t.t == T_NEWLINE);
+            if (t.t == T_EOF) { br_free(text); return v; }
+        }
+    }
+    br_free(text);
+    snprintf(msg, sizeof(msg), "load_data(): %s is damaged, so it was left alone (line %d)", file, L.line);
+    BR_WARN("script: %s", msg);
+    return n > 1 ? a[1] : sc_nil();
+}
+static sc_value bi_has_data(ARGS) {
+    char file[BR_SAVE_NAME_MAX + 8];
+    BR_UNUSED(n);
+    return sc_bool(br_save_exists(sc_data_file(vm, &a[0], line, "has_data()", file, sizeof(file))));
+}
+static sc_value bi_delete_data(ARGS) {
+    char file[BR_SAVE_NAME_MAX + 8];
+    BR_UNUSED(n);
+    return sc_bool(br_save_delete(sc_data_file(vm, &a[0], line, "delete_data()", file, sizeof(file))));
+}
+static sc_value bi_data_names(ARGS) {
+    sc_value out = sc_new_list(vm, line);
+    br_dir_list files;
+    int i;
+    BR_UNUSED(a); BR_UNUSED(n);
+    if (!br_save_list(&files)) return out;
+    for (i = 0; i < files.count; ++i) {
+        size_t len = strlen(files.entries[i].name);
+        if (len > 4 && strcmp(files.entries[i].name + len - 4, ".txt") == 0)
+            sc_list_push(vm, out.as.l, sc_string(vm, files.entries[i].name, len - 4), line);
+    }
+    br_dir_list_free(&files);
+    return out;
 }
 
 /* Signatures (for the type checker): a letter per parameter, '*' repeats the
  * last for the rest, then '>' and the result. n number, i int, s string,
  * b bool, v vec2, l list, e entity, a anything, x number or vec2, t list or
  * string, p vec2 or nil, q entity or nil; results also: - nothing, c a
- * component, L list[entity], R list[int], S like the arguments, E an item of
- * the list argument. */
+ * component, L list[entity], R list[int], W list[string], S like the
+ * arguments, E an item of the list argument. */
 static const sc_builtin k_builtin_table[] = {
     { "print", 0, 16, bi_print, "a*>-" }, { "str", 1, 1, bi_str, "a>s" }, { "num", 1, 1, bi_num, "a>a" },
     { "floor", 1, 1, bi_floor, "n>i" }, { "ceil", 1, 1, bi_ceil, "n>i" }, { "round", 1, 1, bi_round, "n>i" },
@@ -2589,6 +2875,12 @@ static const sc_builtin k_builtin_table[] = {
     { "raycast", 2, 3, bi_raycast, "vvq>a" }, { "entity_at", 1, 1, bi_entity_at, "v>e" },
     { "play_sound", 1, 2, bi_play_sound, "sn>-" }, { "send", 2, 16, bi_send, "esa*>a" },
     { "load_scene", 1, 1, bi_load_scene, "s>-" }, { "quit", 0, 0, bi_quit, ">-" },
+    { "tile_at", 2, 2, bi_tile_at, "ev>s" }, { "set_tile", 3, 3, bi_set_tile, "evs>b" },
+    { "tile_solid", 2, 2, bi_tile_solid, "ev>b" }, { "tile_center", 2, 2, bi_tile_center, "ev>v" },
+    { "substr", 2, 3, bi_substr, "snn>s" },
+    { "save_data", 2, 2, bi_save_data, "sa>b" }, { "load_data", 1, 2, bi_load_data, "sa>a" },
+    { "has_data", 1, 1, bi_has_data, "s>b" }, { "delete_data", 1, 1, bi_delete_data, "s>b" },
+    { "data_names", 0, 0, bi_data_names, ">W" },
 };
 
 static int sc_find_builtin(const char *name) {
@@ -2765,29 +3057,12 @@ static void sc_apply_vars(sc_runtime *rt, sc_instance *inst, const char *vars) {
     for (;;) {
         sc_token name;
         sc_value v = sc_nil();
-        double sign = 1;
         int g;
         do { t = sc_next(&L); } while (t.t == T_COMMA || t.t == T_SEMI || t.t == T_NEWLINE);
         if (t.t == T_EOF) return;
         name = t;
         if (name.t != T_NAME || sc_next(&L).t != T_ASSIGN) break;
-        t = sc_next(&L);
-        if (t.t == T_MINUS) { sign = -1; t = sc_next(&L); }
-        if (t.t == T_NUM) v = sc_num(sign * t.num);
-        else if (t.t == T_TRUE || t.t == T_FALSE) v = sc_bool(t.t == T_TRUE);
-        else if (t.t == T_NIL) v = sc_nil();
-        else if (t.t == T_STR) { v.t = V_STR; v.as.s = sc_str_alloc(&rt->heap, t.start, (size_t)t.len, false); if (!v.as.s) return; }
-        else if (t.t == T_NAME && t.len == 4 && strncmp(t.start, "vec2", 4) == 0) {
-            sc_token x, y;
-            if (sc_next(&L).t != T_LPAREN) break;
-            x = sc_next(&L);
-            if (sc_next(&L).t != T_COMMA) break;
-            y = sc_next(&L);
-            if (x.t != T_NUM || y.t != T_NUM || sc_next(&L).t != T_RPAREN) break;
-            v = sc_vec(x.num, y.num);
-        } else {
-            break;
-        }
+        if (!sc_read_value(rt, &L, sc_next(&L), &v, 0)) break;   /* a number, string, true/false, nil, vec2 or list */
         {
             char key[64];
             snprintf(key, sizeof(key), "%.*s", name.len, name.start);
@@ -2846,15 +3121,24 @@ static void sc_callback(sc_runtime *rt, sc_instance *inst, int cb, const sc_valu
     sc_run(rt, inst, inst->prog->callbacks[cb], args, argc, NULL);
 }
 
+/* Sets up the variables: the script's own starting values, then the
+ * Script's vars. From then on other scripts can read, set and call it. */
+static void sc_make_ready(sc_runtime *rt, sc_instance *inst, const br_script *s) {
+    if (inst->ready) return;
+    inst->ready = true;
+    if (inst->failed || inst->beh) return;
+    if (!sc_run(rt, inst, -1, NULL, 0, NULL)) return;
+    if (s->vars[0]) sc_apply_vars(rt, inst, s->vars);
+}
+
 static void sc_start(sc_runtime *rt, sc_instance *inst, const br_script *s) {
+    sc_make_ready(rt, inst, s);
     inst->started = true;
     if (inst->failed) return;
     if (inst->beh) {
         if (inst->beh->start) inst->beh->start(rt->w, inst->e, inst->state);
         return;
     }
-    if (!sc_run(rt, inst, -1, NULL, 0, NULL)) return;
-    if (s->vars[0]) sc_apply_vars(rt, inst, s->vars);
     sc_callback(rt, inst, CB_START, NULL, 0);
 }
 
@@ -2965,7 +3249,7 @@ void br_script_register(br_world *w) {
 static sc_instance *sc_running(br_world *w, br_entity e) {
     sc_runtime *rt = (sc_runtime *)br_world_attached(w, &k_runtime_key);
     sc_instance *inst = rt ? sc_instance_of(rt, e) : NULL;
-    return inst && inst->prog && inst->started && !inst->failed ? inst : NULL;
+    return inst && inst->prog && inst->ready && !inst->failed ? inst : NULL;
 }
 
 bool br_script_call(br_world *w, br_entity e, const char *function, const double *args, int arg_count) {

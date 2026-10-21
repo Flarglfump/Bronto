@@ -33,7 +33,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define HIGHSCORE_FILE "snake_highscore.txt"
+#define HIGHSCORE_FILE "highscore.txt"          /* in the game's folder for saved data (bronto/save.h) */
+#define OLD_HIGHSCORE_FILE "snake_highscore.txt" /* where older versions kept it: beside wherever it ran */
 
 typedef struct play_data {
     snake_game game;
@@ -60,18 +61,25 @@ static const br_scene_desc k_title, k_play, k_pause, k_game_over;
 
 /* ======================= high score ======================================= */
 
-static void load_best(void) {
-    size_t size;
-    char *data = (char *)br_file_read_all(HIGHSCORE_FILE, &size);
-    G.best = data ? atoi(data) : 0;
-    br_free(data);
-}
-
 static void save_best(void) {
     char buf[32];
     if (G.headless) return;   /* demo runs never touch the player's record */
     snprintf(buf, sizeof(buf), "%d\n", G.best);
-    br_file_write_all(HIGHSCORE_FILE, buf, strlen(buf));
+    br_save_write(HIGHSCORE_FILE, buf, strlen(buf));
+}
+
+static void load_best(void) {
+    size_t size;
+    char *data;
+    G.best = 0;
+    if (G.headless) return;   /* nor read it: a demo run plays the same everywhere */
+    if ((data = (char *)br_save_read(HIGHSCORE_FILE, &size)) != NULL) {
+        G.best = atoi(data);
+    } else if ((data = (char *)br_file_read_all(OLD_HIGHSCORE_FILE, &size)) != NULL) {
+        G.best = atoi(data);  /* a record from an older version: move it over */
+        save_best();
+    }
+    br_free(data);
 }
 
 /* ======================= glue: rules -> message bus ======================== */

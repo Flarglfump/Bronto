@@ -37,6 +37,7 @@ typedef struct br_engine br_engine;
 
 typedef struct br_engine_config {
     const char *title;
+    const char *save_name;        /* names the folder for saved data (save.h); NULL = the title */
     int width, height;            /* framebuffer resolution (default 320x180) */
     int window_scale;             /* initial window = framebuffer * scale (default 3) */
     int window_width, window_height;   /* override initial window size, points */

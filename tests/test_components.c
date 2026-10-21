@@ -20,8 +20,9 @@ static void test_builtin_register(void) {
     int count;
     const br_component_desc *const *descs = br_builtin_descs(&count);
     setup();
-    CHECK_EQ_INT(count, 8);
+    CHECK_EQ_INT(count, 9);
     CHECK(strcmp(descs[0]->name, "Name") == 0 && strcmp(descs[6]->name, "Bounds") == 0);
+    CHECK(strcmp(descs[8]->name, "Tilemap") == 0 && ID.tilemap != BR_COMPONENT_INVALID);
     CHECK(strcmp(descs[7]->name, "Sound") == 0 && ID.sound != BR_COMPONENT_INVALID);
     CHECK(ID.transform != BR_COMPONENT_INVALID && ID.bounds != BR_COMPONENT_INVALID);
     CHECK(br_component_get_desc(&W, ID.shape) == descs[2]);
@@ -190,7 +191,77 @@ static void test_sound_component(void) {
     br_assets_set_root("");
 }
 
+/* Tilemap: drawing from a tileset, the cell under a point, solid tiles, scene files. */
+static void test_tilemap(void) {
+    br_image img, set;
+    br_renderer r;
+    br_entity root, e;
+    br_tilemap *m;
+    br_vec2 c;
+    int col, row, i;
+    char *text;
+    br_entity made[4];
+    setup();
+    br_image_init(&set, 8, 8);                                   /* a 2x2 tileset of 4-pixel tiles */
+    for (i = 0; i < 64; ++i) set.pixels[i] = (i % 8) < 4 ? ((i / 8) < 4 ? BR_RED : BR_BLUE) : ((i / 8) < 4 ? BR_GREEN : BR_WHITE);
+    CHECK(br_image_save_bmp(&set, test_path("tiles_test.bmp")));
+    br_image_destroy(&set);
+    br_assets_set_root(g_out_dir);
+    root = make(br_v2(100, 100));                                /* a map follows its parent */
+    e = make(br_v2(-80, -80));
+    br_set_parent(&W, e, root, false);
+    m = (br_tilemap *)br_add(&W, e, ID.tilemap, NULL);
+    CHECK(m->tile_size == 16 && m->columns == 16 && m->rows == 11 && m->tint.a == 255);
+    strcpy(m->tileset, "tiles_test.bmp");
+    m->tile_size = 4;
+    m->columns = 3;
+    m->rows = 2;
+    strcpy(m->legend, "rgbw");                                   /* r: tile 0 (red), g: 1, b: 2, w: 3 */
+    strcpy(m->solid, "bw");
+    strcpy(m->tiles, "rgbw.r");                                  /* '.' isn't in the legend: nothing there */
+    br_image_init(&img, 64, 64);
+    br_renderer_init(&r, &img);
+    br_clear(&r, BR_BLACK);
+    br_builtin_draw(&W, &r);                                     /* the map spans x 14..26, y 16..24 */
+    CHECK(br_color_eq(px(&img, 15, 17), BR_RED) && br_color_eq(px(&img, 19, 17), BR_GREEN));
+    CHECK(br_color_eq(px(&img, 23, 17), BR_BLUE) && br_color_eq(px(&img, 15, 21), BR_WHITE));
+    CHECK(br_color_eq(px(&img, 19, 21), BR_BLACK) && br_color_eq(px(&img, 23, 21), BR_RED));
+    CHECK(br_color_eq(px(&img, 13, 17), BR_BLACK));
+    CHECK(br_tilemap_get(&W, e, br_v2(19, 17), &col, &row) == 'g' && col == 1 && row == 0);
+    CHECK(br_tilemap_get(&W, e, br_v2(13, 17), &col, &row) == 0 && col == -1);   /* outside */
+    CHECK(br_tilemap_solid(&W, e, br_v2(23, 17)) && !br_tilemap_solid(&W, e, br_v2(15, 17)));
+    CHECK(!br_tilemap_solid(&W, e, br_v2(40, 40)));
+    CHECK(br_tilemap_cell_center(&W, e, 2, 1, &c) && c.x == 24 && c.y == 22);
+    CHECK(br_tilemap_set(&W, e, br_v2(19, 21), 'b') && br_tilemap_solid(&W, e, br_v2(19, 21)));
+    CHECK(!br_tilemap_set(&W, e, br_v2(1, 1), 'b'));
+    {   /* bounds for the editor's picking */
+        br_vec2 k[4];
+        CHECK(br_builtin_box(&W, e, k) && k[0].x == 14 && k[0].y == 16 && k[2].x == 26 && k[2].y == 24);
+    }
+    /* a long map survives a scene file */
+    m = (br_tilemap *)br_get(&W, e, ID.tilemap);
+    m->columns = 40;
+    m->rows = 40;
+    for (i = 0; i < 1600; ++i) m->tiles[i] = "rgbw"[i % 4];
+    m->tiles[1600] = 0;
+    text = br_world_to_text(&W, &e, 1, NULL);
+    CHECK(text != NULL);
+    if (text) {
+        br_world_clear(&W);
+        CHECK(br_world_from_text(&W, text, made, 4, NULL, 0) == 1);
+        m = (br_tilemap *)br_get(&W, made[0], ID.tilemap);
+        CHECK(m && strlen(m->tiles) == 1600 && m->tiles[1599] == 'w' && strcmp(m->legend, "rgbw") == 0);
+        br_free(text);
+    }
+    br_image_destroy(&img);
+    br_builtin_release();
+    br_assets_clear();
+    br_assets_set_root("");
+    br_world_destroy(&W);
+}
+
 void suite_components(void) {
+    RUN(test_tilemap);
     RUN(test_builtin_register);
     RUN(test_sound_component);
     RUN(test_builtin_motion);

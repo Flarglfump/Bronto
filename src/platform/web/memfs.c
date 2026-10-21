@@ -185,13 +185,16 @@ int bw_fs_remove(const char *path) {
 }
 
 /* Renames one node: tells the page the file moved. */
+/* (Kept in the browser's storage under the new name before it is removed
+ * under the old one, so a page closed in between still has the file.) */
 static int move_node(bw_node *n, const char *to) {
-    char *path = strdup(to);
+    char *path = strdup(to), *old;
     if (!path) return ENOMEM;
-    if (!n->is_dir && n->persist) bw_js_file_removed(n->path);
-    free(n->path);
+    old = n->path;
     n->path = path;
     if (!n->is_dir) { n->dirty = true; bw_fs_save(n); }
+    if (!n->is_dir && n->persist) bw_js_file_removed(old);
+    free(old);
     return 0;
 }
 
@@ -208,7 +211,7 @@ int bw_fs_rename(const char *from, const char *to) {
     if ((dst = find_norm(b)) != NULL) {                /* replace it, as POSIX rename does */
         if (dst->is_dir != src->is_dir) return dst->is_dir ? EISDIR : ENOTDIR;
         if (dst->is_dir) { for (i = 0; i < g_count; ++i) if (is_inside(g_nodes[i]->path, b)) return ENOTEMPTY; }
-        else if (dst->persist) bw_js_file_removed(dst->path);
+        else if (dst->persist && !src->persist) bw_js_file_removed(dst->path);   /* (a kept file overwrites it in storage) */
         unlink_node(dst);
     }
     alen = strlen(a);

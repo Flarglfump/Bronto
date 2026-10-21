@@ -1,5 +1,6 @@
 /* Tests: the file system module (fs.h) and path helpers. */
 #include "test.h"
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -71,6 +72,75 @@ static void test_fs_ops(void) {
     }
 }
 
+
+/* Saved data (save.h): a game's files, by name, in its own folder. */
+static void test_save(void) {
+    char folder[BR_PATH_MAX], path[BR_PATH_MAX], a[BR_PATH_MAX], b[BR_PATH_MAX];
+    size_t size;
+    char *data;
+    br_dir_list l;
+    int i;
+    /* replacing a file in one step */
+    br_path_join(a, sizeof(a), g_out_dir, "replace_new.txt");
+    br_path_join(b, sizeof(b), g_out_dir, "replace_old.txt");
+    CHECK(br_file_write_all(b, "old contents", 12) && br_file_write_all(a, "new", 3));
+    CHECK(br_fs_replace(a, b) && !br_fs_exists(a));
+    data = (char *)br_file_read_all(b, &size);
+    CHECK(data && size == 3 && strcmp(data, "new") == 0);
+    br_free(data);
+    br_fs_remove(b);
+    /* the game's name, made safe for a folder */
+    br_save_set_game("Pip's Quest: Part 2/3?");  CHECK(strcmp(br_save_game(), "Pip's Quest_ Part 2_3_") == 0);
+    br_save_set_game("  .Trim me. ");             CHECK(strcmp(br_save_game(), "Trim me") == 0);
+    br_save_set_game("");                         CHECK(strcmp(br_save_game(), "Bronto Game") == 0);
+    br_save_set_game(NULL);                       CHECK(strcmp(br_save_game(), "Bronto Game") == 0);
+    /* names */
+    CHECK(br_save_name_ok("slot1.sav") && br_save_name_ok("Options (2).txt") && br_save_name_ok("a"));
+    CHECK(!br_save_name_ok("") && !br_save_name_ok("../x") && !br_save_name_ok("a/b") && !br_save_name_ok("a\\b"));
+    CHECK(!br_save_name_ok(".hidden") && !br_save_name_ok("x.") && !br_save_name_ok(" x") && !br_save_name_ok("C:x"));
+    CHECK(!br_save_name_ok("x.saving") && !br_save_name_ok(NULL));
+    CHECK(br_save_name_ok("12345678901234567890123456789012345678901234567890123456789012.x"));    /* 64 */
+    CHECK(!br_save_name_ok("12345678901234567890123456789012345678901234567890123456789012.xy"));  /* 65 */
+    /* a folder of its own (as BRONTO_SAVE_DIR would give) */
+    br_path_join(folder, sizeof(folder), g_out_dir, "save_test");
+    br_save_set_folder(folder);
+    br_save_delete("slot1.sav");
+    br_save_delete("notes.txt");
+    CHECK(br_save_folder(path, sizeof(path)) && br_fs_is_dir(folder) && (path[0] == '/' || path[1] == ':'));
+    CHECK(!br_save_exists("slot1.sav") && br_save_read("slot1.sav", &size) == NULL && size == 0);
+    CHECK(br_save_write("slot1.sav", "a long first save", 17));
+    CHECK(br_save_write("slot1.sav", "short", 5));                 /* replaced whole */
+    data = (char *)br_save_read("slot1.sav", &size);
+    CHECK(data && size == 5 && strcmp(data, "short") == 0);
+    br_free(data);
+    CHECK(br_save_write("notes.txt", "", 0) && br_save_exists("notes.txt"));
+    CHECK(!br_save_write("../escaped.txt", "x", 1) && !br_save_write("sub/x", "x", 1));
+    CHECK(br_save_list(&l));
+    CHECK_EQ_INT(l.count, 2);                                      /* nothing half-written left behind */
+    for (i = 0; i < l.count; ++i) CHECK(strcmp(l.entries[i].name, "notes.txt") == 0 || strcmp(l.entries[i].name, "slot1.sav") == 0);
+    br_dir_list_free(&l);
+    CHECK(br_save_path("slot1.sav", path, sizeof(path)) && strcmp(br_path_name(path), "slot1.sav") == 0);
+    CHECK(br_save_delete("slot1.sav") && !br_save_exists("slot1.sav"));
+    CHECK(br_save_delete("slot1.sav"));                            /* already gone: fine */
+    CHECK(br_save_delete("notes.txt"));
+    br_fs_remove(folder);
+    /* the system's place: <data folder>/<game> */
+    br_save_set_folder(NULL);
+    if (!getenv("BRONTO_SAVE_DIR")) {
+        br_save_set_game("bronto-save-test");
+        CHECK(br_save_folder(path, sizeof(path)) && br_fs_is_dir(path) && strcmp(br_path_name(path), "bronto-save-test") == 0);
+        CHECK(br_fs_data_dir("bronto-save-test", a, sizeof(a)) && strcmp(a, path) == 0);
+#if defined(__wasm__)
+        CHECK(strcmp(path, "/saves/bronto-save-test") == 0);      /* kept in the browser's storage */
+#elif defined(__APPLE__)
+        CHECK(strstr(path, "/Library/Application Support/") != NULL);
+#elif !defined(_WIN32)
+        CHECK(getenv("XDG_DATA_HOME") || strstr(path, "/.local/share/") != NULL);
+#endif
+        br_fs_remove(path);
+    }
+    br_save_set_game(NULL);
+}
 
 /* stdout / stderr capture (the editor's console) */
 static void test_capture(void) {
@@ -171,10 +241,15 @@ static void test_project_settings(void) {
     CHECK(!br_project_parse("not a project\n", &p));
     snprintf(p.main_scene, sizeof(p.main_scene), "levels/one.scene");
     snprintf(p.icon, sizeof(p.icon), "art/icon.bmp");
+    snprintf(p.exclude, sizeof(p.exclude), "tools, notes.txt,docs/");
     CHECK(br_project_save(dir, &p));
     CHECK(br_project_load(dir, &q));
     CHECK(strcmp(q.name, "Pop Defense") == 0 && strcmp(q.main_scene, "levels/one.scene") == 0 && q.width == 640 &&
           q.height == 180 && q.strict_typing && strcmp(q.icon, "art/icon.bmp") == 0);
+    CHECK(strcmp(q.exclude, "tools, notes.txt,docs/") == 0);
+    CHECK(br_project_excludes(&q, "tools") && br_project_excludes(&q, "tools/make_art.py") && br_project_excludes(&q, "notes.txt"));
+    CHECK(br_project_excludes(&q, "docs/a.md") && br_project_excludes(&q, "builds") && br_project_excludes(&q, "builds/web/index.html"));
+    CHECK(!br_project_excludes(&q, "toolset.bmp") && !br_project_excludes(&q, "art/tools") && !br_project_excludes(&q, "main.scene"));
     br_path_join(dir, sizeof(dir), g_out_dir, "no_project_here");
     br_fs_mkdir(dir);
     CHECK(!br_project_load(dir, &q) && strcmp(q.name, "no_project_here") == 0);       /* defaults, named after the folder */
@@ -186,4 +261,5 @@ void suite_fs(void) {
     RUN(test_capture);
     RUN(test_pack);
     RUN(test_project_settings);
+    RUN(test_save);
 }
