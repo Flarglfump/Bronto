@@ -102,6 +102,7 @@ func update(dt) {
 }
 
 func hit(amount, d, kind) {
+    if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 { return false }
     if mode != "dizzy" {                                 # its skin is too tough
         play_sound("sfx/tink.wav", 0.7)

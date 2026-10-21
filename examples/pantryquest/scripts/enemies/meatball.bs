@@ -90,6 +90,7 @@ func update(dt) {
 }
 
 func hit(amount, d, kind) {
+    if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0 { return false }
     if kind == "cutter" {
         stun_t = 1.5

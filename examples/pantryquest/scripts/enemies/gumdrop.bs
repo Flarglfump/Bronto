@@ -158,6 +158,7 @@ func split() {
 }
 
 func hit(amount, d, kind_of) {
+    if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 or (king and not whole) { return false }
     if kind_of == "cutter" {
         stun_t = 1.2

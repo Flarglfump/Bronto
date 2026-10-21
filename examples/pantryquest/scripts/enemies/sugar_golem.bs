@@ -105,6 +105,7 @@ func land() {
 }
 
 func hit(amount, d, kind) {
+    if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 or mode == "air" { return false }
     if mode != "stuck" {                               # its cubes are too hard
         play_sound("sfx/tink.wav", 0.6)

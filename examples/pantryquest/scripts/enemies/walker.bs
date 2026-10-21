@@ -151,6 +151,7 @@ func decide() {
 
 # A poke (or bomb, beam, cutter) landed. True if it counted.
 func hit(amount, d, kind) {
+    if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or knock_t > 0 or flash_t > 0.15 { return false }
     if kind == "cutter" and not cutter_kills {
         stun_t = 1.6

@@ -133,6 +133,7 @@ func sink() {
 }
 
 func hit(amount, d, kind) {
+    if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 { return false }
     if mode != "up" and not (mode == "rise" and mode_t < 0.2) { return false }   # under the jam: out of reach
     if kind == "cutter" { return false }

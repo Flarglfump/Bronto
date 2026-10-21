@@ -997,7 +997,8 @@ static void test_pantryquest_banquet_puzzles(void) {
 }
 
 /* A gauntlet: the foyer's three waves come in one after the other, and only
- * after the last do its shutters open. (Its enemies are simply removed.) */
+ * after the last do its shutters open. (Its enemies are simply removed.) An
+ * enemy hit the moment it appears, before it has started, just shrugs. */
 static void test_pantryquest_banquet_waves(void) {
     br_entity game;
     int i, j, most_spawners, waves_seen = 0, last = -1;
@@ -1009,7 +1010,17 @@ static void test_pantryquest_banquet_waves(void) {
     for (i = 0; i < 60 * 30 && (pq_count("Spawner") > 0 || pq_count("Enemy") > 0); ++i) {
         br_script_set_number(&W, game, "hp", 32);
         steps(1);
-        if (pq_count("Spawner") != last) { last = pq_count("Spawner"); waves_seen++; }
+        if (pq_count("Spawner") != last) {
+            static const double poke[3] = { 1, 0, 0 };
+            if (last >= 0) {                           /* a wave just came in: hit it before it has started */
+                for (k = 0; k < W.pools[ID.name].count; ++k)
+                    if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)k * W.pools[ID.name].stride))->text, "Enemy") == 0)
+                        br_script_call(&W, W.pools[ID.name].entities[k], "hit", poke, 3);
+                CHECK_EQ_INT(br_script_error_count(&W), 0);
+            }
+            last = pq_count("Spawner");
+            waves_seen++;
+        }
         if (i % 10) continue;
         for (j = 0; j < 8; ++j) {
             br_entity e = BR_ENTITY_NULL;

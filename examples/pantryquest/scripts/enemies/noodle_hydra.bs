@@ -106,6 +106,7 @@ func topple() {
 }
 
 func hit(amount, d, kind) {
+    if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0 { return false }
     play_sound("sfx/tink.wav", 0.6)                  # iron
     flash_t = 0.25

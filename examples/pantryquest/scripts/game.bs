@@ -674,11 +674,12 @@ func win() {
 # guardians are tuned one by one, for the spoon or ladle Pip is likely to
 # carry by then; only their touch and throws scale.) Health keeps pace with
 # the spoons and ladles, damage with the heart pies and the chef's jacket -
-# the royal coat stays a real reward.
+# the royal coat stays a real reward. (Stage 7 stays at x2: the Sugar Mill's
+# spice and sugar get past the pot lid until its own baking tray is found.)
 #
 #   stage      1    2    3    4    5    6    7    8    9
 #   health    x1   x1  x1.5 x1.5  x2   x2  x2.5  x3  x3.5   (rounded up)
-#   damage    x1   x1   x1  x1.5  x2   x2  x2.5  x3   x3    (rounded up)
+#   damage    x1   x1   x1  x1.5  x2   x2   x2   x3   x3    (rounded up)
 func stage_of(room) {
     if room == nil or not room.alive or room.name != "Room" { return 0 }
     return clamp(room.tier, 0, 9)
@@ -688,7 +689,7 @@ func enemy_hp(base, room) {
     return ceil(base * mult[stage_of(room)])
 }
 func enemy_damage(base, room) {
-    var mult = [1, 1, 1, 1, 1.5, 2, 2, 2.5, 3, 3]
+    var mult = [1, 1, 1, 1, 1.5, 2, 2, 2, 3, 3]
     return ceil(base * mult[stage_of(room)])
 }
 
@@ -701,9 +702,29 @@ func drop_at(local_pos, parent) {
     elif r < 0.46 { kind = "heart" }
     elif r < 0.52 and contains(items, "bombs") { kind = "bomb" }
     if kind == "" { return }
-    var p = spawn("prefabs/pickup.scene", local_pos, parent)
+    var p = spawn("prefabs/pickup.scene", open_spot(local_pos, parent), parent)
     p.kind = kind
     p.timeout = 9
+}
+
+# The nearest spot on open floor to a point in a room (a bat shot down over a crate or
+# the jam drops its bean beside it, where Pip can reach it - not on top of it).
+func open_spot(local_pos, parent) {
+    var m = child(parent, "Map")
+    var origin = parent.global_position
+    var cell = vec2(floor(local_pos.x / 16), floor(local_pos.y / 16))
+    if not tile_solid(m, origin + cell * 16 + vec2(8, 8)) { return local_pos }
+    for k in range(1, 4) {
+        for dy in range(-k, k + 1) {
+            for dx in range(-k, k + 1) {
+                var c = cell + vec2(dx, dy)
+                if c.x >= 1 and c.x <= 14 and c.y >= 1 and c.y <= 9 and not tile_solid(m, origin + c * 16 + vec2(8, 8)) {
+                    return c * 16 + vec2(8, 8)
+                }
+            }
+        }
+    }
+    return local_pos
 }
 
 # ---- a guardian's entrance ---------------------------------------------------------

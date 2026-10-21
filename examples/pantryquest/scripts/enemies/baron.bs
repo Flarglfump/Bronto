@@ -336,6 +336,7 @@ func start_last_course() {
 }
 
 func hit(amount, d, kind) {
+    if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 or mode == "rage" { return false }
     var open = (phase == 1 and mode == "lean") or (phase == 2 and mode == "stunned") or (phase == 3 and mode == "lift")
     if not open {
