@@ -72,6 +72,7 @@ func update(dt) {
         set_alpha(0)
         return
     }
+    if game.say1 != "" or game.say2 != "" { y0 = 124 } else { y0 = 84 }   # (below a cook's words, even ones that start later)
     self.position = vec2(128, y0 - (1 - min(1, t / 0.3)) * 6)
     set_alpha(a)
 }

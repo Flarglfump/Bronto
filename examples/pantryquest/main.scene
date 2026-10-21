@@ -687,3 +687,26 @@ entity
     position = 0 0
   Script
     file = "scripts/map_data.bs"
+
+# (behind the cook's words: game.bs say())
+entity
+  Name
+    text = "SayEdge"
+  Transform
+    position = 128 92
+  Shape
+    kind = rect
+    size = 0 0
+    color = #00000000
+    layer = 43
+
+entity
+  Name
+    text = "SayCard"
+  Transform
+    position = 128 92
+  Shape
+    kind = rect
+    size = 0 0
+    color = #00000000
+    layer = 44

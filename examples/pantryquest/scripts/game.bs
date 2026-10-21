@@ -690,7 +690,7 @@ func after_hold() {
         flag("page:" + area)
         note1 = "RECIPE PAGE " + pages + " OF 8 FOUND!"
         note2 = "NOW FIND THE NEXT CELLAR!"
-        if pages >= 8 { note2 = "THE BARON'S HALL ISN'T DUG YET" }
+        if pages >= 8 { note2 = "NOW FOR THE BARON'S HALL!" }
         area_start = start_room
         area_pos = start_pos
         var cellars = find("Cellars")                       # back out of this cellar's door
@@ -866,6 +866,28 @@ func say(a, b) {
     say_t = 0
     find("Say1").Label.text = ""
     find("Say2").Label.text = ""
+    var card = find("SayCard")                         # a dark card behind the words, so they read on anything
+    var edge = find("SayEdge")
+    if a == "" and b == "" {
+        card.Shape.color = rgb(0, 0, 0, 0)
+        edge.Shape.color = rgb(0, 0, 0, 0)
+        return
+    }
+    var w = max(len(a), len(b)) * 8 + 14
+    var h = 14
+    var y = 86
+    if a != "" and b != "" {
+        h = 26
+        y = 92
+    } elif b != "" {
+        y = 98
+    }
+    card.Shape.size = vec2(w, h)
+    card.position = vec2(128, y)
+    card.Shape.color = rgb(42, 26, 16, 225)
+    edge.Shape.size = vec2(w + 4, h + 4)
+    edge.position = vec2(128, y)
+    edge.Shape.color = rgb(226, 194, 128, 235)
 }
 
 func type_text(dt) {
