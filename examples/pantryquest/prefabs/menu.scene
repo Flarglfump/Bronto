@@ -16,7 +16,7 @@ entity
   Name
     text = "RibbonL"
   Transform
-    position = -50 -72
+    position = -68 -72
   Sprite
     image = "art/banner_l.bmp"
     layer = 72
@@ -28,7 +28,7 @@ entity
     text = "RibbonMid"
   Transform
     position = 0 -72
-    scale = 19 1
+    scale = 31 1
   Sprite
     image = "art/banner_mid.bmp"
     layer = 71
@@ -39,7 +39,7 @@ entity
   Name
     text = "RibbonR"
   Transform
-    position = 50 -72
+    position = 68 -72
   Sprite
     image = "art/banner_r.bmp"
     layer = 72
@@ -52,7 +52,7 @@ entity
   Transform
     position = 1 -72
   Label
-    text = "PANTRY"
+    text = "POCKET PANTRY"
     size = 1
     color = #4a141cff
     layer = 73
@@ -65,7 +65,7 @@ entity
   Transform
     position = 0 -73
   Label
-    text = "PANTRY"
+    text = "POCKET PANTRY"
     size = 1
     color = #fff0d0ff
     layer = 74

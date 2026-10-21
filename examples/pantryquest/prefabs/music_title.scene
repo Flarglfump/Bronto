@@ -8,4 +8,5 @@ entity
     file = "music/title.wav"
     volume = 0.55
     loop = true
+    bus = music
     play_on_start = true

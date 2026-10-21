@@ -931,6 +931,43 @@
    "min": 0,
    "param_types": [],
    "returns": "list[string]"
+  },
+  {
+   "name": "last_key",
+   "signature": "last_key()",
+   "doc": "The name of a key pressed this step (\"\" if none), as key_down() takes it: for letting players choose their keys.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "string"
+  },
+  {
+   "name": "set_volume",
+   "signature": "set_volume(bus, volume)",
+   "doc": "Sets a mix bus's volume: \"master\", \"sfx\", \"music\", \"ui\" or \"ambient\"; 0 is silent, 1 full (up to 2). A Sound component's bus field says which it plays on; play_sound() plays on sfx.",
+   "params": [
+    "bus",
+    "volume"
+   ],
+   "min": 2,
+   "param_types": [
+    "string",
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "volume",
+   "signature": "volume(bus)",
+   "doc": "A mix bus's volume (\"master\", \"sfx\", \"music\", \"ui\" or \"ambient\").",
+   "params": [
+    "bus"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "number"
   }
  ],
  "properties": [
@@ -1054,7 +1091,8 @@
    "file",
    "volume",
    "loop",
-   "play_on_start"
+   "play_on_start",
+   "bus"
   ],
   "RigidBody": [
    "type",

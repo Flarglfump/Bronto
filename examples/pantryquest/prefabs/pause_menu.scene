@@ -1,0 +1,176 @@
+# Pantry Quest - the pause menu (scripts/pause_menu.bs): resume, save, settings, quit
+bronto_scene 1
+
+entity
+  Name
+    text = "PauseMenu"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/menu_bg.bmp"
+    layer = 70
+  Script
+    file = "scripts/pause_menu.bs"
+
+entity
+  Name
+    text = "RibbonL"
+  Transform
+    position = -40 -72
+  Sprite
+    image = "art/banner_l.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonMid"
+  Transform
+    position = 0 -72
+    scale = 17 1
+  Sprite
+    image = "art/banner_mid.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonR"
+  Transform
+    position = 40 -72
+  Sprite
+    image = "art/banner_r.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "HeadingShadow"
+  Transform
+    position = 1 -72
+  Label
+    text = "PAUSED"
+    size = 1
+    color = #4a141cff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Heading"
+  Transform
+    position = 0 -73
+  Label
+    text = "PAUSED"
+    size = 1
+    color = #fff0d0ff
+    layer = 74
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Info"
+  Transform
+    position = 0 -50
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Option0"
+  Transform
+    position = 0 -24
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Option1"
+  Transform
+    position = 0 -8
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Option2"
+  Transform
+    position = 0 8
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Option3"
+  Transform
+    position = 0 24
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Cursor"
+  Transform
+    position = -60 -24
+    rotation = 90
+  Sprite
+    image = "art/spoon.bmp"
+    layer = 74
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Note"
+  Transform
+    position = 0 46
+  Label
+    text = ""
+    size = 1
+    color = #8e1a2aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Hint"
+  Transform
+    position = 0 64
+  Label
+    text = "ESC: BACK TO THE GAME"
+    size = 1
+    color = #a07850ff
+    layer = 73
+  Parent
+    entity = 0

@@ -63,13 +63,15 @@ static const br_field k_bounds_fields[] = {
 };
 static const br_bounds k_bounds_default = { { 0, 0 }, { 320, 180 }, false };
 
+static const char *const k_sound_buses[] = { "sfx", "music", "ui", "ambient" };   /* BR_BUS_* order */
 static const br_field k_sound_fields[] = {
     BR_FIELD(br_sound_src, file, BR_FIELD_STRING, 0, 0),
     BR_FIELD(br_sound_src, volume, BR_FIELD_FLOAT, 0, 2),
     BR_FIELD(br_sound_src, loop, BR_FIELD_BOOL, 0, 0),
     BR_FIELD(br_sound_src, play_on_start, BR_FIELD_BOOL, 0, 0),
+    BR_FIELD_ENUM_OF(br_sound_src, bus, k_sound_buses),
 };
-static const br_sound_src k_sound_default = { "", 1, false, true, 0, false };
+static const br_sound_src k_sound_default = { "", 1, false, true, BR_BUS_SFX, 0, false };
 
 static const br_field k_tilemap_fields[] = {
     BR_FIELD(br_tilemap, tileset, BR_FIELD_STRING, 0, 0),
@@ -177,6 +179,7 @@ static bool sound_start(br_world *w, br_sound_src *s) {
     pp = br_play_defaults();
     pp.volume = s->volume;
     pp.loop = s->loop;
+    pp.bus = s->bus >= 0 && s->bus < BR_AUDIO_BUS_COUNT ? s->bus : BR_BUS_SFX;
     s->voice = br_play(m, snd, &pp);
     return s->voice != 0;
 }

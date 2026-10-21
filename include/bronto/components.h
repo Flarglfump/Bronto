@@ -60,6 +60,7 @@ typedef struct br_tilemap {
 
 typedef struct br_sound_src {
     char file[96]; float volume; bool loop; bool play_on_start;
+    int bus;                    /* BR_BUS_* it plays on: sfx (default), music, ui, ambient */
     br_voice voice;             /* runtime only: not saved, reset when added */
     bool started;
 } br_sound_src;

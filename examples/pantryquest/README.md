@@ -35,12 +35,24 @@ the first three of its nine cellars:
   which marks the guardian's room until it is beaten. Behind each guardian is a heart
   pie and a page of the recipe, and the page takes Pip back out of the cellar's door.
 
-| | Keys | |
+| | Keys (at first: SETTINGS changes them) | |
 |---|---|---|
 | Walk | arrows or WASD | Eight directions; Pip slides along walls and round corners |
-| Poke with the spoon | X (or K, or Space) | At full health the spoon also throws a spark |
+| Poke with the spoon | X (or Space) | At full health the spoon also throws a spark |
 | Use the B item | Z (or J) | Popcorn bombs, the pizza cutter, the skewer bow, the fire chili |
-| Inventory | Enter | Choose the B item there |
+| Pocket Pantry | Enter (or I) | Choose the B item there |
+| Pause | Escape (or P) | Resume, save, settings, quit to the title |
+
+**The title** offers PLAY, SETTINGS and QUIT. PLAY shows three files: an empty one starts
+a new game (saved straight away), one with a game in it carries on from where it was
+saved - the screen Pip was on, outside the cave he was in, or the door of the cellar -
+showing where that is, his hearts, his recipe pages and the time played. ERASE wipes a
+file. **The pause menu** saves the game to its file, opens the settings, or quits to the
+title (saving first, or not). **The settings** set the music's and the sounds' volume and
+two keys for each action (Enter, then the new key; a key does one thing at a time), and
+are kept for every file. Everything is kept with Bronto's saved data (`save_data`): the
+files are `slot1` to `slot3`, the settings `settings`, in the game's folder for saved
+data (on a Mac, `~/Library/Application Support/Pantry Quest`).
 
 Pip's pot lid blocks small things thrown at him (seeds, toothpicks) while he faces them.
 
@@ -85,6 +97,10 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
   - `skewer.bs` and `fire.bs` are the skewer bow's skewers and the fire chili's flame.
   - `pickup.bs` covers anything to pick up or buy.
   - `warp.bs` is for cave mouths and doors.
+  - `title.bs`, `files_menu.bs`, `pause_menu.bs` and `settings_menu.bs` are the title and
+    its menus; `settings.bs` keeps the player's keys and volumes, and everything that
+    reads a key asks it (`find("Settings").down("left")`). `game.bs` saves and loads a
+    file (`save_game`, `load_game`).
   - `hud.bs` and `menu.bs` run the HUD and the inventory; `banner.bs` shows the name of
     where Pip comes in (a room's `region` var, or its cellar's `name`), and `boss_ui.bs`
     a guardian's entrance and strength (the game times the entrance: `boss_arrives`).

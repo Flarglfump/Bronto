@@ -1,0 +1,120 @@
+# The player's settings, kept between runs as saved data ("settings"): how
+# loud the music and the sounds are, and the keys for each action - two keys
+# each. Everything that reads the keys asks here: down("left"),
+# pressed("spoon"). One "Settings" entity in title.scene and in main.scene
+# runs this; scripts/settings_menu.bs changes it.
+
+var actions = ["up", "down", "left", "right", "spoon", "item", "pantry", "pause"]
+var names = ["UP", "DOWN", "LEFT", "RIGHT", "SPOON", "ITEM (B)", "POCKET PANTRY", "PAUSE"]
+var keys = []               # for each action, [first key, second key] ("" = none)
+var music = 8               # 0 (off) to 10
+var sounds = 10
+
+func start() {
+    load()
+    apply()
+}
+
+func defaults() {
+    keys = [["up", "w"], ["down", "s"], ["left", "a"], ["right", "d"],
+            ["x", "space"], ["z", "j"], ["enter", "i"], ["escape", "p"]]
+    music = 8
+    sounds = 10
+}
+
+func load() {
+    defaults()
+    var d = load_data("settings")
+    if d == nil or len(d) != 3 or len(d[0]) != len(actions) { return }
+    keys = d[0]
+    music = clamp(d[1], 0, 10)
+    sounds = clamp(d[2], 0, 10)
+}
+
+func save() { save_data("settings", [keys, music, sounds]) }
+
+func apply() {
+    set_volume("music", music / 10)
+    set_volume("sfx", sounds / 10)
+    set_volume("ui", sounds / 10)
+}
+
+func index_of(action) {
+    for i in len(actions) {
+        if actions[i] == action { return i }
+    }
+    return -1
+}
+
+# Is a key for this action held down / pressed this step?
+func down(action) {
+    for k in keys[index_of(action)] {
+        if k != "" and key_down(k) { return true }
+    }
+    return false
+}
+func pressed(action) {
+    for k in keys[index_of(action)] {
+        if k != "" and key_pressed(k) { return true }
+    }
+    return false
+}
+
+# Gives an action a key (as its first or second, which = 0 or 1). A key does
+# one thing only, so it comes off any other action that had it.
+func set_key(i, which, key) {
+    for a in len(keys) {
+        for w in 2 {
+            if keys[a][w] == key { keys[a][w] = "" }
+        }
+    }
+    keys[i][which] = key
+}
+
+# Menus: the arrows always work, and so do the keys chosen for moving.
+func nav(dir) {
+    if dir == "ok" { return key_pressed("enter") or key_pressed("space") or pressed("spoon") }
+    if dir == "back" { return key_pressed("escape") or key_pressed("backspace") }
+    return key_pressed(dir) or pressed(dir)
+}
+
+# "space" -> "SPACE", "escape" -> "ESC", "" -> "-": a key's name as the menus show it (six letters at most).
+func key_label(k) {
+    if k == "" { return "-" }
+    var long = ["escape", "backspace", "leftshift", "rightshift", "leftctrl", "rightctrl", "leftalt", "rightalt",
+                "leftsuper", "rightsuper", "pageup", "pagedown", "delete", "insert"]
+    var short = ["ESC", "BKSP", "LSHIFT", "RSHIFT", "LCTRL", "RCTRL", "LALT", "RALT", "LSUPER", "RSUPER", "PGUP", "PGDN", "DEL", "INS"]
+    for i in len(long) {
+        if long[i] == k { return short[i] }
+    }
+    return upper(k)
+}
+
+func upper(s) {
+    var lo = "abcdefghijklmnopqrstuvwxyz"
+    var hi = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    var out = ""
+    for i in len(s) {
+        var c = s[i]
+        for j in 26 {
+            if lo[j] == c {
+                c = hi[j]
+                break
+            }
+        }
+        out += c
+    }
+    return out
+}
+
+# 3725 seconds -> "1:02:05": how long a file has been played.
+func clock(t) {
+    var h = floor(t / 3600)
+    var m = floor(t / 60) % 60
+    var sec = floor(t) % 60
+    var mm = "" + m
+    var ss = "" + sec
+    if m < 10 { mm = "0" + mm }
+    if sec < 10 { ss = "0" + ss }
+    return h + ":" + mm + ":" + ss
+}

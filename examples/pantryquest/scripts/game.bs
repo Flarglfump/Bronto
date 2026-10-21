@@ -29,7 +29,7 @@ var ry = 7
 var room_name = ""
 var room                    # the room's root entity
 var map                     # its Tilemap
-var state = "boot"          # boot, play, slide, fade_out, fade_in, hold, menu, intro, dead, over, won
+var state = "boot"          # boot, play, slide, fade_out, fade_in, hold, menu, pause, intro, dead, over, won
 var start_room = "ow_7_7"   # (for testing a room in the editor: set these in Game's Script vars,
 var start_items = ""        #  e.g. start_room = "d1_2_4", start_pos = vec2(128, 200), start_items = "bombs,cutter")
 var start_pos := vec2(120, 168)
@@ -64,25 +64,92 @@ var note1 = ""              # a message for when the next room has faded in
 var note2 = ""
 
 var booted = 0
+var slot = 0                # the save slot being played (1 to 3), chosen on the title; 0: none (the editor's Play)
+var play_time = 0           # seconds played in this slot
+var controls                # the player's keys (the Settings entity)
 var boss                    # the guardian in this room, once it has shown itself
 var intro_t = 0             # how far into its entrance (state "intro")
 
 func start() {
     hero = find("Hero")
     fade = find("Fade")
+    controls = find("Settings")
     state = "boot"
 }
 
 # The first steps: every script in the scene has started before the first room comes in.
+# The title leaves the chosen slot in saved data ("session"): a slot with a game
+# in it carries on from where it was saved, an empty one starts a new game.
 func boot() {
     booted += 1
     if booted < 2 { return }
+    var chosen = load_data("session")
+    if chosen != nil {
+        delete_data("session")
+        slot = chosen
+        if has_data("slot" + slot) { load_game() }
+    }
     for item in split(start_items, ",") {
         if item != "" { give(item) }
     }
     enter(start_room, start_pos, "up")
     state = "fade_in"
     fade_t = 0
+    if slot > 0 and not has_data("slot" + slot) { save_game() }    # a new game: the file shows up straight away
+}
+
+# ---- saving -------------------------------------------------------------------------
+# A slot is saved data "slot1" to "slot3": [name, value] pairs, so a later
+# version can add things and still read old files.
+
+# Where Pip carries on from: this screen on the land, outside a cave, or the
+# door of the cellar he is in.
+func resume_point() {
+    if area == "ow" { return [room_name, hero.position] }
+    if area == "cave" { return [ret_name, ret_pos] }
+    return [area_start, area_pos]
+}
+
+func save_game() {
+    if slot <= 0 { return false }
+    var r = resume_point()
+    var place = area_title()
+    if place == "" { place = find("Banner").last }
+    var data = [["version", 1], ["room", r[0]], ["pos", r[1]], ["place", place], ["time", floor(play_time)],
+                ["hearts_max", hearts_max], ["beans", beans], ["keys", keys], ["bombs", bombs],
+                ["bombs_max", bombs_max], ["weapon", weapon], ["items", items], ["b_item", b_item],
+                ["pages", pages], ["flags", flags], ["visited", visited], ["maps", maps], ["compasses", compasses],
+                ["area_start", area_start], ["area_pos", area_pos]]
+    return save_data("slot" + slot, data)
+}
+
+func load_game() {
+    var data = load_data("slot" + slot)
+    if data == nil { return false }
+    for pair in data {
+        var k = pair[0]
+        var v = pair[1]
+        if k == "room" { start_room = v }
+        elif k == "pos" { start_pos = v }
+        elif k == "time" { play_time = v }
+        elif k == "hearts_max" { hearts_max = v }
+        elif k == "beans" { beans = v }
+        elif k == "keys" { keys = v }
+        elif k == "bombs" { bombs = v }
+        elif k == "bombs_max" { bombs_max = v }
+        elif k == "weapon" { weapon = v }
+        elif k == "items" { items = v }
+        elif k == "b_item" { b_item = v }
+        elif k == "pages" { pages = v }
+        elif k == "flags" { flags = v }
+        elif k == "visited" { visited = v }
+        elif k == "maps" { maps = v }
+        elif k == "compasses" { compasses = v }
+        elif k == "area_start" { area_start = v }
+        elif k == "area_pos" { area_pos = v }
+    }
+    hp = hearts_max * 2
+    return true
 }
 
 # ---- rooms --------------------------------------------------------------------
@@ -277,9 +344,13 @@ func update(dt) {
             play_sound("sfx/game_over.wav")
         }
     } elif state == "play" {
-        if key_pressed("enter") {
+        if controls.pressed("pantry") {
             state = "menu"
             spawn("prefabs/menu.scene", vec2(128, 152))
+            play_sound("sfx/menu.wav")
+        } elif controls.pressed("pause") or key_pressed("escape") {      # (Escape always pauses)
+            state = "pause"
+            spawn("prefabs/pause_menu.scene", vec2(128, 152))
             play_sound("sfx/menu.wav")
         }
         if hp <= 2 and hp > 0 {
@@ -294,6 +365,7 @@ func update(dt) {
     } elif state == "won" {
         won_t += dt
     }
+    if state != "pause" and state != "menu" and state != "over" and state != "boot" { play_time += dt }
     type_text(dt)
 }
 
@@ -466,7 +538,7 @@ func intro(dt) {
         play_sound("sfx/roar.wav")
         play_music("boss")
     }
-    if t > 1.0 and (key_pressed("enter") or key_pressed("x") or key_pressed("space")) and t < 3.0 {
+    if t > 1.0 and (controls.nav("ok") or controls.pressed("pantry")) and t < 3.0 {
         intro_t = 3.0                                  # skip to the end
         boss.scale = 1
         boss.Sprite.tint = rgb(255, 255, 255)

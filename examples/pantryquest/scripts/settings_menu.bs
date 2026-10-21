@@ -1,0 +1,132 @@
+# The settings: how loud the music and the sounds are, and two keys for each
+# action. Up and down choose a line; left and right turn a volume or pick
+# which of the two keys; Enter waits for the new key (Escape there keeps the
+# old one, Delete clears it). Saved as Pip leaves (scripts/settings.bs).
+
+var s
+var row = 0                 # 0 music, 1 sounds, 2 to 9 the actions, 10 reset, 11 back
+var col = 0                 # which key of an action
+var waiting = false
+var wait_t = 0
+var labels = []
+var key_a = []
+var key_b = []
+var music_pips = []
+var sound_pips = []
+var row_hi
+var cell_hi
+var hint
+
+func start() {
+    s = find("Settings")
+    for i in 12 { push(labels, child(self, "Row" + i)) }
+    for i in 8 {
+        push(key_a, child(self, "KeyA" + i))
+        push(key_b, child(self, "KeyB" + i))
+    }
+    for i in 10 {
+        push(music_pips, child(self, "MusicPip" + i))
+        push(sound_pips, child(self, "SoundPip" + i))
+    }
+    row_hi = child(self, "RowHi")
+    cell_hi = child(self, "CellHi")
+    hint = child(self, "Hint")
+    show()
+}
+
+func row_text(i) {
+    if i == 0 { return "MUSIC" }
+    if i == 1 { return "SOUNDS" }
+    if i == 10 { return "RESET TO DEFAULTS" }
+    if i == 11 { return "BACK" }
+    return s.names[i - 2]
+}
+
+func show() {
+    for i in 12 {
+        var t = row_text(i)
+        labels[i].Label.text = t
+        if i < 10 { labels[i].x = -100 + len(t) * 4 } else { labels[i].x = 0 }   # names on the left, the last two centred
+        if i == row { labels[i].Label.color = rgb(142, 26, 42) } else { labels[i].Label.color = rgb(98, 56, 26) }
+    }
+    for i in 8 {
+        key_a[i].Label.text = s.key_label(s.keys[i][0])
+        key_b[i].Label.text = s.key_label(s.keys[i][1])
+        if waiting and row == i + 2 {
+            if col == 0 { key_a[i].Label.text = "?" } else { key_b[i].Label.text = "?" }
+        }
+    }
+    for i in 10 {
+        if i < s.music { music_pips[i].Shape.color = rgb(142, 26, 42) } else { music_pips[i].Shape.color = rgb(226, 194, 128) }
+        if i < s.sounds { sound_pips[i].Shape.color = rgb(142, 26, 42) } else { sound_pips[i].Shape.color = rgb(226, 194, 128) }
+    }
+    row_hi.y = labels[row].y
+    if row >= 2 and row <= 9 {
+        cell_hi.Shape.color = rgb(240, 196, 120)
+        cell_hi.position = vec2(38 + col * 46, labels[row].y)
+    } else {
+        cell_hi.Shape.color = rgb(0, 0, 0, 0)
+    }
+    if waiting { hint.Label.text = "PRESS A KEY  (ESC: KEEP)" }
+    elif row >= 2 and row <= 9 { hint.Label.text = "ENTER: CHANGE  DEL: CLEAR" }
+    elif row <= 1 { hint.Label.text = "<> LOUDER / SOFTER" }
+    else { hint.Label.text = "ENTER: CHOOSE  ESC: BACK" }
+}
+
+func close() {
+    s.save()
+    play_sound("sfx/menu.wav")
+    destroy(self)
+}
+
+func update(dt) {
+    if waiting {
+        wait_t += dt
+        if wait_t < 0.1 { return }                       # (not the Enter that started it)
+        var k = last_key()
+        if k == "" { return }
+        if k != "escape" { s.set_key(row - 2, col, k) }
+        waiting = false
+        play_sound("sfx/key.wav", 0.6)
+        show()
+        return
+    }
+    if key_pressed("escape") {
+        close()
+        return
+    }
+    var moved = false
+    if s.nav("up") { row = (row + 11) % 12; moved = true }
+    if s.nav("down") { row = (row + 1) % 12; moved = true }
+    if s.nav("left") or s.nav("right") {
+        var d = 1
+        if s.nav("left") { d = -1 }
+        if row == 0 { s.music = clamp(s.music + d, 0, 10) }
+        if row == 1 { s.sounds = clamp(s.sounds + d, 0, 10) }
+        if row >= 2 and row <= 9 { col = clamp(col + d, 0, 1) }
+        s.apply()
+        moved = true
+    }
+    if row >= 2 and row <= 9 and (key_pressed("delete") or key_pressed("backspace")) {
+        s.keys[row - 2][col] = ""
+        moved = true
+    }
+    if s.nav("ok") or key_pressed("enter") {
+        if row >= 2 and row <= 9 {
+            waiting = true
+            wait_t = 0
+        } elif row == 10 {
+            s.defaults()
+            s.apply()
+            play_sound("sfx/buy.wav")
+        } elif row == 11 {
+            close()
+            return
+        }
+        moved = true
+    }
+    if moved {
+        play_sound("sfx/menu.wav")
+        show()
+    }
+}

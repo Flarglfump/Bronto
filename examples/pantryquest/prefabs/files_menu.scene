@@ -1,0 +1,275 @@
+# Pantry Quest - choosing a file (scripts/files_menu.bs): three save slots
+bronto_scene 1
+
+entity
+  Name
+    text = "FilesMenu"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/menu_bg.bmp"
+    layer = 70
+  Script
+    file = "scripts/files_menu.bs"
+
+entity
+  Name
+    text = "RibbonL"
+  Transform
+    position = -68 -72
+  Sprite
+    image = "art/banner_l.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonMid"
+  Transform
+    position = 0 -72
+    scale = 31 1
+  Sprite
+    image = "art/banner_mid.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonR"
+  Transform
+    position = 68 -72
+  Sprite
+    image = "art/banner_r.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "HeadingShadow"
+  Transform
+    position = 1 -72
+  Label
+    text = "CHOOSE A FILE"
+    size = 1
+    color = #4a141cff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Heading"
+  Transform
+    position = 0 -73
+  Label
+    text = "CHOOSE A FILE"
+    size = 1
+    color = #fff0d0ff
+    layer = 74
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RowHi"
+  Transform
+    position = 0 -40
+  Shape
+    kind = rect
+    size = 212 28
+    color = #f0c47800
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Badge0"
+  Transform
+    position = -94 -42
+  Sprite
+    image = "art/hud_badge.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Num0"
+  Transform
+    position = -94 -42
+  Label
+    text = "1"
+    size = 1
+    color = #fff0d0ff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Place0"
+  Transform
+    position = 10 -48
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Detail0"
+  Transform
+    position = 10 -36
+  Label
+    text = ""
+    size = 1
+    color = #a07850ff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Badge1"
+  Transform
+    position = -94 -10
+  Sprite
+    image = "art/hud_badge.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Num1"
+  Transform
+    position = -94 -10
+  Label
+    text = "2"
+    size = 1
+    color = #fff0d0ff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Place1"
+  Transform
+    position = 10 -16
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Detail1"
+  Transform
+    position = 10 -4
+  Label
+    text = ""
+    size = 1
+    color = #a07850ff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Badge2"
+  Transform
+    position = -94 22
+  Sprite
+    image = "art/hud_badge.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Num2"
+  Transform
+    position = -94 22
+  Label
+    text = "3"
+    size = 1
+    color = #fff0d0ff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Place2"
+  Transform
+    position = 10 16
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Detail2"
+  Transform
+    position = 10 28
+  Label
+    text = ""
+    size = 1
+    color = #a07850ff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Note"
+  Transform
+    position = 0 48
+  Label
+    text = ""
+    size = 1
+    color = #8e1a2aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Erase"
+  Transform
+    position = -50 62
+  Label
+    text = "ERASE"
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 50 62
+  Label
+    text = "BACK"
+    size = 1
+    color = #62381aff
+    layer = 73
+  Parent
+    entity = 0

@@ -1,6 +1,6 @@
-# Pip, the young cook. Arrows or WASD walk; X (or K, or Space) pokes with the
-# spoon; Z (or J) uses the item on B (bombs, the pizza cutter, the skewer bow,
-# the fire chili); Enter opens the inventory.
+# Pip, the young cook. The keys are the player's (scripts/settings.bs): at
+# first the arrows or WASD walk, X (or Space) pokes with the spoon, Z (or J)
+# uses the item on B (bombs, the pizza cutter, the skewer bow, the fire chili).
 #
 # He walks in eight directions, as fast on a diagonal as straight. Each axis
 # moves on its own, so pushing into a wall at an angle slides along it, and
@@ -20,6 +20,7 @@ var knock_t = 0
 var cooldown = 0
 var hit_list = []           # enemies this poke already hit
 var game
+var keys                    # the player's keys (the Settings entity)
 var weapon
 var held
 var beam                    # the spoon's flying spark (at full health)
@@ -27,6 +28,7 @@ var cutter                  # the pizza cutter, while it's out
 
 func start() {
     game = find("Game")
+    keys = find("Settings")
     weapon = child(self, "Weapon")
     held = child(self, "Held")
     show(weapon, false)
@@ -174,17 +176,17 @@ func update(dt) {
         poke(dt)
         return
     }
-    if (key_pressed("x") or key_pressed("k") or key_pressed("space")) and game.weapon > 0 and cooldown <= 0 {
+    if keys.pressed("spoon") and game.weapon > 0 and cooldown <= 0 {
         start_poke()
         return
     }
-    if key_pressed("z") or key_pressed("j") { use_item() }
+    if keys.pressed("item") { use_item() }
 
     var want := vec2(0, 0)
-    if key_down("left") or key_down("a") { want.x -= 1 }
-    if key_down("right") or key_down("d") { want.x += 1 }
-    if key_down("up") or key_down("w") { want.y -= 1 }
-    if key_down("down") or key_down("s") { want.y += 1 }
+    if keys.down("left") { want.x -= 1 }
+    if keys.down("right") { want.x += 1 }
+    if keys.down("up") { want.y -= 1 }
+    if keys.down("down") { want.y += 1 }
     if want.x != 0 or want.y != 0 {
         # face one of the ways he's going: on a diagonal, keep the way he was facing if it's one of them
         var fx = ""
@@ -292,10 +294,10 @@ func use_item() {
         if cutter != nil and cutter.alive { return }
         var d := dirv
         var want := vec2(0, 0)
-        if key_down("left") or key_down("a") { want.x -= 1 }
-        if key_down("right") or key_down("d") { want.x += 1 }
-        if key_down("up") or key_down("w") { want.y -= 1 }
-        if key_down("down") or key_down("s") { want.y += 1 }
+        if keys.down("left") { want.x -= 1 }
+        if keys.down("right") { want.x += 1 }
+        if keys.down("up") { want.y -= 1 }
+        if keys.down("down") { want.y += 1 }
         if want.x != 0 or want.y != 0 { d = normalize(want) }
         cutter = spawn("prefabs/cutter.scene", self.position + d * 8)
         cutter.dir = d

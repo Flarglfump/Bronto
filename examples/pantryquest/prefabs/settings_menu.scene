@@ -1,0 +1,736 @@
+# Pantry Quest - the settings (scripts/settings_menu.bs): volumes and keys, on a recipe page
+bronto_scene 1
+
+entity
+  Name
+    text = "SettingsMenu"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/menu_bg.bmp"
+    layer = 90
+  Script
+    file = "scripts/settings_menu.bs"
+
+entity
+  Name
+    text = "RibbonL"
+  Transform
+    position = -48 -72
+  Sprite
+    image = "art/banner_l.bmp"
+    layer = 92
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonMid"
+  Transform
+    position = 0 -72
+    scale = 21 1
+  Sprite
+    image = "art/banner_mid.bmp"
+    layer = 91
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonR"
+  Transform
+    position = 48 -72
+  Sprite
+    image = "art/banner_r.bmp"
+    layer = 92
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "HeadingShadow"
+  Transform
+    position = 1 -72
+  Label
+    text = "SETTINGS"
+    size = 1
+    color = #4a141cff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Heading"
+  Transform
+    position = 0 -73
+  Label
+    text = "SETTINGS"
+    size = 1
+    color = #fff0d0ff
+    layer = 94
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RowHi"
+  Transform
+    position = 0 -56
+  Shape
+    kind = rect
+    size = 212 10
+    color = #f0c47860
+    layer = 91
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "CellHi"
+  Transform
+    position = 38 -36
+  Shape
+    kind = rect
+    size = 46 10
+    color = #00000000
+    layer = 92
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row0"
+  Transform
+    position = 0 -56
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row1"
+  Transform
+    position = 0 -46
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row2"
+  Transform
+    position = 0 -36
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row3"
+  Transform
+    position = 0 -26
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row4"
+  Transform
+    position = 0 -16
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row5"
+  Transform
+    position = 0 -6
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row6"
+  Transform
+    position = 0 4
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row7"
+  Transform
+    position = 0 14
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row8"
+  Transform
+    position = 0 24
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row9"
+  Transform
+    position = 0 34
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row10"
+  Transform
+    position = 0 44
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Row11"
+  Transform
+    position = 0 54
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip0"
+  Transform
+    position = 16 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip0"
+  Transform
+    position = 16 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip1"
+  Transform
+    position = 25 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip1"
+  Transform
+    position = 25 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip2"
+  Transform
+    position = 34 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip2"
+  Transform
+    position = 34 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip3"
+  Transform
+    position = 43 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip3"
+  Transform
+    position = 43 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip4"
+  Transform
+    position = 52 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip4"
+  Transform
+    position = 52 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip5"
+  Transform
+    position = 61 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip5"
+  Transform
+    position = 61 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip6"
+  Transform
+    position = 70 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip6"
+  Transform
+    position = 70 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip7"
+  Transform
+    position = 79 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip7"
+  Transform
+    position = 79 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip8"
+  Transform
+    position = 88 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip8"
+  Transform
+    position = 88 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MusicPip9"
+  Transform
+    position = 97 -56
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "SoundPip9"
+  Transform
+    position = 97 -46
+  Shape
+    kind = rect
+    size = 7 6
+    color = #e2c280ff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyA0"
+  Transform
+    position = 38 -36
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyB0"
+  Transform
+    position = 84 -36
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyA1"
+  Transform
+    position = 38 -26
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyB1"
+  Transform
+    position = 84 -26
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyA2"
+  Transform
+    position = 38 -16
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyB2"
+  Transform
+    position = 84 -16
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyA3"
+  Transform
+    position = 38 -6
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyB3"
+  Transform
+    position = 84 -6
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyA4"
+  Transform
+    position = 38 4
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyB4"
+  Transform
+    position = 84 4
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyA5"
+  Transform
+    position = 38 14
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyB5"
+  Transform
+    position = 84 14
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyA6"
+  Transform
+    position = 38 24
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyB6"
+  Transform
+    position = 84 24
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyA7"
+  Transform
+    position = 38 34
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "KeyB7"
+  Transform
+    position = 84 34
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Hint"
+  Transform
+    position = 0 66
+  Label
+    text = ""
+    size = 1
+    color = #a07850ff
+    layer = 93
+  Parent
+    entity = 0

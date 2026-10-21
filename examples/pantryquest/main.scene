@@ -473,6 +473,12 @@ entity
 
 entity
   Name
+    text = "Settings"
+  Script
+    file = "scripts/settings.bs"
+
+entity
+  Name
     text = "Banner"
   Transform
     position = 128 84
@@ -489,7 +495,7 @@ entity
     tint = #ffffff00
     layer = 56
   Parent
-    entity = 47
+    entity = 48
 
 entity
   Name
@@ -501,7 +507,7 @@ entity
     tint = #ffffff00
     layer = 55
   Parent
-    entity = 47
+    entity = 48
 
 entity
   Name
@@ -513,7 +519,7 @@ entity
     tint = #ffffff00
     layer = 56
   Parent
-    entity = 47
+    entity = 48
 
 entity
   Name
@@ -526,7 +532,7 @@ entity
     color = #4a141c00
     layer = 57
   Parent
-    entity = 47
+    entity = 48
 
 entity
   Name
@@ -539,7 +545,7 @@ entity
     color = #fff0d000
     layer = 58
   Parent
-    entity = 47
+    entity = 48
 
 entity
   Name
@@ -585,7 +591,7 @@ entity
     color = #62381aff
     layer = 67
   Parent
-    entity = 55
+    entity = 56
 
 entity
   Name
@@ -598,7 +604,7 @@ entity
     color = #8e1a2aff
     layer = 67
   Parent
-    entity = 55
+    entity = 56
 
 entity
   Name
@@ -611,7 +617,7 @@ entity
     color = #62381aff
     layer = 67
   Parent
-    entity = 55
+    entity = 56
 
 entity
   Name

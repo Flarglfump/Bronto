@@ -4,6 +4,7 @@
 # found so far are along the bottom.
 
 var game
+var keys
 var slots = []
 var plates = []
 var cursor
@@ -15,6 +16,8 @@ var last_mouse := vec2(-1, -1)
 
 func start() {
     game = find("Game")
+    keys = find("Settings")
+    child(self, "Keys").Label.text = "<> CHOOSE   " + keys.key_label(keys.keys[6][0]) + ": CLOSE"
     cursor = child(self, "Cursor")
     item_name = child(self, "ItemName")
     item_info = child(self, "ItemInfo")
@@ -80,10 +83,10 @@ func pick(i) {
 func update(dt) {
     var n = len(owned)
     if n > 0 {
-        if key_pressed("left") or key_pressed("a") { pick((choice + n - 1) % n) }
-        if key_pressed("right") or key_pressed("d") { pick((choice + 1) % n) }
-        if key_pressed("up") or key_pressed("w") { if choice >= 4 { pick(choice - 4) } }
-        if key_pressed("down") or key_pressed("s") { if choice + 4 < n { pick(choice + 4) } }
+        if keys.nav("left") { pick((choice + n - 1) % n) }
+        if keys.nav("right") { pick((choice + 1) % n) }
+        if keys.nav("up") { if choice >= 4 { pick(choice - 4) } }
+        if keys.nav("down") { if choice + 4 < n { pick(choice + 4) } }
         var m = mouse_position()                         # the mouse: over a plate, it's chosen
         if m != last_mouse or mouse_pressed(0) {
             last_mouse = m
@@ -92,7 +95,7 @@ func update(dt) {
             }
         }
     }
-    if key_pressed("enter") or key_pressed("escape") {
+    if keys.pressed("pantry") or keys.nav("back") {
         game.state = "play"
         play_sound("sfx/menu.wav")
         destroy(self)

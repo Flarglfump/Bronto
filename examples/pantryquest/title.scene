@@ -1,16 +1,15 @@
-# Pantry Quest - the title screen (scripts/title.bs): Enter starts the game (main.scene).
+# Pantry Quest - the title: PLAY, SETTINGS, QUIT (scripts/title.bs); the story scrolls up when left alone
 bronto_scene 1
 
 entity
   Name
+    text = "Settings"
+  Script
+    file = "scripts/settings.bs"
+
+entity
+  Name
     text = "Title"
-  Transform
-    position = 128 40
-  Label
-    text = "PANTRY QUEST"
-    size = 2
-    color = #ffd84aff
-    layer = 20
   Script
     file = "scripts/title.bs"
 
@@ -19,115 +18,176 @@ entity
     text = "Background"
   Transform
     position = 128 120
-  Shape
-    kind = rect
-    size = 256 240
-    color = #2b1d17ff
-    layer = -20
+  Sprite
+    image = "art/title_bg.bmp"
+    layer = 0
 
 entity
   Name
-    text = "Shadow"
+    text = "LogoCard"
   Transform
-    position = 129 42
+    position = 128 40
+  Sprite
+    image = "art/card_bg.bmp"
+    layer = 2
+
+entity
+  Name
+    text = "LogoShadow"
+  Transform
+    position = 129 31
+  Label
+    text = "PANTRY QUEST"
+    size = 2
+    color = #62381aff
+    layer = 3
+
+entity
+  Name
+    text = "Logo"
+  Transform
+    position = 128 30
   Label
     text = "PANTRY QUEST"
     size = 2
     color = #8e1a2aff
-    layer = 19
+    layer = 4
 
 entity
   Name
     text = "Subtitle"
   Transform
-    position = 128 62
+    position = 128 53
   Label
     text = "A LITTLE COOK'S BIG ADVENTURE"
     size = 1
-    color = #fff8ecff
-    layer = 20
+    color = #62381aff
+    layer = 4
 
 entity
   Name
-    text = "Press"
+    text = "MenuCard"
   Transform
-    position = 0 138
+    position = 128 104
+  Sprite
+    image = "art/title_card.bmp"
+    layer = 2
+
+entity
+  Name
+    text = "Option0"
+  Transform
+    position = 128 90
   Label
-    text = "PRESS ENTER"
+    text = "PLAY"
     size = 1
-    color = #ffe678ff
-    layer = 20
-  Parent
-    entity = 0
+    color = #62381aff
+    layer = 4
 
 entity
   Name
-    text = "Ground"
+    text = "Option1"
   Transform
-    position = 128 200
-  Tilemap
-    tileset = "art/tiles_overworld.bmp"
-    tile_size = 16
-    columns = 16
-    rows = 5
-    legend = ".,TrW~bCs=fIFKX:Yp"
-    solid = ""
-    tiles = "TT.TT.TTTT.TT.TT..r.....,..b...f.f....,.....r.....,.f......,..f.TTbTTTTTTTTTTbTT"
-    layer = -15
+    position = 128 104
+  Label
+    text = "SETTINGS"
+    size = 1
+    color = #62381aff
+    layer = 4
+
+entity
+  Name
+    text = "Option2"
+  Transform
+    position = 128 118
+  Label
+    text = "QUIT"
+    size = 1
+    color = #62381aff
+    layer = 4
+
+entity
+  Name
+    text = "Cursor"
+  Transform
+    position = 100 90
+    rotation = 90
+  Sprite
+    image = "art/spoon.bmp"
+    layer = 5
 
 entity
   Name
     text = "Pip"
   Transform
-    position = 128 118
-    scale = 2 2
+    position = 128 165
   Sprite
     image = "art/hero_down_0.bmp"
-    layer = 5
+    layer = 6
 
 entity
   Name
     text = "Tomato"
   Transform
-    position = 48 128
+    position = 40 165
   Sprite
     image = "art/tomato_0.bmp"
-    layer = 4
-
-entity
-  Name
-    text = "Burger"
-  Transform
-    position = 208 128
-  Sprite
-    image = "art/burger_0.bmp"
-    layer = 4
+    layer = 6
 
 entity
   Name
     text = "Jelly"
   Transform
-    position = 78 150
+    position = 72 166
   Sprite
     image = "art/jelly_0.bmp"
-    layer = 4
+    layer = 6
+
+entity
+  Name
+    text = "Burger"
+  Transform
+    position = 216 165
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 6
+
+entity
+  Name
+    text = "Olive"
+  Transform
+    position = 184 166
+  Sprite
+    image = "art/olive_0.bmp"
+    layer = 6
 
 entity
   Name
     text = "Bat"
   Transform
-    position = 182 96
+    position = 222 140
   Sprite
     image = "art/bat_0.bmp"
-    layer = 4
+    layer = 6
 
 entity
   Name
     text = "Page"
   Transform
-    position = 128 84
+    position = 128 146
   Sprite
     image = "art/page.bmp"
+    layer = 6
+
+entity
+  Name
+    text = "Footer"
+  Transform
+    position = 128 226
+  Label
+    text = "ARROWS: CHOOSE   ENTER: OK"
+    size = 1
+    color = #e2c280ff
     layer = 4
 
 entity
@@ -138,6 +198,7 @@ entity
     volume = 0.55
     loop = true
     play_on_start = true
+    bus = music
 
 entity
   Name
@@ -148,4 +209,4 @@ entity
     kind = rect
     size = 256 240
     color = #00000000
-    layer = 10
+    layer = 30

@@ -2382,6 +2382,23 @@ static bool sc_key_state(sc_vm *vm, const sc_value *a, int line, int which) {
     return r;
 }
 static sc_value bi_key_down(ARGS) { BR_UNUSED(n); return sc_bool(sc_key_state(vm, &a[0], line, 0)); }
+/* last_key(): the name of a key pressed this step ("" if none), as key_down() takes it. */
+static sc_value bi_last_key(ARGS) {
+    br_engine *e = sc_engine(vm);
+    char name[32];
+    size_t i;
+    int k;
+    UNUSED_ARGS;
+    if (!e) return sc_string(vm, "", 0);
+    for (k = 1; k < BR_KEY_COUNT; ++k) {
+        const char *kn;
+        if (!br_key_pressed(&e->input, (br_key)k) || !(kn = br_key_name((br_key)k)) || strcmp(kn, "Unknown") == 0) continue;
+        snprintf(name, sizeof(name), "%s", kn);
+        for (i = 0; name[i]; ++i) name[i] = (char)tolower((unsigned char)name[i]);
+        return sc_string(vm, name, strlen(name));
+    }
+    return sc_string(vm, "", 0);
+}
 static sc_value bi_key_pressed(ARGS) { BR_UNUSED(n); return sc_bool(sc_key_state(vm, &a[0], line, 1)); }
 static sc_value bi_key_released(ARGS) { BR_UNUSED(n); return sc_bool(sc_key_state(vm, &a[0], line, 2)); }
 static sc_value bi_mouse_down(ARGS) {
@@ -2604,6 +2621,34 @@ static sc_value bi_play_sound(ARGS) {
     if (n > 1) pp.volume = (float)NUM(1, "play_sound() volume");
     br_play(&e->mixer, s, &pp);
     return sc_nil();
+}
+/* set_volume("music", 0.5) / volume("music"): the mixer's buses ("sfx",
+ * "music", "ui", "ambient") and "master", 0 (silent) to 1 (full; up to 2). */
+static int sc_bus_named(sc_vm *vm, const sc_value *v, int line, const char *what) {
+    static const char *const names[] = { "sfx", "music", "ui", "ambient" };
+    const char *name = sc_need_str(vm, v, line, what);
+    int i;
+    if (sc_strieq(name, "master")) return -1;
+    for (i = 0; i < (int)BR_ARRAY_COUNT(names); ++i) if (sc_strieq(name, names[i])) return i;
+    sc_fail(vm, line, "%s: there is no \"%s\" (master, sfx, music, ui or ambient)", what, name);
+    return 0;
+}
+static sc_value bi_set_volume(ARGS) {
+    br_engine *e = sc_engine(vm);
+    int bus = sc_bus_named(vm, &a[0], line, "set_volume()");
+    float v = (float)NUM(1, "set_volume() volume");
+    BR_UNUSED(n);
+    v = v < 0 ? 0 : v > 2 ? 2 : v;
+    if (e && bus < 0) br_mixer_set_master(&e->mixer, v);
+    else if (e) br_mixer_set_bus_volume(&e->mixer, bus, v);
+    return sc_nil();
+}
+static sc_value bi_volume(ARGS) {
+    br_engine *e = sc_engine(vm);
+    int bus = sc_bus_named(vm, &a[0], line, "volume()");
+    BR_UNUSED(n);
+    if (!e) return sc_num(1);
+    return sc_num(bus < 0 ? e->mixer.master_volume : e->mixer.bus_volume[bus]);
 }
 static sc_value bi_load_scene(ARGS) {
     BR_UNUSED(n);
@@ -2881,6 +2926,8 @@ static const sc_builtin k_builtin_table[] = {
     { "save_data", 2, 2, bi_save_data, "sa>b" }, { "load_data", 1, 2, bi_load_data, "sa>a" },
     { "has_data", 1, 1, bi_has_data, "s>b" }, { "delete_data", 1, 1, bi_delete_data, "s>b" },
     { "data_names", 0, 0, bi_data_names, ">W" },
+    { "last_key", 0, 0, bi_last_key, ">s" }, { "set_volume", 2, 2, bi_set_volume, "sn>-" },
+    { "volume", 1, 1, bi_volume, "s>n" },
 };
 
 static int sc_find_builtin(const char *name) {

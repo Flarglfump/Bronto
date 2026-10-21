@@ -1,0 +1,126 @@
+# Choosing a file: three save slots (saved data "slot1" to "slot3"). An
+# empty one starts a new game; one with a game in it carries on. ERASE, then
+# a file, then Enter again, wipes it. The chosen slot is left in saved data
+# ("session") for the game to pick up as main.scene starts.
+
+var s
+var choice = 0              # 0 to 2 the files, 3 erase, 4 back
+var erasing = false
+var confirm = false
+var places = []
+var details = []
+var badges = []
+var row_hi
+var erase_label
+var back_label
+var note
+var filled = [false, false, false]
+
+func start() {
+    s = find("Settings")
+    for i in 3 {
+        push(places, child(self, "Place" + i))
+        push(details, child(self, "Detail" + i))
+        push(badges, child(self, "Badge" + i))
+    }
+    row_hi = child(self, "RowHi")
+    erase_label = child(self, "Erase")
+    back_label = child(self, "Back")
+    note = child(self, "Note")
+    refresh()
+}
+
+# A value from a saved file's [name, value] pairs.
+func field(data, name, otherwise) {
+    for pair in data {
+        if pair[0] == name { return pair[1] }
+    }
+    return otherwise
+}
+
+func refresh() {
+    for i in 3 {
+        var d = load_data("slot" + (i + 1))
+        filled[i] = d != nil
+        if d == nil {
+            places[i].Label.text = "- NEW GAME -"
+            details[i].Label.text = ""
+        } else {
+            places[i].Label.text = field(d, "place", "THE PANTRY PLAINS")
+            details[i].Label.text = (field(d, "hearts_max", 3) + " HEARTS  " + field(d, "pages", 0) + "/8  " +
+                                     s.clock(field(d, "time", 0)))
+        }
+    }
+    show()
+}
+
+func show() {
+    for i in 3 {
+        if i == choice { places[i].Label.color = rgb(142, 26, 42) } else { places[i].Label.color = rgb(98, 56, 26) }
+    }
+    if choice == 3 { erase_label.Label.color = rgb(142, 26, 42) } else { erase_label.Label.color = rgb(98, 56, 26) }
+    if choice == 4 { back_label.Label.color = rgb(142, 26, 42) } else { back_label.Label.color = rgb(98, 56, 26) }
+    if erasing { erase_label.Label.text = "[ERASE]" } else { erase_label.Label.text = "ERASE" }
+    if choice < 3 {
+        row_hi.Shape.color = rgb(240, 196, 120)
+        row_hi.position = vec2(0, places[choice].y + 6)
+    } else {
+        row_hi.Shape.color = rgb(0, 0, 0, 0)
+    }
+    if confirm { note.Label.text = "ERASE FILE " + (choice + 1) + "? ENTER: YES" }
+    elif erasing { note.Label.text = "WHICH FILE SHOULD GO?" }
+    else { note.Label.text = "" }
+}
+
+func update(dt) {
+    if s.nav("back") {
+        if confirm or erasing {
+            confirm = false
+            erasing = false
+            show()
+        } else {
+            destroy(self)
+        }
+        play_sound("sfx/menu.wav")
+        return
+    }
+    var before = choice
+    if s.nav("up") {
+        if choice == 3 or choice == 4 { choice = 2 } else { choice = (choice + 4) % 5 }
+    }
+    if s.nav("down") { choice = min(choice + 1, 3) }
+    if s.nav("left") and choice == 4 { choice = 3 }
+    if s.nav("right") and choice == 3 { choice = 4 }
+    if choice != before {
+        confirm = false
+        play_sound("sfx/menu.wav")
+        show()
+    }
+    if not s.nav("ok") { return }
+    if choice == 4 {
+        destroy(self)
+        play_sound("sfx/menu.wav")
+    } elif choice == 3 {
+        erasing = not erasing
+        confirm = false
+        play_sound("sfx/menu.wav")
+        show()
+    } elif erasing {
+        if not filled[choice] { return }
+        if not confirm {
+            confirm = true
+            play_sound("sfx/menu.wav")
+            show()
+        } else {
+            delete_data("slot" + (choice + 1))
+            confirm = false
+            erasing = false
+            play_sound("sfx/explode.wav", 0.5)
+            refresh()
+        }
+    } else {
+        save_data("session", choice + 1)
+        play_sound("sfx/buy.wav")
+        load_scene("main.scene")
+    }
+}

@@ -1435,6 +1435,23 @@ def recipe_page(w, h, border=8):        # the inventory: a recipe page in a ging
         return 'E' if grain(x, y, 5) > 244 else 'e'
     return fn
 drawn('menu_bg', 232, 160, recipe_page(232, 160))
+drawn('title_card', 128, 52, recipe_page(128, 52, 4))
+
+
+def kitchen(x, y):                      # the title: a striped wall, a gingham-trimmed counter
+    if y < 168:
+        if y >= 160:
+            return 'E' if y < 166 else 'k'          # the wall's skirting
+        stripe = (x // 8) % 2
+        if stripe and (y + x // 16 * 5) % 12 == 0 and x % 8 == 4:
+            return 'p'                              # a little flower in every other stripe
+        return 'e' if stripe else 'E'
+    if y < 172:
+        return gingham(x, y - 168)
+    if y == 172:
+        return 'k'
+    return counter(x, (y - 173) % 58)
+drawn('title_bg', 256, 240, kitchen)
 drawn('card_bg', 244, 72, recipe_page(244, 72, 6))
 sprite('page_on',
        "kkkkkk..",

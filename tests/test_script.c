@@ -27,6 +27,7 @@ static void setup(void) {
     br_assets_set_root(g_out_dir);
     br_script_set_print(on_print, NULL);
     g_printed[0] = 0;
+    br_save_set_folder(test_path("saves"));      /* (saved data stays out of the real place) */
 }
 
 static void teardown(void) {
@@ -444,6 +445,44 @@ static void test_saved_data(void) {
     teardown();
 }
 
+/* Volume settings and choosing keys from scripts: set_volume / volume on the
+ * mixer's buses (a Sound component plays on its bus), and last_key(). */
+static void test_volume_and_keys(void) {
+    br_entity e;
+    double m = 0, mus = 0, master = 0;
+    char key[16];
+    setup();
+    write_script("volume.bs", "var m = 0\nvar music = 0\nvar master = 0\nvar key = \"\"\n"
+                              "func start() { set_volume(\"music\", 0.25); set_volume(\"master\", 0.5); m = volume(\"music\"); music = volume(\"sfx\"); master = volume(\"master\") }\n"
+                              "func update(dt) { var k = last_key(); if k != \"\" { key = k } }\n");
+    e = scripted("Volume", "volume.bs", NULL, br_v2(0, 0));
+    steps(2);
+    CHECK(br_script_get_number(&W, e, "m", &m) && fabs(m - 0.25) < 1e-6);
+    CHECK(br_script_get_number(&W, e, "music", &mus) && mus == 1);
+    CHECK(br_script_get_number(&W, e, "master", &master) && fabs(master - 0.5) < 1e-6);
+    CHECK(fabsf(g_engine.mixer.bus_volume[BR_BUS_MUSIC] - 0.25f) < 1e-6f && fabsf(g_engine.mixer.master_volume - 0.5f) < 1e-6f);
+    br_input_begin_frame(&g_engine.input);
+    {
+        br_event k = br_event_key(BR_EVENT_KEY_DOWN, BR_KEY_Q, 0, false);
+        br_input_handle_event(&g_engine.input, &k);
+    }
+    steps(1);
+    CHECK(br_script_get_string(&W, e, "key", key, sizeof(key)) && strcmp(key, "q") == 0);
+    write_script("badbus.bs", "func start() { set_volume(\"loud\", 1) }\n");
+    scripted("BadBus", "badbus.bs", NULL, br_v2(0, 0));
+    steps(2);
+    CHECK(strstr(br_script_last_error(&W), "there is no \"loud\"") != NULL);
+    {   /* a Sound component's bus is saved by name */
+        const br_component_desc *d = br_component_get_desc(&W, ID.sound);
+        int i, found = 0;
+        for (i = 0; d && i < d->field_count; ++i) if (strcmp(d->fields[i].name, "bus") == 0) found = 1;
+        CHECK(found);
+    }
+    g_engine.mixer.master_volume = 1;
+    g_engine.mixer.bus_volume[BR_BUS_MUSIC] = 1;
+    teardown();
+}
+
 /* Pantry Quest (examples/pantryquest, a project made of scenes and scripts):
  * Pip walks into the first cave, takes the spoon, and walks back out. */
 static br_entity named(const char *name) {
@@ -682,6 +721,110 @@ static void test_pantryquest_eight_ways(void) {
     CHECK_EQ_INT(br_script_error_count(&W), 0);
     if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
     teardown();
+}
+
+/* Pantry Quest's title, files and settings, played with key presses: start
+ * a new game in file 1, save it from the pause menu, quit to the title and
+ * find the file there; then choose a new key and a softer volume. */
+static void pq_press(br_key k) {
+    g_engine.input.keys_pressed[k] = g_engine.input.keys[k] = true;
+    steps(1);
+    g_engine.input.keys_pressed[k] = g_engine.input.keys[k] = false;
+    steps(2);
+}
+static bool pq_load(const char *scene) {
+    char err[200], path[96];
+    setup();
+    br_assets_set_root("examples/pantryquest/");
+    snprintf(path, sizeof(path), "examples/pantryquest/%s", scene);
+    return br_world_load_file(&W, path, NULL, 0, err, sizeof(err)) > 5;
+}
+static void test_pantryquest_files_and_settings(void) {
+    char folder[BR_PATH_MAX], text[64];
+    size_t size;
+    char *saved;
+    double slot = 0;
+    br_path_join(folder, sizeof(folder), g_out_dir, "pq_saves");
+    br_save_set_folder(folder);
+    br_save_delete("slot1.txt"); br_save_delete("session.txt"); br_save_delete("settings.txt");
+    /* the title: PLAY, then file 1 (empty: a new game) */
+    CHECK(pq_load("title.scene"));
+    steps(4);
+    pq_press(BR_KEY_ENTER);
+    CHECK(named("FilesMenu") != BR_ENTITY_NULL);
+    pq_press(BR_KEY_ENTER);
+    CHECK(br_script_scene_request(&W, text, sizeof(text)) && strcmp(text, "main.scene") == 0);
+    CHECK(br_save_exists("session.txt"));
+    teardown();
+    /* the game: file 1 is saved at once; pause, save, then save and quit */
+    CHECK(pq_load("main.scene"));
+    steps(60);
+    CHECK(br_script_get_number(&W, named("Game"), "slot", &slot) && slot == 1);
+    CHECK(br_save_exists("slot1.txt") && !br_save_exists("session.txt"));
+    br_script_set_number(&W, named("Game"), "beans", 42);          /* something to find again */
+    pq_press(BR_KEY_ESCAPE);
+    CHECK(named("PauseMenu") != BR_ENTITY_NULL);
+    pq_press(BR_KEY_DOWN);
+    pq_press(BR_KEY_ENTER);                                       /* SAVE GAME */
+    CHECK(br_script_get_string(&W, named("Game"), "state", text, sizeof(text)) && strcmp(text, "pause") == 0);
+    {
+        const br_label *note = (const br_label *)br_get(&W, named("Note"), ID.label);
+        CHECK(note && strcmp(note->text, "GAME SAVED!") == 0);
+    }
+    pq_press(BR_KEY_DOWN);
+    pq_press(BR_KEY_DOWN);
+    pq_press(BR_KEY_ENTER);                                       /* QUIT TO TITLE: save first? */
+    pq_press(BR_KEY_ENTER);                                       /* SAVE AND QUIT */
+    CHECK(br_script_scene_request(&W, text, sizeof(text)) && strcmp(text, "title.scene") == 0);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+    saved = (char *)br_save_read("slot1.txt", &size);
+    CHECK(saved && strstr(saved, "\"room\", \"ow_7_7\"") && strstr(saved, "\"place\", \"PANTRY PLAINS\""));
+    br_free(saved);
+    /* the title again: file 1 shows where it is; then the settings */
+    CHECK(pq_load("title.scene"));
+    steps(4);
+    pq_press(BR_KEY_ENTER);
+    {
+        const br_label *place = (const br_label *)br_get(&W, named("Place0"), ID.label);
+        CHECK(place && strcmp(place->text, "PANTRY PLAINS") == 0);
+    }
+    pq_press(BR_KEY_ENTER);                                       /* carry on with file 1 */
+    CHECK(br_script_scene_request(&W, text, sizeof(text)) && strcmp(text, "main.scene") == 0);
+    teardown();
+    {
+        double beans = 0;
+        CHECK(pq_load("main.scene"));
+        steps(60);
+        CHECK(br_script_get_number(&W, named("Game"), "beans", &beans) && beans == 42);
+        CHECK(br_script_get_string(&W, named("Game"), "room_name", text, sizeof(text)) && strcmp(text, "ow_7_7") == 0);
+        teardown();
+    }
+    CHECK(pq_load("title.scene"));
+    steps(4);
+    pq_press(BR_KEY_DOWN);
+    pq_press(BR_KEY_ENTER);                                       /* SETTINGS */
+    CHECK(named("SettingsMenu") != BR_ENTITY_NULL);
+    pq_press(BR_KEY_LEFT);                                        /* the music, one step softer */
+    CHECK(fabsf(g_engine.mixer.bus_volume[BR_BUS_MUSIC] - 0.7f) < 1e-4f);
+    pq_press(BR_KEY_DOWN);
+    pq_press(BR_KEY_DOWN);                                        /* UP */
+    pq_press(BR_KEY_ENTER);
+    steps(10);
+    pq_press(BR_KEY_I);                                           /* is now I */
+    pq_press(BR_KEY_ESCAPE);                                      /* leave: saved */
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+    saved = (char *)br_save_read("settings.txt", &size);
+    CHECK(saved && strncmp(saved, "[[[\"i\", \"w\"]", 12) == 0 && strstr(saved, "], 7, 10]"));
+    CHECK(saved && strstr(saved, "[\"enter\", \"\"]"));          /* I was the Pocket Pantry's: a key does one thing */
+    br_free(saved);
+    g_engine.mixer.bus_volume[BR_BUS_MUSIC] = g_engine.mixer.bus_volume[BR_BUS_SFX] = g_engine.mixer.bus_volume[BR_BUS_UI] = 1;
+    br_save_delete("slot1.txt"); br_save_delete("settings.txt");
+    br_fs_remove(folder);
+    br_save_set_folder(NULL);
 }
 
 typedef struct counter_state { int starts, updates, hits; } counter_state;
@@ -968,11 +1111,13 @@ void suite_script(void) {
     RUN(test_tree_from_scripts);
     RUN(test_platformer_example);
     RUN(test_saved_data);
+    RUN(test_volume_and_keys);
     RUN(test_pantryquest_example);
     RUN(test_pantryquest_shutter);
     RUN(test_pantryquest_world);
     RUN(test_pantryquest_bosses);
     RUN(test_pantryquest_eight_ways);
+    RUN(test_pantryquest_files_and_settings);
     RUN(test_check_and_errors);
     RUN(test_types_checked);
     RUN(test_types_at_run_time);

@@ -1,47 +1,83 @@
-# The title screen. After a few seconds the story scrolls up over it; Enter
-# (or Space) starts the game.
+# The title: PLAY (choose a file), SETTINGS, QUIT. Left alone for a while, the
+# story scrolls up over it; any key brings the menu back.
+
 var t = 0
-var phase = "title"         # title, story
+var phase = "menu"          # menu, story
 var labels = []
 var lines = ["LONG AGO, IN THE PANTRY KINGDOM,", "EVERY FEAST WAS COOKED FROM", "THE GRAND RECIPE.", "",
              "BUT GREEDY BARON GORGE TORE IT", "INTO EIGHT PAGES, AND HID THEM", "ALL OVER THE LAND.", "",
-             "PIP, A YOUNG COOK, PICKED UP", "A WOODEN SPOON AND SET OUT", "TO FIND THEM.", "", "",
-             "ARROWS OR WASD - WALK", "X - SPOON     Z - ITEM", "ENTER - INVENTORY"]
+             "PIP, A YOUNG COOK, PICKED UP", "A WOODEN SPOON AND SET OUT", "TO FIND THEM."]
+var options = ["PLAY", "SETTINGS", "QUIT"]
+var choice = 0
+var rows = []
+var cursor
 var panel
-var press
+var page
+var s
 
 func start() {
+    s = find("Settings")
     panel = find("StoryBG")
-    press = child(self, "Press")
+    page = find("Page")
+    cursor = find("Cursor")
+    for i in 3 { push(rows, find("Option" + i)) }
     for i in len(lines) {
         var l = spawn("prefabs/story_line.scene", vec2(128, 260 + i * 12))
         l.Label.text = lines[i]
-        l.Label.layer = 12
+        l.Label.layer = 32
         push(labels, l)
     }
+    show()
 }
+
+func show() {
+    for i in 3 {
+        if i == choice { rows[i].Label.color = rgb(142, 26, 42) } else { rows[i].Label.color = rgb(98, 56, 26) }
+    }
+    cursor.position = vec2(128 - len(options[choice]) * 4 - 14, rows[choice].y)
+}
+
+func busy() { return len(find_all("FilesMenu")) > 0 or len(find_all("SettingsMenu")) > 0 }
 
 func update(dt) {
     t += dt
-    if floor(t * 2) % 2 == 0 { press.Label.color = rgb(255, 230, 120) } else { press.Label.color = rgb(255, 230, 120, 0) }
-    if phase == "title" and t > 7 {
-        phase = "story"
+    page.y = 146 + sin(t * 120) * 3                    # the recipe page bobs over Pip
+    if busy() {
         t = 0
+        return
     }
     if phase == "story" {
         panel.Shape.color = rgb(0, 0, 0, min(t, 1) * 225)
         var last = labels[len(labels) - 1]
-        if last.y > 200 {
-            for l in labels { l.y -= 16 * dt }
-        } elif t > 30 {
-            phase = "title"
+        if last.y > 150 { for l in labels { l.y -= 16 * dt } }
+        if last_key() != "" or t > 30 {
+            phase = "menu"
             t = 0
             panel.Shape.color = rgb(0, 0, 0, 0)
             for i in len(labels) { labels[i].y = 260 + i * 12 }
         }
+        return
     }
-    if key_pressed("enter") or key_pressed("space") {
-        play_sound("sfx/buy.wav")
-        load_scene("main.scene")
+    if t > 14 {
+        phase = "story"
+        t = 0
+        return
+    }
+    if last_key() != "" { t = 0 }
+    if s.nav("up") {
+        choice = (choice + 2) % 3
+        play_sound("sfx/menu.wav")
+        show()
+    }
+    if s.nav("down") {
+        choice = (choice + 1) % 3
+        play_sound("sfx/menu.wav")
+        show()
+    }
+    if s.nav("ok") {
+        play_sound("sfx/menu.wav")
+        if choice == 0 { spawn("prefabs/files_menu.scene", vec2(128, 120)) }
+        elif choice == 1 { spawn("prefabs/settings_menu.scene", vec2(128, 120)) }
+        else { quit() }
     }
 }

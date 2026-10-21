@@ -130,6 +130,8 @@ range(n) range(a, b[, step])`.
 `"left"`, `"a"`, `"space"`, `"enter"`, `"shift"` and `"F1"`, ignoring case.
 `mouse_down(button) mouse_pressed(button)` (0 left, 1 right, 2 middle),
 `mouse_position()` (in game pixels), and `time()` (seconds since the game started).
+`last_key()` gives the name of a key pressed this step (`""` if none) in the form
+`key_down()` takes, for letting players choose their own keys.
 
 **The world:**
 - `find(name)` returns the first entity with that name, or nil. `find_all(name)` returns a list.
@@ -143,7 +145,10 @@ range(n) range(a, b[, step])`.
 - `has(e, "Shape")`, `add(e, "Motion")` (returns the component) and `remove_component(e, "Motion")`.
 - `send(e, "function", args...)` calls a function on another entity's script if it has one,
   and quietly does nothing if not.
-- `play_sound("sfx/jump.wav"[, volume])`.
+- `play_sound("sfx/jump.wav"[, volume])` plays on the `sfx` bus. A Sound component's
+  `bus` field (`sfx`, `music`, `ui` or `ambient`) says where it plays.
+  `set_volume("music", 0.5)` and `volume("music")` set and read a bus's volume (0 to 1,
+  up to 2), or the whole mix's with `"master"`: for a game's volume settings.
 - `load_scene("levels/2.scene")` ends this scene and starts that one (after this step).
   `quit()` ends the game. In the editor's Play, load_scene shows the other scene until Stop,
   and quit stops playing.

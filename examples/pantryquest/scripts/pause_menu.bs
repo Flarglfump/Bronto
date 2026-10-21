@@ -1,0 +1,108 @@
+# The pause menu (Escape, or the player's pause key): carry on, save the game
+# to its file, change the settings, or go back to the title. The game waits
+# while it's open.
+
+var game
+var controls
+var main_options = ["RESUME", "SAVE GAME", "SETTINGS", "QUIT TO TITLE"]
+var quit_options = ["SAVE AND QUIT", "QUIT WITHOUT SAVING", "BACK"]
+var mode = "main"           # main, or quit (asking whether to save first)
+var choice = 0
+var rows = []
+var cursor
+var note
+var info
+
+func start() {
+    game = find("Game")
+    controls = find("Settings")
+    for i in 4 { push(rows, child(self, "Option" + i)) }
+    cursor = child(self, "Cursor")
+    note = child(self, "Note")
+    info = child(self, "Info")
+    if game.slot > 0 { info.Label.text = "FILE " + game.slot + "   PLAYED " + controls.clock(game.play_time) }
+    else { info.Label.text = "NO FILE: STARTED IN THE EDITOR" }
+    show()
+}
+
+func options() {
+    if mode == "quit" { return quit_options }
+    return main_options
+}
+
+func show() {
+    var list = options()
+    for i in 4 {
+        if i < len(list) { rows[i].Label.text = list[i] } else { rows[i].Label.text = "" }
+        if i == choice { rows[i].Label.color = rgb(142, 26, 42) } else { rows[i].Label.color = rgb(98, 56, 26) }
+    }
+    cursor.position = vec2(-len(list[choice]) * 4 - 14, rows[choice].y)
+}
+
+func close() {
+    game.state = "play"
+    play_sound("sfx/menu.wav")
+    destroy(self)
+}
+
+func update(dt) {
+    if len(find_all("SettingsMenu")) > 0 { return }      # the settings are open over it
+    var n = len(options())
+    if controls.nav("up") {
+        choice = (choice + n - 1) % n
+        play_sound("sfx/menu.wav")
+        show()
+    }
+    if controls.nav("down") {
+        choice = (choice + 1) % n
+        play_sound("sfx/menu.wav")
+        show()
+    }
+    if controls.nav("back") or controls.pressed("pause") {
+        if mode == "quit" {
+            mode = "main"
+            choice = 3
+            show()
+        } else {
+            close()
+        }
+        return
+    }
+    if not controls.nav("ok") { return }
+    if mode == "main" {
+        if choice == 0 { close() }
+        elif choice == 1 {
+            if game.save_game() {
+                note.Label.text = "GAME SAVED!"
+                play_sound("sfx/buy.wav")
+            } else {
+                note.Label.text = "START FROM THE TITLE TO SAVE"
+                play_sound("sfx/tink.wav")
+            }
+        } elif choice == 2 {
+            spawn("prefabs/settings_menu.scene", vec2(128, 152))
+            play_sound("sfx/menu.wav")
+        } else {
+            if game.slot > 0 {
+                mode = "quit"
+                choice = 0
+                note.Label.text = ""
+                play_sound("sfx/menu.wav")
+                show()
+            } else {
+                load_scene("title.scene")
+            }
+        }
+    } else {
+        if choice == 0 {
+            game.save_game()
+            load_scene("title.scene")
+        } elif choice == 1 {
+            load_scene("title.scene")
+        } else {
+            mode = "main"
+            choice = 3
+            show()
+        }
+    }
+}
