@@ -2,10 +2,11 @@
 # spoon; Z (or J) uses the item on B (bombs, the pizza cutter, the skewer bow,
 # the fire chili); Enter opens the inventory.
 #
-# Movement keeps to a half-tile grid, as in the old adventure games: turning
-# a corner first lines Pip up with the next row or column, so he slips
-# through gaps a tile wide. Walls are the room Tilemap's solid tiles; only
-# his feet (the lower half of the sprite) collide.
+# He walks in eight directions, as fast on a diagonal as straight. Each axis
+# moves on its own, so pushing into a wall at an angle slides along it, and
+# brushing a corner nudges him round it - he slips into gaps a tile wide
+# without lining up first. Walls are the room Tilemap's solid tiles; only his
+# feet (the lower half of the sprite) collide. He faces (and pokes) in four.
 
 var speed = 84
 var facing = "down"
@@ -114,30 +115,11 @@ func fits(p) {
     return not (solid_at(p + vec2(-7, 1)) or solid_at(p + vec2(6, 1)) or solid_at(p + vec2(-7, 7)) or solid_at(p + vec2(6, 7)))
 }
 
-# Moves up to `dist` pixels along d (a unit vector on one axis), lining up on the other first.
-func walk(d, dist) {
+# Moves up to `dist` pixels along d (a unit vector on one axis). Blocked by a
+# corner he only just touches (up to 6 pixels of it), he is eased round it
+# instead (when `slide` is true).
+func walk(d, dist, slide) {
     var p = self.position
-    if d.x != 0 {
-        var off = (p.y - 64) % 8
-        if off != 0 {
-            if off < 4 { p.y -= min(off, dist) } else { p.y += min(8 - off, dist) }
-            if fits(p) {
-                self.position = p
-                return
-            }
-            p = self.position
-        }
-    } else {
-        var off = p.x % 8
-        if off != 0 {
-            if off < 4 { p.x -= min(off, dist) } else { p.x += min(8 - off, dist) }
-            if fits(p) {
-                self.position = p
-                return
-            }
-            p = self.position
-        }
-    }
     var moved = 0
     while moved < dist {
         var stepn = min(1, dist - moved)
@@ -145,6 +127,19 @@ func walk(d, dist) {
         if not fits(q) { break }
         p = q
         moved += stepn
+    }
+    if moved < dist and slide {
+        var side = vec2(d.y, d.x)                          # across the way he's going
+        for k in range(1, 7) {
+            var found = false
+            for s in [1, -1] {
+                if not found and fits(p + side * (k * s)) and fits(p + side * (k * s) + d) {
+                    p = p + side * (s * min(k, dist - moved))
+                    found = true
+                }
+            }
+            if found { break }
+        }
     }
     self.position = p
 }
@@ -171,7 +166,7 @@ func update(dt) {
     if cooldown > 0 { cooldown -= dt }
     if knock_t > 0 {                                     # (being knocked back never takes him out of the room)
         knock_t -= dt
-        walk(knock, 4)
+        walk(knock, 4, false)
         self.position = vec2(clamp(self.x, 8, 248), clamp(self.y, 72, 232))
         return
     }
@@ -190,21 +185,34 @@ func update(dt) {
     if key_down("right") or key_down("d") { want.x += 1 }
     if key_down("up") or key_down("w") { want.y -= 1 }
     if key_down("down") or key_down("s") { want.y += 1 }
-    var d := vec2(0, 0)
-    if want.x != 0 and want.y != 0 {
-        if facing == "left" or facing == "right" { d = vec2(0, want.y) } else { d = vec2(want.x, 0) }
-    } elif want.x != 0 {
-        d = vec2(want.x, 0)
-    } elif want.y != 0 {
-        d = vec2(0, want.y)
-    }
-    if d.x != 0 or d.y != 0 {
-        if d.x < 0 { facing = "left" }
-        if d.x > 0 { facing = "right" }
-        if d.y < 0 { facing = "up" }
-        if d.y > 0 { facing = "down" }
-        dirv = d
-        walk(d, speed * dt)
+    if want.x != 0 or want.y != 0 {
+        # face one of the ways he's going: on a diagonal, keep the way he was facing if it's one of them
+        var fx = ""
+        var fy = ""
+        if want.x < 0 { fx = "left" }
+        if want.x > 0 { fx = "right" }
+        if want.y < 0 { fy = "up" }
+        if want.y > 0 { fy = "down" }
+        if facing != fx and facing != fy {
+            if fx != "" { facing = fx } else { facing = fy }
+        }
+        if facing == "left" { dirv = vec2(-1, 0) }
+        if facing == "right" { dirv = vec2(1, 0) }
+        if facing == "up" { dirv = vec2(0, -1) }
+        if facing == "down" { dirv = vec2(0, 1) }
+        var full = speed * dt
+        if want.x != 0 and want.y != 0 {                 # a diagonal: as fast as straight...
+            var step = full * 0.7071
+            var before = self.position
+            walk(vec2(want.x, 0), step, false)
+            var x_moved = self.position.x != before.x
+            if x_moved { walk(vec2(0, want.y), step, false) } else { walk(vec2(0, want.y), full, false) }
+            if x_moved and self.position.y == before.y { walk(vec2(want.x, 0), full - step, false) }
+        } elif want.x != 0 {                             # ...and along a wall, full speed the free way
+            walk(vec2(want.x, 0), full, true)
+        } else {
+            walk(vec2(0, want.y), full, true)
+        }
         anim_t += dt
         if anim_t > 0.12 {
             anim_t = 0

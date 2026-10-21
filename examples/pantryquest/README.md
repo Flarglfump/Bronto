@@ -37,7 +37,7 @@ the first three of its nine cellars:
 
 | | Keys | |
 |---|---|---|
-| Walk | arrows or WASD | |
+| Walk | arrows or WASD | Eight directions; Pip slides along walls and round corners |
 | Poke with the spoon | X (or K, or Space) | At full health the spoon also throws a spark |
 | Use the B item | Z (or J) | Popcorn bombs, the pizza cutter, the skewer bow, the fire chili |
 | Inventory | Enter | Choose the B item there |
@@ -77,7 +77,7 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
 - **Prefabs** (`prefabs/*.scene`) hold the enemies, shots, pickups, effects, the
   inventory and the music.
 - **Scripts:**
-  - `hero.bs` handles Pip: grid-aligned walking, the spoon, items, and being hurt.
+  - `hero.bs` handles Pip: walking in eight directions, the spoon, items, and being hurt.
   - `enemies/walker.bs` covers tomatoes, plums, burger knights and breadstick soldiers.
   - `jelly.bs`, `bat.bs` and `meatball.bs` are cellar creatures; `gelatin.bs`,
     `big_dill.bs` and `spice_wraith.bs` are the guardians. Sour olives and chili imps are

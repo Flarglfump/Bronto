@@ -1,5 +1,6 @@
 /* Tests: BrontoScript and the Script component (script.h). */
 #include "test.h"
+#include <math.h>
 #include <string.h>
 
 static br_world W;
@@ -638,6 +639,51 @@ static void test_pantryquest_bosses(void) {
     pq_fight("d3_1_0", 8, false);               /* the Spice Wraith */
 }
 
+/* Pantry Quest: Pip walks in eight directions - a diagonal as fast as
+ * straight - and is eased round a corner he only just touches, so he slips
+ * into a cave mouth without lining up first. */
+static void test_pantryquest_eight_ways(void) {
+    char err[200], room[32];
+    br_entity game, hero;
+    br_script *sc;
+    const br_transform *t;
+    float x0, y0;
+    setup();
+    br_assets_set_root("examples/pantryquest/");
+    CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
+    game = named("Game");
+    hero = named("Hero");
+    sc = (br_script *)br_get(&W, game, SCRIPT);
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"ow_7_7\", start_pos = vec2(120, 168)");
+    steps(40);
+    t = (const br_transform *)br_get(&W, hero, ID.transform);
+    if (!t) { teardown(); return; }
+    x0 = t->position.x;
+    y0 = t->position.y;
+    g_engine.input.keys[BR_KEY_UP] = g_engine.input.keys[BR_KEY_LEFT] = true;     /* up and to the left */
+    steps(30);
+    g_engine.input.keys[BR_KEY_UP] = g_engine.input.keys[BR_KEY_LEFT] = false;
+    t = (const br_transform *)br_get(&W, hero, ID.transform);
+    CHECK(t && x0 - t->position.x > 26 && x0 - t->position.x < 33);   /* 84 px/s for 0.5 s, shared between the axes */
+    CHECK(t && y0 - t->position.y > 26 && y0 - t->position.y < 33);
+    CHECK(t && fabsf((x0 - t->position.x) - (y0 - t->position.y)) < 1);
+    /* four pixels right of the first cave's mouth (column 4: x 64 to 80), walking straight up */
+    teardown();
+    setup();
+    br_assets_set_root("examples/pantryquest/");
+    CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
+    game = named("Game");
+    sc = (br_script *)br_get(&W, game, SCRIPT);
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"ow_7_7\", start_pos = vec2(76, 120)");
+    steps(40);
+    hold_key(BR_KEY_UP, 60);
+    steps(40);
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "cave_chef") == 0);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+
 typedef struct counter_state { int starts, updates, hits; } counter_state;
 static int g_destroyed;
 static void cb_start(br_world *w, br_entity e, void *s) { BR_UNUSED(w); BR_UNUSED(e); ((counter_state *)s)->starts++; }
@@ -926,6 +972,7 @@ void suite_script(void) {
     RUN(test_pantryquest_shutter);
     RUN(test_pantryquest_world);
     RUN(test_pantryquest_bosses);
+    RUN(test_pantryquest_eight_ways);
     RUN(test_check_and_errors);
     RUN(test_types_checked);
     RUN(test_types_at_run_time);
