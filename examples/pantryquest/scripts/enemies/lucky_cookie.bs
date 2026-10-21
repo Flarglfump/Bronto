@@ -5,75 +5,75 @@
 # flinging fortune slips, three at a time. Ten points of health (seven
 # pokes with the copper spoon, five with the silver ladle).
 
-var hp = 10
-var hp_max = 10
-var title = "LUCKY COOKIE"
-var subtitle = "KEEPER OF THE FORTUNE HALL"
-var size = 13
-var damage = 2
-var game
-var hero
-var appear_t = 0
-var crumbs = []
-var spin = 0
-var t = 0
-var flash_t = 0
-var shoot_t = 1.5
+var hp: number = 10
+var hp_max: number = 10
+var title: string = "LUCKY COOKIE"
+var subtitle: string = "KEEPER OF THE FORTUNE HALL"
+var size: number = 13
+var damage: number = 2
+var game: entity
+var hero: entity
+var appear_t: number = 0
+var crumbs: list[entity] = []
+var spin: number = 0
+var t: number = 0
+var flash_t: number = 0
+var shoot_t: number = 1.5
 
-func start() {
+func start() -> void {
     game = find("Game")
     damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)
 }
 
-func intro_done() {
+func intro_done() -> void {
     appear_t = 0
     for i in 8 {
-        var c = spawn("prefabs/crumb.scene", self.position, self.parent)
+        var c := spawn("prefabs/crumb.scene", self.position, self.parent)
         c.slot = i
         push(crumbs, c)
     }
     place_crumbs()
 }
 
-func place_crumbs() {
-    var r = 26 + sin(t * 120) * 10
+func place_crumbs() -> void {
+    var r := 26 + sin(t * 120) * 10
     for c in crumbs { c.position = self.position + from_angle(spin + c.slot * 45, r) }
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         game.boss_arrives(self)
         return
     }
     t += dt
-    var still = []
+    var still := []
     for c in crumbs {
         if c.alive { push(still, c) }
     }
     crumbs = still
-    var bare = len(crumbs) == 0
+    var bare := len(crumbs) == 0
     spin += (100 + (8 - len(crumbs)) * 20) * dt         # the fewer crumbs, the faster they go round
     # floats after Pip (quicker once bare), over everything in the room
-    var to = hero.position - self.global_position
-    var speed = 20
+    var to := hero.position - self.global_position
+    var speed: number = 20
     if bare { speed = 34 }
     if length(to) > 4 { self.position += normalize(to) * speed * dt }
     self.position = vec2(clamp(self.position.x, 48, 208), clamp(self.position.y, 48, 128))
     place_crumbs()
     if flash_t > 0 { flash_t -= dt }
-    var c = 255
+    var c: number = 255
     if flash_t > 0 and floor(flash_t * 24) % 2 == 0 { c = 120 }
     self.Sprite.tint = rgb(255, c, c)
     if bare {
         shoot_t -= dt
         if shoot_t < 0.4 { self.Sprite.image = "art/cookie_1.bmp" } else { self.Sprite.image = "art/cookie_0.bmp" }
         if shoot_t <= 0 {
-            var aim = angle(hero.position - self.global_position)
+            var aim := angle(hero.position - self.global_position)
             for a in [-20, 0, 20] {
-                var s = spawn("prefabs/slip.scene", self.position, self.parent)
+                var s := spawn("prefabs/slip.scene", self.position, self.parent)
                 s.vel = from_angle(aim + a, 100)
                 s.rotation = aim + a
             }
@@ -84,7 +84,7 @@ func update(dt) {
     if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
 }
 
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 { return false }
     if len(crumbs) > 0 {                               # its shell: crumbs first

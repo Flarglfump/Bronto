@@ -4,18 +4,18 @@
 # stays a moment, and fades away. While a cook is talking up there, it sits
 # lower down. It also carries short notes ("GAME SAVED!"), the same way.
 
-var last = ""
-var t = 0
-var shown = false
-var y0 = 84
-var left
-var mid
-var right
-var text
-var shadow
-var game
+var last: string = ""
+var t: number = 0
+var shown: bool = false
+var y0: number = 84
+var left: entity
+var mid: entity
+var right: entity
+var text: entity
+var shadow: entity
+var game: entity
 
-func start() {
+func start() -> void {
     game = find("Game")
     left = child(self, "BannerL")
     mid = child(self, "BannerMid")
@@ -25,19 +25,19 @@ func start() {
 }
 
 # Pip has arrived somewhere called `name` ("" for nowhere in particular: a cave).
-func arrive(name) {
+func arrive(name: string) -> void {
     if name == "" or name == last { return }
     last = name
     put(name)
 }
 
 # A short note on the ribbon (it doesn't count as where Pip is).
-func note(msg) { put(msg) }
+func note(msg: string) -> void { put(msg) }
 
-func put(name) {
+func put(name: string) -> void {
     text.Label.text = name
     shadow.Label.text = name
-    var half = len(name) * 4 + 10                     # the ribbon fits the name
+    var half := len(name) * 4 + 10                     # the ribbon fits the name
     mid.scale = vec2(half * 2 / 4, 1)
     left.x = -half - 6
     right.x = half + 6
@@ -47,8 +47,8 @@ func put(name) {
     shown = true
 }
 
-func set_alpha(a) {
-    var c = rgb(255, 255, 255, a * 255)
+func set_alpha(a: number) -> void {
+    var c := rgb(255, 255, 255, a * 255)
     left.Sprite.tint = c
     mid.Sprite.tint = c
     right.Sprite.tint = c
@@ -56,7 +56,7 @@ func set_alpha(a) {
     shadow.Label.color = rgb(74, 20, 28, a * 255)
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if not shown { return }
     if game.state == "intro" {                          # a guardian is arriving: out of the way
         shown = false
@@ -64,7 +64,7 @@ func update(dt) {
         return
     }
     t += dt
-    var a = 1
+    var a: number = 1
     if t < 0.3 { a = t / 0.3 }
     elif t > 2.6 { a = 1 - (t - 2.6) / 0.5 }
     if a <= 0 {

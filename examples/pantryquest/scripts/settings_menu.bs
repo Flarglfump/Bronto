@@ -12,28 +12,28 @@
 # new button, X clears it. Waiting gives up after five seconds.
 # Saved as Pip leaves (scripts/settings.bs).
 
-var s
-var row = 0                 # 0 music, 1 sounds, 2 .. (1 + actions) the actions, then reset, then back
-var top = 0                 # the first action in view
-var col = 0                 # which key of an action
-var waiting = false
-var wait_t = 0
-var wait_pad = false        # waiting for a gamepad button (not a key)
-var was_pad = false         # (the menu shows the buttons while this is true)
-var labels = []             # the 12 lines on the card: 0 music, 1 sounds, 2 to 9 actions in view, 10 reset, 11 back
-var key_a = []
-var key_b = []
-var music_pips = []
-var sound_pips = []
-var row_hi
-var cell_hi
-var hint
-var more_up
-var more_down
+var s: entity
+var row: number = 0                 # 0 music, 1 sounds, 2 .. (1 + actions) the actions, then reset, then back
+var top: number = 0                 # the first action in view
+var col: number = 0                 # which key of an action
+var waiting: bool = false
+var wait_t: number = 0
+var wait_pad: bool = false        # waiting for a gamepad button (not a key)
+var was_pad: bool = false         # (the menu shows the buttons while this is true)
+var labels: list[entity] = []             # the 12 lines on the card: 0 music, 1 sounds, 2 to 9 actions in view, 10 reset, 11 back
+var key_a: list[entity] = []
+var key_b: list[entity] = []
+var music_pips: list[entity] = []
+var sound_pips: list[entity] = []
+var row_hi: entity
+var cell_hi: entity
+var hint: entity
+var more_up: entity
+var more_down: entity
 var mouse_at := vec2(-1, -1)
-var shown = 8               # actions in view at once
+var shown: number = 8               # actions in view at once
 
-func start() {
+func start() -> void {
     s = find("Settings")
     for i in 12 { push(labels, child(self, "Row" + i)) }
     for i in 8 {
@@ -54,23 +54,23 @@ func start() {
     show()
 }
 
-func actions() { return len(s.actions) }
-func last_row() { return actions() + 3 }
-func reset_row() { return actions() + 2 }
-func is_action(r) { return r >= 2 and r < 2 + actions() }
+func actions() -> number { return len(s.actions) }
+func last_row() -> number { return actions() + 3 }
+func reset_row() -> number { return actions() + 2 }
+func is_action(r: number) -> bool { return r >= 2 and r < 2 + actions() }
 
 # The line on the card for a row (or -1: scrolled out of view).
-func line_of(r) {
+func line_of(r: number) -> number {
     if r <= 1 { return r }
     if is_action(r) {
-        var k = r - 2 - top
+        var k := r - 2 - top
         if k >= 0 and k < shown { return 2 + k }
         return -1
     }
     return r - actions() + 8                           # reset -> 10, back -> 11
 }
 
-func row_text(i) {
+func row_text(i: number) -> string {
     if i == 0 { return "MUSIC" }
     if i == 1 { return "SOUNDS" }
     if i == reset_row() { return "RESET TO DEFAULTS" }
@@ -78,19 +78,19 @@ func row_text(i) {
     return s.names[i - 2]
 }
 
-func keep_in_view() {
+func keep_in_view() -> void {
     if is_action(row) {
         if row - 2 < top { top = row - 2 }
         if row - 2 >= top + shown { top = row - 2 - shown + 1 }
     }
 }
 
-func show() {
+func show() -> void {
     keep_in_view()
     for r in range(0, last_row() + 1) {
-        var l = line_of(r)
+        var l := line_of(r)
         if l >= 0 {
-            var t = row_text(r)
+            var t := row_text(r)
             labels[l].Label.text = t
             if l < 10 { labels[l].x = -100 + len(t) * 4 } else { labels[l].x = 0 }   # names on the left, the last two centred
             if r == row { labels[l].Label.color = rgb(142, 26, 42) } else { labels[l].Label.color = rgb(98, 56, 26) }
@@ -98,7 +98,7 @@ func show() {
     }
     if was_pad { col = 0 }                               # (a gamepad button each: one column)
     for k in shown {
-        var a = top + k
+        var a := top + k
         if was_pad {
             key_a[k].Label.text = s.pad_label(s.pads[a])
             key_b[k].Label.text = ""
@@ -131,14 +131,14 @@ func show() {
     else { hint.Label.text = s.ok_label() + ": CHOOSE  " + s.back_label() + ": BACK" }
 }
 
-func close() {
+func close() -> void {
     s.save()
     play_sound("sfx/menu.wav")
     destroy(self)
 }
 
 # Enter (or a click) on a row. True if the settings closed.
-func choose(r) {
+func choose(r: number) -> bool {
     if r == reset_row() {
         s.defaults()
         s.apply()
@@ -156,11 +156,11 @@ func choose(r) {
 
 # The mouse: a line under it is chosen; a click on a pip, a key, a button or
 # an arrow does it. "closed" if a click closed the settings, else whether to redraw.
-func mouse() {
-    var m = mouse_position()
-    var moved = m != mouse_at
+func mouse() -> string {
+    var m := mouse_position()
+    var moved := m != mouse_at
     mouse_at = m
-    var click = s.clicked()
+    var click: bool = s.clicked()
     if not moved and not click { return "" }
     if click and s.over(more_up, 14, 12) and top > 0 {
         top -= 1
@@ -173,9 +173,9 @@ func mouse() {
         return "redraw"
     }
     for r in range(0, last_row() + 1) {
-        var l = line_of(r)
+        var l := line_of(r)
         if l >= 0 and abs(m.y - labels[l].global_position.y) <= 5 and abs(m.x - self.global_position.x) <= 108 {
-            var changed = r != row
+            var changed := r != row
             row = r
             if is_action(r) {                          # which key: the one under the mouse
                 if s.over(key_a[l - 2], 44, 10) { col = 0 }
@@ -184,10 +184,10 @@ func mouse() {
             if click {
                 if r <= 1 {                            # a pip: that loud (the first one again: off)
                     for i in 10 {
-                        var pip = music_pips[i]
+                        var pip := music_pips[i]
                         if r == 1 { pip = sound_pips[i] }
                         if s.over(pip, 9, 10) {
-                            var v = i + 1
+                            var v := i + 1
                             if r == 0 {
                                 if s.music == 1 and v == 1 { v = 0 }
                                 s.music = v
@@ -211,16 +211,16 @@ func mouse() {
     return ""
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if waiting {
         wait_t += dt
         if wait_t < 0.1 { return }                       # (not the Enter that started it)
         if wait_pad {
-            var b = last_button()
+            var b := last_button()
             if b == "" and not key_pressed("escape") and wait_t < 5 { return }
             if b != "" { s.set_pad(row - 2, b) }
         } else {
-            var k = last_key()
+            var k := last_key()
             if k == "" and wait_t < 5 { return }
             if k != "escape" and k != "" { s.set_key(row - 2, col, k) }
         }
@@ -233,16 +233,16 @@ func update(dt) {
         close()
         return
     }
-    var moved = false
+    var moved := false
     if s.pad_now() != was_pad {                          # (keys or buttons: whichever was used last)
         was_pad = s.pad_now()
         show()
     }
-    var n = last_row() + 1
+    var n := last_row() + 1
     if s.nav("up") { row = (row + n - 1) % n; moved = true }
     if s.nav("down") { row = (row + 1) % n; moved = true }
     if s.nav("left") or s.nav("right") {
-        var d = 1
+        var d: number = 1
         if s.nav("left") { d = -1 }
         if row == 0 { s.music = clamp(s.music + d, 0, 10) }
         if row == 1 { s.sounds = clamp(s.sounds + d, 0, 10) }
@@ -262,7 +262,7 @@ func update(dt) {
         if choose(row) { return }
         moved = true
     }
-    var m = mouse()
+    var m := mouse()
     if m == "closed" { return }
     if m == "redraw" { moved = true }
     if moved {

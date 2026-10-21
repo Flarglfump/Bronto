@@ -7,26 +7,26 @@
 # keeps it hidden until every enemy in the room is gone; `timeout` (drops)
 # makes it vanish after a while.
 
-var kind = "bean"
-var flag = ""
-var price = 0
-var on_clear = false
-var on_solve = false        # hidden until the room's puzzle is solved (scripts/room.bs)
-var min_hearts = 0
-var timeout = 0
-var game
-var hero
-var shown = true
-var label
+var kind: string = "bean"
+var flag: string = ""
+var price: number = 0
+var on_clear: bool = false
+var on_solve: bool = false        # hidden until the room's puzzle is solved (scripts/room.bs)
+var min_hearts: number = 0
+var timeout: number = 0
+var game: entity
+var hero: entity
+var shown: bool = true
+var label: entity
 
-func start() {
+func start() -> void {
     game = find("Game")
     hero = find("Hero")
     if flag != "" and game.has_flag(flag) {
         destroy(self)
         return
     }
-    var images = ["bean", "art/bean.bmp", "bean5", "art/bean_gold.bmp", "heart", "art/heart.bmp", "key", "art/key.bmp",
+    var images := ["bean", "art/bean.bmp", "bean5", "art/bean_gold.bmp", "heart", "art/heart.bmp", "key", "art/key.bmp",
                   "bomb", "art/bomb.bmp", "bombs_item", "art/bomb.bmp", "spoon", "art/spoon.bmp", "cutter", "art/cutter.bmp",
                   "heart_pie", "art/heart_pie.bmp", "page", "art/page.bmp", "soup", "art/soup.bmp",
                   "map", "art/dmap.bmp", "compass", "art/compass.bmp", "skewers", "art/skewer.bmp", "chili", "art/chili.bmp",
@@ -43,17 +43,17 @@ func start() {
     if on_clear or on_solve or game.hearts_max < min_hearts { show(false) }
 }
 
-func show(on) {
+func show(on: bool) -> void {
     shown = on
     if on { self.Sprite.tint = rgb(255, 255, 255) } else { self.Sprite.tint = rgb(255, 255, 255, 0) }
 }
 
-func visible() { return shown }
+func visible() -> bool { return shown }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if not shown {
-        var ready = false
+        var ready := false
         if on_clear and len(find_all("Enemy")) == 0 and len(find_all("Spawner")) == 0 { ready = true }
         if on_solve and self.parent.solved { ready = true }
         if ready {
@@ -73,7 +73,7 @@ func update(dt) {
     if hero.touches(self.global_position, 3) { take() }
 }
 
-func take() {
+func take() -> void {
     if price > 0 {
         if game.beans < price { return }
         game.beans -= price

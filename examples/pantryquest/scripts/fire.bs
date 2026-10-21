@@ -3,22 +3,22 @@
 # secret (tile Y) burns away, and a brazier it reaches catches light.
 
 var dir := vec2(1, 0)
-var travel = 0.25
-var burn = 1.0
-var game
-var t = 0
-var hit_list = []
-var burned = false
+var travel: number = 0.25
+var burn: number = 1.0
+var game: entity
+var t: number = 0
+var hit_list: list = []
+var burned: bool = false
 
-func start() { game = find("Game") }
+func start() -> void { game = find("Game") }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     t += dt
     if floor(t * 10) % 2 == 0 { self.Sprite.image = "art/flame_0.bmp" } else { self.Sprite.image = "art/flame_1.bmp" }
     if travel > 0 {
         travel -= dt
-        var to = self.position + dir * 128 * dt
+        var to := self.position + dir * 128 * dt
         if to.x < 8 or to.x > 248 or to.y < 72 or to.y > 232 or tile_solid(game.map, to + dir * 6) {
             travel = 0
         } else {

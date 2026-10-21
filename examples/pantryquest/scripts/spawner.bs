@@ -2,10 +2,10 @@
 # every enemy of the waves before is beaten). `prefab` is the enemy's prefab
 # name ("toast"), `wave` 2, 3...
 
-var prefab = ""
-var wave = 2
+var prefab: string = ""
+var wave: number = 2
 
-func fire() {
+func fire() -> void {
     spawn("prefabs/" + prefab + ".scene", self.position, self.parent)
     destroy(self)
 }

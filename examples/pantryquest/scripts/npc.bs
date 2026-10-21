@@ -1,18 +1,18 @@
 # Someone in a cave, with something to say. With `pages_needed`,
 # `hearts_needed` or `spoon_needed`, once Pip has that many recipe pages,
 # heart containers or a spoon, they say `ready1` and `ready2` instead.
-var line1 = ""
-var line2 = ""
-var pages_needed = 0
-var hearts_needed = 0
-var spoon_needed = false
-var ready1 = ""
-var ready2 = ""
+var line1: string = ""
+var line2: string = ""
+var pages_needed: number = 0
+var hearts_needed: number = 0
+var spoon_needed: bool = false
+var ready1: string = ""
+var ready2: string = ""
 
-func start() {
-    var game = find("Game")
-    var needs = pages_needed > 0 or hearts_needed > 0 or spoon_needed
-    var met = game.pages >= pages_needed and game.hearts_max >= hearts_needed and (game.weapon > 0 or not spoon_needed)
+func start() -> void {
+    var game := find("Game")
+    var needs := pages_needed > 0 or hearts_needed > 0 or spoon_needed
+    var met := game.pages >= pages_needed and game.hearts_max >= hearts_needed and (game.weapon > 0 or not spoon_needed)
     if needs and met {
         game.say(ready1, ready2)
     } else {

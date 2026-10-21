@@ -1,13 +1,13 @@
 # GAME OVER: Enter carries on (from the start of the overworld or the cellar
 # Pip was in), Escape goes back to the title. Or a click on either; on a
 # gamepad, A and B.
-var t = 0
-func start() { update(0) }
-func update(dt) {
+var t: number = 0
+func start() -> void { update(0) }
+func update(dt: number) -> void {
     t += dt
-    var s = find("Settings")
-    var c1 = child(self, "Choice1")
-    var c2 = child(self, "Choice2")
+    var s := find("Settings")
+    var c1 := child(self, "Choice1")
+    var c2 := child(self, "Choice2")
     c1.Label.text = s.ok_label() + " - TRY AGAIN"         # (named for keys or the gamepad, from the start)
     c2.Label.text = s.back_label() + " - BACK TO THE TITLE"
     if t < 1 { return }

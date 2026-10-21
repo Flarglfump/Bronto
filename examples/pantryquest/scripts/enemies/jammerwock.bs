@@ -5,51 +5,51 @@
 # strength on it spits five blobs, not three, and comes up sooner. Ten points of health
 # (seven pokes with the copper spoon).
 
-var hp = 10
-var hp_max = 10
-var title = "JAMMERWOCK"
-var subtitle = "KEEPER OF THE JAM JAR"
-var size = 12
-var damage = 2
-var game
-var hero
-var appear_t = 0
-var mode = "up"             # under, rise, up, sink
-var mode_t = 1.2
-var spat = false
-var spots = [vec2(80, 64), vec2(96, 64), vec2(160, 64), vec2(176, 64)]   # (in the pools: room coordinates)
-var flash_t = 0
-var alpha = 1
+var hp: number = 10
+var hp_max: number = 10
+var title: string = "JAMMERWOCK"
+var subtitle: string = "KEEPER OF THE JAM JAR"
+var size: number = 12
+var damage: number = 2
+var game: entity
+var hero: entity
+var appear_t: number = 0
+var mode: string = "up"             # under, rise, up, sink
+var mode_t: number = 1.2
+var spat: bool = false
+var spots: list[vec2] = [vec2(80, 64), vec2(96, 64), vec2(160, 64), vec2(176, 64)]   # (in the pools: room coordinates)
+var flash_t: number = 0
+var alpha: number = 1
 
-func start() {
+func start() -> void {
     game = find("Game")
     damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)
 }
 
-func intro_done() {
+func intro_done() -> void {
     appear_t = 0
     mode = "up"
     mode_t = 1.2
     spat = false
 }
 
-func set_alpha(a) {
+func set_alpha(a: number) -> void {
     alpha = clamp(a, 0, 1)
-    var c = 255
+    var c: number = 255
     if flash_t > 0 and floor(flash_t * 24) % 2 == 0 { c = 120 }
     self.Sprite.tint = rgb(255, c, c, alpha * 255)
 }
 
 # Comes up at whichever pool spot is nearest Pip (now and then the next nearest).
-func pick_spot() {
-    var best = spots[0]
-    var second = spots[1]
-    var bd = 99999
-    var sd = 99999
+func pick_spot() -> vec2 {
+    var best := spots[0]
+    var second := spots[1]
+    var bd: number = 99999
+    var sd: number = 99999
     for s in spots {
-        var d = distance(self.parent.global_position + s, hero.position)
+        var d := distance(self.parent.global_position + s, hero.position)
         if d < bd {
             second = best
             sd = bd
@@ -64,18 +64,18 @@ func pick_spot() {
     return best
 }
 
-func spit() {
-    var aim = angle(hero.position - self.global_position)
-    var spread = [-18, 0, 18]
+func spit() -> void {
+    var aim := angle(hero.position - self.global_position)
+    var spread := [-18, 0, 18]
     if hp <= hp_max / 2 { spread = [-30, -15, 0, 15, 30] }
     for a in spread {
-        var s = spawn("prefabs/jam.scene", self.position + vec2(0, 4), self.parent)
+        var s := spawn("prefabs/jam.scene", self.position + vec2(0, 4), self.parent)
         s.vel = from_angle(aim + a, 92)
     }
     play_sound("sfx/splash.wav", 0.8)
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         game.boss_arrives(self)
@@ -92,7 +92,7 @@ func update(dt) {
             play_sound("sfx/splash.wav", 0.5)
         }
     } elif mode == "rise" {
-        var k = 1 - mode_t / 0.45
+        var k := 1 - mode_t / 0.45
         set_alpha(k)
         self.scale = vec2(1, 0.4 + 0.6 * k)
         if mode_t <= 0 {
@@ -113,7 +113,7 @@ func update(dt) {
         if spat and mode_t < 0.7 { self.Sprite.image = "art/jamwock_0.bmp" }
         if mode_t <= 0 { sink() }
     } elif mode == "sink" {
-        var k = mode_t / 0.35
+        var k := mode_t / 0.35
         set_alpha(k)
         self.scale = vec2(1, 0.4 + 0.6 * k)
         if mode_t <= 0 {
@@ -126,13 +126,13 @@ func update(dt) {
     if mode == "up" and hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
 }
 
-func sink() {
+func sink() -> void {
     self.Sprite.image = "art/jamwock_0.bmp"
     mode = "sink"
     mode_t = 0.35
 }
 
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 { return false }
     if mode != "up" and not (mode == "rise" and mode_t < 0.2) { return false }   # under the jam: out of reach

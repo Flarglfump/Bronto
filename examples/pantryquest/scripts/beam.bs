@@ -1,17 +1,17 @@
 # The spark of flavour that flies from Pip's spoon when his health is full.
 
 var vel := vec2(0, 0)
-var game
-var t = 0
+var game: entity
+var t: number = 0
 
-func start() { game = find("Game") }
+func start() -> void { game = find("Game") }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     self.position += vel * dt
     t += dt
     if floor(t * 20) % 2 == 0 { self.Sprite.tint = rgb(255, 255, 160) } else { self.Sprite.tint = rgb(255, 160, 120) }
-    var p = self.position
+    var p := self.position
     if p.x < 0 or p.x > 256 or p.y < 64 or p.y > 240 {
         burst()
         return
@@ -24,7 +24,7 @@ func update(dt) {
     }
 }
 
-func burst() {
+func burst() -> void {
     spawn("prefabs/sparkle.scene", self.position)
     destroy(self)
 }

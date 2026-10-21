@@ -4,19 +4,19 @@
 # times it all: game.intro_t). During the fight its name and a bar of its
 # strength stay at the bottom of the play area.
 
-var game
-var pre
-var title
-var sub
-var top
-var bot
-var name
-var back
-var fill
-var track
-var named = ""
+var game: entity
+var pre: entity
+var title: entity
+var sub: entity
+var top: entity
+var bot: entity
+var name: entity
+var back: entity
+var fill: entity
+var track: entity
+var named: string = ""
 
-func start() {
+func start() -> void {
     game = find("Game")
     pre = child(self, "BossPre")
     title = child(self, "BossTitle")
@@ -30,24 +30,24 @@ func start() {
 }
 
 # "THE" before a guardian's name - but not a baron's.
-func the(b) {
+func the(b: entity) -> string {
     if substr(b.title, 0, 6) == "BARON " { return "" }
     return "THE"
 }
 
-func ease(k) { return 1 - (1 - k) * (1 - k) }
+func ease(k: number) -> number { return 1 - (1 - k) * (1 - k) }
 
-func update(dt) {
-    var t = -1
+func update(dt: number) -> void {
+    var t: number = -1
     if game.state == "intro" { t = game.intro_t }
-    var h = 0
+    var h: number = 0
     if t >= 0 { h = 28 * clamp(min(t / 0.3, (3.4 - t) / 0.3), 0, 1) }
     top.Shape.size = vec2(256, h)
     top.position = vec2(128, 64 + h / 2)
     bot.Shape.size = vec2(256, h)
     bot.position = vec2(128, 240 - h / 2)
-    var b = game.boss
-    var x = 400
+    var b: entity = game.boss
+    var x: number = 400
     if t >= 1.3 and b != nil and b.alive {
         if named != b.title {
             named = b.title
@@ -59,7 +59,7 @@ func update(dt) {
     }
     self.position = vec2(x, 136)
     # the bar, while it fights
-    var a = 0
+    var a: number = 0
     if game.state == "play" and b != nil and b.alive and b.appear_t <= 0 { a = 255 }
     name.Label.color = rgb(255, 240, 208, a)
     back.Shape.color = rgb(27, 20, 24, a * 0.85)
@@ -68,7 +68,7 @@ func update(dt) {
     if a > 0 {
         name.Label.text = the(b) + " " + b.title
         if the(b) == "" { name.Label.text = b.title }
-        var w = 126 * clamp(b.hp / b.hp_max, 0, 1)
+        var w: number = 126 * clamp(b.hp / b.hp_max, 0, 1)
         fill.Shape.size = vec2(w, 4)
         fill.position = vec2(128 - 63 + w / 2, 233)
     }

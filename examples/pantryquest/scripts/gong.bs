@@ -1,23 +1,23 @@
 # A gong in the Banquet Hall, out of reach across the jam: a skewer rings it
 # (scripts/skewer.bs), which solves its room's puzzle (scripts/room.bs).
 
-var rung = false
-var game
-var t = 0
+var rung: bool = false
+var game: entity
+var t: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     if game.has_flag("solved:" + self.parent.id) { rung = true }
 }
 
-func ring() {
+func ring() -> void {
     if rung { return }
     rung = true
     t = 0.8
     play_sound("sfx/gong.wav")
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if t > 0 {
         t -= dt
         self.rotation = sin(t * 1600) * 12 * t

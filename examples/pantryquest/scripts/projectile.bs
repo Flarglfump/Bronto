@@ -4,29 +4,29 @@
 # with the baking tray, every one).
 
 var vel := vec2(0, 0)
-var damage = 1
-var blockable = true        # can Pip's lid stop it?
-var walls = true            # does a wall stop it?
-var game
-var hero
-var map
+var damage: number = 1
+var blockable: bool = true        # can Pip's lid stop it?
+var walls: bool = true            # does a wall stop it?
+var game: entity
+var hero: entity
+var map: entity
 
-func start() {
+func start() -> void {
     game = find("Game")
     damage = game.enemy_damage(damage, self.parent)     # (thrown harder later in the game)
     hero = find("Hero")
     map = child(self.parent, "Map")
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     self.position += vel * dt
-    var p = self.position
+    var p := self.position
     if p.x < -8 or p.x > 264 or p.y < -8 or p.y > 184 {
         destroy(self)
         return
     }
-    var g = self.global_position
+    var g := self.global_position
     if walls and tile_solid(map, g) {
         destroy(self)
         return

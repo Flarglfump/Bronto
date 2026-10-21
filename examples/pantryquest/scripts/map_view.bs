@@ -7,19 +7,19 @@
 # the screens he hasn't been to.
 # The game waits while it's open; Escape, Enter or the MAP key closes it.
 
-var game
-var controls
-var you
-var t = 0
-var opened = 0
+var game: entity
+var controls: entity
+var you: entity
+var t: number = 0
+var opened: number = 0
 
 # A spot on the map (in its pixels) as a place in this view.
-func at(p) { return vec2(-128 + p.x, -62 + p.y) }
+func at(p: vec2) -> vec2 { return vec2(-128 + p.x, -62 + p.y) }
 
-func start() {
+func start() -> void {
     game = find("Game")
     controls = find("Settings")
-    var data = find("MapData")
+    var data := find("MapData")
     for y in 8 {                                       # the fog: screens not yet seen
         for x in 16 {
             if not contains(game.land, x + "_" + y) {
@@ -29,13 +29,13 @@ func start() {
     }
     for d in data.doors() {                            # the cellar doors found
         if contains(game.land, d[3]) {
-            var icon = spawn("prefabs/map_icon.scene", at(vec2(d[1], d[2] - 4)), self)
-            var kind = "red"
+            var icon := spawn("prefabs/map_icon.scene", at(vec2(d[1], d[2] - 4)), self)
+            var kind := "red"
             if find("HUD").cleared(d[0]) { kind = "gold" }
             icon.Sprite.image = "art/map_" + d[0] + "_" + kind + ".bmp"
         }
     }
-    var ring = spawn("prefabs/map_mark.scene", at(game.map_spot()), self)   # (a dark ring, so he shows on anything)
+    var ring := spawn("prefabs/map_mark.scene", at(game.map_spot()), self)   # (a dark ring, so he shows on anything)
     ring.Shape.size = vec2(6, 6)
     ring.Shape.color = rgb(42, 26, 16)
     ring.Shape.layer = 88
@@ -48,19 +48,19 @@ func start() {
     child(self, "TabMap").Label.color = rgb(255, 240, 208)
 }
 
-func to_items() {
+func to_items() -> void {
     play_sound("sfx/menu.wav")
     spawn("prefabs/menu.scene", self.position)
     destroy(self)
 }
 
-func close() {
+func close() -> void {
     game.state = "play"
     play_sound("sfx/menu.wav")
     destroy(self)
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     t += dt
     opened += 1
     if floor(t * 4) % 2 == 0 { you.Shape.color = rgb(255, 248, 236) } else { you.Shape.color = rgb(216, 52, 58) }

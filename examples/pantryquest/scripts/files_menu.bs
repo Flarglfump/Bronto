@@ -4,21 +4,21 @@
 # ("session") for the game to pick up as main.scene starts.
 # The mouse works too: over a file (or ERASE, BACK) it's chosen; a click does it.
 
-var s
-var choice = 0              # 0 to 2 the files, 3 erase, 4 back
-var erasing = false
-var confirm = false
-var places = []
-var details = []
-var badges = []
-var row_hi
-var erase_label
-var back_label
-var note
-var filled = [false, false, false]
+var s: entity
+var choice: number = 0              # 0 to 2 the files, 3 erase, 4 back
+var erasing: bool = false
+var confirm: bool = false
+var places: list[entity] = []
+var details: list[entity] = []
+var badges: list[entity] = []
+var row_hi: entity
+var erase_label: entity
+var back_label: entity
+var note: entity
+var filled: list[bool] = [false, false, false]
 var mouse_at := vec2(-1, -1)
 
-func start() {
+func start() -> void {
     s = find("Settings")
     for i in 3 {
         push(places, child(self, "Place" + i))
@@ -34,16 +34,16 @@ func start() {
 }
 
 # A value from a saved file's [name, value] pairs.
-func field(data, name, otherwise) {
+func field(data: list[list], name: string, otherwise: any) -> any {
     for pair in data {
         if pair[0] == name { return pair[1] }
     }
     return otherwise
 }
 
-func refresh() {
+func refresh() -> void {
     for i in 3 {
-        var d = load_data("slot" + (i + 1))
+        var d: any = load_data("slot" + (i + 1))
         filled[i] = d != nil
         if d == nil {
             places[i].Label.text = "- NEW GAME -"
@@ -57,7 +57,7 @@ func refresh() {
     show()
 }
 
-func show() {
+func show() -> void {
     for i in 3 {
         if i == choice { places[i].Label.color = rgb(142, 26, 42) } else { places[i].Label.color = rgb(98, 56, 26) }
     }
@@ -76,8 +76,8 @@ func show() {
 }
 
 # What the mouse is over (a file 0 to 2, 3 erase, 4 back), or -1.
-func under_mouse() {
-    var m = mouse_position()
+func under_mouse() -> number {
+    var m := mouse_position()
     for i in 3 {
         if abs(m.y - places[i].global_position.y - 6) <= 10 and abs(m.x - self.global_position.x) <= 100 { return i }
     }
@@ -86,13 +86,13 @@ func under_mouse() {
     return -1
 }
 
-func update(dt) {
-    var m = mouse_position()
-    var moved = m != mouse_at
+func update(dt: number) -> void {
+    var m := mouse_position()
+    var moved := m != mouse_at
     mouse_at = m
-    var click = false
+    var click := false
     if moved or s.clicked() {
-        var u = under_mouse()
+        var u := under_mouse()
         if u >= 0 {
             if u != choice {
                 choice = u
@@ -114,7 +114,7 @@ func update(dt) {
         play_sound("sfx/menu.wav")
         return
     }
-    var before = choice
+    var before := choice
     if s.nav("up") {
         if choice == 3 or choice == 4 { choice = 2 } else { choice = (choice + 4) % 5 }
     }

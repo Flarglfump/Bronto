@@ -3,21 +3,21 @@
 # it touches on the ground.
 
 var dir := vec2(1, 0)
-var speed = 150
-var out_dist = 84
-var gone = 0
-var back = false
-var game
-var hero
-var carried
-var sound_t = 0
+var speed: number = 150
+var out_dist: number = 84
+var gone: number = 0
+var back: bool = false
+var game: entity
+var hero: entity
+var carried: entity
+var sound_t: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     hero = find("Hero")
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     self.rotation += 900 * dt
     sound_t -= dt
@@ -28,10 +28,10 @@ func update(dt) {
     if not back {
         self.position += dir * speed * dt
         gone += speed * dt
-        var p = self.position
+        var p := self.position
         if gone >= out_dist or p.x < 4 or p.x > 252 or p.y < 68 or p.y > 236 or tile_solid(game.map, p) { back = true }
     } else {
-        var to = hero.position - self.position
+        var to := hero.position - self.position
         if length(to) < 8 {
             if carried != nil and carried.alive { carried.take() }
             destroy(self)

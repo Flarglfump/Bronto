@@ -2,18 +2,18 @@
 # in one by one; after a moment, Enter (or the spoon's key) goes back to the
 # title (or a click).
 
-var t = 0
-var names = ["Title", "Title2", "Line1", "Line2", "Line3", "Time", "Thanks", "Keys"]
+var t: number = 0
+var names: list[string] = ["Title", "Title2", "Line1", "Line2", "Line3", "Time", "Thanks", "Keys"]
 
-func start() {
-    var game = find("Game")
+func start() -> void {
+    var game := find("Game")
     child(self, "Time").Label.text = "TIME " + find("Settings").clock(game.play_time)
     for n in names { child(self, n).Label.color = rgb(0, 0, 0, 0) }
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     t += dt
-    var colours = [rgb(142, 26, 42), rgb(142, 26, 42), rgb(98, 56, 26), rgb(98, 56, 26), rgb(98, 56, 26),
+    var colours := [rgb(142, 26, 42), rgb(142, 26, 42), rgb(98, 56, 26), rgb(98, 56, 26), rgb(98, 56, 26),
                    rgb(160, 120, 80), rgb(142, 26, 42), rgb(160, 120, 80)]
     child(self, "Keys").Label.text = find("Settings").ok_label() + " - BACK TO THE TITLE"
     for i in len(names) {

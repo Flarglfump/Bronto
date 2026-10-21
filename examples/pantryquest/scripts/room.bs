@@ -14,32 +14,32 @@
 #   - `need_pages`: Pip must carry that many recipe pages.
 # Pickups with `on_solve` show up when it is solved.
 
-var id = ""                 # its file name: "ow_7_7", "d1_2_3", "cave_chef"
-var region = ""             # the part of the land it is in ("LETTUCE WOODS"): shown as Pip comes in
-var title = ""              # a name of its own to show instead (an unbuilt cellar's)
-var music = ""              # the track while Pip is here ("" = silence)
-var tier = 0                # its stage of the game (1 to 9): a cellar's number, or on the land the
+var id: string = ""                 # its file name: "ow_7_7", "d1_2_3", "cave_chef"
+var region: string = ""             # the part of the land it is in ("LETTUCE WOODS"): shown as Pip comes in
+var title: string = ""              # a name of its own to show instead (an unbuilt cellar's)
+var music: string = ""              # the track while Pip is here ("" = silence)
+var tier: number = 0                # its stage of the game (1 to 9): a cellar's number, or on the land the
                             #   cellar in its region; 0 for caves. Enemies get tougher with it (game.enemy_hp)
-var shut = ""               # sides whose shutters close while enemies remain, e.g. "s" or "ns"
-var stays_clear = false     # once cleared, its enemies don't come back (the cellars)
-var sealed = ""             # sides shut (by shutters) until the room's puzzle is solved
-var need_pages = 0          # a puzzle of its own: carrying this many recipe pages
-var puzzle = false          # does it have one?
-var solved = false
-var plates = []             # its pressure plates (cells)
-var tiles                   # its Tilemap
-var exit_n = ""             # leaving by this side goes to this room instead of the next one
-var exit_s = ""             #   ("back" = where Pip came from: for caves)
-var exit_e = ""
-var exit_w = ""
+var shut: string = ""               # sides whose shutters close while enemies remain, e.g. "s" or "ns"
+var stays_clear: bool = false     # once cleared, its enemies don't come back (the cellars)
+var sealed: string = ""             # sides shut (by shutters) until the room's puzzle is solved
+var need_pages: number = 0          # a puzzle of its own: carrying this many recipe pages
+var puzzle: bool = false          # does it have one?
+var solved: bool = false
+var plates: list[vec2] = []             # its pressure plates (cells)
+var tiles: entity    # its Tilemap
+var exit_n: string = ""             # leaving by this side goes to this room instead of the next one
+var exit_s: string = ""             #   ("back" = where Pip came from: for caves)
+var exit_e: string = ""
+var exit_w: string = ""
 var exit_pos := vec2(128, 200)
-var exit_face = "down"
-var game
-var shutting = false
-var shut_tiles = []         # what each shut side was before its shutter came down (a locked door stays locked)
-var started = false
+var exit_face: string = "down"
+var game: entity
+var shutting: bool = false
+var shut_tiles: list[string] = []         # what each shut side was before its shutter came down (a locked door stays locked)
+var started: bool = false
 
-func start() {
+func start() -> void {
     game = find("Game")
     tiles = child(self, "Map")
     for side in ["n", "s", "e", "w"] {
@@ -63,21 +63,21 @@ func start() {
     started = true
 }
 
-func cell_point(c) { return self.global_position + c * 16 + vec2(8, 8) }
+func cell_point(c: vec2) -> vec2 { return self.global_position + c * 16 + vec2(8, 8) }
 
-func door(side, tile) {
+func door(side: string, tile: string) -> void {
     for c in game.door_cells(side) { set_tile(tiles, cell_point(c), tile) }
 }
 
-func named(n) {
-    var out = []
+func named(n: string) -> list[entity] {
+    var out := []
     for e in children(self) {
         if e.name == n { push(out, e) }
     }
     return out
 }
 
-func has_side(sides, side) {
+func has_side(sides: string, side: string) -> bool {
     for i in len(sides) {
         if sides[i] == side { return true }
     }
@@ -85,15 +85,15 @@ func has_side(sides, side) {
 }
 
 # What the floor under a crate is: a pressure plate, or plain floor.
-func floor_at(p) {
-    var c = vec2(floor((p.x - self.global_position.x) / 16), floor((p.y - self.global_position.y) / 16))
+func floor_at(p: vec2) -> string {
+    var c := vec2(floor((p.x - self.global_position.x) / 16), floor((p.y - self.global_position.y) / 16))
     for q in plates {
         if q.x == c.x and q.y == c.y { return "B" }
     }
     return "."
 }
 
-func puzzle_done() {
+func puzzle_done() -> bool {
     for c in plates {
         if tile_at(tiles, cell_point(c)) != "O" { return false }
     }
@@ -106,7 +106,7 @@ func puzzle_done() {
     return need_pages <= 0 or game.pages >= need_pages
 }
 
-func solve() {
+func solve() -> void {
     solved = true
     game.flag("solved:" + id)
     for i in len(sealed) { door(sealed[i], ",") }
@@ -114,8 +114,8 @@ func solve() {
 }
 
 # The next wave: the spawners with the lowest wave number let their enemies in.
-func next_wave() {
-    var first = 999
+func next_wave() -> bool {
+    var first: number = 999
     for s in named("Spawner") { first = min(first, s.wave) }
     if first == 999 { return false }
     for s in named("Spawner") {
@@ -126,7 +126,7 @@ func next_wave() {
 }
 
 # Pip has arrived (the slide or fade is over).
-func entered() {
+func entered() -> void {
     if shut != "" and enemies() > 0 {
         shut_tiles = []
         for i in len(shut) {
@@ -138,15 +138,15 @@ func entered() {
     }
 }
 
-func enemies() {
-    var n = 0
+func enemies() -> number {
+    var n: number = 0
     for e in children(self) {
         if e.name == "Enemy" { n += 1 }
     }
     return n
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if not started or game.state != "play" or game.room != self { return }
     if puzzle and not solved and puzzle_done() { solve() }
     if enemies() == 0 and next_wave() { return }
@@ -155,7 +155,7 @@ func update(dt) {
         if shutting {
             shutting = false
             for i in len(shut) {
-                var back = ","
+                var back := ","
                 if i < len(shut_tiles) and shut_tiles[i] != "H" { back = shut_tiles[i] }   # (as it was: open, or still locked)
                 if solved or not has_side(sealed, shut[i]) { game.set_door(shut[i], back) }
             }

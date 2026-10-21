@@ -8,77 +8,77 @@
 # under the HUD); walking off its edge slides the next one in, and stairs
 # and doorways fade to another room.
 
-var hearts_max = 3          # heart containers
-var hp = 6                  # in half hearts
-var beans = 0
-var keys = 0                # keys for the cellar Pip is in (each cellar's own: cellar_keys)
-var cellar_keys = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]   # the keys found in each cellar and not yet used (by its number)
-var bombs = 0
-var bombs_max = 8
-var weapon = 0              # 0 none, 1 wooden spoon, 2 copper spoon, 3 silver ladle, 4 golden ladle (attack())
-var outfit = 0              # 0 apron, 1 chef's jacket (hits hurt half as much), 2 royal coat (a quarter)
-var hint_i = -1             # the upgrade the old chef told of last
-var items = []              # "bombs", "cutter", "skewers", "chili", "whisk"
-var treasures = []          # things carried that work by themselves: "plank", "mitt", "tray"
-var b_item = ""             # the one on the B button (Z)
-var pages = 0               # pages of the Grand Recipe
-var flags = []              # what's been done: doors opened, items taken...
-var visited = []            # cellar rooms seen (for the HUD map)
-var land = []               # screens of the land Pip has been to ("x_y"): the pause map shows the rest in fog
-var maps = []               # cellars whose map Pip has ("d1"...): the HUD shows every room
-var compasses = []          # cellars whose compass he has: the HUD shows where the guardian is
+var hearts_max: number = 3          # heart containers
+var hp: number = 6                  # in half hearts
+var beans: number = 0
+var keys: number = 0                # keys for the cellar Pip is in (each cellar's own: cellar_keys)
+var cellar_keys: list[number] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]   # the keys found in each cellar and not yet used (by its number)
+var bombs: number = 0
+var bombs_max: number = 8
+var weapon: number = 0              # 0 none, 1 wooden spoon, 2 copper spoon, 3 silver ladle, 4 golden ladle (attack())
+var outfit: number = 0              # 0 apron, 1 chef's jacket (hits hurt half as much), 2 royal coat (a quarter)
+var hint_i: number = -1             # the upgrade the old chef told of last
+var items: list[string] = []              # "bombs", "cutter", "skewers", "chili", "whisk"
+var treasures: list[string] = []          # things carried that work by themselves: "plank", "mitt", "tray"
+var b_item: string = ""             # the one on the B button (Z)
+var pages: number = 0               # pages of the Grand Recipe
+var flags: list[string] = []              # what's been done: doors opened, items taken...
+var visited: list[string] = []            # cellar rooms seen (for the HUD map)
+var land: list[string] = []               # screens of the land Pip has been to ("x_y"): the pause map shows the rest in fog
+var maps: list[string] = []               # cellars whose map Pip has ("d1"...): the HUD shows every room
+var compasses: list[string] = []          # cellars whose compass he has: the HUD shows where the guardian is
 
-var area = "ow"             # "ow", "cave", or a cellar: "d1", "d2"...
-var rx = 7
-var ry = 7
-var room_name = ""
-var room                    # the room's root entity
-var map                     # its Tilemap
-var state = "boot"          # boot, play, slide, fade_out, fade_in, hold, menu, pause, intro, dead, over, won
-var start_room = "ow_7_7"   # (for testing a room in the editor: set these in Game's Script vars,
-var start_items = ""        #  e.g. start_room = "d1_2_4", start_pos = vec2(128, 200), start_items = "bombs,cutter")
+var area: string = "ow"             # "ow", "cave", or a cellar: "d1", "d2"...
+var rx: number = 7
+var ry: number = 7
+var room_name: string = ""
+var room: entity    # the room's root entity
+var map: entity    # its Tilemap
+var state: string = "boot"          # boot, play, slide, fade_out, fade_in, hold, menu, pause, intro, dead, over, won
+var start_room: string = "ow_7_7"   # (for testing a room in the editor: set these in Game's Script vars,
+var start_items: string = ""        #  e.g. start_room = "d1_2_4", start_pos = vec2(128, 200), start_items = "bombs,cutter")
 var start_pos := vec2(120, 168)
-var area_start = "ow_7_7"   # where Continue goes after a game over
+var area_start: string = "ow_7_7"   # where Continue goes after a game over
 var area_pos := vec2(120, 168)
 
-var hero
-var fade
-var next_room
+var hero: entity
+var fade: entity
+var next_room: entity
 var slide_dir := vec2(0, 0)
-var slide_left = 0
-var slide_total = 1
+var slide_left: number = 0
+var slide_total: number = 1
 var hero_from := vec2(0, 0)
 var hero_to := vec2(0, 0)
-var fade_t = 0
-var warp_name = ""
+var fade_t: number = 0
+var warp_name: string = ""
 var warp_pos := vec2(0, 0)
-var warp_face = "up"
-var ret_name = ""           # where a cave's way out leads back to
+var warp_face: string = "up"
+var ret_name: string = ""           # where a cave's way out leads back to
 var ret_pos := vec2(0, 0)
-var cave_region = ""        # the region a cave opens onto (for the map)
-var hold_t = 0
-var dead_t = 0
-var music_name = ""
-var music
-var say1 = ""
-var say2 = ""
-var say_t = 0
-var beep_t = 0
-var won_t = 0
-var holding_page = false
-var holding_recipe = false  # the Grand Recipe, whole: the end
-var note1 = ""              # a message for when the next room has faded in
-var note2 = ""
-var whisk_i = -1            # the cellar door the whisk went to last (in the list of those with a page)
+var cave_region: string = ""        # the region a cave opens onto (for the map)
+var hold_t: number = 0
+var dead_t: number = 0
+var music_name: string = ""
+var music: entity
+var say1: string = ""
+var say2: string = ""
+var say_t: number = 0
+var beep_t: number = 0
+var won_t: number = 0
+var holding_page: bool = false
+var holding_recipe: bool = false  # the Grand Recipe, whole: the end
+var note1: string = ""              # a message for when the next room has faded in
+var note2: string = ""
+var whisk_i: number = -1            # the cellar door the whisk went to last (in the list of those with a page)
 
-var booted = 0
-var slot = 0                # the save slot being played (1 to 3), chosen on the title; 0: none (the editor's Play)
-var play_time = 0           # seconds played in this slot
-var controls                # the player's keys (the Settings entity)
-var boss                    # the guardian in this room, once it has shown itself
-var intro_t = 0             # how far into its entrance (state "intro")
+var booted: number = 0
+var slot: number = 0                # the save slot being played (1 to 3), chosen on the title; 0: none (the editor's Play)
+var play_time: number = 0           # seconds played in this slot
+var controls: entity    # the player's keys (the Settings entity)
+var boss: entity    # the guardian in this room, once it has shown itself
+var intro_t: number = 0             # how far into its entrance (state "intro")
 
-func start() {
+func start() -> void {
     hero = find("Hero")
     fade = find("Fade")
     controls = find("Settings")
@@ -88,10 +88,10 @@ func start() {
 # The first steps: every script in the scene has started before the first room comes in.
 # The title leaves the chosen slot in saved data ("session"): a slot with a game
 # in it carries on from where it was saved, an empty one starts a new game.
-func boot() {
+func boot() -> void {
     booted += 1
     if booted < 2 { return }
-    var chosen = load_data("session")
+    var chosen: any = load_data("session")
     if chosen != nil {
         delete_data("session")
         slot = chosen
@@ -112,18 +112,18 @@ func boot() {
 
 # Where Pip carries on from: this screen on the land, outside a cave, or the
 # door of the cellar he is in.
-func resume_point() {
+func resume_point() -> list {
     if area == "ow" { return [room_name, hero.position] }
     if area == "cave" { return [ret_name, ret_pos] }
     return [area_start, area_pos]
 }
 
-func save_game() {
+func save_game() -> bool {
     if slot <= 0 { return false }
-    var r = resume_point()
-    var place = area_title()
+    var r := resume_point()
+    var place := area_title()
     if place == "" { place = find("Banner").last }
-    var data = [["version", 3], ["outfit", outfit], ["land", land], ["room", r[0]], ["pos", r[1]], ["place", place], ["time", floor(play_time)],
+    var data := [["version", 3], ["outfit", outfit], ["land", land], ["room", r[0]], ["pos", r[1]], ["place", place], ["time", floor(play_time)],
                 ["hearts_max", hearts_max], ["beans", beans], ["cellar_keys", stored_keys()], ["bombs", bombs],
                 ["bombs_max", bombs_max], ["weapon", weapon], ["items", items], ["b_item", b_item], ["treasures", treasures],
                 ["pages", pages], ["flags", flags], ["visited", visited], ["maps", maps], ["compasses", compasses],
@@ -131,15 +131,15 @@ func save_game() {
     return save_data("slot" + slot, data)
 }
 
-func load_game() {
-    var data = load_data("slot" + slot)
+func load_game() -> bool {
+    var data: any = load_data("slot" + slot)
     if data == nil { return false }
-    var version = 1
-    var has_land = false
-    var old_keys = 0
+    var version: number = 1
+    var has_land := false
+    var old_keys: number = 0
     for pair in data {
-        var k = pair[0]
-        var v = pair[1]
+        var k: string = pair[0]
+        var v: any = pair[1]
         if k == "version" { version = v }
         elif k == "outfit" { outfit = v }
         elif k == "land" {
@@ -180,15 +180,15 @@ func load_game() {
 }
 
 # How hard a poke hits, with the spoon or ladle Pip has.
-func attack() {
-    var power = [0, 1, 1.5, 2, 3]
+func attack() -> number {
+    var power := [0, 1, 1.5, 2, 3]
     return power[clamp(weapon, 0, 4)]
 }
 
 # ---- rooms --------------------------------------------------------------------
-func split(s, sep) {
-    var out = []
-    var cur = ""
+func split(s: string, sep: string) -> list[string] {
+    var out := []
+    var cur := ""
     for i in len(s) {
         if s[i] == sep {
             push(out, cur)
@@ -201,10 +201,10 @@ func split(s, sep) {
     return out
 }
 
-func room_file(name) { return "rooms/" + name + ".scene" }
+func room_file(name: string) -> string { return "rooms/" + name + ".scene" }
 
 # The name for the banner as Pip comes in: the part of the land, or the cellar.
-func area_title() {
+func area_title() -> string {
     if area == "cave" { return "" }
     if room.title != "" { return room.title }
     if area == "ow" { return room.region }
@@ -212,7 +212,7 @@ func area_title() {
 }
 
 # Makes `name` the current room (spawned at the top of the play area).
-func enter(name, pos, face) {
+func enter(name: string, pos: vec2, face: string) -> void {
     if room != nil { destroy(room) }
     room = spawn(room_file(name), vec2(0, 64))
     map = child(room, "Map")
@@ -230,15 +230,15 @@ func enter(name, pos, face) {
     say("", "")
 }
 
-func set_place(name) {
+func set_place(name: string) -> void {
     room_name = name
-    var was = area
+    var was := area
     if substr(name, 0, 4) == "cave" {
         area = "cave"
         switch_keys(was)
         return
     }
-    var p = split(name, "_")
+    var p := split(name, "_")
     area = p[0]
     switch_keys(was)
     rx = num(p[1])
@@ -250,46 +250,46 @@ func set_place(name) {
 # ---- keys: each cellar's own -------------------------------------------------------------
 # A key opens a door only in the cellar it was found in. `keys` is the count for
 # the cellar Pip is in; leaving puts it away (cellar_keys), coming back gets it out.
-func key_slot(name) {
+func key_slot(name: string) -> number {
     if substr(name, 0, 1) == "d" {
-        var p = split(name, "_")
+        var p := split(name, "_")
         return clamp(num(substr(p[0], 1, len(p[0]) - 1)), 0, 9)
     }
     return 0
 }
 
-func switch_keys(was) {
+func switch_keys(was: string) -> void {
     if was == area { return }
     cellar_keys[key_slot(was)] = keys
     keys = cellar_keys[key_slot(area)]
 }
 
 # Every cellar's keys, with this one's as they are now (for saving).
-func stored_keys() {
+func stored_keys() -> list[number] {
     cellar_keys[key_slot(area)] = keys
     return cellar_keys
 }
 
 # Where Pip is on the map of the land (art/world_map.bmp, a pixel a tile): on
 # the land, his very spot; in a cave, its mouth; in a cellar, its door.
-func map_spot() {
-    var name = room_name
-    var pos = hero.position
+func map_spot() -> vec2 {
+    var name := room_name
+    var pos := hero.position
     if area == "cave" {
         name = ret_name
         pos = ret_pos
     } elif area != "ow" {
-        var c = find("Cellars")
+        var c := find("Cellars")
         name = c.exit_room(area)
         pos = c.exit_pos(area)
     }
-    var p = split(name, "_")
+    var p := split(name, "_")
     if len(p) < 3 { return vec2(7 * 16 + 8, 7 * 11 + 6) }
     return vec2(num(p[1]) * 16 + pos.x / 16, num(p[2]) * 11 + (pos.y - 64) / 16)
 }
 
 # What the map calls where Pip is.
-func place_name() {
+func place_name() -> string {
     if area == "cave" {
         if cave_region == "" { return "IN A CAVE" }
         return "IN A CAVE, " + in_or_on(cave_region)
@@ -298,20 +298,20 @@ func place_name() {
     return "IN " + find("Cellars").name(area)
 }
 
-func in_or_on(region) {
+func in_or_on(region: string) -> string {
     if region == "SUGAR ROAD" or region == "PANTRY PLAINS" or region == "JUICE COAST" { return "ON THE " + region }
     return "IN THE " + region
 }
 
-func music_for_room() {
-    var want = room.music
+func music_for_room() -> void {
+    var want: string = room.music
     if want == "" { want = "none" }
     play_music(want)
 }
 
 # A track by name ("overworld", "cellar", "boss"...); a name starting with
 # "none" just stops the music.
-func play_music(name) {
+func play_music(name: string) -> void {
     if name == music_name { return }
     music_name = name
     if music != nil { destroy(music) }
@@ -320,9 +320,9 @@ func play_music(name) {
 }
 
 # The hero walked off the play area towards `side` ("n", "s", "e" or "w").
-func leave(side) {
+func leave(side: string) -> void {
     if state != "play" { return }
-    var ex = exit_of(side)
+    var ex := exit_of(side)
     if ex == "back" {
         warp(ret_name, ret_pos, "down")
         return
@@ -337,7 +337,7 @@ func leave(side) {
     if side == "s" { d = vec2(0, 1) }
     if side == "w" { d = vec2(-1, 0) }
     if side == "e" { d = vec2(1, 0) }
-    var name = area + "_" + (rx + d.x) + "_" + (ry + d.y)
+    var name := area + "_" + (rx + d.x) + "_" + (ry + d.y)
     next_room = spawn(room_file(name), vec2(d.x * 256, 64 + d.y * 176))
     slide_dir = d
     if d.x != 0 { slide_left = 256 } else { slide_left = 176 }
@@ -346,7 +346,7 @@ func leave(side) {
     hero_to = hero.position - d * slide_total          # the same place on the screen, then a few steps in
     # In the cellars he walks on past the doorway (two tiles deep), so that
     # a shutter closing behind him can't close on his feet.
-    var deep = 0
+    var deep: number = 0
     if area != "ow" { deep = 1 }
     if d.y < 0 { hero_to.y = min(hero_to.y, 232 - deep * 32) }      # arriving at the bottom: 200
     if d.y > 0 { hero_to.y = max(hero_to.y, 72 + deep * 24) }       # arriving at the top: 96
@@ -357,14 +357,14 @@ func leave(side) {
     say("", "")
 }
 
-func exit_of(side) {
+func exit_of(side: string) -> string {
     if side == "n" { return room.exit_n }
     if side == "s" { return room.exit_s }
     if side == "e" { return room.exit_e }
     return room.exit_w
 }
 
-func warp(name, pos, face) {
+func warp(name: string, pos: vec2, face: string) -> void {
     if state != "play" and state != "hold" { return }
     if substr(name, 0, 4) == "cave" and area != "cave" {
         ret_name = room_name
@@ -379,11 +379,11 @@ func warp(name, pos, face) {
     play_sound("sfx/stairs.wav", 0.6)
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if state == "boot" {
         boot()
     } elif state == "slide" {
-        var step = min(4, slide_left)
+        var step := min(4, slide_left)
         slide_left -= step
         room.position -= slide_dir * step
         next_room.position -= slide_dir * step
@@ -469,13 +469,13 @@ func update(dt) {
     type_text(dt)
 }
 
-func set_fade(a) {
+func set_fade(a: number) -> void {
     fade.Shape.color = rgb(0, 0, 0, clamp(a, 0, 1) * 255)
 }
 
 # ---- the hero's health ------------------------------------------------------------
-func damage(half_hearts) {
-    var guard = [1, 0.5, 0.25]
+func damage(half_hearts: number) -> void {
+    var guard := [1, 0.5, 0.25]
     hp -= half_hearts * guard[clamp(outfit, 0, 2)]
     play_sound("sfx/hurt.wav")
     rumble(0.5, 0.15)                                  # (a gamepad feels it)
@@ -488,7 +488,7 @@ func damage(half_hearts) {
     }
 }
 
-func continue_game() {
+func continue_game() -> void {
     hp = 6
     for e in find_all("GameOver") { destroy(e) }
     set_fade(1)
@@ -498,18 +498,18 @@ func continue_game() {
     fade_t = 0
 }
 
-func heal(half_hearts) {
+func heal(half_hearts: number) -> void {
     hp = min(hp + half_hearts, hearts_max * 2)
 }
 
 # ---- flags --------------------------------------------------------------------------
-func flag(f) {
+func flag(f: string) -> void {
     if not contains(flags, f) { push(flags, f) }
 }
-func has_flag(f) { return contains(flags, f) }
+func has_flag(f: string) -> bool { return contains(flags, f) }
 
 # ---- things to pick up -----------------------------------------------------------------
-func collect(kind, thing) {
+func collect(kind: string, thing: entity) -> void {
     if kind == "bean" {
         beans = min(beans + 1, 255)
         play_sound("sfx/bean.wav")
@@ -601,12 +601,12 @@ func collect(kind, thing) {
         holding_page = true
     }
 }
-func has_treasure(t) { return contains(treasures, t) }
+func has_treasure(t: string) -> bool { return contains(treasures, t) }
 
 # The whisk: out on the land, it whirls Pip off to a cellar door - each use,
 # the next cellar whose recipe page he has. Anywhere else it just spins.
-func whisk() {
-    var places = []
+func whisk() -> bool {
+    var places: list[string] = []
     for n in range(1, 10) {
         if has_flag("page:d" + n) { push(places, "d" + n) }
     }
@@ -615,8 +615,8 @@ func whisk() {
         return false
     }
     whisk_i = (whisk_i + 1) % len(places)
-    var c = find("Cellars")
-    var a = places[whisk_i]
+    var c := find("Cellars")
+    var a: string = places[whisk_i]
     spawn("prefabs/whirl.scene", hero.position)
     play_sound("sfx/whisk.wav")
     warp(c.exit_room(a), c.exit_pos(a), "down")
@@ -624,36 +624,36 @@ func whisk() {
 }
 
 # The picture of Pip's spoon or ladle (for his hand and the HUD).
-func weapon_image() {
-    var images = ["art/spoon.bmp", "art/spoon.bmp", "art/spoon_copper.bmp", "art/ladle.bmp", "art/ladle_gold.bmp"]
+func weapon_image() -> string {
+    var images := ["art/spoon.bmp", "art/spoon.bmp", "art/spoon_copper.bmp", "art/ladle.bmp", "art/ladle_gold.bmp"]
     return images[clamp(weapon, 0, 4)]
 }
 
 # ---- hints (the old chef in the first cave: scripts/hint.bs) ------------------------
 # The next cellar to clear (the first whose page Pip hasn't found), and how to find it.
-func hint_next() {
-    var data = find("Hints")
+func hint_next() -> list[string] {
+    var data := find("Hints")
     if has_flag("won") { return ["THE KINGDOM IS FED! GO AND", "EXPLORE, LITTLE CHEF."] }
     for n in range(1, 9) {
         if not has_flag("page:d" + n) {
-            var h = data.cellar(n)
+            var h: list = data.cellar(n)
             if h[2] and not contains(items, "bombs") { return ["FIRST, GET POPCORN BOMBS:", "THE SHOPS SELL THEM."] }
             return [h[0], h[1]]
         }
     }
-    var last = data.cellar(9)
+    var last: list = data.cellar(9)
     return [last[0], last[1]]
 }
 
 # One upgrade out in the land Pip can reach now (and hasn't taken): a
 # different one each time he asks.
-func hint_upgrade() {
-    var open = []
-    var left = 0
+func hint_upgrade() -> list[string] {
+    var open := []
+    var left: number = 0
     for u in find("Hints").upgrades() {
         if not has_flag(u[0]) {
             left += 1
-            var can = hearts_max >= u[2]
+            var can := hearts_max >= u[2]
             if u[1] == "bombs" and not contains(items, "bombs") { can = false }
             if u[1] == "fire" and not contains(items, "bombs") and not contains(items, "chili") { can = false }
             if can { push(open, u) }
@@ -665,21 +665,21 @@ func hint_upgrade() {
     return [open[hint_i][3], open[hint_i][4]]
 }
 
-func give(item) {
+func give(item: string) -> void {
     if not contains(items, item) {
         push(items, item)
         if b_item == "" { b_item = item }
     }
 }
 
-func hold(image, seconds) {
+func hold(image: string, seconds: number) -> void {
     state = "hold"
     hold_t = seconds
     hero.hold(image)
     if image != "art/page.bmp" { play_sound("sfx/item.wav") }
 }
 
-func after_hold() {
+func after_hold() -> void {
     if holding_recipe {
         holding_recipe = false
         win()
@@ -693,7 +693,7 @@ func after_hold() {
         if pages >= 8 { note2 = "NOW FOR THE BARON'S HALL!" }
         area_start = start_room
         area_pos = start_pos
-        var cellars = find("Cellars")                       # back out of this cellar's door
+        var cellars := find("Cellars")                       # back out of this cellar's door
         warp(cellars.exit_room(area), cellars.exit_pos(area), "down")
         music_name = ""
     }
@@ -701,7 +701,7 @@ func after_hold() {
 
 # The end: the Grand Recipe is whole. The file is saved (marked as won,
 # carrying on from the Banquet Hall's door), and the ending card comes up.
-func win() {
+func win() -> void {
     flag("won")
     state = "won"
     won_t = 0
@@ -724,44 +724,44 @@ func win() {
 #   stage      1    2    3    4    5    6    7    8    9
 #   health    x1   x1  x1.5 x1.5  x2   x2  x2.5  x3  x3.5   (rounded up)
 #   damage    x1   x1   x1  x1.5  x2   x2   x2   x3   x3    (rounded up)
-func stage_of(room) {
+func stage_of(room: entity) -> number {
     if room == nil or not room.alive or room.name != "Room" { return 0 }
     return clamp(room.tier, 0, 9)
 }
-func enemy_hp(base, room) {
-    var mult = [1, 1, 1, 1.5, 1.5, 2, 2, 2.5, 3, 3.5]
+func enemy_hp(base: number, room: entity) -> number {
+    var mult := [1, 1, 1, 1.5, 1.5, 2, 2, 2.5, 3, 3.5]
     return ceil(base * mult[stage_of(room)])
 }
-func enemy_damage(base, room) {
-    var mult = [1, 1, 1, 1, 1.5, 2, 2, 2, 3, 3]
+func enemy_damage(base: number, room: entity) -> number {
+    var mult := [1, 1, 1, 1, 1.5, 2, 2, 2, 3, 3]
     return ceil(base * mult[stage_of(room)])
 }
 
 # Something an enemy might leave behind.
-func drop_at(local_pos, parent) {
-    var r = random()
-    var kind = ""
+func drop_at(local_pos: vec2, parent: entity) -> void {
+    var r := random()
+    var kind := ""
     if r < 0.28 { kind = "bean" }
     elif r < 0.34 { kind = "bean5" }
     elif r < 0.46 { kind = "heart" }
     elif r < 0.52 and contains(items, "bombs") { kind = "bomb" }
     if kind == "" { return }
-    var p = spawn("prefabs/pickup.scene", open_spot(local_pos, parent), parent)
+    var p := spawn("prefabs/pickup.scene", open_spot(local_pos, parent), parent)
     p.kind = kind
     p.timeout = 9
 }
 
 # The nearest spot on open floor to a point in a room (a bat shot down over a crate or
 # the jam drops its bean beside it, where Pip can reach it - not on top of it).
-func open_spot(local_pos, parent) {
-    var m = child(parent, "Map")
-    var origin = parent.global_position
-    var cell = vec2(floor(local_pos.x / 16), floor(local_pos.y / 16))
+func open_spot(local_pos: vec2, parent: entity) -> vec2 {
+    var m := child(parent, "Map")
+    var origin := parent.global_position
+    var cell := vec2(floor(local_pos.x / 16), floor(local_pos.y / 16))
     if not tile_solid(m, origin + cell * 16 + vec2(8, 8)) { return local_pos }
     for k in range(1, 4) {
         for dy in range(-k, k + 1) {
             for dx in range(-k, k + 1) {
-                var c = cell + vec2(dx, dy)
+                var c := cell + vec2(dx, dy)
                 if c.x >= 1 and c.x <= 14 and c.y >= 1 and c.y <= 9 and not tile_solid(m, origin + c * 16 + vec2(8, 8)) {
                     return c * 16 + vec2(8, 8)
                 }
@@ -776,7 +776,7 @@ func open_spot(local_pos, parent) {
 # game waits while bars close in, the guardian swells into view and roars,
 # and its name comes in on a card (scripts/boss_ui.bs draws those); Enter,
 # X or Space skips the rest after the first second.
-func boss_arrives(b) {
+func boss_arrives(b: entity) -> void {
     boss = b
     state = "intro"
     intro_t = 0
@@ -784,16 +784,16 @@ func boss_arrives(b) {
     b.Sprite.tint = rgb(255, 255, 255, 0)
 }
 
-func intro(dt) {
-    var before = intro_t
+func intro(dt: number) -> void {
+    var before := intro_t
     intro_t += dt
     if boss == nil or not boss.alive {
         state = "play"
         return
     }
-    var t = intro_t
+    var t := intro_t
     if t >= 0.4 and t < 1.3 {                          # it swells into view, wobbling
-        var k = (t - 0.4) / 0.9
+        var k := (t - 0.4) / 0.9
         boss.Sprite.tint = rgb(255, 255, 255, min(1, k * 1.6) * 255)
         boss.scale = 1 + (1 - k) * 0.7 + sin(k * 540) * 0.12 * (1 - k)
     }
@@ -819,19 +819,19 @@ func intro(dt) {
 }
 
 # A cellar's guardian is beaten (its script calls this as it goes).
-func boss_beaten() {
+func boss_beaten() -> void {
     flag("boss:" + area)
     play_music("cellar")
 }
 
-func enemy_killed(e) {
+func enemy_killed(e: entity) -> void {
     play_sound("sfx/enemy_die.wav")
     spawn("prefabs/puff.scene", e.position, e.parent)
     drop_at(e.position, e.parent)
 }
 
 # ---- the shortcuts in play: quick save, and the next or previous item for B ----------
-func shortcuts() {
+func shortcuts() -> void {
     if controls.pressed("quicksave") {
         if save_game() {
             find("Banner").note("GAME SAVED!")
@@ -841,41 +841,41 @@ func shortcuts() {
             play_sound("sfx/tink.wav")
         }
     }
-    var d = 0
+    var d: number = 0
     if controls.pressed("item_next") { d = 1 }
     if controls.pressed("item_prev") { d = -1 }
     if d != 0 { cycle_item(d) }
 }
 
-func cycle_item(d) {
-    var n = len(items)
+func cycle_item(d: number) -> void {
+    var n := len(items)
     if n == 0 { return }
-    var i = 0
+    var i: number = 0
     for k in n {
         if items[k] == b_item { i = k }
     }
-    var was = b_item
+    var was := b_item
     b_item = items[(i + d + n) % n]
     if b_item != was { play_sound("sfx/menu.wav") }
 }
 
 # ---- the message at the top of a cave -------------------------------------------------
-func say(a, b) {
+func say(a: string, b: string) -> void {
     say1 = a
     say2 = b
     say_t = 0
     find("Say1").Label.text = ""
     find("Say2").Label.text = ""
-    var card = find("SayCard")                         # a dark card behind the words, so they read on anything
-    var edge = find("SayEdge")
+    var card := find("SayCard")                         # a dark card behind the words, so they read on anything
+    var edge := find("SayEdge")
     if a == "" and b == "" {
         card.Shape.color = rgb(0, 0, 0, 0)
         edge.Shape.color = rgb(0, 0, 0, 0)
         return
     }
-    var w = max(len(a), len(b)) * 8 + 14
-    var h = 14
-    var y = 86
+    var w := max(len(a), len(b)) * 8 + 14
+    var h: number = 14
+    var y: number = 86
     if a != "" and b != "" {
         h = 26
         y = 92
@@ -890,12 +890,12 @@ func say(a, b) {
     edge.Shape.color = rgb(226, 194, 128, 235)
 }
 
-func type_text(dt) {
+func type_text(dt: number) -> void {
     if say1 == "" and say2 == "" { return }
-    var total = len(say1) + len(say2)
-    var before = floor(say_t * 20)
+    var total := len(say1) + len(say2)
+    var before := floor(say_t * 20)
     say_t += dt
-    var shown = min(floor(say_t * 20), total)
+    var shown := min(floor(say_t * 20), total)
     if shown == before or before >= total { return }
     find("Say1").Label.text = substr(say1, 0, shown)
     find("Say2").Label.text = substr(say2, 0, max(0, shown - len(say1)))
@@ -904,29 +904,29 @@ func type_text(dt) {
 
 # ---- doors -----------------------------------------------------------------------------
 # The cells of each side's doorway in a cellar room.
-func door_cells(side) {
+func door_cells(side: string) -> list[vec2] {
     if side == "n" { return [vec2(7, 0), vec2(8, 0), vec2(7, 1), vec2(8, 1)] }
     if side == "s" { return [vec2(7, 9), vec2(8, 9), vec2(7, 10), vec2(8, 10)] }
     if side == "w" { return [vec2(0, 5), vec2(1, 5)] }
     return [vec2(14, 5), vec2(15, 5)]
 }
 
-func cell_point(c) { return room.global_position + vec2(c.x * 16 + 8, c.y * 16 + 8) }
+func cell_point(c: vec2) -> vec2 { return room.global_position + vec2(c.x * 16 + 8, c.y * 16 + 8) }
 
-func set_door(side, tile) {
+func set_door(side: string, tile: string) -> void {
     for c in door_cells(side) { set_tile(map, cell_point(c), tile) }
 }
 
-func opposite(side) {
+func opposite(side: string) -> string {
     if side == "n" { return "s" }
     if side == "s" { return "n" }
     if side == "e" { return "w" }
     return "e"
 }
 
-func neighbour(side) {
-    var x = rx
-    var y = ry
+func neighbour(side: string) -> string {
+    var x := rx
+    var y := ry
     if side == "n" { y -= 1 }
     if side == "s" { y += 1 }
     if side == "w" { x -= 1 }
@@ -935,13 +935,13 @@ func neighbour(side) {
 }
 
 # Opens a doorway for good: this room's side, and the other room's matching side.
-func open_door(side) {
+func open_door(side: string) -> void {
     set_door(side, ",")
     flag("open:" + room_name + ":" + side)
     flag("open:" + neighbour(side) + ":" + opposite(side))
 }
 
-func side_of_cell(col, row) {
+func side_of_cell(col: number, row: number) -> string {
     if row <= 1 { return "n" }
     if row >= 9 { return "s" }
     if col <= 1 { return "w" }
@@ -949,9 +949,9 @@ func side_of_cell(col, row) {
 }
 
 # The hero pushed against a locked door at a world point.
-func try_unlock(point) {
+func try_unlock(point: vec2) -> bool {
     if keys <= 0 { return false }
-    var local = point - room.global_position
+    var local := point - room.global_position
     keys -= 1
     open_door(side_of_cell(floor(local.x / 16), floor(local.y / 16)))
     play_sound("sfx/door.wav")
@@ -959,23 +959,23 @@ func try_unlock(point) {
 }
 
 # The fire chili burned at a world point: a bush hiding a way in (tile Y) burns away.
-func burn(point) {
+func burn(point: vec2) -> void {
     for w in find_all("Warp") {
         if w.hidden and distance(w.global_position, point) < 20 and tile_at(map, w.global_position) == "Y" { w.reveal() }
     }
 }
 
 # A bomb went off at a world point: secret walls nearby open.
-func blast(point) {
+func blast(point: vec2) -> void {
     for w in find_all("Warp") {
         if distance(w.global_position, point) < 28 { w.reveal() }
     }
     if area == "ow" or area == "cave" { return }
     for dx in [-16, 0, 16] {
         for dy in [-16, 0, 16] {
-            var p = point + vec2(dx, dy)
+            var p := point + vec2(dx, dy)
             if tile_at(map, p) == "X" {
-                var local = p - room.global_position
+                var local := p - room.global_position
                 open_door(side_of_cell(floor(local.x / 16), floor(local.y / 16)))
                 play_sound("sfx/secret.wav")
                 return

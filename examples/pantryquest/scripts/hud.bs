@@ -3,24 +3,24 @@
 # found; in a cellar, its rooms, with the map and compass), his beans, keys
 # and bombs, the items on B and A, and his hearts.
 
-var game
-var hearts = []
-var bean_label
-var key_label
-var bomb_label
-var b_item
-var a_item
-var dot
-var map_box
-var cells = []
-var map_sig = ""            # what the cellar map was last drawn from
-var boss_cell               # the compass's mark
-var mini                    # the land's minimap
-var marks = []              # the cellar doors on it
-var marks_sig = ""
-var t = 0
+var game: entity
+var hearts: list[entity] = []
+var bean_label: entity
+var key_label: entity
+var bomb_label: entity
+var b_item: entity
+var a_item: entity
+var dot: entity
+var map_box: entity
+var cells: list[entity] = []
+var map_sig: string = ""            # what the cellar map was last drawn from
+var boss_cell: entity    # the compass's mark
+var mini: entity    # the land's minimap
+var marks: list[entity] = []              # the cellar doors on it
+var marks_sig: string = ""
+var t: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     for i in 16 {
         push(hearts, find("Heart" + i))
@@ -35,7 +35,7 @@ func start() {
     mini = find("MiniMap")
 }
 
-func icon(item) {
+func icon(item: string) -> string {
     if item == "bombs" { return "art/bomb.bmp" }
     if item == "cutter" { return "art/cutter.bmp" }
     if item == "skewers" { return "art/skewer.bmp" }
@@ -48,43 +48,43 @@ func icon(item) {
 }
 
 # Where a cellar room ("x_y") sits on the map.
-func cell_pos(xy) {
-    var p = game.split(xy, "_")
+func cell_pos(xy: string) -> vec2 {
+    var p: list[string] = game.split(xy, "_")
     return vec2(8 + num(p[0]) * 8 + 4 + 12, 16 + num(p[1]) * 6 + 3 + 1)
 }
 
 # A spot on the map of the land (in its pixels, a pixel a tile) on the minimap.
-func mini_pos(spot) { return vec2(8 + spot.x / 4, 16 + spot.y * 4 / 11) }
+func mini_pos(spot: vec2) -> vec2 { return vec2(8 + spot.x / 4, 16 + spot.y * 4 / 11) }
 
 # Is a cellar done? (Its page found; the Banquet Hall: the game won.)
-func cleared(n) {
+func cleared(n: number) -> bool {
     if n == 9 { return game.has_flag("won") }
     return game.has_flag("page:d" + n)
 }
 
 # The doors of the cellars whose screens Pip has seen: red, or gold once cleared.
-func draw_land_marks() {
+func draw_land_marks() -> void {
     if game.state == "boot" { return }               # (the map's data starts after the HUD)
-    var sig = len(game.land) + ":" + game.pages + ":" + game.has_flag("won")
+    var sig := len(game.land) + ":" + game.pages + ":" + game.has_flag("won")
     if sig == marks_sig { return }
     clear_marks()
     marks_sig = sig
     for d in find("MapData").doors() {
         if contains(game.land, d[3]) {
-            var m = spawn("prefabs/map_mark.scene", mini_pos(vec2(d[1], d[2])))
+            var m := spawn("prefabs/map_mark.scene", mini_pos(vec2(d[1], d[2])))
             if cleared(d[0]) { m.Shape.color = rgb(255, 216, 74) } else { m.Shape.color = rgb(216, 52, 58) }
             push(marks, m)
         }
     }
 }
 
-func clear_marks() {
+func clear_marks() -> void {
     for m in marks { destroy(m) }
     marks = []
     marks_sig = ""
 }
 
-func clear_cells() {
+func clear_cells() -> void {
     for c in cells { destroy(c) }
     cells = []
     boss_cell = nil
@@ -93,23 +93,23 @@ func clear_cells() {
 # The cellar map: the rooms seen so far, or every room once Pip has the
 # map (those not seen yet, dimmer); and with the compass, the guardian's
 # room, blinking until it is beaten.
-func draw_cellar_map() {
-    var area = game.area
-    var has_map = contains(game.maps, area)
-    var has_compass = contains(game.compasses, area) and not game.has_flag("boss:" + area)
-    var sig = area + ":" + len(game.visited) + ":" + has_map + ":" + has_compass
+func draw_cellar_map() -> void {
+    var area: string = game.area
+    var has_map := contains(game.maps, area)
+    var has_compass := contains(game.compasses, area) and not game.has_flag("boss:" + area)
+    var sig := area + ":" + len(game.visited) + ":" + has_map + ":" + has_compass
     if sig != map_sig {
         map_sig = sig
         clear_cells()
-        var seen = []
+        var seen := []
         for name in game.visited {
-            var p = game.split(name, "_")
+            var p: list[string] = game.split(name, "_")
             if p[0] == area { push(seen, p[1] + "_" + p[2]) }
         }
-        var all = seen
+        var all := seen
         if has_map { all = find("Cellars").rooms(area) }
         for xy in all {
-            var c = spawn("prefabs/map_cell.scene", cell_pos(xy))
+            var c := spawn("prefabs/map_cell.scene", cell_pos(xy))
             if not contains(seen, xy) { c.Shape.color = rgb(126, 92, 60) }
             push(cells, c)
         }
@@ -125,11 +125,11 @@ func draw_cellar_map() {
     }
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     bean_label.Label.text = "x" + game.beans
     key_label.Label.text = "x" + game.keys
     bomb_label.Label.text = "x" + game.bombs
-    var b = icon(game.b_item)
+    var b := icon(game.b_item)
     if b == "" { b_item.Sprite.tint = rgb(255, 255, 255, 0) } else {
         b_item.Sprite.image = b
         b_item.Sprite.tint = rgb(255, 255, 255)
@@ -137,7 +137,7 @@ func update(dt) {
     a_item.Sprite.image = game.weapon_image()
     if game.weapon > 0 { a_item.Sprite.tint = rgb(255, 255, 255) } else { a_item.Sprite.tint = rgb(255, 255, 255, 0) }
     for i in 16 {
-        var h = hearts[i]
+        var h := hearts[i]
         if i >= game.hearts_max {
             h.Sprite.tint = rgb(255, 255, 255, 0)
         } else {

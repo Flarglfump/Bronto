@@ -3,33 +3,33 @@
 # and then stop and throw something (if `shot` is set), and hurt Pip when
 # they touch him. One script, set up per kind by the vars in its prefab.
 
-var hp = 1
-var size = 6                # how far from its centre a poke reaches it
-var damage = 1              # half hearts, when it touches Pip
-var speed = 30
-var image = "art/tomato_"   # + "0.bmp" / "1.bmp"
-var shot = ""               # a prefab it throws, or ""
-var shot_speed = 110
-var shot_chance = 0.22      # at each tile, the chance it stops to throw
-var aim = false             # throws only towards Pip, when lined up with him
-var cutter_kills = false    # the pizza cutter only stuns most things
-var front_guard = false     # a poke, skewer or spark from in front just glances off (toast knights)
-var game
-var hero
-var map
-var appear_t = 0
+var hp: number = 1
+var size: number = 6                # how far from its centre a poke reaches it
+var damage: number = 1              # half hearts, when it touches Pip
+var speed: number = 30
+var image: string = "art/tomato_"   # + "0.bmp" / "1.bmp"
+var shot: string = ""               # a prefab it throws, or ""
+var shot_speed: number = 110
+var shot_chance: number = 0.22      # at each tile, the chance it stops to throw
+var aim: bool = false             # throws only towards Pip, when lined up with him
+var cutter_kills: bool = false    # the pizza cutter only stuns most things
+var front_guard: bool = false     # a poke, skewer or spark from in front just glances off (toast knights)
+var game: entity
+var hero: entity
+var map: entity
+var appear_t: number = 0
 var dir := vec2(0, 1)
 var target := vec2(0, 0)
-var moving = false
-var wait_t = 0
-var anim_t = 0
-var frame = 0
-var flash_t = 0
+var moving: bool = false
+var wait_t: number = 0
+var anim_t: number = 0
+var frame: number = 0
+var flash_t: number = 0
 var knock := vec2(0, 0)
-var knock_t = 0
-var stun_t = 0
+var knock_t: number = 0
+var stun_t: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     hp = game.enemy_hp(hp, self.parent)                # (tougher later in the game)
     damage = game.enemy_damage(damage, self.parent)
@@ -37,18 +37,18 @@ func start() {
     map = child(self.parent, "Map")
     appear_t = 0.3 + random(0.6)
     self.Sprite.image = "art/cloud_0.bmp"
-    var dirs = [vec2(0, 1), vec2(0, -1), vec2(1, 0), vec2(-1, 0)]
+    var dirs := [vec2(0, 1), vec2(0, -1), vec2(1, 0), vec2(-1, 0)]
     dir = dirs[floor(random(4))]
 }
 
-func free(p) {
+func free(p: vec2) -> bool {
     if p.x < 24 or p.x > 232 or p.y < 24 or p.y > 152 { return false }
     return not tile_solid(map, self.parent.global_position + p)
 }
 
-func snap(p) { return vec2(floor(p.x / 16) * 16 + 8, floor(p.y / 16) * 16 + 8) }
+func snap(p: vec2) -> vec2 { return vec2(floor(p.x / 16) * 16 + 8, floor(p.y / 16) * 16 + 8) }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         appear_t -= dt
@@ -67,7 +67,7 @@ func update(dt) {
     }
     if knock_t > 0 {
         knock_t -= dt
-        var to = self.position + knock * 4
+        var to := self.position + knock * 4
         if free(snap(to)) or free(to) { self.position = to }
         if knock_t <= 0 {
             target = snap(self.position)
@@ -82,8 +82,8 @@ func update(dt) {
         return
     }
     if moving {
-        var to = target - self.position
-        var step = speed * dt
+        var to := target - self.position
+        var step := speed * dt
         if length(to) <= step {
             self.position = target
             moving = false
@@ -105,18 +105,18 @@ func update(dt) {
     touch()
 }
 
-func touch() {
+func touch() -> void {
     if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
 }
 
-func lined_up() {
-    var d = hero.position - self.global_position
+func lined_up() -> vec2 {
+    var d := hero.position - self.global_position
     if abs(d.x) < 8 { return vec2(0, sign(d.y)) }
     if abs(d.y) < 8 { return vec2(sign(d.x), 0) }
     return vec2(0, 0)
 }
 
-func decide() {
+func decide() -> void {
     if shot != "" and len(find_all("Shot")) < 3 {
         var throw := vec2(0, 0)
         if aim {
@@ -126,16 +126,16 @@ func decide() {
         }
         if throw.x != 0 or throw.y != 0 {
             dir = throw
-            var s = spawn(shot, self.position + dir * 8, self.parent)
+            var s := spawn(shot, self.position + dir * 8, self.parent)
             s.vel = dir * shot_speed
             s.rotation = angle(dir) + 90
             wait_t = 0.45
             return
         }
     }
-    var dirs = [vec2(0, 1), vec2(0, -1), vec2(1, 0), vec2(-1, 0)]
+    var dirs := [vec2(0, 1), vec2(0, -1), vec2(1, 0), vec2(-1, 0)]
     if random() < 0.35 or not free(self.position + dir * 16) {
-        var options = []
+        var options := []
         for d in dirs {
             if free(self.position + d * 16) { push(options, d) }
         }
@@ -150,7 +150,7 @@ func decide() {
 }
 
 # A poke (or bomb, beam, cutter) landed. True if it counted.
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or knock_t > 0 or flash_t > 0.15 { return false }
     if kind == "cutter" and not cutter_kills {

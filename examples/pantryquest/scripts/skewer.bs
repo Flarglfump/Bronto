@@ -3,14 +3,14 @@
 # than a poke (a point more). It rings a gong.
 
 var vel := vec2(0, 0)
-var game
+var game: entity
 
-func start() { game = find("Game") }
+func start() -> void { game = find("Game") }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     self.position += vel * dt
-    var p = self.position
+    var p := self.position
     if p.x < 4 or p.x > 252 or p.y < 68 or p.y > 236 or (tile_solid(game.map, p) and tile_at(game.map, p) != "~") {
         stop()
         return
@@ -31,7 +31,7 @@ func update(dt) {
     }
 }
 
-func stop() {
+func stop() -> void {
     spawn("prefabs/sparkle.scene", self.position)
     destroy(self)
 }

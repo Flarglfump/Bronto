@@ -1,22 +1,22 @@
 # Jelly: a wobbly blob of the cellar. Hops quickly from tile to tile, then
 # sits still for a moment. One poke (or the pizza cutter) pops it.
 
-var hp = 1
-var size = 5
-var damage = 1
-var speed = 70
-var game
-var hero
-var map
-var appear_t = 0
+var hp: number = 1
+var size: number = 5
+var damage: number = 1
+var speed: number = 70
+var game: entity
+var hero: entity
+var map: entity
+var appear_t: number = 0
 var target := vec2(0, 0)
-var moving = false
-var wait_t = 0
-var anim_t = 0
-var frame = 0
-var stun_t = 0
+var moving: bool = false
+var wait_t: number = 0
+var anim_t: number = 0
+var frame: number = 0
+var stun_t: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     hp = game.enemy_hp(hp, self.parent)                # (tougher later in the game)
     damage = game.enemy_damage(damage, self.parent)
@@ -27,12 +27,12 @@ func start() {
     wait_t = random(1)
 }
 
-func free(p) {
+func free(p: vec2) -> bool {
     if p.x < 24 or p.x > 232 or p.y < 24 or p.y > 152 { return false }
     return not tile_solid(map, self.parent.global_position + p)
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         appear_t -= dt
@@ -46,8 +46,8 @@ func update(dt) {
     if stun_t > 0 {
         stun_t -= dt
     } elif moving {
-        var to = target - self.position
-        var step = speed * dt
+        var to := target - self.position
+        var step := speed * dt
         if length(to) <= step {
             self.position = target
             moving = false
@@ -58,10 +58,10 @@ func update(dt) {
     } elif wait_t > 0 {
         wait_t -= dt
     } else {
-        var dirs = [vec2(0, 1), vec2(0, -1), vec2(1, 0), vec2(-1, 0)]
-        var d = dirs[floor(random(4))]
+        var dirs := [vec2(0, 1), vec2(0, -1), vec2(1, 0), vec2(-1, 0)]
+        var d: vec2 = dirs[floor(random(4))]
         if random() < 0.4 {                                  # now and then, towards Pip
-            var to = hero.position - self.global_position
+            var to := hero.position - self.global_position
             if abs(to.x) > abs(to.y) { d = vec2(sign(to.x), 0) } else { d = vec2(0, sign(to.y)) }
         }
         if free(self.position + d * 16) {
@@ -80,7 +80,7 @@ func update(dt) {
     if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
 }
 
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 { return false }
     play_sound("sfx/hit.wav")

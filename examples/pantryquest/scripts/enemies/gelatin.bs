@@ -2,22 +2,22 @@
 # forth on its side of the room and spits sprinkles at Pip, three at a
 # time. Six pokes (or a few bombs) melt it.
 
-var hp = 6
-var hp_max = 6
-var title = "GELATIN GIANT"
-var subtitle = "KEEPER OF THE COLD CELLAR"
-var size = 13
-var damage = 2
-var game
-var hero
-var appear_t = 0
+var hp: number = 6
+var hp_max: number = 6
+var title: string = "GELATIN GIANT"
+var subtitle: string = "KEEPER OF THE COLD CELLAR"
+var size: number = 13
+var damage: number = 2
+var game: entity
+var hero: entity
+var appear_t: number = 0
 var home := vec2(0, 0)
-var t = 0
-var shoot_t = 2
-var mouth_t = 0
-var flash_t = 0
+var t: number = 0
+var shoot_t: number = 2
+var mouth_t: number = 0
+var flash_t: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
@@ -26,9 +26,9 @@ func start() {
     self.Sprite.tint = rgb(255, 255, 255, 0)
 }
 
-func intro_done() { appear_t = 0 }
+func intro_done() -> void { appear_t = 0 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         game.boss_arrives(self)
@@ -45,10 +45,10 @@ func update(dt) {
     if shoot_t <= 0 {
         shoot_t = 1.6 + random(1.4)
         mouth_t = 0.5
-        var mouth = self.position + vec2(-6, 6)
-        var aim = angle(hero.position - (self.parent.global_position + mouth))
+        var mouth := self.position + vec2(-6, 6)
+        var aim := angle(hero.position - (self.parent.global_position + mouth))
         for spread in [-18, 0, 18] {
-            var s = spawn("prefabs/sprinkle.scene", mouth, self.parent)
+            var s := spawn("prefabs/sprinkle.scene", mouth, self.parent)
             s.vel = from_angle(aim + spread, 90)
         }
     }
@@ -61,7 +61,7 @@ func update(dt) {
     if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
 }
 
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 { return false }
     if kind == "cutter" { return false }

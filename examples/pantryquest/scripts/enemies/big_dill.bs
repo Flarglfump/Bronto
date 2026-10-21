@@ -3,24 +3,24 @@
 # at him until it slams into a wall - and there it sits, dizzy. That is the
 # only time a poke or a skewer gets through its tough skin. Six hits.
 
-var hp = 6
-var hp_max = 6
-var title = "BIG DILL"
-var subtitle = "KEEPER OF THE PICKLE PANTRY"
-var size = 14
-var damage = 2
-var game
-var hero
-var map
-var appear_t = 0
-var mode = "watch"          # watch, rumble, charge, dizzy
-var mode_t = 1.4
+var hp: number = 6
+var hp_max: number = 6
+var title: string = "BIG DILL"
+var subtitle: string = "KEEPER OF THE PICKLE PANTRY"
+var size: number = 14
+var damage: number = 2
+var game: entity
+var hero: entity
+var map: entity
+var appear_t: number = 0
+var mode: string = "watch"          # watch, rumble, charge, dizzy
+var mode_t: number = 1.4
 var dir := vec2(0, 1)
 var base := vec2(0, 0)
-var flash_t = 0
-var t = 0
+var flash_t: number = 0
+var t: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
@@ -29,21 +29,21 @@ func start() {
     self.Sprite.tint = rgb(255, 255, 255, 0)
 }
 
-func intro_done() { appear_t = 0 }
+func intro_done() -> void { appear_t = 0 }
 
 # Would its body bump into a wall with its centre at local point p, moving along d?
-func blocked(p, d) {
-    var side = vec2(d.y, d.x)
-    var front = p + d * 13
+func blocked(p: vec2, d: vec2) -> bool {
+    var side := vec2(d.y, d.x)
+    var front := p + d * 13
     for k in [-9, 0, 9] {
-        var q = front + side * k
+        var q := front + side * k
         if q.x < 32 or q.x > 224 or q.y < 32 or q.y > 144 { return true }
         if tile_solid(map, self.parent.global_position + q) { return true }
     }
     return false
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         game.boss_arrives(self)
@@ -51,13 +51,13 @@ func update(dt) {
     }
     t += dt
     mode_t -= dt
-    var d = hero.position - self.global_position
+    var d := hero.position - self.global_position
     if mode == "watch" {
         self.Sprite.image = "art/dill_0.bmp"
         var step := vec2(0, 0)                           # line up with Pip on the nearer axis
         if abs(d.x) < abs(d.y) { step = vec2(sign(d.x), 0) } else { step = vec2(0, sign(d.y)) }
         if abs(d.x) > 2 or abs(d.y) > 2 {
-            var to = self.position + step * 26 * dt
+            var to := self.position + step * 26 * dt
             if not blocked(to, step) { self.position = to }
         }
         if mode_t <= 0 {
@@ -75,7 +75,7 @@ func update(dt) {
             mode = "charge"
         }
     } elif mode == "charge" {
-        var to = self.position + dir * 160 * dt
+        var to := self.position + dir * 160 * dt
         if blocked(to, dir) {
             mode = "dizzy"
             mode_t = 1.8
@@ -101,7 +101,7 @@ func update(dt) {
     if mode != "dizzy" and hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
 }
 
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 { return false }
     if mode != "dizzy" {                                 # its skin is too tough
@@ -119,7 +119,7 @@ func hit(amount, d, kind) {
     return true
 }
 
-func die() {
+func die() -> void {
     play_sound("sfx/boss_die.wav")
     for off in [vec2(-10, -10), vec2(10, -8), vec2(0, 6), vec2(-12, 10), vec2(12, 10)] {
         spawn("prefabs/puff.scene", self.position + off, self.parent)

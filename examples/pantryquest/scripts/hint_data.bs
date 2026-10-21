@@ -2,7 +2,7 @@
 # where the upgrades out in the land are. Made by tools/design_overworld.py - edit it there.
 
 # A cellar's whereabouts: [line 1, line 2, hidden behind a cracked cliff?]
-func cellar(n) {
+func cellar(n: number) -> list {
     if n == 1 { return ["THE COLD CELLAR, JUST NORTH", "IN THE FROSTY FIELDS.", false] }
     if n == 2 { return ["THE PICKLE PANTRY: GO EAST", "FROM THE FROSTY FIELDS.", false] }
     if n == 3 { return ["THE SPICE RACK, WEST, DEEP", "IN THE LETTUCE WOODS.", false] }
@@ -17,7 +17,7 @@ func cellar(n) {
 
 # The upgrades out in the land: [flag once taken, what reaching it needs ("", "bombs", "fire"),
 # hearts needed, line 1, line 2]
-func upgrades() {
+func upgrades() -> list[list] {
     return [
         ["ow:pie1", "", 0, "A HEART PIE: FAR NORTHWEST,", "OUT IN THE COOKIE FIELD."],
         ["ow:pie2", "", 0, "A HEART PIE: NORTH,", "OUT BY BLUEBERRY LAKE."],

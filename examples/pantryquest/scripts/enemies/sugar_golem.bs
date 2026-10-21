@@ -6,24 +6,24 @@
 # other hit. Twelve points of health (eight pokes with the copper spoon,
 # four with the golden ladle).
 
-var hp = 12
-var hp_max = 12
-var title = "SUGAR GOLEM"
-var subtitle = "KEEPER OF THE SUGAR MILL"
-var size = 13
-var damage = 2
-var game
-var hero
-var appear_t = 0
-var mode = "stand"          # stand, crouch, air, stuck
-var mode_t = 1.0
+var hp: number = 12
+var hp_max: number = 12
+var title: string = "SUGAR GOLEM"
+var subtitle: string = "KEEPER OF THE SUGAR MILL"
+var size: number = 13
+var damage: number = 2
+var game: entity
+var hero: entity
+var appear_t: number = 0
+var mode: string = "stand"          # stand, crouch, air, stuck
+var mode_t: number = 1.0
 var ground := vec2(0, 0)    # where it is on the floor (its sprite rises off it in the air)
 var from := vec2(0, 0)
 var to := vec2(0, 0)
-var shadow
-var flash_t = 0
+var shadow: entity
+var flash_t: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
@@ -31,14 +31,14 @@ func start() {
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)
 }
 
-func intro_done() {
+func intro_done() -> void {
     appear_t = 0
     shadow = spawn("prefabs/shadow.scene", ground + vec2(0, 12), self.parent)
     mode = "stand"
     mode_t = 0.8
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         game.boss_arrives(self)
@@ -46,12 +46,12 @@ func update(dt) {
     }
     mode_t -= dt
     if flash_t > 0 { flash_t -= dt }
-    var c = 255
+    var c: number = 255
     if flash_t > 0 and floor(flash_t * 24) % 2 == 0 { c = 120 }
     self.Sprite.tint = rgb(255, c, c)
     if mode == "stand" {                               # trudging after Pip
         self.Sprite.image = "art/golem_0.bmp"
-        var d = hero.position - self.parent.global_position - ground
+        var d := hero.position - self.parent.global_position - ground
         if length(d) > 4 { ground += normalize(d) * 18 * dt }
         ground = vec2(clamp(ground.x, 40, 216), clamp(ground.y, 40, 136))
         self.position = ground
@@ -63,7 +63,7 @@ func update(dt) {
         self.Sprite.image = "art/golem_1.bmp"
         if mode_t <= 0 {
             from = ground
-            var p = hero.position - self.parent.global_position
+            var p := hero.position - self.parent.global_position
             to = vec2(clamp(p.x, 40, 216), clamp(p.y, 40, 136))
             mode = "air"
             mode_t = 0.9
@@ -71,7 +71,7 @@ func update(dt) {
         }
     } elif mode == "air" {
         self.Sprite.image = "art/golem_0.bmp"
-        var k = clamp(1 - mode_t / 0.9, 0, 1)
+        var k := clamp(1 - mode_t / 0.9, 0, 1)
         ground = lerp(from, to, k)
         self.position = ground - vec2(0, sin(k * 180) * 56)
         if mode_t <= 0 { land() }
@@ -83,28 +83,28 @@ func update(dt) {
     }
     if shadow != nil {
         shadow.position = ground + vec2(0, 12)
-        var lift = length(ground - self.position)
+        var lift := length(ground - self.position)
         shadow.scale = 1 - lift / 120
     }
-    var reach = mode != "air" or mode_t < 0.1
+    var reach := mode != "air" or mode_t < 0.1
     if reach and hero.touches(self.parent.global_position + ground, size) { hero.hurt(damage, self.parent.global_position + ground) }
 }
 
-func land() {
+func land() -> void {
     self.position = ground
     self.Sprite.image = "art/golem_1.bmp"
     mode = "stuck"
     mode_t = 1.4
-    var n = 8
+    var n: number = 8
     if hp <= hp_max / 2 { n = 12 }
     for i in n {
-        var s = spawn("prefabs/sugar.scene", ground, self.parent)
+        var s := spawn("prefabs/sugar.scene", ground, self.parent)
         s.vel = from_angle(i * 360 / n, 96)
     }
     play_sound("sfx/explode.wav", 0.7)
 }
 
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 or mode == "air" { return false }
     if mode != "stuck" {                               # its cubes are too hard

@@ -10,27 +10,27 @@
 # without lining up first. Walls are the room Tilemap's solid tiles; only his
 # feet (the lower half of the sprite) collide. He faces (and pokes) in four.
 
-var speed = 84
-var facing = "down"
+var speed: number = 84
+var facing: string = "down"
 var dirv := vec2(0, 1)
-var anim_t = 0
-var step_frame = 0
-var attack_t = 0            # > 0 while the spoon is out
-var hurt_t = 0              # > 0: just hit, can't be hurt again
+var anim_t: number = 0
+var step_frame: number = 0
+var attack_t: number = 0            # > 0 while the spoon is out
+var hurt_t: number = 0              # > 0: just hit, can't be hurt again
 var knock := vec2(0, 0)
-var knock_t = 0
-var cooldown = 0
-var hit_list = []           # enemies this poke already hit
-var game
-var keys                    # the player's keys (the Settings entity)
-var weapon
-var held
-var beam                    # the spoon's flying spark (at full health)
-var cutter                  # the pizza cutter, while it's out
-var plank                   # the wafer plank, shown under him while he crosses on it
-var push_t = 0              # how long he has been leaning on a crate
+var knock_t: number = 0
+var cooldown: number = 0
+var hit_list: list[number] = []           # enemies this poke already hit
+var game: entity
+var keys: entity    # the player's keys (the Settings entity)
+var weapon: entity
+var held: entity
+var beam: entity    # the spoon's flying spark (at full health)
+var cutter: entity    # the pizza cutter, while it's out
+var plank: entity    # the wafer plank, shown under him while he crosses on it
+var push_t: number = 0              # how long he has been leaning on a crate
 
-func start() {
+func start() -> void {
     game = find("Game")
     keys = find("Settings")
     weapon = child(self, "Weapon")
@@ -41,11 +41,11 @@ func start() {
     show(plank, false)
 }
 
-func show(e, on) {
+func show(e: entity, on: bool) -> void {
     if on { e.Sprite.tint = rgb(255, 255, 255) } else { e.Sprite.tint = rgb(255, 255, 255, 0) }
 }
 
-func face(f) {
+func face(f: string) -> void {
     facing = f
     if f == "up" { dirv = vec2(0, -1) }
     if f == "down" { dirv = vec2(0, 1) }
@@ -58,7 +58,7 @@ func face(f) {
 }
 
 # ---- what the game asks of him ----------------------------------------------------
-func hold(image) {
+func hold(image: string) -> void {
     held.Sprite.image = image
     show(held, true)
     show(weapon, false)
@@ -67,14 +67,14 @@ func hold(image) {
     self.scale = vec2(1, 1)
 }
 
-func hold_done() {
+func hold_done() -> void {
     show(held, false)
     draw_frame()
 }
 
-func spin(t) {
-    var f = floor(t * 10) % 4
-    var names = ["down", "left", "up", "right"]
+func spin(t: number) -> void {
+    var f := floor(t * 10) % 4
+    var names := ["down", "left", "up", "right"]
     if t > 1.6 {
         self.Sprite.tint = rgb(140, 140, 140)
         return
@@ -84,11 +84,11 @@ func spin(t) {
 }
 
 # Something hurt him (half hearts), coming from a world point.
-func hurt(amount, from) {
+func hurt(amount: number, from: vec2) -> bool {
     if hurt_t > 0 or game.state != "play" { return false }
     hurt_t = 1.0
     game.damage(amount)
-    var d = self.position - from
+    var d := self.position - from
     if abs(d.x) > abs(d.y) { knock = vec2(sign(d.x), 0) } else { knock = vec2(0, sign(d.y)) }
     if knock.x == 0 and knock.y == 0 { knock = dirv * -1 }
     knock_t = 0.13
@@ -98,21 +98,21 @@ func hurt(amount, from) {
 }
 
 # Does his pot lid stop a shot flying with velocity v? (Facing it, not poking.)
-func blocks(v) {
+func blocks(v: vec2) -> bool {
     if attack_t > 0 or game.state != "play" { return false }
     return dot(normalize(v), dirv) < -0.7
 }
 
 # Is a world point within `r` of him?
-func touches(p, r) {
-    var d = p - self.position
+func touches(p: vec2, r: number) -> bool {
+    var d := p - self.position
     return abs(d.x) < 6 + r and abs(d.y) < 6 + r
 }
 
 # ---- walking --------------------------------------------------------------------------
-func solid_at(p) {
+func solid_at(p: vec2) -> bool {
     if tile_solid(game.map, p) {
-        var t = tile_at(game.map, p)
+        var t := tile_at(game.map, p)
         if t == "L" and game.try_unlock(p) { return false }
         if t == "~" and plank_way(p) != "" { return false }
         return true
@@ -122,52 +122,52 @@ func solid_at(p) {
 
 # With the plank: is the jam (or water) at p one tile wide? "across" if it
 # has dry ground left and right, "along" if above and below; "" if not.
-func plank_way(p) {
+func plank_way(p: vec2) -> string {
     if not game.has_treasure("plank") or tile_at(game.map, p) != "~" { return "" }
-    var m = game.map
+    var m: entity = game.map
     if tile_at(m, p + vec2(-16, 0)) != "~" and tile_at(m, p + vec2(16, 0)) != "~" { return "across" }
     if tile_at(m, p + vec2(0, -16)) != "~" and tile_at(m, p + vec2(0, 16)) != "~" { return "along" }
     return ""
 }
 
 # Lays the plank under him while he is on jam.
-func show_plank() {
-    var feet = self.position + vec2(0, 4)
-    var way = ""
+func show_plank() -> void {
+    var feet := self.position + vec2(0, 4)
+    var way := ""
     if game.state == "play" { way = plank_way(feet) }
     if way == "" {
         show(plank, false)
         return
     }
-    var room = game.room.global_position
-    var local = feet - room
+    var room: vec2 = game.room.global_position
+    var local: vec2 = feet - room
     plank.position = room + vec2(floor(local.x / 16) * 16 + 8, floor(local.y / 16) * 16 + 8)
     if way == "across" { plank.rotation = 0 } else { plank.rotation = 90 }
     show(plank, true)
 }
 
 # Would his feet fit with his centre at p?
-func fits(p) {
+func fits(p: vec2) -> bool {
     return not (solid_at(p + vec2(-7, 1)) or solid_at(p + vec2(6, 1)) or solid_at(p + vec2(-7, 7)) or solid_at(p + vec2(6, 7)))
 }
 
 # Moves up to `dist` pixels along d (a unit vector on one axis). Blocked by a
 # corner he only just touches (up to 6 pixels of it), he is eased round it
 # instead (when `slide` is true).
-func walk(d, dist, slide) {
-    var p = self.position
-    var moved = 0
+func walk(d: vec2, dist: number, slide: bool) -> void {
+    var p := self.position
+    var moved: number = 0
     while moved < dist {
-        var stepn = min(1, dist - moved)
-        var q = p + d * stepn
+        var stepn := min(1, dist - moved)
+        var q := p + d * stepn
         if not fits(q) { break }
         p = q
         moved += stepn
     }
     if moved < dist and slide {
-        var side = vec2(d.y, d.x)                          # across the way he's going
+        var side := vec2(d.y, d.x)                          # across the way he's going
         for k in range(1, 7) {
-            var found = false
+            var found := false
             for s in [1, -1] {
                 if not found and fits(p + side * (k * s)) and fits(p + side * (k * s) + d) {
                     p = p + side * (s * min(k, dist - moved))
@@ -183,20 +183,20 @@ func walk(d, dist, slide) {
 # The oven mitt: the crate he is leaning on (lined up with it) slides a
 # tile along, if there is bare floor there - not a doorway, not onto
 # anything. Leaving the room puts it back.
-func push_crate(d) {
-    var m = game.map
-    var feet = self.position + vec2(0, 4)
-    var probe = feet + vec2(d.x * 10, d.y * 6)
+func push_crate(d: vec2) -> bool {
+    var m: entity = game.map
+    var feet := self.position + vec2(0, 4)
+    var probe := feet + vec2(d.x * 10, d.y * 6)
     if tile_at(m, probe) != "O" { return false }
-    var room = game.room.global_position
-    var local = probe - room
-    var cell = vec2(floor(local.x / 16), floor(local.y / 16))
-    var centre = room + cell * 16 + vec2(8, 8)
+    var room: vec2 = game.room.global_position
+    var local: vec2 = probe - room
+    var cell := vec2(floor(local.x / 16), floor(local.y / 16))
+    var centre: vec2 = room + cell * 16 + vec2(8, 8)
     if d.x != 0 and abs(feet.y - centre.y) > 6 { return false }
     if d.y != 0 and abs(feet.x - centre.x) > 6 { return false }
-    var to = cell + d
+    var to := cell + d
     if to.x < 2 or to.x > 13 or to.y < 2 or to.y > 8 { return false }
-    var dest = room + to * 16 + vec2(8, 8)
+    var dest: vec2 = room + to * 16 + vec2(8, 8)
     if tile_at(m, dest) != "." and tile_at(m, dest) != "B" { return false }    # onto bare floor, or a pressure plate
     for e in find_all("Enemy") {
         if distance(e.global_position, dest) < 12 { return false }
@@ -210,8 +210,8 @@ func push_crate(d) {
     return true
 }
 
-func edge_check() {
-    var p = self.position
+func edge_check() -> void {
+    var p := self.position
     if p.x < 4 { game.leave("w") }
     elif p.x > 252 { game.leave("e") }
     elif p.y < 68 { game.leave("n") }
@@ -219,7 +219,7 @@ func edge_check() {
 }
 
 # ---- every step --------------------------------------------------------------------------
-func update(dt) {
+func update(dt: number) -> void {
     show_plank()
     if game.state != "play" {
         if game.state != "hold" and game.state != "dead" { self.Sprite.tint = rgb(255, 255, 255) }
@@ -254,8 +254,8 @@ func update(dt) {
     if keys.down("down") { want.y += 1 }
     if want.x != 0 or want.y != 0 {
         # face one of the ways he's going: on a diagonal, keep the way he was facing if it's one of them
-        var fx = ""
-        var fy = ""
+        var fx := ""
+        var fy := ""
         if want.x < 0 { fx = "left" }
         if want.x > 0 { fx = "right" }
         if want.y < 0 { fy = "up" }
@@ -267,13 +267,13 @@ func update(dt) {
         if facing == "right" { dirv = vec2(1, 0) }
         if facing == "up" { dirv = vec2(0, -1) }
         if facing == "down" { dirv = vec2(0, 1) }
-        var full = speed * dt
+        var full := speed * dt
         var was := self.position
         if want.x != 0 and want.y != 0 {                 # a diagonal: as fast as straight...
-            var step = full * 0.7071
-            var before = self.position
+            var step := full * 0.7071
+            var before := self.position
             walk(vec2(want.x, 0), step, false)
-            var x_moved = self.position.x != before.x
+            var x_moved := self.position.x != before.x
             if x_moved { walk(vec2(0, want.y), step, false) } else { walk(vec2(0, want.y), full, false) }
             if x_moved and self.position.y == before.y { walk(vec2(want.x, 0), full - step, false) }
         } elif want.x != 0 {                             # ...and along a wall, full speed the free way
@@ -301,15 +301,15 @@ func update(dt) {
 }
 
 # Pip's pictures, in the outfit he has on: "art/hero_" (apron), "art/hero1_" (jacket), "art/hero2_" (royal coat).
-func look() {
+func look() -> string {
     if game.outfit >= 2 { return "art/hero2_" }
     if game.outfit == 1 { return "art/hero1_" }
     return "art/hero_"
 }
 
-func draw_frame() {
-    var img = look() + "down_"
-    var flip = false
+func draw_frame() -> void {
+    var img := look() + "down_"
+    var flip := false
     if facing == "up" { img = look() + "up_" }
     if facing == "left" or facing == "right" { img = look() + "side_" }
     if facing == "left" { flip = true }
@@ -318,11 +318,11 @@ func draw_frame() {
 }
 
 # ---- the spoon ------------------------------------------------------------------------------
-func start_poke() {
+func start_poke() -> void {
     attack_t = 0.26
     hit_list = []
     play_sound("sfx/swing.wav", 0.7)
-    var img = look() + "attack_down.bmp"
+    var img := look() + "attack_down.bmp"
     if facing == "up" { img = look() + "attack_up.bmp" }
     if facing == "left" or facing == "right" { img = look() + "attack_side.bmp" }
     self.Sprite.image = img
@@ -336,10 +336,10 @@ func start_poke() {
     place_weapon()
 }
 
-func place_weapon() {
-    var reach = 13
+func place_weapon() -> void {
+    var reach: number = 13
     if attack_t > 0.2 or attack_t < 0.06 { reach = 9 }
-    var at = dirv * reach
+    var at := dirv * reach
     if facing == "left" { at = vec2(reach, 0) }          # (the hero is flipped: his children are too)
     if facing == "down" { at += vec2(-1, 0) }
     if facing == "left" or facing == "right" { at += vec2(0, 3) }
@@ -349,10 +349,10 @@ func place_weapon() {
     if facing == "right" or facing == "left" { weapon.rotation = 90 }
 }
 
-func poke(dt) {
+func poke(dt: number) -> void {
     attack_t -= dt
     place_weapon()
-    var tip = self.position + dirv * 14
+    var tip := self.position + dirv * 14
     for e in find_all("Enemy") {
         if not contains(hit_list, e.id) and distance(e.global_position, tip) < 10 + e.size {
             if e.hit(game.attack(), dirv, "spoon") { push(hit_list, e.id) }
@@ -366,8 +366,8 @@ func poke(dt) {
 }
 
 # ---- the B item --------------------------------------------------------------------------------
-func use_item() {
-    var item = game.b_item
+func use_item() -> void {
+    var item: string = game.b_item
     if item == "bombs" {
         if game.bombs <= 0 or len(find_all("Bomb")) >= 1 { return }
         game.bombs -= 1
@@ -391,7 +391,7 @@ func use_item() {
             return
         }
         game.beans -= 1
-        var s = spawn("prefabs/skewer.scene", self.position + dirv * 10)
+        var s := spawn("prefabs/skewer.scene", self.position + dirv * 10)
         s.vel = dirv * 240
         s.rotation = angle(dirv) + 90
         play_sound("sfx/skewer.wav")
@@ -399,7 +399,7 @@ func use_item() {
         game.whisk()
     } elif item == "chili" {
         if len(find_all("Fire")) > 0 { return }
-        var f = spawn("prefabs/fire.scene", self.position + dirv * 12)
+        var f := spawn("prefabs/fire.scene", self.position + dirv * 12)
         f.dir = dirv
         play_sound("sfx/fire.wav")
     }

@@ -34,6 +34,7 @@ static void setup(void) {
 
 static void teardown(void) {
     br_world_destroy(&W);
+    br_script_set_strict(false);
     br_assets_clear();
     br_assets_set_root("");
     br_script_set_print(NULL, NULL);
@@ -506,6 +507,7 @@ static void test_pantryquest_example(void) {
     const br_transform *t;
     setup();
     br_assets_set_root("examples/pantryquest/");
+    br_script_set_strict(true);                        /* (Pantry Quest is strictly typed: project.bronto) */
     CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
     game = named("Game");
     hero = named("Hero");
@@ -544,6 +546,7 @@ static void test_pantryquest_shutter(void) {
     float x, y;
     setup();
     br_assets_set_root("examples/pantryquest/");
+    br_script_set_strict(true);                        /* (Pantry Quest is strictly typed: project.bronto) */
     CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
     game = named("Game");
     hero = named("Hero");
@@ -642,6 +645,7 @@ static void pq_fight(const char *room, int max_hp, const char *only) {
     static const double poke[3] = { 1, 0, 0 };
     setup();
     br_assets_set_root("examples/pantryquest/");
+    br_script_set_strict(true);                        /* (Pantry Quest is strictly typed: project.bronto) */
     CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
     game = named("Game");
     sc = (br_script *)br_get(&W, game, SCRIPT);
@@ -657,7 +661,7 @@ static void pq_fight(const char *room, int max_hp, const char *only) {
         if (i % 7 || !br_entity_alive(&W, boss)) continue;
         mode[0] = 0;
         br_script_get_string(&W, boss, "mode", mode, sizeof(mode));
-        br_script_call(&W, boss, "hit", poke, 3);
+        br_script_call(&W, boss, "hit", poke, 1);   /* (the amount: the rest take their defaults) */
         if (!br_entity_alive(&W, boss)) { landed++; break; }
         br_script_get_number(&W, boss, "hp", &hp);
         if (hp < last_hp) {
@@ -695,6 +699,7 @@ static void pq_fight_all(const char *room, int total, int pieces) {
     static const double poke[3] = { 1, 0, 0 };
     setup();
     br_assets_set_root("examples/pantryquest/");
+    br_script_set_strict(true);                        /* (Pantry Quest is strictly typed: project.bronto) */
     CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
     game = named("Game");
     sc = (br_script *)br_get(&W, game, SCRIPT);
@@ -714,7 +719,7 @@ static void pq_fight_all(const char *room, int total, int pieces) {
             if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)j * W.pools[ID.name].stride))->text, "Enemy") == 0)
                 all[n++] = W.pools[ID.name].entities[j];
         if (n - 1 > most) most = n - 1;                /* (the king stays, unseen, to keep count) */
-        for (j = 0; j < n; ++j) br_script_call(&W, all[j], "hit", poke, 3);
+        for (j = 0; j < n; ++j) br_script_call(&W, all[j], "hit", poke, 1);   /* (the amount: the rest take their defaults) */
         steps(1);
         if (!br_entity_alive(&W, king)) { landed += (int)last_hp; break; }
         br_script_get_number(&W, king, "hp", &hp);
@@ -751,6 +756,7 @@ static void test_pantryquest_eight_ways(void) {
     float x0, y0;
     setup();
     br_assets_set_root("examples/pantryquest/");
+    br_script_set_strict(true);                        /* (Pantry Quest is strictly typed: project.bronto) */
     CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
     game = named("Game");
     hero = named("Hero");
@@ -772,6 +778,7 @@ static void test_pantryquest_eight_ways(void) {
     teardown();
     setup();
     br_assets_set_root("examples/pantryquest/");
+    br_script_set_strict(true);                        /* (Pantry Quest is strictly typed: project.bronto) */
     CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
     game = named("Game");
     sc = (br_script *)br_get(&W, game, SCRIPT);
@@ -799,6 +806,7 @@ static bool pq_load(const char *scene) {
     char err[200], path[96];
     setup();
     br_assets_set_root("examples/pantryquest/");
+    br_script_set_strict(true);                        /* (Pantry Quest is strictly typed: project.bronto) */
     snprintf(path, sizeof(path), "examples/pantryquest/%s", scene);
     return br_world_load_file(&W, path, NULL, 0, err, sizeof(err)) > 5;
 }
@@ -1018,7 +1026,7 @@ static void test_pantryquest_banquet_waves(void) {
             if (last >= 0) {                           /* a wave just came in: hit it before it has started */
                 for (k = 0; k < W.pools[ID.name].count; ++k)
                     if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)k * W.pools[ID.name].stride))->text, "Enemy") == 0)
-                        br_script_call(&W, W.pools[ID.name].entities[k], "hit", poke, 3);
+                        br_script_call(&W, W.pools[ID.name].entities[k], "hit", poke, 1);   /* (the amount: the rest take their defaults) */
                 CHECK_EQ_INT(br_script_error_count(&W), 0);
             }
             last = pq_count("Spawner");
@@ -1075,7 +1083,7 @@ static void test_pantryquest_baron(void) {
         }
         if (i % 7) continue;
         hp = pq_num(baron, "hp");
-        br_script_call(&W, baron, "hit", poke, 3);
+        br_script_call(&W, baron, "hit", poke, 1);   /* (the amount: the rest take their defaults) */
         if (br_entity_alive(&W, baron) && pq_num(baron, "hp") < hp) hits_open++;
     }
     CHECK(!br_entity_alive(&W, baron));

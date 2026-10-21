@@ -15,70 +15,70 @@
 #      shuffle (faster as he weakens) and lift: under his, him, and he can
 #      be hit; under the others, a dish thrown, or a meatball.
 
-var hp = 40
-var hp_max = 40
-var title = "BARON GORGE"
-var subtitle = "LORD OF THE BANQUET HALL"
-var size = 14
-var damage = 2
-var game
-var hero
-var appear_t = 0
-var phase = 1
-var mode = "slide"          # 1: slide, lean;  2: chase, inhale, stunned;  3: covered, shuffle, lift;  rage (between)
-var mode_t = 1.5
-var t = 0
-var flash_t = 0
-var throws = 0
-var dir = 1
-var home_y = 36             # behind the table
-var bomb_t = 4
-var covers = []             # phase 3: the three dish covers
-var spots = [vec2(64, 96), vec2(128, 96), vec2(192, 96)]
-var under = 1               # the cover he is under
-var swaps = 0
-var swap_a = 0
-var swap_b = 1
-var lifted = false
+var hp: number = 40
+var hp_max: number = 40
+var title: string = "BARON GORGE"
+var subtitle: string = "LORD OF THE BANQUET HALL"
+var size: number = 14
+var damage: number = 2
+var game: entity
+var hero: entity
+var appear_t: number = 0
+var phase: number = 1
+var mode: string = "slide"          # 1: slide, lean;  2: chase, inhale, stunned;  3: covered, shuffle, lift;  rage (between)
+var mode_t: number = 1.5
+var t: number = 0
+var flash_t: number = 0
+var throws: number = 0
+var dir: number = 1
+var home_y: number = 36             # behind the table
+var bomb_t: number = 4
+var covers: list[entity] = []             # phase 3: the three dish covers
+var spots: list[vec2] = [vec2(64, 96), vec2(128, 96), vec2(192, 96)]
+var under: number = 1               # the cover he is under
+var swaps: number = 0
+var swap_a: number = 0
+var swap_b: number = 1
+var lifted: bool = false
 
-func start() {
+func start() -> void {
     game = find("Game")
     damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     appear_t = 1                                       # until his entrance is over (game.boss_arrives)
 }
 
-func intro_done() {
+func intro_done() -> void {
     appear_t = 0
     mode = "slide"
     mode_t = 1.2
 }
 
-func local_hero() { return hero.position - self.parent.global_position }
+func local_hero() -> vec2 { return hero.position - self.parent.global_position }
 
-func set_face(open) {
+func set_face(open: bool) -> void {
     if open { self.Sprite.image = "art/baron_1.bmp" } else { self.Sprite.image = "art/baron_0.bmp" }
 }
 
-func throw_dishes(n, spread, speed) {
-    var aim = angle(local_hero() - self.position)
+func throw_dishes(n: number, spread: number, speed: number) -> void {
+    var aim := angle(local_hero() - self.position)
     for i in n {
-        var a = aim + (i - (n - 1) / 2) * spread
-        var s = spawn("prefabs/dish.scene", self.position + vec2(0, 10), self.parent)
+        var a := aim + (i - (n - 1) / 2) * spread
+        var s := spawn("prefabs/dish.scene", self.position + vec2(0, 10), self.parent)
         s.vel = from_angle(a, speed)
     }
     play_sound("sfx/swing.wav")
 }
 
-func enemies_out() {
-    var n = 0
+func enemies_out() -> number {
+    var n: number = 0
     for e in children(self.parent) {
         if e.name == "Enemy" and e.id != self.id { n += 1 }
     }
     return n
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         game.boss_arrives(self)
@@ -87,22 +87,22 @@ func update(dt) {
     t += dt
     mode_t -= dt
     if flash_t > 0 { flash_t -= dt }
-    var c = 255
+    var c: number = 255
     if flash_t > 0 and floor(flash_t * 24) % 2 == 0 { c = 120 }
-    var alpha = 255
+    var alpha: number = 255
     if phase == 3 and not (mode == "lift") and mode != "rage" { alpha = 0 }
     self.Sprite.tint = rgb(255, c, c, alpha)
     if mode == "rage" { rage(dt) }
     elif phase == 1 { feast(dt) }
     elif phase == 2 { gorge(dt) }
     else { last_course(dt) }
-    var reach = size
+    var reach := size
     if phase == 2 { reach = size * 1.3 }
     if alpha > 0 and mode != "rage" and hero.touches(self.global_position, reach) { hero.hurt(damage, self.global_position) }
 }
 
 # ---- 1: the feast -------------------------------------------------------------------
-func feast(dt) {
+func feast(dt: number) -> void {
     if mode == "slide" {
         set_face(false)
         self.position = vec2(self.position.x + dir * 34 * dt, home_y)
@@ -124,11 +124,11 @@ func feast(dt) {
         }
     } elif mode == "lean" {                            # over the table: down to Pip's side
         set_face(true)
-        var k = clamp((1.6 - mode_t) / 0.25, 0, 1)
+        var k := clamp((1.6 - mode_t) / 0.25, 0, 1)
         self.position = vec2(self.position.x, home_y + 22 * k)
         if mode_t < 1.3 and mode_t + dt >= 1.3 {
             for a in [45, 90, 135] {
-                var s = spawn("prefabs/dish.scene", self.position + vec2(0, 12), self.parent)
+                var s := spawn("prefabs/dish.scene", self.position + vec2(0, 12), self.parent)
                 s.vel = from_angle(a, 80)
             }
             play_sound("sfx/explode.wav", 0.5)
@@ -142,17 +142,17 @@ func feast(dt) {
 }
 
 # ---- 2: gorge -------------------------------------------------------------------------
-func gorge(dt) {
+func gorge(dt: number) -> void {
     bomb_t -= dt
     if bomb_t <= 0 {                                   # bombs, while Pip is short of them
         bomb_t = 7
         if game.bombs < 2 and len(find_all("Pickup")) < 2 {
-            var p = spawn("prefabs/pickup.scene", vec2(48 + random(160), 56 + random(80)), self.parent)
+            var p := spawn("prefabs/pickup.scene", vec2(48 + random(160), 56 + random(80)), self.parent)
             p.kind = "bomb"
             p.timeout = 12
         }
     }
-    var to = local_hero() - self.position
+    var to := local_hero() - self.position
     if mode == "chase" {
         set_face(false)
         if length(to) > 6 { self.position += normalize(to) * 28 * dt }
@@ -165,13 +165,13 @@ func gorge(dt) {
     } elif mode == "inhale" {
         set_face(true)
         self.scale = vec2(1.3 + sin(t * 2000) * 0.04, 1.3)
-        var pull = normalize(self.global_position - hero.position)  # Pip is dragged in...
+        var pull := normalize(self.global_position - hero.position)  # Pip is dragged in...
         if length(to) < 150 {
             hero.walk(vec2(sign(pull.x), 0), abs(pull.x) * 40 * dt, false)
             hero.walk(vec2(0, sign(pull.y)), abs(pull.y) * 40 * dt, false)
         }
         for b in find_all("Bomb") {                    # ...and so is a bomb
-            var d = self.global_position - b.global_position
+            var d := self.global_position - b.global_position
             if length(d) < 18 {
                 destroy(b)
                 mode = "stunned"
@@ -199,12 +199,12 @@ func gorge(dt) {
     }
 }
 
-func keep_in() {
+func keep_in() -> void {
     self.position = vec2(clamp(self.position.x, 48, 208), clamp(self.position.y, 52, 124))
 }
 
 # ---- 3: the last course -------------------------------------------------------------
-func last_course(dt) {
+func last_course(dt: number) -> void {
     if mode == "covered" {                             # the covers come down
         for i in 3 { covers[i].position = lerp(covers[i].position, cover_spot(i, false), min(1, dt * 8)) }
         if mode_t <= 0 {
@@ -213,15 +213,15 @@ func last_course(dt) {
             next_swap()
         }
     } elif mode == "shuffle" {
-        var k = clamp(1 - mode_t / swap_time(), 0, 1)
-        var pa = spots[swap_a]
-        var pb = spots[swap_b]
-        var lift = sin(k * 180) * 14
+        var k := clamp(1 - mode_t / swap_time(), 0, 1)
+        var pa := spots[swap_a]
+        var pb := spots[swap_b]
+        var lift := sin(k * 180) * 14
         covers_at(swap_a).position = lerp(pa, pb, k) + vec2(0, -lift)
         covers_at(swap_b).position = lerp(pb, pa, k) + vec2(0, lift)
         if mode_t <= 0 {
-            var a = covers_at(swap_a)                  # (the covers trade places)
-            var b = covers_at(swap_b)
+            var a := covers_at(swap_a)                  # (the covers trade places)
+            var b := covers_at(swap_b)
             a.spot = swap_b
             b.spot = swap_a
             a.position = spots[swap_b]
@@ -243,9 +243,9 @@ func last_course(dt) {
                     if random() < 0.5 and enemies_out() < 2 {
                         spawn("prefabs/meatball.scene", spots[cv.spot], self.parent)
                     } else {
-                        var aim = angle(local_hero() - spots[cv.spot])
+                        var aim := angle(local_hero() - spots[cv.spot])
                         for a in [-15, 15] {
-                            var s = spawn("prefabs/dish.scene", spots[cv.spot], self.parent)
+                            var s := spawn("prefabs/dish.scene", spots[cv.spot], self.parent)
                             s.vel = from_angle(aim + a, 90)
                         }
                     }
@@ -262,21 +262,21 @@ func last_course(dt) {
     if mode != "lift" { self.position = spots[under] + vec2(0, 2) }
 }
 
-func swap_time() { return 0.3 + hp * 0.02 }
+func swap_time() -> number { return 0.3 + hp * 0.02 }
 
-func cover_spot(i, up) {
+func cover_spot(i: number, up: bool) -> vec2 {
     if up { return spots[i] + vec2(0, -18) }
     return spots[i]
 }
 
-func covers_at(spot) {
+func covers_at(spot: number) -> entity {
     for cv in covers {
         if cv.spot == spot { return cv }
     }
     return covers[0]
 }
 
-func next_swap() {
+func next_swap() -> void {
     swap_a = floor(random(3))
     swap_b = (swap_a + 1 + floor(random(2))) % 3
     if under == swap_a { under = swap_b } elif under == swap_b { under = swap_a }   # he goes with his cover
@@ -285,7 +285,7 @@ func next_swap() {
 }
 
 # ---- between courses -------------------------------------------------------------------
-func rage(dt) {
+func rage(dt: number) -> void {
     set_face(true)
     self.rotation = sin(t * 2400) * 6
     if mode_t <= 0 {
@@ -294,7 +294,7 @@ func rage(dt) {
     }
 }
 
-func next_phase() {
+func next_phase() -> void {
     phase += 1
     mode = "rage"
     mode_t = 1.6
@@ -304,10 +304,10 @@ func next_phase() {
     for b in find_all("Bomb") { destroy(b) }
 }
 
-func start_gorge() {
-    var map = child(self.parent, "Map")                # the table goes flying
+func start_gorge() -> void {
+    var map := child(self.parent, "Map")                # the table goes flying
     for c in range(2, 14) {
-        var p = self.parent.global_position + vec2(c * 16 + 8, 4 * 16 + 8)
+        var p := self.parent.global_position + vec2(c * 16 + 8, 4 * 16 + 8)
         if tile_at(map, p) == "T" {
             set_tile(map, p, ".")
             spawn("prefabs/puff.scene", p - self.parent.global_position, self.parent)
@@ -322,10 +322,10 @@ func start_gorge() {
     game.say("HE'LL SWALLOW ANYTHING...", "EVEN A POPCORN BOMB?")
 }
 
-func start_last_course() {
+func start_last_course() -> void {
     self.scale = vec2(1, 1)
     for i in 3 {
-        var cv = spawn("prefabs/cloche.scene", spots[i] + vec2(0, -40), self.parent)
+        var cv := spawn("prefabs/cloche.scene", spots[i] + vec2(0, -40), self.parent)
         cv.spot = i
         push(covers, cv)
     }
@@ -335,10 +335,10 @@ func start_last_course() {
     play_sound("sfx/shutter.wav")
 }
 
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 or mode == "rage" { return false }
-    var open = (phase == 1 and mode == "lean") or (phase == 2 and mode == "stunned") or (phase == 3 and mode == "lift")
+    var open := (phase == 1 and mode == "lean") or (phase == 2 and mode == "stunned") or (phase == 3 and mode == "lift")
     if not open {
         if phase == 3 { return false }                 # (under a cover: nothing to hit)
         play_sound("sfx/tink.wav", 0.6)
@@ -362,7 +362,7 @@ func hit(amount, d, kind) {
     return true
 }
 
-func defeated() {
+func defeated() -> void {
     play_sound("sfx/boss_die.wav")
     for cv in covers { destroy(cv) }
     for e in children(self.parent) {

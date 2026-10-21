@@ -13,24 +13,24 @@
 # its name and what it does shown underneath; otherwise, the item on B.
 # Enter (or the Pocket Pantry key, or Escape) closes it.
 
-var game
-var keys
-var slots = []
-var plates = []
-var cursor
-var choice = 0
-var owned = []
-var item_name
-var item_info
+var game: entity
+var keys: entity
+var slots: list[entity] = []
+var plates: list[entity] = []
+var cursor: entity
+var choice: number = 0
+var owned: list[string] = []
+var item_name: entity
+var item_info: entity
 var mouse_at := vec2(-1, -1)
-var treasure_spots = []
-var equip_spots = []
-var equipment = []          # what's in the equipment column: "weapon", "outfit", "bag"
-var page_icons = []
-var hovering = ""           # what the mouse is over (a thing's name, as name_of knows it), or ""
-var opened = 0
+var treasure_spots: list[entity] = []
+var equip_spots: list[entity] = []
+var equipment: list[string] = []          # what's in the equipment column: "weapon", "outfit", "bag"
+var page_icons: list[entity] = []
+var hovering: string = ""           # what the mouse is over (a thing's name, as name_of knows it), or ""
+var opened: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     keys = find("Settings")
     cursor = child(self, "Cursor")
@@ -54,7 +54,7 @@ func start() {
         if i < game.pages { page_icons[i].Sprite.image = "art/page_on.bmp" }
     }
     for i in 3 {
-        var t = child(self, "Treasure" + i)
+        var t := child(self, "Treasure" + i)
         push(treasure_spots, t)
         if i < len(game.treasures) {
             t.Sprite.image = find("HUD").icon(game.treasures[i])
@@ -64,7 +64,7 @@ func start() {
     equipment = ["weapon", "outfit"]
     if game.bombs_max > 8 { push(equipment, "bag") }
     for i in 3 {
-        var e = child(self, "Equip" + i)
+        var e := child(self, "Equip" + i)
         push(equip_spots, e)
         if i < len(equipment) {
             e.Sprite.image = equip_image(equipment[i])
@@ -75,7 +75,7 @@ func start() {
     show()
 }
 
-func equip_image(e) {
+func equip_image(e: string) -> string {
     if e == "weapon" { return game.weapon_image() }
     if e == "outfit" {
         if game.outfit >= 2 { return "art/coat.bmp" }
@@ -86,7 +86,7 @@ func equip_image(e) {
 }
 
 # What each thing is called, and what it's for (the card holds about 27 letters a line).
-func name_of(item) {
+func name_of(item: string) -> string {
     if item == "bombs" { return "POPCORN BOMBS x" + game.bombs }
     if item == "cutter" { return "PIZZA CUTTER" }
     if item == "skewers" { return "SKEWER BOW" }
@@ -96,18 +96,18 @@ func name_of(item) {
     if item == "mitt" { return "OVEN MITT" }
     if item == "tray" { return "BAKING TRAY" }
     if item == "weapon" {
-        var w = ["NO SPOON YET", "WOODEN SPOON", "COPPER SPOON", "SILVER LADLE", "GOLDEN LADLE"]
+        var w := ["NO SPOON YET", "WOODEN SPOON", "COPPER SPOON", "SILVER LADLE", "GOLDEN LADLE"]
         return w[clamp(game.weapon, 0, 4)]
     }
     if item == "outfit" {
-        var o = ["COOK'S APRON", "CHEF'S JACKET", "ROYAL COAT"]
+        var o := ["COOK'S APRON", "CHEF'S JACKET", "ROYAL COAT"]
         return o[clamp(game.outfit, 0, 2)]
     }
     if item == "bag" { return "BIG BOMB BAG" }
     if item == "pages" { return "RECIPE PAGES: " + game.pages + " OF 8" }
     return ""
 }
-func info_of(item) {
+func info_of(item: string) -> string {
     if item == "bombs" { return "POP! CRACKED WALLS OPEN" }
     if item == "cutter" { return "FLIES OUT AND COMES BACK" }
     if item == "skewers" { return "A BEAN FOR EACH SKEWER" }
@@ -117,12 +117,12 @@ func info_of(item) {
     if item == "mitt" { return "WALK INTO A CRATE TO PUSH IT" }
     if item == "tray" { return "YOUR LID STOPS EVERY SHOT" }
     if item == "weapon" {
-        var w = ["THE OLD CHEF HAS ONE", "POKES: 1 POINT A HIT", "POKES: 1.5 POINTS A HIT", "POKES: 2 POINTS A HIT",
+        var w := ["THE OLD CHEF HAS ONE", "POKES: 1 POINT A HIT", "POKES: 1.5 POINTS A HIT", "POKES: 2 POINTS A HIT",
                  "POKES: 3 POINTS A HIT"]
         return w[clamp(game.weapon, 0, 4)]
     }
     if item == "outfit" {
-        var o = ["HITS HURT IN FULL", "HITS HURT HALF AS MUCH", "HITS HURT A QUARTER"]
+        var o := ["HITS HURT IN FULL", "HITS HURT HALF AS MUCH", "HITS HURT A QUARTER"]
         return o[clamp(game.outfit, 0, 2)]
     }
     if item == "bag" { return "HOLDS " + game.bombs_max + " POPCORN BOMBS" }
@@ -133,8 +133,8 @@ func info_of(item) {
     return ""
 }
 
-func show() {
-    var what = hovering
+func show() -> void {
+    var what := hovering
     if what == "" and len(owned) > 0 { what = owned[choice] }
     if len(owned) == 0 {
         cursor.Sprite.tint = rgb(255, 255, 255, 0)
@@ -151,7 +151,7 @@ func show() {
     item_info.Label.text = info_of(what)
 }
 
-func pick(i) {
+func pick(i: number) -> void {
     if i >= len(owned) { return }
     if i == choice { return }
     choice = i
@@ -161,12 +161,12 @@ func pick(i) {
 
 # What the mouse is over: a plate (chosen for B), equipment, a treasure, the pages.
 # True if a click on the MAP tab turned the page.
-func mouse() {
-    var m = mouse_position()
-    var moved = m != mouse_at
+func mouse() -> bool {
+    var m := mouse_position()
+    var moved := m != mouse_at
     mouse_at = m
     if not moved and not keys.clicked() { return false }
-    var over = ""
+    var over := ""
     for i in len(owned) {
         if keys.over(plates[i], 26, 26) {
             pick(i)
@@ -194,22 +194,22 @@ func mouse() {
     return false
 }
 
-func to_map() {
+func to_map() -> void {
     play_sound("sfx/menu.wav")
     spawn("prefabs/map_view.scene", self.position)
     destroy(self)
 }
 
-func close() {
+func close() -> void {
     game.state = "play"
     play_sound("sfx/menu.wav")
     destroy(self)
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     opened += 1
     child(self, "Keys").Label.text = keys.page_label() + ": MAP   " + keys.label_of("pantry") + ": CLOSE"
-    var n = len(owned)
+    var n := len(owned)
     if n > 0 {
         if keys.nav("left") { pick((choice + n - 1) % n) }
         if keys.nav("right") { pick((choice + 1) % n) }

@@ -2,29 +2,29 @@
 # story scrolls up over it; any key (or the mouse) brings the menu back.
 # The mouse chooses too: over an option it's chosen, a click does it.
 
-var t = 0
-var phase = "menu"          # menu, story
-var labels = []
-var lines = ["LONG AGO, IN THE PANTRY KINGDOM,", "EVERY FEAST WAS COOKED FROM", "THE GRAND RECIPE.", "",
+var t: number = 0
+var phase: string = "menu"          # menu, story
+var labels: list[entity] = []
+var lines: list[string] = ["LONG AGO, IN THE PANTRY KINGDOM,", "EVERY FEAST WAS COOKED FROM", "THE GRAND RECIPE.", "",
              "BUT GREEDY BARON GORGE TORE IT", "INTO EIGHT PAGES, AND HID THEM", "ALL OVER THE LAND.", "",
              "PIP, A YOUNG COOK, PICKED UP", "A WOODEN SPOON AND SET OUT", "TO FIND THEM."]
-var options = ["PLAY", "SETTINGS", "QUIT"]
-var choice = 0
-var rows = []
-var cursor
-var panel
-var page
-var s
+var options: list[string] = ["PLAY", "SETTINGS", "QUIT"]
+var choice: number = 0
+var rows: list[entity] = []
+var cursor: entity
+var panel: entity
+var page: entity
+var s: entity
 var mouse_at := vec2(-1, -1)
 
-func start() {
+func start() -> void {
     s = find("Settings")
     panel = find("StoryBG")
     page = find("Page")
     cursor = find("Cursor")
     for i in 3 { push(rows, find("Option" + i)) }
     for i in len(lines) {
-        var l = spawn("prefabs/story_line.scene", vec2(128, 260 + i * 12))
+        var l := spawn("prefabs/story_line.scene", vec2(128, 260 + i * 12))
         l.Label.text = lines[i]
         l.Label.layer = 32
         push(labels, l)
@@ -33,29 +33,29 @@ func start() {
     show()
 }
 
-func show() {
+func show() -> void {
     for i in 3 {
         if i == choice { rows[i].Label.color = rgb(142, 26, 42) } else { rows[i].Label.color = rgb(98, 56, 26) }
     }
     cursor.position = vec2(128 - len(options[choice]) * 4 - 14, rows[choice].y)
 }
 
-func busy() { return len(find_all("FilesMenu")) > 0 or len(find_all("SettingsMenu")) > 0 }
+func busy() -> bool { return len(find_all("FilesMenu")) > 0 or len(find_all("SettingsMenu")) > 0 }
 
-func update(dt) {
+func update(dt: number) -> void {
     t += dt
     page.y = 146 + sin(t * 120) * 3                    # the recipe page bobs over Pip
-    var m = mouse_position()
-    var moved = m != mouse_at
+    var m := mouse_position()
+    var moved := m != mouse_at
     mouse_at = m
     if busy() {
         t = 0
         return
     }
-    var click = s.clicked()
+    var click: bool = s.clicked()
     if phase == "story" {
         panel.Shape.color = rgb(0, 0, 0, min(t, 1) * 225)
-        var last = labels[len(labels) - 1]
+        var last := labels[len(labels) - 1]
         if last.y > 150 { for l in labels { l.y -= 16 * dt } }
         if last_key() != "" or last_button() != "" or moved or click or t > 30 {
             phase = "menu"
@@ -72,7 +72,7 @@ func update(dt) {
     }
     if last_key() != "" or last_button() != "" or moved or click { t = 0 }
     find("Footer").Label.text = s.choose_label() + ": CHOOSE   " + s.ok_label() + ": OK"
-    var ok = s.nav("ok")
+    var ok: bool = s.nav("ok")
     if moved or click {
         for i in 3 {
             if s.over_label(rows[i]) {

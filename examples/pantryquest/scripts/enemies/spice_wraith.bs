@@ -4,24 +4,24 @@
 # hurt. Each hit sends it off somewhere else. From half its strength on it
 # bursts twice. Eight hits.
 
-var hp = 8
-var hp_max = 8
-var title = "SPICE WRAITH"
-var subtitle = "KEEPER OF THE SPICE RACK"
-var size = 13
-var damage = 2
-var game
-var hero
-var appear_t = 0
-var mode = "fade_in"        # fade_in, gather, solid, fade_out
-var mode_t = 0.6
-var spots = [vec2(64, 56), vec2(192, 56), vec2(64, 120), vec2(192, 120), vec2(128, 88)]
-var flash_t = 0
-var second = 0              # time to the second burst (0: none due)
-var t = 0
-var alpha = 0
+var hp: number = 8
+var hp_max: number = 8
+var title: string = "SPICE WRAITH"
+var subtitle: string = "KEEPER OF THE SPICE RACK"
+var size: number = 13
+var damage: number = 2
+var game: entity
+var hero: entity
+var appear_t: number = 0
+var mode: string = "fade_in"        # fade_in, gather, solid, fade_out
+var mode_t: number = 0.6
+var spots: list[vec2] = [vec2(64, 56), vec2(192, 56), vec2(64, 120), vec2(192, 120), vec2(128, 88)]
+var flash_t: number = 0
+var second: number = 0              # time to the second burst (0: none due)
+var t: number = 0
+var alpha: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
@@ -29,32 +29,32 @@ func start() {
     set_alpha(0)
 }
 
-func intro_done() {
+func intro_done() -> void {
     appear_t = 0
     set_alpha(1)
     mode = "gather"
     mode_t = 0.9
 }
 
-func set_alpha(a) {
+func set_alpha(a: number) -> void {
     alpha = clamp(a, 0, 1)
-    var c = 255
+    var c: number = 255
     if flash_t > 0 and floor(flash_t * 24) % 2 == 0 { c = 120 }
     self.Sprite.tint = rgb(255, c, c, alpha * 255)
 }
 
-func burst(turn) {
+func burst(turn: number) -> void {
     for i in 8 {
-        var s = spawn("prefabs/spice.scene", self.position, self.parent)
+        var s := spawn("prefabs/spice.scene", self.position, self.parent)
         s.vel = from_angle(i * 45 + turn, 84)
     }
     play_sound("sfx/fire.wav", 0.7)
 }
 
 # Somewhere else to settle: not where it is, and not on top of Pip.
-func move_on() {
-    var options = []
-    var here = self.position
+func move_on() -> void {
+    var options := []
+    var here := self.position
     for s in spots {
         if distance(s, here) > 8 and distance(self.parent.global_position + s, hero.position) > 56 { push(options, s) }
     }
@@ -63,7 +63,7 @@ func move_on() {
     play_sound("sfx/teleport.wav", 0.6)
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         game.boss_arrives(self)
@@ -110,7 +110,7 @@ func update(dt) {
     if alpha > 0.6 and hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
 }
 
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0.2 { return false }
     if mode != "solid" and mode != "gather" { return false }   # a cloud: it passes through

@@ -1,6 +1,6 @@
 # A stove's flame, flickering.
-var t = 0
-func update(dt) {
+var t: number = 0
+func update(dt: number) -> void {
     t += dt
     if floor(t * 8) % 2 == 0 { self.Sprite.image = "art/flame_0.bmp" } else { self.Sprite.image = "art/flame_1.bmp" }
 }

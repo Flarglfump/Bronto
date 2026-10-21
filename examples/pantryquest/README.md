@@ -194,6 +194,12 @@ artwork. The folder isn't packed into built games (`exclude` in `project.bronto`
 
 ## How it's made
 
+Every script is strictly typed: `strict_typing = true` in `project.bronto` makes each
+variable, parameter and result declare its type (`var hp: number = 6`,
+`func hit(amount: number, d: vec2, kind: string) -> bool`), and the editor, `bscheck` and
+the Build menu check them before the game runs. Only values whose shape isn't known until
+the game runs - what comes back from saved data - are `any`.
+
 - `title.scene` is the title screen.
 - `main.scene` is the game: the HUD, Pip, and the **Game** entity (`scripts/game.bs`).
   The Game entity keeps track of everything Pip carries and everything he has done. It

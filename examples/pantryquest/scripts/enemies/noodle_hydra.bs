@@ -5,37 +5,37 @@
 # room, still biting and spitting, and can't be hurt. When the last head
 # breaks off, the pot topples and the loose heads go with it.
 
-var hp = 20                 # the health its heads have left
-var hp_max = 20
-var title = "NOODLE HYDRA"
-var subtitle = "KEEPER OF THE SOUP CAULDRON"
-var size = 13
-var damage = 2
-var game
-var hero
-var appear_t = 0
-var heads = []
-var necks = []              # for each head, the bits of its neck
-var anchors = [vec2(-46, 18), vec2(-18, 42), vec2(18, 42), vec2(46, 18)]
-var t = 0
-var flash_t = 0
+var hp: number = 20                 # the health its heads have left
+var hp_max: number = 20
+var title: string = "NOODLE HYDRA"
+var subtitle: string = "KEEPER OF THE SOUP CAULDRON"
+var size: number = 13
+var damage: number = 2
+var game: entity
+var hero: entity
+var appear_t: number = 0
+var heads: list[entity] = []
+var necks: list[list] = []              # for each head, the bits of its neck
+var anchors: list[vec2] = [vec2(-46, 18), vec2(-18, 42), vec2(18, 42), vec2(46, 18)]
+var t: number = 0
+var flash_t: number = 0
 
-func start() {
+func start() -> void {
     game = find("Game")
     damage = game.enemy_damage(damage, self.parent)
     hero = find("Hero")
     appear_t = 1                                       # until its entrance is over (game.boss_arrives)
 }
 
-func intro_done() {
+func intro_done() -> void {
     appear_t = 0
     for i in 4 {
-        var h = spawn("prefabs/noodle_head.scene", self.position + anchors[i], self.parent)
+        var h := spawn("prefabs/noodle_head.scene", self.position + anchors[i], self.parent)
         h.pot = self
         h.slot = i
         h.shoot_t = 1.2 + i * 0.8
         push(heads, h)
-        var bits = []
+        var bits := []
         for k in 3 { push(bits, spawn("prefabs/neck.scene", self.position, self.parent)) }
         push(necks, bits)
     }
@@ -43,14 +43,14 @@ func intro_done() {
 }
 
 # Where each head on its neck is, swaying.
-func place() {
+func place() -> void {
     for i in len(heads) {
-        var h = heads[i]
+        var h := heads[i]
         if h.alive and h.attached {
-            var sway = vec2(sin(t * 90 + i * 70) * 9, cos(t * 70 + i * 50) * 6)
+            var sway := vec2(sin(t * 90 + i * 70) * 9, cos(t * 70 + i * 50) * 6)
             h.position = self.position + anchors[i] + sway
-            var base = self.position + vec2(0, 6)
-            var k = 1
+            var base := self.position + vec2(0, 6)
+            var k: number = 1
             for b in necks[i] {
                 b.position = lerp(base, h.position, k / 4)
                 k += 1
@@ -60,20 +60,20 @@ func place() {
 }
 
 # A head has broken off: its neck goes.
-func head_gone(h) {
+func head_gone(h: entity) -> void {
     for b in necks[h.slot] { destroy(b) }
     necks[h.slot] = []
     play_sound("sfx/roar.wav", 0.5)
 }
 
-func update(dt) {
+func update(dt: number) -> void {
     if game.state != "play" { return }
     if appear_t > 0 {
         game.boss_arrives(self)
         return
     }
     t += dt
-    var left = 0
+    var left: number = 0
     for h in heads {
         if h.alive and h.attached { left += max(h.hp, 0) }
     }
@@ -87,7 +87,7 @@ func update(dt) {
     if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
 }
 
-func topple() {
+func topple() -> void {
     play_sound("sfx/boss_die.wav")
     for h in heads {
         if h.alive {
@@ -105,7 +105,7 @@ func topple() {
     destroy(self)
 }
 
-func hit(amount, d, kind) {
+func hit(amount: number, d: vec2, kind: string) -> bool {
     if game == nil { return false }                   # (it has only just appeared: not started yet)
     if appear_t > 0 or flash_t > 0 { return false }
     play_sound("sfx/tink.wav", 0.6)                  # iron
