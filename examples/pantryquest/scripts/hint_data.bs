@@ -4,10 +4,10 @@
 # A cellar's whereabouts: [line 1, line 2, hidden behind a cracked cliff?]
 func cellar(n) {
     if n == 1 { return ["THE COLD CELLAR, JUST NORTH", "IN THE FROSTY FIELDS.", false] }
-    if n == 2 { return ["THE PICKLE PANTRY, FAR", "NORTHEAST IN THE PICKLE MARSH.", false] }
+    if n == 2 { return ["THE PICKLE PANTRY: GO EAST", "FROM THE FROSTY FIELDS.", false] }
     if n == 3 { return ["THE SPICE RACK, WEST, DEEP", "IN THE LETTUCE WOODS.", false] }
     if n == 4 { return ["THE JAM JAR, ON THE ISLAND", "IN BLUEBERRY LAKE.", false] }
-    if n == 5 { return ["THE CANDY WORKS, EAST", "IN THE CANDY MEADOWS.", false] }
+    if n == 5 { return ["THE CANDY WORKS: PAST THE", "MARSH, DOWN THE JUICE COAST.", false] }
     if n == 6 { return ["THE FORTUNE HALL, FAR", "NORTHWEST IN THE COOKIE FIELD.", false] }
     if n == 7 { return ["THE SUGAR MILL: A CRACKED", "CLIFF IN THE SUGAR DESERT.", true] }
     if n == 8 { return ["THE SOUP CAULDRON: A CRACKED", "CLIFF HIGH IN THE MOUNTAINS.", true] }

@@ -57,6 +57,9 @@ GATEWAYS = [((5, 7), (4, 7)), ((4, 6), (3, 6)), ((5, 5), (4, 5)), ((4, 6), (4, 5
 HAND_OPEN = {('ow_6_7', 'w'): (4, 6), ('ow_8_7', 'e'): (4, 6), ('ow_6_6', 'n'): (7, 8),
              ('ow_8_6', 'e'): (4, 6), ('ow_7_5', 'w'): (4, 6), ('ow_7_5', 'e'): (4, 6), ('ow_7_5', 'n'): (3, 4)}
 CLOSED = [((5, 6), (6, 6)), ((8, 6), (8, 5))]
+# Passages opened last of all (so nothing else in the land changes): the Sugar Road runs through,
+# and the coast road goes on south to the Candy Meadows.
+ROAD_LINKS = [((11, 3), (12, 3)), ((15, 5), (15, 6))]
 SAME_REGION_CHANCE = 0.72
 
 DIRS = {'n': (0, -1), 's': (0, 1), 'w': (-1, 0), 'e': (1, 0)}
@@ -126,7 +129,7 @@ HINTS = {  # cave -> lines
     'cave_hint6': ("SOME CLIFFS SOUND HOLLOW.", "A POPCORN BOMB WILL TELL."),
     'cave_hint7': ("SWEETS AND TREATS LIE EAST,", "IN THE CANDY WORKS."),
     'cave_hint8': ("THE FORTUNE HALL? IT'S IN", "THE COOKIE FIELD, NORTHWEST."),
-    'cave_hint9': ("PICKLES! THE PANTRY IS", "OUT IN THE MARSH, NORTHEAST."),
+    'cave_hint9': ("PICKLES! THE PANTRY IS JUST", "NORTH OF HERE, IN THE MARSH."),
 }
 # (x, y) -> (cave, hidden): a cave mouth on the screen ('X' cliff or 'Y' bush when hidden)
 CAVES = {
@@ -157,10 +160,10 @@ UPGRADES = {
 # What the old chef in the first cave says of each cellar, when it is the next to clear
 CELLAR_HINTS = {
     1: ("THE COLD CELLAR, JUST NORTH", "IN THE FROSTY FIELDS."),
-    2: ("THE PICKLE PANTRY, FAR", "NORTHEAST IN THE PICKLE MARSH."),
+    2: ("THE PICKLE PANTRY: GO EAST", "FROM THE FROSTY FIELDS."),
     3: ("THE SPICE RACK, WEST, DEEP", "IN THE LETTUCE WOODS."),
     4: ("THE JAM JAR, ON THE ISLAND", "IN BLUEBERRY LAKE."),
-    5: ("THE CANDY WORKS, EAST", "IN THE CANDY MEADOWS."),
+    5: ("THE CANDY WORKS: PAST THE", "MARSH, DOWN THE JUICE COAST."),
     6: ("THE FORTUNE HALL, FAR", "NORTHWEST IN THE COOKIE FIELD."),
     7: ("THE SUGAR MILL: A CRACKED", "CLIFF IN THE SUGAR DESERT."),
     8: ("THE SOUP CAULDRON: A CRACKED", "CLIFF HIGH IN THE MOUNTAINS."),
@@ -180,6 +183,15 @@ OW_PIES = {(0, 0): 'ow:pie1', (6, 2): 'ow:pie2', (15, 7): 'ow:pie3'}
 # Each region's stage of the game: the cellar in it (the order Pip is meant to clear them). Its
 # screens' enemies get tougher with it (scripts/game.bs enemy_hp), and there are more of them.
 TIER = {'P': 1, 'I': 1, 'B': 2, 'W': 3, 'L': 4, 'K': 5, 'C': 5, 'G': 6, 'D': 7, 'M': 8}
+# The Sugar Road: the desert's north edge, from the Frosty Fields east to the Pickle Marsh. The
+# marsh (cellar 2) and the coast and meadows past it (cellar 5) touch only the desert and the
+# mountains, so without it the way there would cross stage 7 and 8 country. Its screens are
+# desert to look at, but stage 2, with the marsh's enemies, and have a name of their own.
+ROAD = [(10, 3), (11, 3), (12, 3)]
+ROAD_TIER, ROAD_ENEMIES, ROAD_NAME = 2, 'B', 'SUGAR ROAD'
+
+def tier_of(x, y): return ROAD_TIER if (x, y) in ROAD else TIER[reg(x, y)]
+def region_title(x, y): return ROAD_NAME if (x, y) in ROAD else REGION_NAME[reg(x, y)].upper()
 # The enemies of each region, for its stage: the plains' tomatoes and plums near home, the cellars'
 # kinds out where those cellars are (chili imps in the woods, ants in the desert...)
 ENEMIES = {'P': ['tomato', 'plum'], 'I': ['plum', 'jelly', 'tomato'], 'B': ['plum', 'olive', 'jelly', 'burger'],
@@ -464,6 +476,8 @@ def design(seed):
         cands.sort()
         _, _, p, q = cands[0]
         spans[ekey(p, q)] = choose_span(p, q)
+    for a, b in ROAD_LINKS:
+        if ekey(a, b) not in spans: spans[ekey(a, b)] = choose_span(a, b)
 
     rooms = {}
     for y in range(8):
@@ -533,9 +547,10 @@ def build_room(x, y, opens, world_edges, seed):
             room.puts.append(('pickup', None, None, 'kind = "heart"'))
     # enemies
     if (x, y) not in SPRINGS:
-        count = 1 + min(3, (TIER[room.r] + 1) // 3) + (1 if rnd.random() < 0.4 else 0)
+        count = 1 + min(3, (tier_of(x, y) + 1) // 3) + (1 if rnd.random() < 0.4 else 0)
+        kinds = ENEMIES[ROAD_ENEMIES] if (x, y) in ROAD else ENEMIES[room.r]
         for _ in range(min(count, 4)):
-            room.puts.append(('enemy', None, None, rnd.choice(ENEMIES[room.r])))
+            room.puts.append(('enemy', None, None, rnd.choice(kinds)))
     room.opens = opens
     return room
 
@@ -646,8 +661,8 @@ def write(rooms, caves_old, seed):
                 problems += ['%s: %s' % (n, p) for p in pr]
             out.append('room %s' % n)
             out.append('music overworld')
-            out.append('var region = "%s"' % REGION_NAME[reg(x, y)].upper())   # shown as Pip comes in
-            out.append('var tier = %d' % TIER[reg(x, y)])                       # its stage: how tough its enemies are
+            out.append('var region = "%s"' % region_title(x, y))               # shown as Pip comes in
+            out.append('var tier = %d' % tier_of(x, y))                         # its stage: how tough its enemies are
             out.append('map')
             out += m
             out += puts
@@ -685,6 +700,35 @@ def write(rooms, caves_old, seed):
               'end', '']
     open(GAME + '/tools/world/cellars_unbuilt.txt', 'w').write('\n'.join(s))
     write_hints(rooms)
+    return problems + stage_check()
+
+def stage_check():
+    """Every cellar's door must be reachable from the start walking only through screens of its
+    stage or earlier (so the way to cellar 2 never crosses stage 7 country). Walks the land as
+    written, all 128 screens stitched together."""
+    import collections
+    rooms, _ = parse_world(GAME + '/tools/world/overworld.txt')
+    grid, tier = {}, {}
+    for n, r in rooms.items():
+        x, y = (int(v) for v in n.split('_')[1:])
+        tier[(x, y)] = next(int(v.split('=')[1]) for v in r['vars'] if v.startswith('tier'))
+        for rr in range(H_):
+            for c in range(W_): grid[(x * W_ + c, y * H_ + rr)] = r['map'][rr][c]
+    problems = []
+    start = (7 * W_ + 7, 7 * H_ + 6)
+    for (x, y), (num, title, hidden) in sorted(CELLARS.items(), key=lambda kv: kv[1][0]):
+        door = next((p for p in rooms['ow_%d_%d' % (x, y)]['puts'] if p.startswith('warp') and 'd%d_2_4' % num in p), None)
+        c, r = (int(float(v)) for v in door.split()[1:3])
+        front = (x * W_ + c, y * H_ + r + 1)
+        seen, todo = {start}, collections.deque([start])
+        while todo:
+            p = todo.popleft()
+            for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                q = (p[0] + dc, p[1] + dr)
+                if q in grid and q not in seen and grid[q] not in SOLID and tier[(q[0] // W_, q[1] // H_)] <= max(num, 1):
+                    seen.add(q); todo.append(q)
+        if front not in seen:
+            problems.append('cellar %d (%s): its door can only be reached through later stages' % (num, title.title()))
     return problems
 
 def where(x, y):

@@ -255,7 +255,7 @@ KK::::::::::::KK
 KKKKKKK::KKKKKKK
 put flame 4.5 4
 put flame 10.5 4
-put old_chef 7.5 4 line1 = "PICKLES! THE PANTRY IS", line2 = "OUT IN THE MARSH, NORTHEAST."
+put old_chef 7.5 4 line1 = "PICKLES! THE PANTRY IS JUST", line2 = "NORTH OF HERE, IN THE MARSH."
 end
 
 room cave_jacket

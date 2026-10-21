@@ -11,6 +11,9 @@ ending.
 - **The Pantry Plains:** 128 screens in ten regions: the start plains, the Lettuce Woods,
   Blueberry Lake, the Frosty Fields, the Fortune Cookie Field, the Chocolate Mountains,
   the Pickle Marsh, the Sugar Desert, the Candy Meadows and the Juice Coast.
+  - **The Sugar Road** runs along the desert's north edge, from the Frosty Fields east
+    to the Pickle Marsh: the safe way to the second cellar, and on down the Juice Coast
+    to the Candy Meadows, without crossing the desert's or the mountains' later dangers.
   - **30 caves:** the old chef with the spoon (and hints), five shops, nine chefs with
     hints, eight secret bean stashes, two heart-pie caves, and four upgrades.
   - **Secrets show if you look:** a cliff a bomb can open has a crack down it, a bush

@@ -75,6 +75,6 @@ entity
     layer = 2
   Script
     file = "scripts/npc.bs"
-    vars = "line1 = \"PICKLES! THE PANTRY IS\", line2 = \"OUT IN THE MARSH, NORTHEAST.\""
+    vars = "line1 = \"PICKLES! THE PANTRY IS JUST\", line2 = \"NORTH OF HERE, IN THE MARSH.\""
   Parent
     entity = 0

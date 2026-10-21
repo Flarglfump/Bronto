@@ -7,8 +7,8 @@
 #   Pss.sssssssss.ss
 #   Psssssssssssssss
 #   Pssss.s...ssssss
-#   Psssss....sssssP
-#   rsssss...ssssssr
+#   ssssss....sssssP
+#   ssssss...ssssssr
 #   rPPssrPPPPsssssP
 #   PPrssPPrPrPPPrrP
 bronto_scene 1
@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_12_3\", music = \"overworld\", region = \"SUGAR DESERT\", tier = 7"
+    vars = "id = \"ow_12_3\", music = \"overworld\", region = \"SUGAR ROAD\", tier = 2"
 
 entity
   Name
@@ -34,7 +34,7 @@ entity
     rows = 11
     legend = ".,TrW~bCs=fIFKX:YpPLGSg"
     solid = "TrW~bIKXYPLGSg"
-    tiles = "rrPPPPPPPrPssrrPPssssssssssssPPrPsssWWWs.ssss.srrsssWCWsssss.ssrPss.sssssssss.ssPsssssssssssssssPssss.s...ssssssPsssss....sssssPrsssss...ssssssrrPPssrPPPPsssssPPPrssPPrPrPPPrrP"
+    tiles = "rrPPPPPPPrPssrrPPssssssssssssPPrPsssWWWs.ssss.srrsssWCWsssss.ssrPss.sssssssss.ssPsssssssssssssssPssss.s...ssssssssssss....sssssPssssss...ssssssrrPPssrPPPPsssssPPPrssPPrPrPPPrrP"
     layer = -10
   Parent
     entity = 0
@@ -54,27 +54,13 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 120 40
+    position = 184 72
   Sprite
-    image = "art/meatball_0.bmp"
-    layer = 3
-  Script
-    file = "scripts/enemies/meatball.bs"
-    vars = ""
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Enemy"
-  Transform
-    position = 168 136
-  Sprite
-    image = "art/imp_0.bmp"
+    image = "art/plum_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, damage = 2, image = \"art/imp_\", speed = 58, shot = \"prefabs/spice.scene\", shot_speed = 100, shot_chance = 0.3"
+    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
   Parent
     entity = 0
 
@@ -82,12 +68,26 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 72 104
+    position = 184 120
   Sprite
     image = "art/burger_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/walker.bs"
     vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 120 104
+  Sprite
+    image = "art/olive_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/olive_\", speed = 36, shot = \"prefabs/seed.scene\", shot_speed = 120, aim = true"
   Parent
     entity = 0

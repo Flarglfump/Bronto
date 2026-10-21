@@ -6,9 +6,9 @@
 #   Pssss...sssssssr
 #   sssss...sssssssr
 #   ssssss.ssssssssP
-#   sssssPsssss.ssPr
-#   rsssssss.ss...rr
-#   rsssPssssss...PP
+#   sssssPsssss.sssr
+#   rsssssss.ss...ss
+#   rsssPssssss...ss
 #   PPsssPPsssrsssrr
 #   PPrrPrrssrPrPPrr
 bronto_scene 1
@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_11_3\", music = \"overworld\", region = \"SUGAR DESERT\", tier = 7"
+    vars = "id = \"ow_11_3\", music = \"overworld\", region = \"SUGAR ROAD\", tier = 2"
 
 entity
   Name
@@ -34,7 +34,7 @@ entity
     rows = 11
     legend = ".,TrW~bCs=fIFKX:YpPLGSg"
     solid = "TrW~bIKXYPLGSg"
-    tiles = "rPrrPPPPrrPrrPPrPssssssssssssssrPssssPsssPsssssrPssss...sssssssrsssss...sssssssrssssss.ssssssssPsssssPsssss.ssPrrsssssss.ss...rrrsssPssssss...PPPPsssPPsssrsssrrPPrrPrrssrPrPPrr"
+    tiles = "rPrrPPPPrrPrrPPrPssssssssssssssrPssssPsssPsssssrPssss...sssssssrsssss...sssssssrssssss.ssssssssPsssssPsssss.sssrrsssssss.ss...ssrsssPssssss...ssPPsssPPsssrsssrrPPrrPrrssrPrPPrr"
     layer = -10
   Parent
     entity = 0
@@ -43,13 +43,13 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 72 120
+    position = 152 120
   Sprite
-    image = "art/burger_0.bmp"
+    image = "art/jelly_0.bmp"
     layer = 3
   Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
   Parent
     entity = 0
 
@@ -57,21 +57,7 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 88 88
-  Sprite
-    image = "art/imp_0.bmp"
-    layer = 3
-  Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, damage = 2, image = \"art/imp_\", speed = 58, shot = \"prefabs/spice.scene\", shot_speed = 100, shot_chance = 0.3"
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Enemy"
-  Transform
-    position = 152 88
+    position = 120 72
   Sprite
     image = "art/burger_0.bmp"
     layer = 3

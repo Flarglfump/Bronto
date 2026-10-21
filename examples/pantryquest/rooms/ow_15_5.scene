@@ -10,7 +10,7 @@
 #   Tsssssssssss~~~~
 #   TsssssTrsssss~~~
 #   TTTTTTssssTT~~~~
-#   TTTTTTTTTTTT~~~~
+#   TTTTTTTssTTT~~~~
 bronto_scene 1
 
 entity
@@ -34,7 +34,7 @@ entity
     rows = 11
     legend = ".,TrW~bCs=fIFKX:YpPLGSg"
     solid = "TrW~bIKXYPLGSg"
-    tiles = "TTTTTTTssTTT~~~~TTsssssssss~~~~~TTsssssssss~~~~~TTsss.sssss~~~~~TTsssssssss.~~~~Tsssssssssss~~~~Tssrss.s.sss~~~~Tsssssssssss~~~~TsssssTrsssss~~~TTTTTTssssTT~~~~TTTTTTTTTTTT~~~~"
+    tiles = "TTTTTTTssTTT~~~~TTsssssssss~~~~~TTsssssssss~~~~~TTsss.sssss~~~~~TTsssssssss.~~~~Tsssssssssss~~~~Tssrss.s.sss~~~~Tsssssssssss~~~~TsssssTrsssss~~~TTTTTTssssTT~~~~TTTTTTTssTTT~~~~"
     layer = -10
   Parent
     entity = 0
@@ -43,35 +43,7 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 200 136
-  Sprite
-    image = "art/olive_0.bmp"
-    layer = 3
-  Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, damage = 1, image = \"art/olive_\", speed = 36, shot = \"prefabs/seed.scene\", shot_speed = 120, aim = true"
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Enemy"
-  Transform
-    position = 56 72
-  Sprite
-    image = "art/olive_0.bmp"
-    layer = 3
-  Script
-    file = "scripts/enemies/walker.bs"
-    vars = "hp = 2, damage = 1, image = \"art/olive_\", speed = 36, shot = \"prefabs/seed.scene\", shot_speed = 120, aim = true"
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Enemy"
-  Transform
-    position = 120 120
+    position = 88 88
   Sprite
     image = "art/burger_0.bmp"
     layer = 3
@@ -85,7 +57,35 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 88 56
+    position = 184 120
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 152 40
+  Sprite
+    image = "art/corn_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 1, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 120 104
   Sprite
     image = "art/burger_0.bmp"
     layer = 3

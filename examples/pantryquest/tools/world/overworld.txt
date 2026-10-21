@@ -1281,8 +1281,8 @@ end
 
 room ow_10_3
 music overworld
-var region = "SUGAR DESERT"
-var tier = 7
+var region = "SUGAR ROAD"
+var tier = 2
 map
 rrrrPPPPrPPPrrPP
 PrPPssssrrrrsssP
@@ -1295,15 +1295,14 @@ Psssrss...sssssr
 rssssPsss.sssssr
 PssrPrsssssssssr
 rrPrrPPssPrrrPPr
-put imp 9 2
-put ant 5 2
-put imp 12 2
+put burger 7 7
+put plum 10 6
 end
 
 room ow_11_3
 music overworld
-var region = "SUGAR DESERT"
-var tier = 7
+var region = "SUGAR ROAD"
+var tier = 2
 map
 rPrrPPPPrrPrrPPr
 Pssssssssssssssr
@@ -1311,20 +1310,19 @@ PssssPsssPsssssr
 Pssss...sssssssr
 sssss...sssssssr
 ssssss.ssssssssP
-sssssPsssss.ssPr
-rsssssss.ss...rr
-rsssPssssss...PP
+sssssPsssss.sssr
+rsssssss.ss...ss
+rsssPssssss...ss
 PPsssPPsssrsssrr
 PPrrPrrssrPrPPrr
-put burger 4 7
-put imp 5 5
-put burger 9 5
+put jelly 9 7
+put burger 7 4
 end
 
 room ow_12_3
 music overworld
-var region = "SUGAR DESERT"
-var tier = 7
+var region = "SUGAR ROAD"
+var tier = 2
 map
 rrPPPPPPPrPssrrP
 PssssssssssssPPr
@@ -1333,14 +1331,14 @@ rsssWCWsssss.ssr
 Pss.sssssssss.ss
 Psssssssssssssss
 Pssss.s...ssssss
-Psssss....sssssP
-rsssss...ssssssr
+ssssss....sssssP
+ssssss...ssssssr
 rPPssrPPPPsssssP
 PPrssPPrPrPPPrrP
 put warp 5 3 to = "cave_hint9", pos = vec2(128, 216)
-put meatball 7 2
-put imp 10 8
-put burger 4 6
+put plum 11 4
+put burger 11 7
+put olive 7 6
 end
 
 room ow_13_3
@@ -2068,11 +2066,11 @@ Tssrss.s.sss~~~~
 Tsssssssssss~~~~
 TsssssTrsssss~~~
 TTTTTTssssTT~~~~
-TTTTTTTTTTTT~~~~
-put olive 12 8
-put olive 3 4
-put burger 7 7
-put burger 5 3
+TTTTTTTssTTT~~~~
+put burger 5 5
+put burger 11 7
+put corn 9 2
+put burger 7 6
 end
 
 room ow_0_6
@@ -2393,7 +2391,7 @@ music overworld
 var region = "JUICE COAST"
 var tier = 5
 map
-TTTTTTTTTTTT~~~~
+TTTTTTTssTTT~~~~
 TTTTTTsssss~~~~~
 Tsssssssssss~~~~
 Tsssss..sss~~~~~
@@ -2404,9 +2402,9 @@ Tssssssssss~~~~~
 Tsssssssssss~~~~
 Tsssssssssss~~~~
 TTTTTTTTTTT~~~~~
-put olive 8 4
-put burger 3 8
-put olive 6 2
+put olive 5 6
+put corn 7 5
+put burger 11 8
 end
 
 room ow_0_7
