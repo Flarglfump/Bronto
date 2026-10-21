@@ -4,6 +4,9 @@ A small 2D game engine in C99 with **no dependencies beyond the C standard libra
 the operating system itself**. OS-specific code is kept in a separate platform layer,
 and the math and render APIs are designed so that 3D can be added later.
 
+> **Note:** much of the code in this project was written with Claude Opus 5.5, an AI
+> model made by Anthropic.
+
 Status (v0.1):
 - **Done:** the core systems; native windows, sound output and gamepads on Windows,
   macOS and Linux; web builds (WebAssembly, with no Emscripten); two sample games, Snake
