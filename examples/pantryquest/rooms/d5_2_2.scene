@@ -1,0 +1,83 @@
+# Pantry Quest - room d5_2_2 (made by tools/make_rooms.py from tools/world/cellar5.txt: edit it there)
+#
+#   #######LL#######
+#   #######LL#######
+#   ##............##
+#   ##..P......P..##
+#   ##............##
+#   LL............,,
+#   ##............##
+#   ##..P......P..##
+#   ##............##
+#   #######,,#######
+#   #######,,#######
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d5_2_2\", music = \"cellar\", stays_clear = true"
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,"
+    solid = "#O~LHXPV"
+    tiles = "#######LL##############LL#########............####..P......P..####............##LL............,,##............####..P......P..####............#########,,##############,,#######"
+    layer = -10
+    tint = #ffb4dcff
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 88 88
+  Sprite
+    image = "art/corn_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 168 88
+  Sprite
+    image = "art/corn_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 120 56
+  Sprite
+    image = "art/olive_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/olive_\", speed = 36, shot = \"prefabs/seed.scene\", shot_speed = 120, aim = true"
+  Parent
+    entity = 0

@@ -157,6 +157,10 @@ def make_sfx():
                         (0, tone(R, 300, 0.5, 'noise', vol=0.2, decay=0.3))])
     sfx('teleport', 0.45, [(0, tone(R, 'C5', 0.4, duty=0.125, vol=0.15, f1='C7', vibrato=10)),
                            (0.05, tone(R, 'G5', 0.35, 'triangle', vol=0.2, f1='G3'))])
+    sfx('splash', 0.4, [(0, tone(R, 900, 0.35, 'noise', vol=0.3, f1=200, decay=0.12)),
+                        (0, tone(R, 'G3', 0.2, 'triangle', vol=0.3, f1='C3'))])
+    sfx('whisk', 1.0, [(0, tone(R, 400, 0.95, 'noise', vol=0.25, f1=2400, decay=0.6)),
+                       (0, tone(R, 'C4', 0.9, duty=0.125, vol=0.12, f1='C6', vibrato=14))])
 
 
 # ---------------------------------------------------------------- music

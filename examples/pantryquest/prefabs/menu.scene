@@ -419,3 +419,27 @@ entity
     layer = 71
   Parent
     entity = 0
+
+entity
+  Name
+    text = "Treasure0"
+  Transform
+    position = 96 -30
+  Sprite
+    image = "art/plank.bmp"
+    tint = #ffffff00
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Treasure1"
+  Transform
+    position = 96 0
+  Sprite
+    image = "art/plank.bmp"
+    tint = #ffffff00
+    layer = 71
+  Parent
+    entity = 0

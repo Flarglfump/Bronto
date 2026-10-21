@@ -1,0 +1,14 @@
+# Pantry Quest - the Jammerwock (the Jam Jar's guardian) (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/jamwock_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/jammerwock.bs"
+    vars = ""

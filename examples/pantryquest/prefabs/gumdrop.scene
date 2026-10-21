@@ -1,0 +1,14 @@
+# Pantry Quest - a gumdrop the Gumdrop King split into (spawned by scripts/enemies/gumdrop.bs)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/gum_mid.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/gumdrop.bs"
+    vars = ""

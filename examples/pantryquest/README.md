@@ -6,7 +6,7 @@ into eight pages and hidden them all over the land. Pip, a young cook, picks up 
 spoon and sets out to find them.
 
 This is the first part of a bigger game. The whole land is there to explore now, with
-the first three of its nine cellars:
+the first five of its nine cellars:
 
 - **The Pantry Plains:** 128 screens in ten regions: the start plains, the Lettuce Woods,
   Blueberry Lake, the Frosty Fields, the Fortune Cookie Field, the Chocolate Mountains,
@@ -17,7 +17,7 @@ the first three of its nine cellars:
   - **Two healing springs**, and three heart pies hidden out in the land.
   - **The doors of all nine cellars.** Two are hidden behind cracked cliffs, and the
     last, Baron Gorge's Banquet Hall, waits at the top of the Chocolate Mountains.
-    Cellars 2 to 9 are still being dug: for now each door leads to an entrance room
+    Cellars 6 to 9 are still being dug: for now each door leads to an entrance room
     where a cook says so.
 - **The Cold Cellar** (in the Frosty Fields): nine rooms. It has locked doors and keys,
   shutters that close until the enemies are beaten, and a bombable wall with a stash
@@ -31,6 +31,17 @@ the first three of its nine cellars:
   treasure is the **fire chili**: its flame scorches enemies and burns away a bush that
   hides a cave. Its guardian, the **Spice Wraith**, drifts from spot to spot bursting
   out rings of spice, and can only be hurt while it is solid.
+- **The Jam Jar** (on the island in Blueberry Lake, over the long bridge): fourteen rooms,
+  with toast knights whose buttered fronts turn a poke (hit them from the side or
+  behind). Its treasure is the **wafer plank**, which Pip just carries: with it he
+  walks over jam or water one tile wide. A key on a jam-ringed island and the guardian's
+  room both need it. The guardian, the **Jammerwock**, rises out of the jam pool nearest
+  Pip, spits jam and sinks again; it can only be hit while it is up.
+- **The Candy Works** (in the Candy Meadows): fifteen rooms, with candy-corn soldiers
+  that fire kernels when lined up with Pip. A syrup channel needs the plank. Its treasure
+  is the **whisk**: out on the land, it whirls Pip to the door of a cellar whose recipe
+  page he has, the next one each time. The guardian, the **Gumdrop King**, bounces off
+  the walls, and when beaten bursts into two gumdrops, which burst into two more each.
 - Every cellar has a **map**, which shows all its rooms on the HUD, and a **compass**,
   which marks the guardian's room until it is beaten. Behind each guardian is a heart
   pie and a page of the recipe, and the page takes Pip back out of the cellar's door.
@@ -39,8 +50,8 @@ the first three of its nine cellars:
 |---|---|---|
 | Walk | arrows or WASD | Eight directions; Pip slides along walls and round corners |
 | Poke with the spoon | X (or Space) | At full health the spoon also throws a spark |
-| Use the B item | Z (or J) | Popcorn bombs, the pizza cutter, the skewer bow, the fire chili |
-| Pocket Pantry | Enter (or I) | Choose the B item there |
+| Use the B item | Z (or J) | Popcorn bombs, the pizza cutter, the skewer bow, the fire chili, the whisk |
+| Pocket Pantry | Enter (or I) | Choose the B item there; treasures you carry are down the right edge |
 | Pause | Escape (or P) | Resume, save, settings, quit to the title |
 
 **The title** offers PLAY, SETTINGS and QUIT. PLAY shows three files: an empty one starts
@@ -90,9 +101,11 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
   inventory and the music.
 - **Scripts:**
   - `hero.bs` handles Pip: walking in eight directions, the spoon, items, and being hurt.
-  - `enemies/walker.bs` covers tomatoes, plums, burger knights and breadstick soldiers.
+  - `enemies/walker.bs` covers tomatoes, plums, burger knights, breadstick soldiers,
+    toast knights (`front_guard`) and candy-corn soldiers.
   - `jelly.bs`, `bat.bs` and `meatball.bs` are cellar creatures; `gelatin.bs`,
-    `big_dill.bs` and `spice_wraith.bs` are the guardians. Sour olives and chili imps are
+    `big_dill.bs`, `spice_wraith.bs`, `jammerwock.bs` and `gumdrop.bs` (the Gumdrop King
+    and the gumdrops he splits into) are the guardians. Sour olives and chili imps are
     walkers with their own vars (`prefabs/olive.scene`, `prefabs/imp.scene`).
   - `skewer.bs` and `fire.bs` are the skewer bow's skewers and the fire chili's flame.
   - `pickup.bs` covers anything to pick up or buy.
@@ -122,7 +135,7 @@ standard library only:
 - `make_rooms.py` turns the maps in `tools/world/*.txt` into `rooms/*.scene`. The maps
   are easier to edit there than tile by tile. Each map is 16 x 11 characters, or a
   cellar room's 12 x 7 inside with its doors named. `overworld.txt` holds the land,
-  `caves.txt` the caves, `cellar1.txt` to `cellar3.txt` the cellars built so far (each
+  `caves.txt` the caves, `cellar1.txt` to `cellar5.txt` the cellars built so far (each
   with its own `name` and `tint`), and `cellars_unbuilt.txt` the entrance rooms of the cellars to
   come. It also writes `scripts/cellars.bs`, which tells the game each cellar's rooms,
   its guardian's room and its way out (for the HUD's map and compass).

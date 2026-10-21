@@ -1,0 +1,11 @@
+# Pantry Quest - the wafer plank, laid across jam under Pip's feet (scripts/hero.bs shows it)
+bronto_scene 1
+
+entity
+  Name
+    text = "Plank"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/plank_flat.bmp"
+    layer = 1

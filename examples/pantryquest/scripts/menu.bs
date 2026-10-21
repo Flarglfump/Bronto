@@ -1,7 +1,9 @@
 # The inventory: a recipe page, with Pip's things on plates. The game waits
 # while it's open. The arrows (or the mouse) choose the item for B - its name
 # and what it does show underneath - and Enter closes it. The recipe pages
-# found so far are along the bottom.
+# found so far are along the bottom, and the treasures Pip carries (they
+# work by themselves: the wafer plank) down the right edge - the mouse over
+# one shows what it is.
 
 var game
 var keys
@@ -13,6 +15,8 @@ var owned = []
 var item_name
 var item_info
 var last_mouse := vec2(-1, -1)
+var treasure_spots = []
+var on_treasure = -1        # the treasure the mouse is over, or -1
 
 func start() {
     game = find("Game")
@@ -40,6 +44,14 @@ func start() {
         if i < game.pages { child(self, "Page" + i).Sprite.image = "art/page_on.bmp" }
     }
     child(self, "Pages").Label.text = "RECIPE PAGES"
+    for i in 2 {
+        var t = child(self, "Treasure" + i)
+        push(treasure_spots, t)
+        if i < len(game.treasures) {
+            t.Sprite.image = find("HUD").icon(game.treasures[i])
+            t.Sprite.tint = rgb(255, 255, 255)
+        }
+    }
     last_mouse = mouse_position()
     show()
 }
@@ -50,6 +62,8 @@ func name_of(item) {
     if item == "cutter" { return "PIZZA CUTTER" }
     if item == "skewers" { return "SKEWER BOW" }
     if item == "chili" { return "FIRE CHILI" }
+    if item == "whisk" { return "WHISK" }
+    if item == "plank" { return "WAFER PLANK" }
     return ""
 }
 func info_of(item) {
@@ -57,10 +71,17 @@ func info_of(item) {
     if item == "cutter" { return "FLIES OUT AND COMES BACK" }
     if item == "skewers" { return "A BEAN FOR EACH SKEWER" }
     if item == "chili" { return "BURNS BUSHES AND FOES" }
+    if item == "whisk" { return "WHIRLS YOU TO A CELLAR DOOR" }
+    if item == "plank" { return "CROSS JAM ONE TILE WIDE" }
     return ""
 }
 
 func show() {
+    if on_treasure >= 0 {                                # (just naming it: it isn't for B)
+        item_name.Label.text = name_of(game.treasures[on_treasure])
+        item_info.Label.text = info_of(game.treasures[on_treasure])
+        return
+    }
     if len(owned) == 0 {
         cursor.Sprite.tint = rgb(255, 255, 255, 0)
         item_name.Label.text = "NOTHING HERE YET"
@@ -74,7 +95,12 @@ func show() {
 }
 
 func pick(i) {
-    if i == choice or i >= len(owned) { return }
+    if i >= len(owned) { return }
+    on_treasure = -1
+    if i == choice {
+        show()
+        return
+    }
     choice = i
     play_sound("sfx/menu.wav")
     show()
@@ -92,6 +118,14 @@ func update(dt) {
             last_mouse = m
             for i in n {
                 if distance(plates[i].global_position, m) < 13 { pick(i) }
+            }
+            var over = -1
+            for i in len(game.treasures) {
+                if i < 2 and distance(treasure_spots[i].global_position, m) < 10 { over = i }
+            }
+            if over != on_treasure {
+                on_treasure = over
+                show()
             }
         }
     }

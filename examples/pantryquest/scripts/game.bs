@@ -15,7 +15,8 @@ var keys = 0
 var bombs = 0
 var bombs_max = 8
 var weapon = 0              # 0 none, 1 wooden spoon
-var items = []              # "bombs", "cutter", "skewers", "chili"
+var items = []              # "bombs", "cutter", "skewers", "chili", "whisk"
+var treasures = []          # things carried that work by themselves: "plank"
 var b_item = ""             # the one on the B button (Z)
 var pages = 0               # pages of the Grand Recipe
 var flags = []              # what's been done: doors opened, items taken...
@@ -62,6 +63,7 @@ var won_t = 0
 var holding_page = false
 var note1 = ""              # a message for when the next room has faded in
 var note2 = ""
+var whisk_i = -1            # the cellar door the whisk went to last (in the list of those with a page)
 
 var booted = 0
 var slot = 0                # the save slot being played (1 to 3), chosen on the title; 0: none (the editor's Play)
@@ -117,7 +119,7 @@ func save_game() {
     if place == "" { place = find("Banner").last }
     var data = [["version", 1], ["room", r[0]], ["pos", r[1]], ["place", place], ["time", floor(play_time)],
                 ["hearts_max", hearts_max], ["beans", beans], ["keys", keys], ["bombs", bombs],
-                ["bombs_max", bombs_max], ["weapon", weapon], ["items", items], ["b_item", b_item],
+                ["bombs_max", bombs_max], ["weapon", weapon], ["items", items], ["b_item", b_item], ["treasures", treasures],
                 ["pages", pages], ["flags", flags], ["visited", visited], ["maps", maps], ["compasses", compasses],
                 ["area_start", area_start], ["area_pos", area_pos]]
     return save_data("slot" + slot, data)
@@ -140,6 +142,7 @@ func load_game() {
         elif k == "weapon" { weapon = v }
         elif k == "items" { items = v }
         elif k == "b_item" { b_item = v }
+        elif k == "treasures" { treasures = v }
         elif k == "pages" { pages = v }
         elif k == "flags" { flags = v }
         elif k == "visited" { visited = v }
@@ -451,6 +454,13 @@ func collect(kind, thing) {
         give("chili")
         b_item = "chili"
         hold("art/chili.bmp", 1.6)
+    } elif kind == "plank" {
+        if not contains(treasures, "plank") { push(treasures, "plank") }
+        hold("art/plank.bmp", 1.6)
+    } elif kind == "whisk" {
+        give("whisk")
+        b_item = "whisk"
+        hold("art/whisk.bmp", 1.6)
     } elif kind == "heart_pie" {
         hearts_max = min(hearts_max + 1, 16)
         hp = hearts_max * 2
@@ -463,6 +473,28 @@ func collect(kind, thing) {
         holding_page = true
     }
 }
+func has_treasure(t) { return contains(treasures, t) }
+
+# The whisk: out on the land, it whirls Pip off to a cellar door - each use,
+# the next cellar whose recipe page he has. Anywhere else it just spins.
+func whisk() {
+    var places = []
+    for n in range(1, 10) {
+        if has_flag("page:d" + n) { push(places, "d" + n) }
+    }
+    if area != "ow" or len(places) == 0 {
+        play_sound("sfx/tink.wav", 0.6)
+        return false
+    }
+    whisk_i = (whisk_i + 1) % len(places)
+    var c = find("Cellars")
+    var a = places[whisk_i]
+    spawn("prefabs/whirl.scene", hero.position)
+    play_sound("sfx/whisk.wav")
+    warp(c.exit_room(a), c.exit_pos(a), "down")
+    return true
+}
+
 func give(item) {
     if not contains(items, item) {
         push(items, item)
@@ -483,7 +515,7 @@ func after_hold() {
         flag("page:" + area)
         note1 = "RECIPE PAGE " + pages + " OF 8 FOUND!"
         note2 = "NOW FIND THE NEXT CELLAR!"
-        if pages >= 3 { note2 = "MORE CELLARS ARE BEING DUG!" }
+        if pages >= 5 { note2 = "MORE CELLARS ARE BEING DUG!" }
         area_start = start_room
         area_pos = start_pos
         var cellars = find("Cellars")                       # back out of this cellar's door

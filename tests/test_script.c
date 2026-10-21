@@ -627,9 +627,11 @@ static void test_pantryquest_world(void) {
 
 /* Pantry Quest's cellar guardians, fought from here: Pip stays put (his
  * health kept full) and pokes at the guardian every few steps. The Big Dill
- * only feels it while dizzy from charging into a wall; the Spice Wraith only
- * while it is solid. Both must go down, and the cellar's music comes back. */
-static void pq_fight(const char *room, int max_hp, bool only_when_dizzy) {
+ * only feels it while dizzy from charging into a wall; the Jammerwock only
+ * while it is up out of the jam; the Spice Wraith only while it is solid.
+ * Each must go down, and the cellar's music comes back. `only` lists the
+ * modes a hit may land in (NULL: any). */
+static void pq_fight(const char *room, int max_hp, const char *only) {
     char err[200], mode[32], music[32];
     br_entity game, boss = BR_ENTITY_NULL;
     br_script *sc;
@@ -658,15 +660,63 @@ static void pq_fight(const char *room, int max_hp, bool only_when_dizzy) {
         br_script_get_number(&W, boss, "hp", &hp);
         if (hp < last_hp) {
             landed++;
-            if (only_when_dizzy) CHECK(strcmp(mode, "dizzy") == 0);
-        } else if (only_when_dizzy && strcmp(mode, "dizzy") != 0) {
+            if (only) CHECK(mode[0] && strstr(only, mode) != NULL);
+        } else if (only && !(mode[0] && strstr(only, mode))) {
             shrugged++;
         }
         last_hp = hp;
     }
     CHECK(!br_entity_alive(&W, boss));
     CHECK_EQ_INT(landed, max_hp);
-    if (only_when_dizzy) CHECK(shrugged > 0);
+    if (only) CHECK(shrugged > 0);
+    steps(2);
+    CHECK(br_script_get_string(&W, game, "music_name", music, sizeof(music)) && strcmp(music, "cellar") == 0);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+/* The Gumdrop King: four hits and he bursts into two gumdrops, two hits
+ * each and those burst into two little ones; one hit pops each of those.
+ * Twelve in all, poking at every gumdrop in the room, and his bar counts
+ * them down. */
+static void pq_fight_gumdrops(void) {
+    char err[200], music[32];
+    br_entity game, king, all[32];
+    br_script *sc;
+    double hp = 0, last_hp = 12, life = 32;
+    int i, j, n, landed = 0, most = 0;
+    static const double poke[3] = { 1, 0, 0 };
+    setup();
+    br_assets_set_root("examples/pantryquest/");
+    CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
+    game = named("Game");
+    sc = (br_script *)br_get(&W, game, SCRIPT);
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"d5_2_0\", start_pos = vec2(128, 200), weapon = 1, hearts_max = 16");
+    steps(40);
+    king = named("Enemy");
+    CHECK(king != BR_ENTITY_NULL);
+    if (king == BR_ENTITY_NULL) { teardown(); return; }
+    steps(60 * 4);                                     /* (his entrance) */
+    CHECK(br_script_get_number(&W, king, "hp", &hp) && hp == 12);
+    for (i = 0; i < 60 * 60 && br_entity_alive(&W, king); ++i) {
+        br_script_set_number(&W, game, "hp", life);
+        steps(1);
+        if (i % 9) continue;
+        n = 0;
+        for (j = 0; j < (int)W.pools[ID.name].count && n < 32; ++j)
+            if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)j * W.pools[ID.name].stride))->text, "Enemy") == 0)
+                all[n++] = W.pools[ID.name].entities[j];
+        if (n - 1 > most) most = n - 1;                /* (the king stays, unseen, to keep count) */
+        for (j = 0; j < n; ++j) br_script_call(&W, all[j], "hit", poke, 3);
+        steps(1);
+        if (!br_entity_alive(&W, king)) { landed += (int)last_hp; break; }
+        br_script_get_number(&W, king, "hp", &hp);
+        if (hp < last_hp) landed += (int)(last_hp - hp);
+        last_hp = hp;
+    }
+    CHECK(!br_entity_alive(&W, king));
+    CHECK_EQ_INT(landed, 12);
+    CHECK_EQ_INT(most, 4);
     steps(2);
     CHECK(br_script_get_string(&W, game, "music_name", music, sizeof(music)) && strcmp(music, "cellar") == 0);
     CHECK_EQ_INT(br_script_error_count(&W), 0);
@@ -674,8 +724,10 @@ static void pq_fight(const char *room, int max_hp, bool only_when_dizzy) {
     teardown();
 }
 static void test_pantryquest_bosses(void) {
-    pq_fight("d2_2_1", 6, true);                /* the Big Dill */
-    pq_fight("d3_1_0", 8, false);               /* the Spice Wraith */
+    pq_fight("d2_2_1", 6, "dizzy");             /* the Big Dill */
+    pq_fight("d3_1_0", 8, NULL);                /* the Spice Wraith */
+    pq_fight("d4_2_0", 8, "up rise");           /* the Jammerwock */
+    pq_fight_gumdrops();                        /* the Gumdrop King */
 }
 
 /* Pantry Quest: Pip walks in eight directions - a diagonal as fast as
@@ -739,6 +791,51 @@ static bool pq_load(const char *scene) {
     snprintf(path, sizeof(path), "examples/pantryquest/%s", scene);
     return br_world_load_file(&W, path, NULL, 0, err, sizeof(err)) > 5;
 }
+/* Pantry Quest's wafer plank and whisk. With the plank Pip walks over jam
+ * one tile wide (the Jam Jar's moat room), and not without it; the whisk,
+ * out on the land, whirls him to the door of a cellar whose page he has. */
+static float pq_walk_west(const char *treasures) {
+    br_script *sc;
+    const br_transform *t;
+    float x;
+    if (!pq_load("main.scene")) { teardown(); return -1; }
+    sc = (br_script *)br_get(&W, named("Game"), SCRIPT);
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"d4_0_2\", start_pos = vec2(200, 152), weapon = 1, treasures = [%s]", treasures);
+    steps(40);
+    hold_key(BR_KEY_LEFT, 90);
+    t = (const br_transform *)br_get(&W, named("Hero"), ID.transform);
+    x = t ? t->position.x : -1;
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+    return x;
+}
+static void test_pantryquest_plank_and_whisk(void) {
+    char room[32];
+    br_entity game;
+    br_script *sc;
+    float x;
+    x = pq_walk_west("");
+    CHECK(x > 128);                                    /* stopped at the jam (x 112 to 128) */
+    x = pq_walk_west("\"plank\"");
+    CHECK(x > 0 && x < 100);                           /* over it on the plank */
+    CHECK(pq_load("main.scene"));
+    game = named("Game");
+    sc = (br_script *)br_get(&W, game, SCRIPT);
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"ow_7_7\", start_pos = vec2(120, 168), start_items = \"whisk\", "
+             "flags = [\"page:d1\", \"page:d3\"]");
+    steps(40);
+    pq_press(BR_KEY_Z);
+    steps(40);
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "ow_7_5") == 0);   /* the Cold Cellar's door */
+    pq_press(BR_KEY_Z);
+    steps(40);
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "ow_1_6") == 0);   /* then the Spice Rack's */
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+
 static void test_pantryquest_files_and_settings(void) {
     char folder[BR_PATH_MAX], text[64];
     size_t size;
@@ -1116,6 +1213,7 @@ void suite_script(void) {
     RUN(test_pantryquest_shutter);
     RUN(test_pantryquest_world);
     RUN(test_pantryquest_bosses);
+    RUN(test_pantryquest_plank_and_whisk);
     RUN(test_pantryquest_eight_ways);
     RUN(test_pantryquest_files_and_settings);
     RUN(test_check_and_errors);

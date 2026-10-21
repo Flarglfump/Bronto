@@ -34,6 +34,8 @@ func icon(item) {
     if item == "cutter" { return "art/cutter.bmp" }
     if item == "skewers" { return "art/skewer.bmp" }
     if item == "chili" { return "art/chili.bmp" }
+    if item == "whisk" { return "art/whisk.bmp" }
+    if item == "plank" { return "art/plank.bmp" }
     return ""
 }
 

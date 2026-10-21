@@ -1,0 +1,14 @@
+# Pantry Quest - a toast knight, of the Jam Jar: its buttered front turns a poke (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/toast_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 3, damage = 2, image = \"art/toast_\", speed = 34, front_guard = true"

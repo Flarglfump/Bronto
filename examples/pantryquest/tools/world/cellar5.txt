@@ -1,0 +1,262 @@
+# The Candy Works (the fifth cellar, "d5"), in the Candy Meadows. Its
+# treasure is the whisk: on the land outside, it whirls Pip away to the
+# door of any cellar whose recipe page he has. Its guardian, the Gumdrop
+# King, bounces off the walls - and beaten, splits into two gumdrops, which
+# split again.
+#
+#   .  tiled floor   O  crate   ~  syrup   P  pepper-mill statue
+#
+# Map of the cellar (columns 0-4, rows 0-4):
+#
+#               [1,0 recipe ][2,0 Gumdrop King]
+#   [0,1 key   ][1,1 hall   ][2,1 hall        ][3,1 hall ][4,1 stash]
+#   [0,2 map   ][1,2 whisk  ][2,2 hub         ][3,2 compass]
+#               [1,3 key    ][2,3 hall        ][3,3 key  ]
+#                            [2,4 entrance] - the door south goes back out to the meadows
+name The Candy Works
+tint #ffb4dcff
+
+room d5_2_4
+music cellar
+doors n=open s=open
+var exit_s = "ow_13_6"
+var exit_pos = vec2(104, 136)
+var exit_face = "down"
+inside
+............
+..P......P..
+............
+............
+............
+..P......P..
+............
+end
+
+room d5_2_3
+music cellar
+doors s=open n=open w=open e=open
+inside
+............
+.O..O..O..O.
+............
+............
+............
+.O..O..O..O.
+............
+put corn 4 4
+put corn 11 6
+put jelly 7 7
+end
+
+room d5_1_3
+music cellar
+doors e=open
+inside
+OOOOOOOOOOOO
+O.....~....O
+O.....~....O
+......~.....
+O.....~....O
+O.....~....O
+OOOOOOOOOOOO
+put corn 11 4
+put corn 11 7
+put pickup 4.5 5 kind = "key", flag = "d5:key1", on_clear = true
+end
+
+room d5_3_3
+music cellar
+doors w=open
+inside
+............
+..~~....~~..
+..~~....~~..
+............
+..~~....~~..
+..~~....~~..
+............
+put bat 6 4
+put bat 9 6
+put corn 7 8
+put pickup 7.5 5 kind = "key", flag = "d5:key2", on_clear = true
+end
+
+room d5_2_2
+music cellar
+doors s=open w=locked e=open n=locked
+inside
+............
+..P......P..
+............
+............
+............
+..P......P..
+............
+put corn 5 5
+put corn 10 5
+put olive 7 3
+end
+
+room d5_3_2
+music cellar
+doors w=open n=open
+inside
+............
+.~~~~..~~~~.
+............
+....O..O....
+............
+.~~~~..~~~~.
+............
+put corn 4 5
+put corn 11 5
+put jelly 7 7
+put pickup 7.5 4 kind = "compass", flag = "d5:compass", on_clear = true
+end
+
+room d5_3_1
+music cellar
+doors s=open e=bomb
+inside
+............
+.O.O.O.O.O..
+............
+............
+............
+.O.O.O.O.O..
+............
+put bat 5 4
+put bat 9 6
+put olive 8 7
+end
+
+room d5_4_1
+music cellar
+doors w=bomb
+inside
+OOOOOOOOOOOO
+O..........O
+O...P..P...O
+............
+O...P..P...O
+O..........O
+OOOOOOOOOOOO
+put pickup 6 5 kind = "bean5", flag = "d5:stash1"
+put pickup 7.5 5 kind = "heart", flag = "d5:stash2"
+put pickup 9 5 kind = "bean5", flag = "d5:stash3"
+end
+
+room d5_1_2
+music cellar
+doors e=locked w=open
+var shut = "e"
+inside
+............
+.P..P..P..P.
+............
+............
+............
+.P..P..P..P.
+............
+put corn 4 4
+put corn 11 6
+put olive 5 7
+put olive 10 3
+put pickup 7.5 5 kind = "whisk", flag = "d5:whisk", on_clear = true
+end
+
+room d5_0_2
+music cellar
+doors e=open n=open
+inside
+............
+.OO......OO.
+............
+.....OO.....
+............
+.OO......OO.
+............
+put bat 5 5
+put bat 10 5
+put jelly 7 7
+put pickup 7.5 7 kind = "map", flag = "d5:map"
+end
+
+room d5_0_1
+music cellar
+doors s=open e=open
+inside
+OOOO....OOOO
+O..........O
+O...~~~~...O
+O...~~~~....
+O..........O
+O..........O
+OOOO....OOOO
+put corn 3 3
+put corn 12 3
+put corn 4 7
+put pickup 7.5 7 kind = "key", flag = "d5:key3", on_clear = true
+end
+
+room d5_1_1
+music cellar
+doors w=open e=open
+inside
+............
+.~~......~~.
+.~~..PP..~~.
+............
+.~~..PP..~~.
+.~~......~~.
+............
+put olive 4 5
+put olive 11 5
+put jelly 7 7
+end
+
+room d5_2_1
+music cellar
+doors w=open s=locked n=locked
+inside
+............
+.O........O.
+............
+....OOOO....
+............
+.O........O.
+............
+put corn 4 4
+put corn 11 4
+put bat 7 7
+end
+
+room d5_2_0
+music cellar
+doors s=locked w=open
+var shut = "w"
+inside
+............
+.P........P.
+............
+............
+............
+.P........P.
+............
+put gumdrop_king 7.5 4
+put pickup 7.5 7 kind = "heart_pie", flag = "d5:heart", on_clear = true
+end
+
+room d5_1_0
+music cellar
+doors e=open
+inside
+............
+............
+.....PP.....
+............
+............
+............
+............
+put pickup 7.5 4 kind = "page", flag = "d5:page"
+end

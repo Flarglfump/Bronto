@@ -1,6 +1,7 @@
 # Pip, the young cook. The keys are the player's (scripts/settings.bs): at
 # first the arrows or WASD walk, X (or Space) pokes with the spoon, Z (or J)
-# uses the item on B (bombs, the pizza cutter, the skewer bow, the fire chili).
+# uses the item on B (bombs, the pizza cutter, the skewer bow, the fire chili,
+# the whisk). With the wafer plank he walks over jam (or water) one tile wide.
 #
 # He walks in eight directions, as fast on a diagonal as straight. Each axis
 # moves on its own, so pushing into a wall at an angle slides along it, and
@@ -25,6 +26,7 @@ var weapon
 var held
 var beam                    # the spoon's flying spark (at full health)
 var cutter                  # the pizza cutter, while it's out
+var plank                   # the wafer plank, shown under him while he crosses on it
 
 func start() {
     game = find("Game")
@@ -33,6 +35,8 @@ func start() {
     held = child(self, "Held")
     show(weapon, false)
     show(held, false)
+    plank = spawn("prefabs/plank_flat.scene", vec2(0, 0))
+    show(plank, false)
 }
 
 func show(e, on) {
@@ -106,10 +110,38 @@ func touches(p, r) {
 # ---- walking --------------------------------------------------------------------------
 func solid_at(p) {
     if tile_solid(game.map, p) {
-        if tile_at(game.map, p) == "L" and game.try_unlock(p) { return false }
+        var t = tile_at(game.map, p)
+        if t == "L" and game.try_unlock(p) { return false }
+        if t == "~" and plank_way(p) != "" { return false }
         return true
     }
     return false
+}
+
+# With the plank: is the jam (or water) at p one tile wide? "across" if it
+# has dry ground left and right, "along" if above and below; "" if not.
+func plank_way(p) {
+    if not game.has_treasure("plank") or tile_at(game.map, p) != "~" { return "" }
+    var m = game.map
+    if tile_at(m, p + vec2(-16, 0)) != "~" and tile_at(m, p + vec2(16, 0)) != "~" { return "across" }
+    if tile_at(m, p + vec2(0, -16)) != "~" and tile_at(m, p + vec2(0, 16)) != "~" { return "along" }
+    return ""
+}
+
+# Lays the plank under him while he is on jam.
+func show_plank() {
+    var feet = self.position + vec2(0, 4)
+    var way = ""
+    if game.state == "play" { way = plank_way(feet) }
+    if way == "" {
+        show(plank, false)
+        return
+    }
+    var room = game.room.global_position
+    var local = feet - room
+    plank.position = room + vec2(floor(local.x / 16) * 16 + 8, floor(local.y / 16) * 16 + 8)
+    if way == "across" { plank.rotation = 0 } else { plank.rotation = 90 }
+    show(plank, true)
 }
 
 # Would his feet fit with his centre at p?
@@ -156,6 +188,7 @@ func edge_check() {
 
 # ---- every step --------------------------------------------------------------------------
 func update(dt) {
+    show_plank()
     if game.state != "play" {
         if game.state != "hold" and game.state != "dead" { self.Sprite.tint = rgb(255, 255, 255) }
         return
@@ -312,6 +345,8 @@ func use_item() {
         s.vel = dirv * 240
         s.rotation = angle(dirv) + 90
         play_sound("sfx/skewer.wav")
+    } elif item == "whisk" {
+        game.whisk()
     } elif item == "chili" {
         if len(find_all("Fire")) > 0 { return }
         var f = spawn("prefabs/fire.scene", self.position + dirv * 12)

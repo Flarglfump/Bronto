@@ -1,0 +1,245 @@
+# The Jam Jar (the fourth cellar, "d4"), on the island in Blueberry Lake.
+# Its treasure is the wafer plank: carried, not used, it lets Pip walk
+# over jam (or water) one tile wide. Its guardian, the Jammerwock, rises
+# out of the jam pools, spits, and sinks again - it can only be hit while
+# it is up.
+#
+#   .  tiled floor   O  crate   ~  jam   P  pepper-mill statue
+#
+# Map of the cellar (columns 0-4, rows 0-4):
+#
+#                         [2,0 Jammerwock][3,0 recipe]
+#             [1,1 island key][2,1 hall   ]            [3,1 compass]
+#   [0,2 moat ][1,2 plank ][2,2 hub      ]            [3,2 pantry ][4,2 stash]
+#             [1,3 key    ][2,3 hall     ]            [3,3 map]
+#                          [2,4 entrance] - the door south goes back out to the lake
+name The Jam Jar
+tint #c8a0ffff
+
+room d4_2_4
+music cellar
+doors n=open s=open
+var exit_s = "ow_4_3"
+var exit_pos = vec2(120, 152)
+var exit_face = "down"
+inside
+............
+..P......P..
+............
+....~~~~....
+............
+..P......P..
+............
+end
+
+room d4_2_3
+music cellar
+doors s=open n=open w=open e=open
+inside
+............
+.OO......OO.
+............
+............
+............
+.OO......OO.
+............
+put toast 4 4
+put toast 11 8
+put jelly 7 6
+end
+
+room d4_1_3
+music cellar
+doors e=open
+inside
+OOOOOOOOOOOO
+O..........O
+O..~~..~~..O
+O...........
+O..~~..~~..O
+O..........O
+OOOOOOOOOOOO
+put jelly 4 4
+put jelly 11 4
+put jelly 4 7
+put jelly 11 7
+put pickup 7.5 5 kind = "key", flag = "d4:key1", on_clear = true
+end
+
+room d4_3_3
+music cellar
+doors w=open
+inside
+............
+.P..P..P..P.
+............
+............
+............
+.P..P..P..P.
+............
+put bat 5 4
+put bat 10 6
+put bat 7 7
+put pickup 7.5 5 kind = "map", flag = "d4:map", on_clear = true
+end
+
+room d4_2_2
+music cellar
+doors s=open w=locked e=open
+inside
+............
+.~~~....~~~.
+.~~~....~~~.
+............
+.~~~....~~~.
+.~~~....~~~.
+............
+put toast 7 3
+put meatball 8 7
+end
+
+room d4_3_2
+music cellar
+doors w=open n=open e=bomb
+inside
+............
+..O......O..
+....O..O....
+............
+....O..O....
+..O......O..
+............
+put meatball 4 4
+put meatball 12 7
+put toast 7 5
+end
+
+room d4_4_2
+music cellar
+doors w=bomb
+inside
+OOOOOOOOOOOO
+O..........O
+O..O....O..O
+............
+O..O....O..O
+O..........O
+OOOOOOOOOOOO
+put pickup 6 5 kind = "bean5", flag = "d4:stash1"
+put pickup 7.5 5 kind = "bomb", flag = "d4:stash2"
+put pickup 9 5 kind = "bean5", flag = "d4:stash3"
+end
+
+room d4_3_1
+music cellar
+doors s=open
+inside
+OOOOO..OOOOO
+O..........O
+O...~~~~...O
+O...~..~...O
+O...~~~~...O
+O..........O
+OOOOO..OOOOO
+put toast 3 3
+put toast 12 7
+put bat 4 7
+put pickup 7.5 7 kind = "compass", flag = "d4:compass", on_clear = true
+end
+
+room d4_1_2
+music cellar
+doors e=locked n=open w=open
+var shut = "e"
+inside
+............
+.P..P..P..P.
+............
+............
+............
+.P..P..P..P.
+............
+put toast 4 4
+put toast 11 6
+put jelly 7 7
+put pickup 7.5 5 kind = "plank", flag = "d4:plank", on_clear = true
+end
+
+room d4_0_2
+music cellar
+doors e=open
+inside
+.....~......
+.O...~...OO.
+.....~......
+.O...~......
+.....~...OO.
+.O...~......
+.....~......
+put pickup 4 3 kind = "bean5", flag = "d4:moat1"
+put pickup 4 7 kind = "bean5", flag = "d4:moat2"
+put pickup 4 5 kind = "bomb", flag = "d4:moat3"
+end
+
+room d4_1_1
+music cellar
+doors s=open e=open
+inside
+............
+....~~~~....
+....~..~....
+....~..~....
+....~~~~....
+............
+............
+put bat 4 4
+put bat 11 7
+put meatball 3 8
+put pickup 7.5 5 kind = "key", flag = "d4:key2"
+end
+
+room d4_2_1
+music cellar
+doors w=open n=locked
+inside
+............
+.~~......~~.
+.~~.O..O.~~.
+............
+.~~.O..O.~~.
+.~~......~~.
+............
+put toast 5 3
+put toast 10 7
+put meatball 7 5
+end
+
+room d4_2_0
+music cellar
+doors s=locked e=open
+var shut = "e"
+inside
+............
+..~~~..~~~..
+..~~~..~~~..
+............
+............
+~~~~~~~~~~~~
+............
+put jammerwock 5 3.5
+put pickup 7.5 5.5 kind = "heart_pie", flag = "d4:heart", on_clear = true
+end
+
+room d4_3_0
+music cellar
+doors w=open
+inside
+............
+............
+.....PP.....
+............
+............
+............
+............
+put pickup 7.5 4 kind = "page", flag = "d4:page"
+end

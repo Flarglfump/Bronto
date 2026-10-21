@@ -1,0 +1,83 @@
+# Pantry Quest - room d4_2_3 (made by tools/make_rooms.py from tools/world/cellar4.txt: edit it there)
+#
+#   #######,,#######
+#   #######,,#######
+#   ##............##
+#   ##.OO......OO.##
+#   ##............##
+#   ,,............,,
+#   ##............##
+#   ##.OO......OO.##
+#   ##............##
+#   #######,,#######
+#   #######,,#######
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d4_2_3\", music = \"cellar\", stays_clear = true"
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,"
+    solid = "#O~LHXPV"
+    tiles = "#######,,##############,,#########............####.OO......OO.####............##,,............,,##............####.OO......OO.####............#########,,##############,,#######"
+    layer = -10
+    tint = #c8a0ffff
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 72
+  Sprite
+    image = "art/toast_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 3, damage = 2, image = \"art/toast_\", speed = 34, front_guard = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 184 136
+  Sprite
+    image = "art/toast_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 3, damage = 2, image = \"art/toast_\", speed = 34, front_guard = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 120 104
+  Sprite
+    image = "art/jelly_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
+  Parent
+    entity = 0

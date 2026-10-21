@@ -1,0 +1,14 @@
+# Pantry Quest - an effect: the whisk's whirlwind
+bronto_scene 1
+
+entity
+  Name
+    text = "Effect"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/whirl_0.bmp"
+    layer = 8
+  Script
+    file = "scripts/effect.bs"
+    vars = "first = \"art/whirl_0.bmp\", second = \"art/whirl_1.bmp\", life = 0.5"

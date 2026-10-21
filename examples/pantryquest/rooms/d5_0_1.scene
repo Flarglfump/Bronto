@@ -1,0 +1,97 @@
+# Pantry Quest - room d5_0_1 (made by tools/make_rooms.py from tools/world/cellar5.txt: edit it there)
+#
+#   ################
+#   ################
+#   ##OOOO....OOOO##
+#   ##O..........O##
+#   ##O...~~~~...O##
+#   ##O...~~~~....,,
+#   ##O..........O##
+#   ##O..........O##
+#   ##OOOO....OOOO##
+#   #######,,#######
+#   #######,,#######
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d5_0_1\", music = \"cellar\", stays_clear = true"
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,"
+    solid = "#O~LHXPV"
+    tiles = "##################################OOOO....OOOO####O..........O####O...~~~~...O####O...~~~~....,,##O..........O####O..........O####OOOO....OOOO#########,,##############,,#######"
+    layer = -10
+    tint = #ffb4dcff
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 56 56
+  Sprite
+    image = "art/corn_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 200 56
+  Sprite
+    image = "art/corn_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 120
+  Sprite
+    image = "art/corn_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/corn_\", speed = 46, shot = \"prefabs/kernel.scene\", shot_speed = 140, aim = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 128 120
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"key\", flag = \"d5:key3\", on_clear = true"
+  Parent
+    entity = 0

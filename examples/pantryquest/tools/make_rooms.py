@@ -29,7 +29,7 @@ TILESETS = {
     'dungeon': dict(image='art/tiles_dungeon.bmp', legend='.#O~SLHXPV,', solid='#O~LHXPV'),
 }
 COLS, ROWS = 16, 11
-BOSSES = {'gelatin', 'big_dill', 'spice_wraith'}     # prefabs that are a cellar's guardian
+BOSSES = {'gelatin', 'big_dill', 'spice_wraith', 'jammerwock', 'gumdrop_king'}     # prefabs that are a cellar's guardian
 DOOR_CELLS = {'n': [(7, 0), (8, 0), (7, 1), (8, 1)], 's': [(7, 9), (8, 9), (7, 10), (8, 10)],
               'w': [(0, 5), (1, 5)], 'e': [(14, 5), (15, 5)]}
 DOOR_TILE = {'open': ',', 'locked': 'L', 'bomb': 'X'}

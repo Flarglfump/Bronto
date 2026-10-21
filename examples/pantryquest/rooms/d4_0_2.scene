@@ -1,0 +1,83 @@
+# Pantry Quest - room d4_0_2 (made by tools/make_rooms.py from tools/world/cellar4.txt: edit it there)
+#
+#   ################
+#   ################
+#   ##.....~......##
+#   ##.O...~...OO.##
+#   ##.....~......##
+#   ##.O...~......,,
+#   ##.....~...OO.##
+#   ##.O...~......##
+#   ##.....~......##
+#   ################
+#   ################
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d4_0_2\", music = \"cellar\", stays_clear = true"
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,"
+    solid = "#O~LHXPV"
+    tiles = "##################################.....~......####.O...~...OO.####.....~......####.O...~......,,##.....~...OO.####.O...~......####.....~......##################################"
+    layer = -10
+    tint = #c8a0ffff
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 72 56
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"bean5\", flag = \"d4:moat1\""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 72 120
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"bean5\", flag = \"d4:moat2\""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 72 88
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"bomb\", flag = \"d4:moat3\""
+  Parent
+    entity = 0

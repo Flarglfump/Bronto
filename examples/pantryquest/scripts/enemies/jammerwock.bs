@@ -1,0 +1,151 @@
+# The Jammerwock, guardian of the Jam Jar: a serpent of jam living in the
+# two pools of its room. It rises out of the pool spot nearest Pip, spits
+# jam at him, and sinks again - only while it is up can it be hit, so Pip
+# has to wait at the edge for it. Each hit sends it under. From half its
+# strength on it spits five blobs, not three, and comes up sooner. Eight hits.
+
+var hp = 8
+var hp_max = 8
+var title = "JAMMERWOCK"
+var subtitle = "KEEPER OF THE JAM JAR"
+var size = 12
+var damage = 2
+var game
+var hero
+var appear_t = 0
+var mode = "up"             # under, rise, up, sink
+var mode_t = 1.2
+var spat = false
+var spots = [vec2(80, 64), vec2(96, 64), vec2(160, 64), vec2(176, 64)]   # (in the pools: room coordinates)
+var flash_t = 0
+var alpha = 1
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    appear_t = 1                                       # until its entrance is over (game.boss_arrives)
+}
+
+func intro_done() {
+    appear_t = 0
+    mode = "up"
+    mode_t = 1.2
+    spat = false
+}
+
+func set_alpha(a) {
+    alpha = clamp(a, 0, 1)
+    var c = 255
+    if flash_t > 0 and floor(flash_t * 24) % 2 == 0 { c = 120 }
+    self.Sprite.tint = rgb(255, c, c, alpha * 255)
+}
+
+# Comes up at whichever pool spot is nearest Pip (now and then the next nearest).
+func pick_spot() {
+    var best = spots[0]
+    var second = spots[1]
+    var bd = 99999
+    var sd = 99999
+    for s in spots {
+        var d = distance(self.parent.global_position + s, hero.position)
+        if d < bd {
+            second = best
+            sd = bd
+            best = s
+            bd = d
+        } elif d < sd {
+            second = s
+            sd = d
+        }
+    }
+    if random() < 0.3 { return second }
+    return best
+}
+
+func spit() {
+    var aim = angle(hero.position - self.global_position)
+    var spread = [-18, 0, 18]
+    if hp <= hp_max / 2 { spread = [-30, -15, 0, 15, 30] }
+    for a in spread {
+        var s = spawn("prefabs/jam.scene", self.position + vec2(0, 4), self.parent)
+        s.vel = from_angle(aim + a, 92)
+    }
+    play_sound("sfx/splash.wav", 0.8)
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    if appear_t > 0 {
+        game.boss_arrives(self)
+        return
+    }
+    mode_t -= dt
+    if flash_t > 0 { flash_t -= dt }
+    if mode == "under" {
+        set_alpha(0)
+        if mode_t <= 0 {
+            self.position = pick_spot()
+            mode = "rise"
+            mode_t = 0.45
+            play_sound("sfx/splash.wav", 0.5)
+        }
+    } elif mode == "rise" {
+        var k = 1 - mode_t / 0.45
+        set_alpha(k)
+        self.scale = vec2(1, 0.4 + 0.6 * k)
+        if mode_t <= 0 {
+            self.scale = vec2(1, 1)
+            mode = "up"
+            mode_t = 1.6
+            spat = false
+        }
+    } elif mode == "up" {
+        set_alpha(1)
+        if not spat and mode_t < 1.1 {
+            self.Sprite.image = "art/jamwock_1.bmp"
+            if mode_t < 0.95 {
+                spit()
+                spat = true
+            }
+        }
+        if spat and mode_t < 0.7 { self.Sprite.image = "art/jamwock_0.bmp" }
+        if mode_t <= 0 { sink() }
+    } elif mode == "sink" {
+        var k = mode_t / 0.35
+        set_alpha(k)
+        self.scale = vec2(1, 0.4 + 0.6 * k)
+        if mode_t <= 0 {
+            self.scale = vec2(1, 1)
+            mode = "under"
+            mode_t = 1.1 + random(0.5)
+            if hp <= hp_max / 2 { mode_t = 0.7 + random(0.4) }
+        }
+    }
+    if mode == "up" and hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+func sink() {
+    self.Sprite.image = "art/jamwock_0.bmp"
+    mode = "sink"
+    mode_t = 0.35
+}
+
+func hit(amount, d, kind) {
+    if appear_t > 0 or flash_t > 0.2 { return false }
+    if mode != "up" and not (mode == "rise" and mode_t < 0.2) { return false }   # under the jam: out of reach
+    if kind == "cutter" { return false }
+    hp -= amount
+    flash_t = 0.5
+    if hp <= 0 {
+        play_sound("sfx/boss_die.wav")
+        for off in [vec2(-10, -10), vec2(10, -8), vec2(0, 6), vec2(-12, 10), vec2(12, 10)] {
+            spawn("prefabs/puff.scene", self.position + off, self.parent)
+        }
+        game.boss_beaten()
+        destroy(self)
+        return true
+    }
+    play_sound("sfx/hit.wav")
+    sink()
+    return true
+}

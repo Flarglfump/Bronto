@@ -1,0 +1,181 @@
+# The Gumdrop King, guardian of the Candy Works, and the gumdrops he splits
+# into. One script for both: the king (`king = true`) bounces round the
+# room off the walls; four hits and he bursts into two gumdrops, quicker,
+# that bounce too - and two hits each splits those into two little ones.
+# Pop them all. The king's entity stays (unseen) until the last is gone,
+# keeping the count for the bar at the bottom: twelve hits in all.
+
+var king = false            # the one the room was built with
+var kind = "big"            # big, mid, small
+var hp = 12                 # the king: every hit still to land, his own and his gumdrops'
+var hp_max = 12
+var title = "GUMDROP KING"
+var subtitle = "KEEPER OF THE CANDY WORKS"
+var size = 13
+var damage = 2
+var speed = 46
+var body_hp = 4             # this gumdrop's own hits
+var whole = true            # the king: still in one piece
+var boss                    # a gumdrop: the king it came from
+var pieces = []             # the king: every gumdrop split off so far
+var game
+var hero
+var appear_t = 0
+var vel := vec2(0, 0)
+var flash_t = 0
+var stun_t = 0
+var t = 0
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    t = random(3)
+    if king {
+        appear_t = 1                                   # until its entrance is over (game.boss_arrives)
+        setup("big")
+    }
+}
+
+func setup(k) {
+    kind = k
+    if k == "big" {
+        size = 13
+        damage = 2
+        speed = 46
+        body_hp = 4
+        self.Sprite.image = "art/gum_big.bmp"
+    } elif k == "mid" {
+        size = 9
+        damage = 1
+        speed = 64
+        body_hp = 2
+        self.Sprite.image = "art/gum_mid.bmp"
+    } else {
+        size = 6
+        damage = 1
+        speed = 84
+        body_hp = 1
+        self.Sprite.image = "art/gum_small.bmp"
+    }
+    if not king { hp = body_hp }
+}
+
+func intro_done() {
+    appear_t = 0
+    vel = normalize(vec2(1, 1)) * speed
+}
+
+# The king's count: what's left of him, and of his gumdrops.
+func count() {
+    var n = 0
+    if whole { n = left() }
+    var still = []
+    for p in pieces {
+        if p.alive {
+            push(still, p)
+            n += p.left()
+        }
+    }
+    pieces = still
+    hp = n
+}
+
+func add_piece(p) { push(pieces, p) }
+
+# Hits still to land on this gumdrop and everything it will split into.
+func left() {
+    if body_hp <= 0 { return 0 }                      # (already split: its gumdrops count for it)
+    if kind == "big" { return body_hp + 8 }
+    if kind == "mid" { return body_hp + 2 }
+    return body_hp
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    if appear_t > 0 {
+        game.boss_arrives(self)
+        return
+    }
+    if king {
+        count()
+        if not whole {
+            if hp <= 0 {
+                game.boss_beaten()
+                destroy(self)
+            }
+            return
+        }
+    }
+    t += dt
+    if flash_t > 0 {
+        flash_t -= dt
+        if floor(flash_t * 24) % 2 == 0 { self.Sprite.tint = rgb(255, 150, 150) } else { self.Sprite.tint = rgb(255, 255, 255) }
+        if flash_t <= 0 { self.Sprite.tint = rgb(255, 255, 255) }
+    }
+    var sq = sin(t * 720) * 0.08                       # boing
+    self.scale = vec2(1 + sq, 1 - sq)
+    if stun_t > 0 {
+        stun_t -= dt
+    } else {
+        bounce(dt)
+    }
+    if hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+# Moves on, turning off walls (and the crates and statues in the room) like a ball.
+func bounce(dt) {
+    var map = game.map
+    var room = self.parent.global_position
+    var p = self.position + vel * dt
+    var r = size
+    if vel.x != 0 and (tile_solid(map, room + p + vec2(sign(vel.x) * r, 0)) or p.x < 32 + r or p.x > 224 - r) {
+        vel.x = -vel.x
+        p.x = self.position.x
+    }
+    if vel.y != 0 and (tile_solid(map, room + p + vec2(0, sign(vel.y) * r)) or p.y < 32 + r or p.y > 144 - r) {
+        vel.y = -vel.y
+        p.y = self.position.y
+    }
+    self.position = p
+}
+
+func split() {
+    var next = "mid"
+    if kind == "mid" { next = "small" }
+    var k = boss
+    if king { k = self }
+    for side in [-1, 1] {
+        var g = spawn("prefabs/gumdrop.scene", self.position + vec2(side * size * 0.6, 0), self.parent)
+        g.boss = k
+        g.setup(next)
+        g.flash_t = 0.5                                # (the poke that split it can't pop them too)
+        g.vel = normalize(vec2(side, -1)) * g.speed
+        k.add_piece(g)
+    }
+    play_sound("sfx/pop.wav")
+}
+
+func hit(amount, d, kind_of) {
+    if appear_t > 0 or flash_t > 0.2 or (king and not whole) { return false }
+    if kind_of == "cutter" {
+        stun_t = 1.2
+        play_sound("sfx/tink.wav", 0.6)
+        return true
+    }
+    body_hp -= amount
+    flash_t = 0.45
+    play_sound("sfx/hit.wav")
+    if body_hp > 0 { return true }
+    body_hp = 0
+    spawn("prefabs/puff.scene", self.position, self.parent)
+    if kind != "small" { split() }
+    if king {
+        whole = false                                  # the king's gone to pieces: he only keeps count now
+        self.Sprite.tint = rgb(255, 255, 255, 0)
+        self.scale = vec2(1, 1)
+        play_sound("sfx/roar.wav", 0.6)
+    } else {
+        destroy(self)
+    }
+    return true
+}
