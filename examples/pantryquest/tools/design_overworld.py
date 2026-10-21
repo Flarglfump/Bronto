@@ -106,6 +106,7 @@ CELLARS = {(7, 5): (1, 'THE COLD CELLAR', False), (13, 1): (2, 'THE PICKLE PANTR
            (13, 6): (5, 'THE CANDY WORKS', False), (1, 1): (6, 'THE FORTUNE HALL', False),
            (11, 4): (7, 'THE SUGAR MILL', True), (9, 1): (8, 'THE SOUP CAULDRON', True),
            (5, 0): (9, "BARON GORGE'S BANQUET HALL", False)}
+BUILT = {1, 2, 3}       # cellars with their own world file (cellarN.txt): no stand-in entrance room
 SHOP_STOCK = {
     'cave_shop2': [('bombs_item', 20), ('key', 60), ('heart', 10)],
     'cave_shop3': [('soup', 30), ('bombs_item', 25), ('key', 50)],
@@ -620,10 +621,10 @@ def write(rooms, caves_old, seed):
         c += ['room %s' % nme, 'var exit_s = "back"', 'map'] + m + puts + ['end', '']
     open(GAME + '/tools/world/caves.txt', 'w').write('\n'.join(c))
     # the cellars still to be dug: an entrance room each
-    s = ['# The cellars still to come (2 to 9): for now, just an entrance room each, where a cook',
+    s = ['# The cellars still to come: for now, just an entrance room each, where a cook',
          '# says it is still being dug. Each will get its own file, like cellar1.txt.', '']
     for (x, y), (num, title, hidden) in sorted(CELLARS.items(), key=lambda kv: kv[1][0]):
-        if num == 1: continue
+        if num in BUILT: continue
         # where the door is on the overworld screen
         door = None
         for p in rooms['ow_%d_%d' % (x, y)].puts:

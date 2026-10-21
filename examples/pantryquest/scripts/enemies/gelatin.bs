@@ -71,7 +71,7 @@ func hit(amount, d, kind) {
         for off in [vec2(-8, -8), vec2(8, -6), vec2(0, 6), vec2(-10, 8), vec2(10, 8)] {
             spawn("prefabs/puff.scene", self.position + off, self.parent)
         }
-        game.play_music("cellar")
+        game.boss_beaten()
         destroy(self)
         return true
     }

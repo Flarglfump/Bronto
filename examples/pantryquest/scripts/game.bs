@@ -15,13 +15,15 @@ var keys = 0
 var bombs = 0
 var bombs_max = 8
 var weapon = 0              # 0 none, 1 wooden spoon
-var items = []              # "bombs", "cutter"
+var items = []              # "bombs", "cutter", "skewers", "chili"
 var b_item = ""             # the one on the B button (Z)
 var pages = 0               # pages of the Grand Recipe
 var flags = []              # what's been done: doors opened, items taken...
 var visited = []            # cellar rooms seen (for the HUD map)
+var maps = []               # cellars whose map Pip has ("d1"...): the HUD shows every room
+var compasses = []          # cellars whose compass he has: the HUD shows where the guardian is
 
-var area = "ow"             # "ow", "d1", or "cave"
+var area = "ow"             # "ow", "cave", or a cellar: "d1", "d2"...
 var rx = 7
 var ry = 7
 var room_name = ""
@@ -349,6 +351,20 @@ func collect(kind, thing) {
         give("cutter")
         b_item = "cutter"
         hold("art/cutter.bmp", 1.6)
+    } elif kind == "map" {
+        if not contains(maps, area) { push(maps, area) }
+        hold("art/dmap.bmp", 1.2)
+    } elif kind == "compass" {
+        if not contains(compasses, area) { push(compasses, area) }
+        hold("art/compass.bmp", 1.2)
+    } elif kind == "skewers" {
+        give("skewers")
+        b_item = "skewers"
+        hold("art/skewer.bmp", 1.6)
+    } elif kind == "chili" {
+        give("chili")
+        b_item = "chili"
+        hold("art/chili.bmp", 1.6)
     } elif kind == "heart_pie" {
         hearts_max = min(hearts_max + 1, 16)
         hp = hearts_max * 2
@@ -380,10 +396,12 @@ func after_hold() {
         holding_page = false
         flag("page:" + area)
         note1 = "RECIPE PAGE " + pages + " OF 8 FOUND!"
-        note2 = "THE DEMO ENDS HERE - THANKS!"
+        note2 = "NOW FIND THE NEXT CELLAR!"
+        if pages >= 3 { note2 = "MORE CELLARS ARE BEING DUG!" }
         area_start = start_room
         area_pos = start_pos
-        warp("ow_7_5", vec2(120, 152), "down")
+        var cellars = find("Cellars")                       # back out of this cellar's door
+        warp(cellars.exit_room(area), cellars.exit_pos(area), "down")
         music_name = ""
     }
 }
@@ -400,6 +418,12 @@ func drop_at(local_pos, parent) {
     var p = spawn("prefabs/pickup.scene", local_pos, parent)
     p.kind = kind
     p.timeout = 9
+}
+
+# A cellar's guardian is beaten (its script calls this as it goes).
+func boss_beaten() {
+    flag("boss:" + area)
+    play_music("cellar")
 }
 
 func enemy_killed(e) {
@@ -483,6 +507,13 @@ func try_unlock(point) {
     open_door(side_of_cell(floor(local.x / 16), floor(local.y / 16)))
     play_sound("sfx/door.wav")
     return true
+}
+
+# The fire chili burned at a world point: a bush hiding a way in (tile Y) burns away.
+func burn(point) {
+    for w in find_all("Warp") {
+        if w.hidden and distance(w.global_position, point) < 20 and tile_at(map, w.global_position) == "Y" { w.reveal() }
+    }
 }
 
 # A bomb went off at a world point: secret walls nearby open.

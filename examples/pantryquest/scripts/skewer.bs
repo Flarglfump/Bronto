@@ -1,0 +1,29 @@
+# A skewer from the skewer bow (each costs a bean): it flies straight until
+# it hits a wall or something, and hits twice as hard as a poke.
+
+var vel := vec2(0, 0)
+var game
+
+func start() { game = find("Game") }
+
+func update(dt) {
+    if game.state != "play" { return }
+    self.position += vel * dt
+    var p = self.position
+    if p.x < 4 or p.x > 252 or p.y < 68 or p.y > 236 or tile_solid(game.map, p) {
+        stop()
+        return
+    }
+    for e in find_all("Enemy") {
+        if distance(e.global_position, p) < 5 + e.size {
+            e.hit(2, normalize(vel), "skewer")
+            stop()
+            return
+        }
+    }
+}
+
+func stop() {
+    spawn("prefabs/sparkle.scene", self.position)
+    destroy(self)
+}

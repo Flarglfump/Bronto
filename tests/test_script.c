@@ -585,6 +585,59 @@ static void test_pantryquest_world(void) {
     CHECK_EQ_INT(cellars, 0x3fe);                               /* cellars 1 to 9 */
 }
 
+/* Pantry Quest's cellar guardians, fought from here: Pip stays put (his
+ * health kept full) and pokes at the guardian every few steps. The Big Dill
+ * only feels it while dizzy from charging into a wall; the Spice Wraith only
+ * while it is solid. Both must go down, and the cellar's music comes back. */
+static void pq_fight(const char *room, int max_hp, bool only_when_dizzy) {
+    char err[200], mode[32], music[32];
+    br_entity game, boss = BR_ENTITY_NULL;
+    br_script *sc;
+    double hp = 0, last_hp, life = 32;
+    int i, landed = 0, shrugged = 0;
+    static const double poke[3] = { 1, 0, 0 };
+    setup();
+    br_assets_set_root("examples/pantryquest/");
+    CHECK(br_world_load_file(&W, "examples/pantryquest/main.scene", NULL, 0, err, sizeof(err)) > 20);
+    game = named("Game");
+    sc = (br_script *)br_get(&W, game, SCRIPT);
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"%s\", start_pos = vec2(128, 200), weapon = 1, hearts_max = 16", room);
+    steps(40);
+    boss = named("Enemy");
+    CHECK(boss != BR_ENTITY_NULL);
+    if (boss == BR_ENTITY_NULL) { teardown(); return; }
+    last_hp = max_hp;
+    for (i = 0; i < 60 * 60 && br_entity_alive(&W, boss); ++i) {
+        br_script_set_number(&W, game, "hp", life);
+        steps(1);
+        if (i % 7 || !br_entity_alive(&W, boss)) continue;
+        mode[0] = 0;
+        br_script_get_string(&W, boss, "mode", mode, sizeof(mode));
+        br_script_call(&W, boss, "hit", poke, 3);
+        if (!br_entity_alive(&W, boss)) { landed++; break; }
+        br_script_get_number(&W, boss, "hp", &hp);
+        if (hp < last_hp) {
+            landed++;
+            if (only_when_dizzy) CHECK(strcmp(mode, "dizzy") == 0);
+        } else if (only_when_dizzy && strcmp(mode, "dizzy") != 0) {
+            shrugged++;
+        }
+        last_hp = hp;
+    }
+    CHECK(!br_entity_alive(&W, boss));
+    CHECK_EQ_INT(landed, max_hp);
+    if (only_when_dizzy) CHECK(shrugged > 0);
+    steps(2);
+    CHECK(br_script_get_string(&W, game, "music_name", music, sizeof(music)) && strcmp(music, "cellar") == 0);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+static void test_pantryquest_bosses(void) {
+    pq_fight("d2_2_1", 6, true);                /* the Big Dill */
+    pq_fight("d3_1_0", 8, false);               /* the Spice Wraith */
+}
+
 typedef struct counter_state { int starts, updates, hits; } counter_state;
 static int g_destroyed;
 static void cb_start(br_world *w, br_entity e, void *s) { BR_UNUSED(w); BR_UNUSED(e); ((counter_state *)s)->starts++; }
@@ -872,6 +925,7 @@ void suite_script(void) {
     RUN(test_pantryquest_example);
     RUN(test_pantryquest_shutter);
     RUN(test_pantryquest_world);
+    RUN(test_pantryquest_bosses);
     RUN(test_check_and_errors);
     RUN(test_types_checked);
     RUN(test_types_at_run_time);

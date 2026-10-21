@@ -1,0 +1,49 @@
+# What each cellar holds: its rooms ("x_y"), its guardian's room, and where its
+# way out leads. Made by tools/make_rooms.py from tools/world/*.txt - edit those.
+
+func rooms(area) {
+    if area == "d1" { return ["2_4", "2_3", "1_3", "3_3", "3_2", "2_2", "1_2", "2_1", "2_0"] }
+    if area == "d2" { return ["2_4", "2_3", "1_3", "3_3", "3_2", "4_2", "2_2", "1_2", "2_1", "2_0"] }
+    if area == "d3" { return ["2_4", "2_3", "1_3", "3_3", "4_3", "3_2", "2_2", "2_1", "1_2", "0_2", "0_1", "1_1", "1_0", "0_0"] }
+    if area == "d4" { return ["2_4"] }
+    if area == "d5" { return ["2_4"] }
+    if area == "d6" { return ["2_4"] }
+    if area == "d7" { return ["2_4"] }
+    if area == "d8" { return ["2_4"] }
+    if area == "d9" { return ["2_4"] }
+    return []
+}
+
+func boss_room(area) {
+    if area == "d1" { return "2_1" }
+    if area == "d2" { return "2_1" }
+    if area == "d3" { return "1_0" }
+    return ""
+}
+
+func exit_room(area) {
+    if area == "d1" { return "ow_7_5" }
+    if area == "d2" { return "ow_13_1" }
+    if area == "d3" { return "ow_1_6" }
+    if area == "d4" { return "ow_4_3" }
+    if area == "d5" { return "ow_13_6" }
+    if area == "d6" { return "ow_1_1" }
+    if area == "d7" { return "ow_11_4" }
+    if area == "d8" { return "ow_9_1" }
+    if area == "d9" { return "ow_5_0" }
+    return "ow_7_7"
+}
+
+func exit_pos(area) {
+    if area == "d1" { return vec2(120, 152) }
+    if area == "d2" { return vec2(136, 136) }
+    if area == "d3" { return vec2(120, 136) }
+    if area == "d4" { return vec2(120, 152) }
+    if area == "d5" { return vec2(104, 136) }
+    if area == "d6" { return vec2(120, 120) }
+    if area == "d7" { return vec2(136, 136) }
+    if area == "d8" { return vec2(168, 136) }
+    if area == "d9" { return vec2(88, 136) }
+    return vec2(120, 168)
+}
+

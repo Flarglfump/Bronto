@@ -1,5 +1,5 @@
-# The strip along the top: where Pip is, his beans, keys and bombs, the
-# items on B and A, and his hearts.
+# The strip along the top: where Pip is (with the cellar map and compass),
+# his beans, keys and bombs, the items on B and A, and his hearts.
 
 var game
 var hearts = []
@@ -11,6 +11,9 @@ var a_item
 var dot
 var map_box
 var cells = []
+var map_sig = ""            # what the cellar map was last drawn from
+var boss_cell               # the compass's mark
+var t = 0
 
 func start() {
     game = find("Game")
@@ -29,7 +32,56 @@ func start() {
 func icon(item) {
     if item == "bombs" { return "art/bomb.bmp" }
     if item == "cutter" { return "art/cutter.bmp" }
+    if item == "skewers" { return "art/skewer.bmp" }
+    if item == "chili" { return "art/chili.bmp" }
     return ""
+}
+
+# Where a cellar room ("x_y") sits on the map.
+func cell_pos(xy) {
+    var p = game.split(xy, "_")
+    return vec2(8 + num(p[0]) * 8 + 4 + 12, 16 + num(p[1]) * 6 + 3 + 1)
+}
+
+func clear_cells() {
+    for c in cells { destroy(c) }
+    cells = []
+    boss_cell = nil
+}
+
+# The cellar map: the rooms seen so far, or every room once Pip has the
+# map (those not seen yet, dimmer); and with the compass, the guardian's
+# room, blinking until it is beaten.
+func draw_cellar_map() {
+    var area = game.area
+    var has_map = contains(game.maps, area)
+    var has_compass = contains(game.compasses, area) and not game.has_flag("boss:" + area)
+    var sig = area + ":" + len(game.visited) + ":" + has_map + ":" + has_compass
+    if sig != map_sig {
+        map_sig = sig
+        clear_cells()
+        var seen = []
+        for name in game.visited {
+            var p = game.split(name, "_")
+            if p[0] == area { push(seen, p[1] + "_" + p[2]) }
+        }
+        var all = seen
+        if has_map { all = find("Cellars").rooms(area) }
+        for xy in all {
+            var c = spawn("prefabs/map_cell.scene", cell_pos(xy))
+            if not contains(seen, xy) { c.Shape.color = rgb(40, 56, 110) }
+            push(cells, c)
+        }
+        if has_compass {
+            boss_cell = spawn("prefabs/map_cell.scene", cell_pos(find("Cellars").boss_room(area)))
+            boss_cell.Shape.size = vec2(3, 3)
+            boss_cell.Shape.layer = 42
+            push(cells, boss_cell)
+        }
+    }
+    if boss_cell != nil {
+        if floor(t * 3) % 2 == 0 { boss_cell.Shape.color = rgb(230, 60, 60) } else { boss_cell.Shape.color = rgb(120, 20, 20) }
+    }
 }
 
 func update(dt) {
@@ -63,18 +115,11 @@ func update(dt) {
         map_box.Shape.color = rgb(0, 0, 0)
         dot.position = vec2(8 + game.rx * 8 + 4 + 12, 16 + game.ry * 6 + 3 + 1)
     }
-    if game.area != "ow" and game.area != "cave" and len(cells) != len(game.visited) {
-        for c in cells { destroy(c) }
-        cells = []
-        for name in game.visited {
-            var p = game.split(name, "_")
-            if p[0] == game.area {
-                push(cells, spawn("prefabs/map_cell.scene", vec2(8 + num(p[1]) * 8 + 4 + 12, 16 + num(p[2]) * 6 + 3 + 1)))
-            }
-        }
-    }
-    if game.area == "ow" and len(cells) > 0 {
-        for c in cells { destroy(c) }
-        cells = []
+    t += dt
+    if game.area != "ow" and game.area != "cave" {
+        draw_cellar_map()
+    } elif len(cells) > 0 {
+        clear_cells()
+        map_sig = ""
     }
 }

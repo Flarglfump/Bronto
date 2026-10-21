@@ -6,7 +6,7 @@ into eight pages and hidden them all over the land. Pip, a young cook, picks up 
 spoon and sets out to find them.
 
 This is the first part of a bigger game. The whole land is there to explore now, with
-the first of its nine cellars:
+the first three of its nine cellars:
 
 - **The Pantry Plains:** 128 screens in ten regions: the start plains, the Lettuce Woods,
   Blueberry Lake, the Frosty Fields, the Fortune Cookie Field, the Chocolate Mountains,
@@ -19,16 +19,27 @@ the first of its nine cellars:
     last, Baron Gorge's Banquet Hall, waits at the top of the Chocolate Mountains.
     Cellars 2 to 9 are still being dug: for now each door leads to an entrance room
     where a cook says so.
-- **The Cold Cellar:** nine rooms. It has locked doors and keys, shutters that close
-  until the enemies are beaten, and a bombable wall with a stash behind it. Its treasure
-  is the **pizza cutter**, and its guardian is the **Gelatin Giant**. Behind the guardian
-  is the first recipe page.
+- **The Cold Cellar** (in the Frosty Fields): nine rooms. It has locked doors and keys,
+  shutters that close until the enemies are beaten, and a bombable wall with a stash
+  behind it. Its treasure is the **pizza cutter**, and its guardian is the **Gelatin
+  Giant**, who wobbles and spits sprinkles.
+- **The Pickle Pantry** (in the Pickle Marsh): ten rooms, with sour olives that spit
+  pits. Its treasure is the **skewer bow**: each skewer costs a bean and hits twice as
+  hard as the spoon. Its guardian, the **Big Dill**, charges at Pip and only feels a hit
+  while it sits dizzy after slamming into a wall.
+- **The Spice Rack** (deep in the Lettuce Woods): fourteen rooms, with chili imps. Its
+  treasure is the **fire chili**: its flame scorches enemies and burns away a bush that
+  hides a cave. Its guardian, the **Spice Wraith**, drifts from spot to spot bursting
+  out rings of spice, and can only be hurt while it is solid.
+- Every cellar has a **map**, which shows all its rooms on the HUD, and a **compass**,
+  which marks the guardian's room until it is beaten. Behind each guardian is a heart
+  pie and a page of the recipe, and the page takes Pip back out of the cellar's door.
 
 | | Keys | |
 |---|---|---|
 | Walk | arrows or WASD | |
 | Poke with the spoon | X (or K, or Space) | At full health the spoon also throws a spark |
-| Use the B item | Z (or J) | Popcorn bombs, the pizza cutter |
+| Use the B item | Z (or J) | Popcorn bombs, the pizza cutter, the skewer bow, the fire chili |
 | Inventory | Enter | Choose the B item there |
 
 Pip's pot lid blocks small things thrown at him (seeds, toothpicks) while he faces them.
@@ -59,12 +70,17 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
 - **Scripts:**
   - `hero.bs` handles Pip: grid-aligned walking, the spoon, items, and being hurt.
   - `enemies/walker.bs` covers tomatoes, plums, burger knights and breadstick soldiers.
-  - `jelly.bs`, `bat.bs`, `meatball.bs` and `gelatin.bs` are the cellar's creatures.
+  - `jelly.bs`, `bat.bs` and `meatball.bs` are cellar creatures; `gelatin.bs`,
+    `big_dill.bs` and `spice_wraith.bs` are the guardians. Sour olives and chili imps are
+    walkers with their own vars (`prefabs/olive.scene`, `prefabs/imp.scene`).
+  - `skewer.bs` and `fire.bs` are the skewer bow's skewers and the fire chili's flame.
   - `pickup.bs` covers anything to pick up or buy.
   - `warp.bs` is for cave mouths and doors.
   - `hud.bs` and `menu.bs` run the HUD and the inventory.
 - To test a room straight away, set the Game entity's Script vars in the editor, for
   example `start_room = "d1_2_1", start_pos = vec2(128, 200), weapon = 1, start_items = "bombs"`.
+  Any of the Game's variables can be set there, lists too: `maps = ["d2"], compasses = ["d2"]`
+  shows the Pickle Pantry's whole map with its guardian marked.
 
 ### The tools
 
@@ -78,8 +94,10 @@ standard library only:
 - `make_rooms.py` turns the maps in `tools/world/*.txt` into `rooms/*.scene`. The maps
   are easier to edit there than tile by tile. Each map is 16 x 11 characters, or a
   cellar room's 12 x 7 inside with its doors named. `overworld.txt` holds the land,
-  `caves.txt` the caves, `cellar1.txt` the Cold Cellar and `cellars_unbuilt.txt` the
-  entrance rooms of the cellars to come.
+  `caves.txt` the caves, `cellar1.txt` to `cellar3.txt` the cellars built so far (each
+  with its own `tint`), and `cellars_unbuilt.txt` the entrance rooms of the cellars to
+  come. It also writes `scripts/cellars.bs`, which tells the game each cellar's rooms,
+  its guardian's room and its way out (for the HUD's map and compass).
 - `design_overworld.py --force` lays the whole land out again from its plan (the
   regions, where every cellar and cave goes, what is in each cave), keeping the
   hand-made screens around the start. It checks that every screen's edges meet its

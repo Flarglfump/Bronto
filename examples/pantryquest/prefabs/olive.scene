@@ -1,0 +1,14 @@
+# Pantry Quest - a sour olive, of the Pickle Pantry (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/olive_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/olive_\", speed = 36, shot = \"prefabs/seed.scene\", shot_speed = 120, aim = true"

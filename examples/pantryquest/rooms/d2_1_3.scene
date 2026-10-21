@@ -1,0 +1,97 @@
+# Pantry Quest - room d2_1_3 (made by tools/make_rooms.py from tools/world/cellar2.txt: edit it there)
+#
+#   ################
+#   ################
+#   ##............##
+#   ##.OOOO..OOOO.##
+#   ##.O........O.##
+#   ##.O..O..O....,,
+#   ##.O........O.##
+#   ##.OOOOOOOOOO.##
+#   ##............##
+#   ################
+#   ################
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d2_1_3\", music = \"cellar\", stays_clear = true"
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,"
+    solid = "#O~LHXPV"
+    tiles = "##################################............####.OOOO..OOOO.####.O........O.####.O..O..O....,,##.O........O.####.OOOOOOOOOO.####............##################################"
+    layer = -10
+    tint = #b4f0a0ff
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 40
+  Sprite
+    image = "art/jelly_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 184 136
+  Sprite
+    image = "art/jelly_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 56 136
+  Sprite
+    image = "art/jelly_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 128 88
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"key\", flag = \"d2:key1\""
+  Parent
+    entity = 0

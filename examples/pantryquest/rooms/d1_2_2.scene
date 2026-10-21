@@ -43,7 +43,7 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 56 56
+    position = 56 72
   Sprite
     image = "art/meatball_0.bmp"
     layer = 3
@@ -57,7 +57,7 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 200 120
+    position = 200 104
   Sprite
     image = "art/meatball_0.bmp"
     layer = 3
@@ -71,12 +71,26 @@ entity
   Name
     text = "Enemy"
   Transform
-    position = 184 56
+    position = 184 72
   Sprite
     image = "art/meatball_0.bmp"
     layer = 3
   Script
     file = "scripts/enemies/meatball.bs"
     vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 128 120
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"compass\", flag = \"d1:compass\", on_clear = true"
   Parent
     entity = 0

@@ -1,0 +1,129 @@
+# The Spice Wraith, guardian of the Spice Rack: a cloud of cinnamon and
+# pepper that drifts from spot to spot. Where it settles it gathers itself
+# and bursts out a ring of spice - and only while it is solid can it be
+# hurt. Each hit sends it off somewhere else. From half its strength on it
+# bursts twice. Eight hits.
+
+var hp = 8
+var size = 13
+var damage = 2
+var game
+var hero
+var appear_t = 0
+var mode = "fade_in"        # fade_in, gather, solid, fade_out
+var mode_t = 0.6
+var spots = [vec2(64, 56), vec2(192, 56), vec2(64, 120), vec2(192, 120), vec2(128, 88)]
+var flash_t = 0
+var second = 0              # time to the second burst (0: none due)
+var t = 0
+var alpha = 0
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    appear_t = 0.8
+    set_alpha(0)
+}
+
+func set_alpha(a) {
+    alpha = clamp(a, 0, 1)
+    var c = 255
+    if flash_t > 0 and floor(flash_t * 24) % 2 == 0 { c = 120 }
+    self.Sprite.tint = rgb(255, c, c, alpha * 255)
+}
+
+func burst(turn) {
+    for i in 8 {
+        var s = spawn("prefabs/spice.scene", self.position, self.parent)
+        s.vel = from_angle(i * 45 + turn, 84)
+    }
+    play_sound("sfx/fire.wav", 0.7)
+}
+
+# Somewhere else to settle: not where it is, and not on top of Pip.
+func move_on() {
+    var options = []
+    var here = self.position
+    for s in spots {
+        if distance(s, here) > 8 and distance(self.parent.global_position + s, hero.position) > 56 { push(options, s) }
+    }
+    if len(options) == 0 { options = spots }
+    self.position = options[floor(random(len(options)))]
+    play_sound("sfx/teleport.wav", 0.6)
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    if appear_t > 0 {
+        appear_t -= dt
+        set_alpha((0.8 - appear_t) / 0.8)
+        if appear_t <= 0 {
+            play_sound("sfx/roar.wav")
+            game.play_music("boss")
+            mode = "gather"
+            mode_t = 0.9
+        }
+        return
+    }
+    t += dt
+    mode_t -= dt
+    if flash_t > 0 { flash_t -= dt }
+    if floor(t * 4) % 2 == 0 { self.Sprite.image = "art/wraith_0.bmp" } else { self.Sprite.image = "art/wraith_1.bmp" }
+    if mode == "fade_in" {
+        set_alpha(1 - mode_t / 0.5)
+        if mode_t <= 0 {
+            mode = "gather"
+            mode_t = 0.8
+        }
+    } elif mode == "gather" {                          # swelling up, glowing
+        set_alpha(1)
+        self.scale = 1 + sin(t * 1400) * 0.06
+        if mode_t <= 0 {
+            self.scale = 1
+            burst(0)
+            if hp <= 4 { second = 0.35 }
+            mode = "solid"
+            mode_t = 1.5
+        }
+    } elif mode == "solid" {
+        set_alpha(1)
+        if second > 0 {
+            second -= dt
+            if second <= 0 { burst(22.5) }
+        }
+        if mode_t <= 0 {
+            mode = "fade_out"
+            mode_t = 0.4
+        }
+    } elif mode == "fade_out" {
+        set_alpha(mode_t / 0.4)
+        if mode_t <= 0 {
+            move_on()
+            mode = "fade_in"
+            mode_t = 0.5
+        }
+    }
+    if alpha > 0.6 and hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+func hit(amount, d, kind) {
+    if appear_t > 0 or flash_t > 0.2 { return false }
+    if mode != "solid" and mode != "gather" { return false }   # a cloud: it passes through
+    if kind == "cutter" { return false }
+    hp -= amount
+    flash_t = 0.5
+    if hp <= 0 {
+        play_sound("sfx/boss_die.wav")
+        for off in [vec2(-10, -10), vec2(10, -8), vec2(0, 6), vec2(-12, 10), vec2(12, 10)] {
+            spawn("prefabs/puff.scene", self.position + off, self.parent)
+        }
+        game.boss_beaten()
+        destroy(self)
+        return true
+    }
+    play_sound("sfx/hit.wav")
+    second = 0
+    mode = "fade_out"                                  # off it goes
+    mode_t = 0.3
+    return true
+}

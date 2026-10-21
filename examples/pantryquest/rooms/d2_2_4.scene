@@ -1,7 +1,7 @@
-# Pantry Quest - room d2_2_4 (made by tools/make_rooms.py from tools/world/cellars_unbuilt.txt: edit it there)
+# Pantry Quest - room d2_2_4 (made by tools/make_rooms.py from tools/world/cellar2.txt: edit it there)
 #
-#   ################
-#   ################
+#   #######,,#######
+#   #######,,#######
 #   ##............##
 #   ##..P......P..##
 #   ##............##
@@ -34,47 +34,8 @@ entity
     rows = 11
     legend = ".#O~SLHXPV,"
     solid = "#O~LHXPV"
-    tiles = "##################################............####..P......P..####............####............####............####..P......P..####............#########,,##############,,#######"
+    tiles = "#######,,##############,,#########............####..P......P..####............####............####............####..P......P..####............#########,,##############,,#######"
     layer = -10
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Flame"
-  Transform
-    position = 80 56
-  Sprite
-    image = "art/flame_0.bmp"
-    layer = 2
-  Script
-    file = "scripts/flame.bs"
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "Flame"
-  Transform
-    position = 176 56
-  Sprite
-    image = "art/flame_0.bmp"
-    layer = 2
-  Script
-    file = "scripts/flame.bs"
-  Parent
-    entity = 0
-
-entity
-  Name
-    text = "NPC"
-  Transform
-    position = 128 56
-  Sprite
-    image = "art/old_chef.bmp"
-    layer = 2
-  Script
-    file = "scripts/npc.bs"
-    vars = "line1 = \"THE PICKLE PANTRY\", line2 = \"IS STILL BEING DUG. LATER!\""
+    tint = #b4f0a0ff
   Parent
     entity = 0

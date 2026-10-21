@@ -1,0 +1,13 @@
+# Pantry Quest - the flame Pip's fire chili throws
+bronto_scene 1
+
+entity
+  Name
+    text = "Fire"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/flame_0.bmp"
+    layer = 6
+  Script
+    file = "scripts/fire.bs"

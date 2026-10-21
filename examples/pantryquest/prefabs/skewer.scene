@@ -1,0 +1,13 @@
+# Pantry Quest - a skewer from Pip's skewer bow
+bronto_scene 1
+
+entity
+  Name
+    text = "Skewer"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/skewer.bmp"
+    layer = 6
+  Script
+    file = "scripts/skewer.bs"

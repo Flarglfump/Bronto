@@ -1,5 +1,6 @@
 # Pip, the young cook. Arrows or WASD walk; X (or K, or Space) pokes with the
-# spoon; Z (or J) uses the item on B; Enter opens the inventory.
+# spoon; Z (or J) uses the item on B (bombs, the pizza cutter, the skewer bow,
+# the fire chili); Enter opens the inventory.
 #
 # Movement keeps to a half-tile grid, as in the old adventure games: turning
 # a corner first lines Pip up with the next row or column, so he slips
@@ -290,5 +291,21 @@ func use_item() {
         if want.x != 0 or want.y != 0 { d = normalize(want) }
         cutter = spawn("prefabs/cutter.scene", self.position + d * 8)
         cutter.dir = d
+    } elif item == "skewers" {                         # a skewer costs a bean
+        if len(find_all("Skewer")) > 0 { return }
+        if game.beans <= 0 {
+            play_sound("sfx/tink.wav", 0.5)
+            return
+        }
+        game.beans -= 1
+        var s = spawn("prefabs/skewer.scene", self.position + dirv * 10)
+        s.vel = dirv * 240
+        s.rotation = angle(dirv) + 90
+        play_sound("sfx/skewer.wav")
+    } elif item == "chili" {
+        if len(find_all("Fire")) > 0 { return }
+        var f = spawn("prefabs/fire.scene", self.position + dirv * 12)
+        f.dir = dirv
+        play_sound("sfx/fire.wav")
     }
 }

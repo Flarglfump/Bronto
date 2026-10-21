@@ -1,0 +1,244 @@
+# The Spice Rack (the third cellar, "d3"), deep in the Lettuce Woods. Its
+# treasure is the fire chili; its guardian, the Spice Wraith, can only be
+# hurt while it is solid, after it bursts out a ring of spice.
+#
+#   .  tiled floor   O  crate   ~  chili broth   P  pepper-mill statue
+#
+# Map of the cellar (columns 0-4, rows 0-4):
+#
+#   [0,0 recipe][1,0 Wraith  ]
+#   [0,1 key   ][1,1 guards  ][2,1 chili]
+#   [0,2 map   ][1,2 hall    ][2,2 maze ][3,2 key  ]
+#               [1,3 compass ][2,3 hall ][3,3 key  ][4,3 stash]
+#                             [2,4 entrance] - the door south goes back out to the woods
+tint #ffb48cff
+
+room d3_2_4
+music cellar
+doors n=open s=open
+var exit_s = "ow_1_6"
+var exit_pos = vec2(120, 136)
+var exit_face = "down"
+inside
+............
+..P......P..
+............
+............
+............
+..P......P..
+............
+end
+
+room d3_2_3
+music cellar
+doors s=open w=open e=open n=locked
+inside
+............
+.OO......OO.
+............
+.....~~.....
+............
+.OO......OO.
+............
+put imp 4 4
+put imp 8 7
+put bat 8 3
+end
+
+room d3_1_3
+music cellar
+doors e=open
+inside
+............
+..P..P..P...
+............
+............
+............
+..P..P..P...
+............
+put bat 5 5
+put bat 10 4
+put imp 8 7
+put pickup 7.5 5 kind = "compass", flag = "d3:compass", on_clear = true
+end
+
+room d3_3_3
+music cellar
+doors w=open n=open e=bomb
+inside
+............
+.~~~....~~~.
+.~........~.
+............
+.~........~.
+.~~~....~~~.
+............
+put imp 5 5
+put imp 10 5
+put imp 7 7
+put pickup 7.5 5 kind = "key", flag = "d3:key1", on_clear = true
+end
+
+room d3_4_3
+music cellar
+doors w=bomb
+inside
+OOOOOOOOOOOO
+O..........O
+O...~~~~...O
+............
+O...~~~~...O
+O..........O
+OOOOOOOOOOOO
+put pickup 6 5 kind = "bean5", flag = "d3:stash1"
+put pickup 7.5 5 kind = "bomb", flag = "d3:stash2"
+put pickup 9 5 kind = "bean5", flag = "d3:stash3"
+end
+
+room d3_3_2
+music cellar
+doors s=open
+inside
+OOOOO..OOOOO
+O..........O
+O...O..O...O
+O..........O
+O...O..O...O
+O..........O
+OOOOO..OOOOO
+put meatball 3 3
+put meatball 12 7
+put meatball 4 7
+put pickup 7.5 5 kind = "key", flag = "d3:key2"
+end
+
+room d3_2_2
+music cellar
+doors s=locked w=open n=open
+inside
+....O..O....
+.OO.O..O.OO.
+.O..........
+...OOOOOO.O.
+.O........O.
+.OOO.OO.OOO.
+............
+put breadstick 2 4
+put breadstick 11 6
+put imp 7 6
+end
+
+room d3_2_1
+music cellar
+doors s=open
+var shut = "s"
+inside
+............
+.P..P..P..P.
+............
+............
+............
+.P..P..P..P.
+............
+put imp 4 4
+put imp 11 4
+put imp 7 6
+put pickup 7.5 5 kind = "chili", flag = "d3:chili", on_clear = true
+end
+
+room d3_1_2
+music cellar
+doors e=open w=open n=locked
+inside
+............
+..~~....~~..
+..~......~..
+............
+..~......~..
+..~~....~~..
+............
+put imp 6 3
+put imp 12 7
+put jelly 7 5
+end
+
+room d3_0_2
+music cellar
+doors e=open n=open
+inside
+............
+.O..O..O..O.
+............
+............
+............
+.O..O..O..O.
+............
+put bat 5 4
+put bat 10 6
+put bat 7 7
+put pickup 7.5 5 kind = "map", flag = "d3:map"
+end
+
+room d3_0_1
+music cellar
+doors s=open
+inside
+OOOO....OOOO
+O..........O
+O...~~~~...O
+O...~~~~...O
+O..........O
+O..........O
+OOOO....OOOO
+put breadstick 3 3
+put breadstick 12 3
+put breadstick 4 7
+put pickup 7.5 7 kind = "key", flag = "d3:key3", on_clear = true
+end
+
+room d3_1_1
+music cellar
+doors s=locked n=locked
+inside
+............
+.~~~~..~~~~.
+............
+....P..P....
+............
+.~~~~..~~~~.
+............
+put meatball 4 4
+put meatball 11 6
+put imp 4 6
+put imp 11 4
+end
+
+room d3_1_0
+music cellar
+doors s=locked w=open
+var shut = "sw"
+inside
+P..........P
+............
+............
+............
+............
+............
+P..........P
+put spice_wraith 7.5 5
+put pickup 7.5 7 kind = "heart_pie", flag = "d3:heart", on_clear = true
+end
+
+room d3_0_0
+music cellar
+doors e=open
+inside
+............
+............
+.....PP.....
+............
+............
+............
+............
+put pickup 7.5 4 kind = "page", flag = "d3:page"
+end

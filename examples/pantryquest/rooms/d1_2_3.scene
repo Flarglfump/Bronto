@@ -94,3 +94,17 @@ entity
     vars = ""
   Parent
     entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 128 120
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"map\", flag = \"d1:map\", on_clear = true"
+  Parent
+    entity = 0

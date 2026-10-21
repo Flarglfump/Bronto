@@ -1,0 +1,128 @@
+# The Big Dill, guardian of the Pickle Pantry: a giant pickle in a sour
+# mood. It edges round to line up with Pip, rumbles, then charges straight
+# at him until it slams into a wall - and there it sits, dizzy. That is the
+# only time a poke or a skewer gets through its tough skin. Six hits.
+
+var hp = 6
+var size = 14
+var damage = 2
+var game
+var hero
+var map
+var appear_t = 0
+var mode = "watch"          # watch, rumble, charge, dizzy
+var mode_t = 1.4
+var dir := vec2(0, 1)
+var base := vec2(0, 0)
+var flash_t = 0
+var t = 0
+
+func start() {
+    game = find("Game")
+    hero = find("Hero")
+    map = child(self.parent, "Map")
+    appear_t = 0.8
+    self.Sprite.tint = rgb(255, 255, 255, 0)
+}
+
+# Would its body bump into a wall with its centre at local point p, moving along d?
+func blocked(p, d) {
+    var side = vec2(d.y, d.x)
+    var front = p + d * 13
+    for k in [-9, 0, 9] {
+        var q = front + side * k
+        if q.x < 32 or q.x > 224 or q.y < 32 or q.y > 144 { return true }
+        if tile_solid(map, self.parent.global_position + q) { return true }
+    }
+    return false
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    if appear_t > 0 {
+        appear_t -= dt
+        self.Sprite.tint = rgb(255, 255, 255, clamp((0.8 - appear_t) / 0.8, 0, 1) * 255)
+        if appear_t <= 0 {
+            self.Sprite.tint = rgb(255, 255, 255)
+            play_sound("sfx/roar.wav")
+            game.play_music("boss")
+        }
+        return
+    }
+    t += dt
+    mode_t -= dt
+    var d = hero.position - self.global_position
+    if mode == "watch" {
+        self.Sprite.image = "art/dill_0.bmp"
+        var step := vec2(0, 0)                           # line up with Pip on the nearer axis
+        if abs(d.x) < abs(d.y) { step = vec2(sign(d.x), 0) } else { step = vec2(0, sign(d.y)) }
+        if abs(d.x) > 2 or abs(d.y) > 2 {
+            var to = self.position + step * 26 * dt
+            if not blocked(to, step) { self.position = to }
+        }
+        if mode_t <= 0 {
+            mode = "rumble"
+            mode_t = 0.6
+            base = self.position
+            if abs(d.x) > abs(d.y) { dir = vec2(sign(d.x), 0) } else { dir = vec2(0, sign(d.y)) }
+            play_sound("sfx/charge.wav")
+        }
+    } elif mode == "rumble" {
+        self.Sprite.image = "art/dill_1.bmp"
+        self.position = base + vec2(sin(t * 2400) * 2, 0)
+        if mode_t <= 0 {
+            self.position = base
+            mode = "charge"
+        }
+    } elif mode == "charge" {
+        var to = self.position + dir * 160 * dt
+        if blocked(to, dir) {
+            mode = "dizzy"
+            mode_t = 1.8
+            play_sound("sfx/door.wav")
+            spawn("prefabs/puff.scene", self.position + dir * 14, self.parent)
+        } else {
+            self.position = to
+        }
+    } elif mode == "dizzy" {
+        self.Sprite.image = "art/dill_0.bmp"
+        self.rotation = sin(t * 900) * 12
+        if mode_t <= 0 {
+            mode = "watch"
+            mode_t = 0.9 + random(0.9)
+            self.rotation = 0
+        }
+    }
+    if flash_t > 0 {
+        flash_t -= dt
+        if floor(flash_t * 24) % 2 == 0 { self.Sprite.tint = rgb(255, 120, 120) } else { self.Sprite.tint = rgb(255, 255, 255) }
+        if flash_t <= 0 { self.Sprite.tint = rgb(255, 255, 255) }
+    }
+    if mode != "dizzy" and hero.touches(self.global_position, size) { hero.hurt(damage, self.global_position) }
+}
+
+func hit(amount, d, kind) {
+    if appear_t > 0 { return false }
+    if mode != "dizzy" {                                 # its skin is too tough
+        play_sound("sfx/tink.wav", 0.7)
+        return true
+    }
+    if flash_t > 0.2 or kind == "cutter" { return false }
+    hp -= amount
+    flash_t = 0.5
+    if hp <= 0 {
+        die()
+        return true
+    }
+    play_sound("sfx/hit.wav")
+    return true
+}
+
+func die() {
+    play_sound("sfx/boss_die.wav")
+    for off in [vec2(-10, -10), vec2(10, -8), vec2(0, 6), vec2(-12, 10), vec2(12, 10)] {
+        spawn("prefabs/puff.scene", self.position + off, self.parent)
+    }
+    game.boss_beaten()
+    destroy(self)
+}

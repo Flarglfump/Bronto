@@ -9,6 +9,12 @@ and a child for every enemy, item and doorway, copied from prefabs/. The
 game spawns a room under the HUD as Pip walks into it. Edit the maps here
 (rather than the generated scenes) and run this again; it uses only
 Python's standard library.
+
+It also writes scripts/cellars.bs: each cellar's rooms, its guardian's room
+and the way out, for the HUD's map and compass and for leaving with a page.
+
+A world file can start with `tint #rrggbbaa`: every room after it has its
+tiles tinted (each cellar has its own colour).
 """
 import glob
 import os
@@ -22,6 +28,7 @@ TILESETS = {
     'dungeon': dict(image='art/tiles_dungeon.bmp', legend='.#O~SLHXPV,', solid='#O~LHXPV'),
 }
 COLS, ROWS = 16, 11
+BOSSES = {'gelatin', 'big_dill', 'spice_wraith'}     # prefabs that are a cellar's guardian
 DOOR_CELLS = {'n': [(7, 0), (8, 0), (7, 1), (8, 1)], 's': [(7, 9), (8, 9), (7, 10), (8, 10)],
               'w': [(0, 5), (1, 5)], 'e': [(14, 5), (15, 5)]}
 DOOR_TILE = {'open': ',', 'locked': 'L', 'bomb': 'X'}
@@ -103,7 +110,10 @@ def room_scene(room, source):
             'entity', '  Name', '    text = "Map"', '  Transform', '    position = 128 88',
             '  Tilemap', '    tileset = "%s"' % ts['image'], '    tile_size = 16', '    columns = %d' % COLS,
             '    rows = %d' % ROWS, '    legend = "%s"' % ts['legend'], '    solid = "%s"' % ts['solid'],
-            '    tiles = "%s"' % ''.join(rows), '    layer = -10', '  Parent', '    entity = 0']
+            '    tiles = "%s"' % ''.join(rows), '    layer = -10']
+    if room.get('tint'):
+        out.append('    tint = %s' % room['tint'])
+    out += ['  Parent', '    entity = 0']
     for (prefab, col, row, extra) in room['things']:
         out += [''] + thing(prefab, col, row, extra)
     return '\n'.join(out) + '\n'
@@ -111,7 +121,7 @@ def room_scene(room, source):
 
 def parse(path):
     rel = os.path.relpath(path, HERE)
-    rooms, cur, mode = [], None, None
+    rooms, cur, mode, tint = [], None, None, None
     for n, line in enumerate(open(path).read().split('\n'), 1):
         s = line.strip()
         if mode in ('map', 'inside') and s and not s.startswith('#') and not re.match(r'(put|var|end)\b', s):
@@ -120,8 +130,12 @@ def parse(path):
         if not s or s.startswith('#'):
             continue
         word, _, rest = s.partition(' ')
-        if word == 'room':
-            cur = dict(name=rest.strip(), map=[], inside=None, doors={}, vars=[], things=[])
+        if word == 'tint' and cur is None:
+            tint = rest.strip()
+            if not re.match(r'#[0-9a-fA-F]{8}$', tint):
+                raise SystemExit('%s:%d: tint #rrggbbaa' % (rel, n))
+        elif word == 'room':
+            cur = dict(name=rest.strip(), map=[], inside=None, doors={}, vars=[], things=[], tint=tint)
             mode = None
         elif cur is None:
             raise SystemExit('%s:%d: %r outside a room' % (rel, n, s))
@@ -155,17 +169,50 @@ def parse(path):
     return rel, rooms
 
 
+def cellars_script(cellars):
+    """scripts/cellars.bs: what the game needs to know about each cellar."""
+    out = ['# What each cellar holds: its rooms ("x_y"), its guardian\'s room, and where its',
+           '# way out leads. Made by tools/make_rooms.py from tools/world/*.txt - edit those.', '']
+    def fn(name, args, cases, default):
+        out.append('func %s(%s) {' % (name, args))
+        for area, value in cases:
+            out.append('    if area == "%s" { return %s }' % (area, value))
+        out.append('    return %s' % default)
+        out.append('}')
+        out.append('')
+    order = sorted(cellars, key=lambda a: int(a[1:]))
+    fn('rooms', 'area', [(a, '[' + ', '.join('"%s"' % r for r in cellars[a]['rooms']) + ']') for a in order], '[]')
+    fn('boss_room', 'area', [(a, '"%s"' % cellars[a]['boss']) for a in order if cellars[a]['boss']], '""')
+    fn('exit_room', 'area', [(a, '"%s"' % cellars[a]['exit'][0]) for a in order if cellars[a]['exit']], '"ow_7_7"')
+    fn('exit_pos', 'area', [(a, cellars[a]['exit'][1]) for a in order if cellars[a]['exit']], 'vec2(120, 168)')
+    return '\n'.join(out)
+
+
 def main():
     out_dir = os.path.join(GAME, 'rooms')
     os.makedirs(out_dir, exist_ok=True)
     made = 0
+    cellars = {}
     for path in sorted(glob.glob(os.path.join(HERE, 'world', '*.txt'))):
         rel, rooms = parse(path)
         for room in rooms:
             with open(os.path.join(out_dir, room['name'] + '.scene'), 'w') as f:
                 f.write(room_scene(room, rel))
             made += 1
-    print('make_rooms: wrote %d rooms to %s' % (made, os.path.relpath(out_dir)))
+            m = re.match(r'(d\d+)_(\d+)_(\d+)$', room['name'])
+            if m:
+                c = cellars.setdefault(m.group(1), dict(rooms=[], boss='', exit=None))
+                xy = m.group(2) + '_' + m.group(3)
+                c['rooms'].append(xy)
+                if any(t[0] in BOSSES for t in room['things']):
+                    c['boss'] = xy
+                vs = dict(v.split('=', 1) for v in room['vars'] if '=' in v)
+                vs = {k.strip(): v.strip() for k, v in vs.items()}
+                if vs.get('exit_s', '"').strip('"').startswith('ow_'):
+                    c['exit'] = (vs['exit_s'].strip('"'), vs.get('exit_pos', 'vec2(128, 200)'))
+    with open(os.path.join(GAME, 'scripts', 'cellars.bs'), 'w') as f:
+        f.write(cellars_script(cellars) + '\n')
+    print('make_rooms: wrote %d rooms to %s, and scripts/cellars.bs' % (made, os.path.relpath(out_dir)))
 
 
 if __name__ == '__main__':

@@ -1,0 +1,14 @@
+# Pantry Quest - a puff of spice (thrown by chili imps and the Spice Wraith)
+bronto_scene 1
+
+entity
+  Name
+    text = "Shot"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/spice.bmp"
+    layer = 4
+  Script
+    file = "scripts/projectile.bs"
+    vars = "damage = 2, blockable = false"

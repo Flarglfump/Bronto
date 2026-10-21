@@ -1,0 +1,14 @@
+# Pantry Quest - a chili imp, of the Spice Rack (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/imp_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 2, image = \"art/imp_\", speed = 58, shot = \"prefabs/spice.scene\", shot_speed = 100, shot_chance = 0.3"

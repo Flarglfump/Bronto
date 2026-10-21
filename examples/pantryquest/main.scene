@@ -407,3 +407,11 @@ entity
     layer = 6
   Parent
     entity = 36
+
+entity
+  Name
+    text = "Cellars"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/cellars.bs"

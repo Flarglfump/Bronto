@@ -148,6 +148,15 @@ def make_sfx():
     sfx('fall', 0.7, [(0, tone(R, 'C6', 0.65, duty=0.25, vol=0.2, f1='C3'))])
     sfx('menu', 0.08, [(0, tone(R, 'G6', 0.06, duty=0.25, vol=0.18))])
     sfx('buy', 0.3, seq(R, [('C6', 1), ('G6', 1), ('C7', 2)], 0.06, duty=0.25, vol=0.2))
+    # the Pickle Pantry and the Spice Rack
+    sfx('skewer', 0.2, [(0, tone(R, 2600, 0.18, 'noise', vol=0.22, f1=1200, decay=0.06)),
+                        (0, tone(R, 'A6', 0.12, 'triangle', vol=0.15, f1='E6'))])
+    sfx('fire', 0.45, [(0, tone(R, 700, 0.42, 'noise', vol=0.35, f1=250, decay=0.2)),
+                       (0.02, tone(R, 'D3', 0.25, 'saw', vol=0.12, f1='A2'))])
+    sfx('charge', 0.6, [(0, tone(R, 'E2', 0.55, 'saw', vol=0.3, f1='E3', vibrato=8)),
+                        (0, tone(R, 300, 0.5, 'noise', vol=0.2, decay=0.3))])
+    sfx('teleport', 0.45, [(0, tone(R, 'C5', 0.4, duty=0.125, vol=0.15, f1='C7', vibrato=10)),
+                           (0.05, tone(R, 'G5', 0.35, 'triangle', vol=0.2, f1='G3'))])
 
 
 # ---------------------------------------------------------------- music
