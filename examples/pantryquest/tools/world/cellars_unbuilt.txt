@@ -4,6 +4,7 @@
 room d4_2_4
 music cellar
 doors s=open
+var title = "THE JAM JAR"
 var exit_s = "ow_4_3"
 var exit_pos = vec2(120, 152)
 var exit_face = "down"
@@ -23,6 +24,7 @@ end
 room d5_2_4
 music cellar
 doors s=open
+var title = "THE CANDY WORKS"
 var exit_s = "ow_13_6"
 var exit_pos = vec2(104, 136)
 var exit_face = "down"
@@ -42,6 +44,7 @@ end
 room d6_2_4
 music cellar
 doors s=open
+var title = "THE FORTUNE HALL"
 var exit_s = "ow_1_1"
 var exit_pos = vec2(120, 120)
 var exit_face = "down"
@@ -61,6 +64,7 @@ end
 room d7_2_4
 music cellar
 doors s=open
+var title = "THE SUGAR MILL"
 var exit_s = "ow_11_4"
 var exit_pos = vec2(136, 136)
 var exit_face = "down"
@@ -80,6 +84,7 @@ end
 room d8_2_4
 music cellar
 doors s=open
+var title = "THE SOUP CAULDRON"
 var exit_s = "ow_9_1"
 var exit_pos = vec2(168, 136)
 var exit_face = "down"
@@ -99,6 +104,7 @@ end
 room d9_2_4
 music cellar
 doors s=open
+var title = "BARON GORGE'S BANQUET HALL"
 var exit_s = "ow_5_0"
 var exit_pos = vec2(88, 136)
 var exit_face = "down"

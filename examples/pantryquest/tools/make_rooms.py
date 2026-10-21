@@ -14,7 +14,8 @@ It also writes scripts/cellars.bs: each cellar's rooms, its guardian's room
 and the way out, for the HUD's map and compass and for leaving with a page.
 
 A world file can start with `tint #rrggbbaa`: every room after it has its
-tiles tinted (each cellar has its own colour).
+tiles tinted (each cellar has its own colour). A cellar's file also says
+`name The Pickle Pantry`: shown on a ribbon as Pip comes in.
 """
 import glob
 import os
@@ -119,6 +120,9 @@ def room_scene(room, source):
     return '\n'.join(out) + '\n'
 
 
+names = {}                  # world file -> its cellar's name (from a `name` line)
+
+
 def parse(path):
     rel = os.path.relpath(path, HERE)
     rooms, cur, mode, tint = [], None, None, None
@@ -130,7 +134,9 @@ def parse(path):
         if not s or s.startswith('#'):
             continue
         word, _, rest = s.partition(' ')
-        if word == 'tint' and cur is None:
+        if word == 'name' and cur is None:
+            names[rel] = rest.strip()
+        elif word == 'tint' and cur is None:
             tint = rest.strip()
             if not re.match(r'#[0-9a-fA-F]{8}$', tint):
                 raise SystemExit('%s:%d: tint #rrggbbaa' % (rel, n))
@@ -171,7 +177,7 @@ def parse(path):
 
 def cellars_script(cellars):
     """scripts/cellars.bs: what the game needs to know about each cellar."""
-    out = ['# What each cellar holds: its rooms ("x_y"), its guardian\'s room, and where its',
+    out = ['# What each cellar holds: its name, its rooms ("x_y"), its guardian\'s room, and where its',
            '# way out leads. Made by tools/make_rooms.py from tools/world/*.txt - edit those.', '']
     def fn(name, args, cases, default):
         out.append('func %s(%s) {' % (name, args))
@@ -181,6 +187,7 @@ def cellars_script(cellars):
         out.append('}')
         out.append('')
     order = sorted(cellars, key=lambda a: int(a[1:]))
+    fn('name', 'area', [(a, '"%s"' % cellars[a]['name'].upper()) for a in order if cellars[a].get('name')], '""')
     fn('rooms', 'area', [(a, '[' + ', '.join('"%s"' % r for r in cellars[a]['rooms']) + ']') for a in order], '[]')
     fn('boss_room', 'area', [(a, '"%s"' % cellars[a]['boss']) for a in order if cellars[a]['boss']], '""')
     fn('exit_room', 'area', [(a, '"%s"' % cellars[a]['exit'][0]) for a in order if cellars[a]['exit']], '"ow_7_7"')
@@ -201,7 +208,7 @@ def main():
             made += 1
             m = re.match(r'(d\d+)_(\d+)_(\d+)$', room['name'])
             if m:
-                c = cellars.setdefault(m.group(1), dict(rooms=[], boss='', exit=None))
+                c = cellars.setdefault(m.group(1), dict(rooms=[], boss='', exit=None, name=names.get(rel, '')))
                 xy = m.group(2) + '_' + m.group(3)
                 c['rooms'].append(xy)
                 if any(t[0] in BOSSES for t in room['things']):

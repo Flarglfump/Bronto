@@ -1,4 +1,4 @@
-# Pantry Quest - the inventory (scripts/menu.bs): spawned over the play area while the game waits
+# Pantry Quest - the inventory (scripts/menu.bs): a recipe page spawned over the play area while the game waits
 bronto_scene 1
 
 entity
@@ -6,25 +6,69 @@ entity
     text = "Menu"
   Transform
     position = 0 0
-  Shape
-    kind = rect
-    size = 232 160
-    color = #101828f0
-    outline = #4060c0ff
+  Sprite
+    image = "art/menu_bg.bmp"
     layer = 70
   Script
     file = "scripts/menu.bs"
 
 entity
   Name
+    text = "RibbonL"
+  Transform
+    position = -50 -72
+  Sprite
+    image = "art/banner_l.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonMid"
+  Transform
+    position = 0 -72
+    scale = 19 1
+  Sprite
+    image = "art/banner_mid.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "RibbonR"
+  Transform
+    position = 50 -72
+  Sprite
+    image = "art/banner_r.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "HeadingShadow"
+  Transform
+    position = 1 -72
+  Label
+    text = "PANTRY"
+    size = 1
+    color = #4a141cff
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
     text = "Heading"
   Transform
-    position = 0 -64
+    position = 0 -73
   Label
-    text = "INVENTORY"
+    text = "PANTRY"
     size = 1
-    color = #ffd84aff
-    layer = 71
+    color = #fff0d0ff
+    layer = 74
   Parent
     entity = 0
 
@@ -32,26 +76,23 @@ entity
   Name
     text = "Hint"
   Transform
-    position = 0 -46
+    position = 0 -53
   Label
-    text = "ITEM FOR B (Z KEY)"
+    text = "PICK AN ITEM FOR B"
     size = 1
-    color = #c8c0b8ff
+    color = #62381aff
     layer = 71
   Parent
     entity = 0
 
 entity
   Name
-    text = "Cursor"
+    text = "Plate0"
   Transform
-    position = -48 -20
-  Shape
-    kind = rect
-    size = 22 22
-    color = #00000000
-    outline = #ffd84aff
-    layer = 72
+    position = -63 -30
+  Sprite
+    image = "art/plate.bmp"
+    layer = 71
   Parent
     entity = 0
 
@@ -59,9 +100,21 @@ entity
   Name
     text = "Slot0"
   Transform
-    position = -48 -20
+    position = -63 -30
   Sprite
     image = "art/bomb.bmp"
+    tint = #ffffff00
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Plate1"
+  Transform
+    position = -21 -30
+  Sprite
+    image = "art/plate.bmp"
     layer = 71
   Parent
     entity = 0
@@ -70,9 +123,21 @@ entity
   Name
     text = "Slot1"
   Transform
-    position = -16 -20
+    position = -21 -30
   Sprite
     image = "art/bomb.bmp"
+    tint = #ffffff00
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Plate2"
+  Transform
+    position = 21 -30
+  Sprite
+    image = "art/plate.bmp"
     layer = 71
   Parent
     entity = 0
@@ -81,9 +146,21 @@ entity
   Name
     text = "Slot2"
   Transform
-    position = 16 -20
+    position = 21 -30
   Sprite
     image = "art/bomb.bmp"
+    tint = #ffffff00
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Plate3"
+  Transform
+    position = 63 -30
+  Sprite
+    image = "art/plate.bmp"
     layer = 71
   Parent
     entity = 0
@@ -92,9 +169,139 @@ entity
   Name
     text = "Slot3"
   Transform
-    position = 48 -20
+    position = 63 -30
   Sprite
     image = "art/bomb.bmp"
+    tint = #ffffff00
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Plate4"
+  Transform
+    position = -63 0
+  Sprite
+    image = "art/plate.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slot4"
+  Transform
+    position = -63 0
+  Sprite
+    image = "art/bomb.bmp"
+    tint = #ffffff00
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Plate5"
+  Transform
+    position = -21 0
+  Sprite
+    image = "art/plate.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slot5"
+  Transform
+    position = -21 0
+  Sprite
+    image = "art/bomb.bmp"
+    tint = #ffffff00
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Plate6"
+  Transform
+    position = 21 0
+  Sprite
+    image = "art/plate.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slot6"
+  Transform
+    position = 21 0
+  Sprite
+    image = "art/bomb.bmp"
+    tint = #ffffff00
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Plate7"
+  Transform
+    position = 63 0
+  Sprite
+    image = "art/plate.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slot7"
+  Transform
+    position = 63 0
+  Sprite
+    image = "art/bomb.bmp"
+    tint = #ffffff00
+    layer = 73
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Cursor"
+  Transform
+    position = -63 -30
+  Sprite
+    image = "art/plate_ring.bmp"
+    layer = 72
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "ItemName"
+  Transform
+    position = 0 22
+  Label
+    text = ""
+    size = 1
+    color = #8e1a2aff
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "ItemInfo"
+  Transform
+    position = 0 33
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
     layer = 71
   Parent
     entity = 0
@@ -103,22 +310,99 @@ entity
   Name
     text = "Pages"
   Transform
-    position = 0 18
+    position = -52 50
   Label
-    text = "RECIPE PAGES  0 / 8"
+    text = "RECIPE PAGES"
     size = 1
-    color = #fff8ecff
+    color = #62381aff
     layer = 71
   Parent
     entity = 0
 
 entity
   Name
-    text = "PageIcon"
+    text = "Page0"
   Transform
-    position = 0 40
+    position = 12 50
   Sprite
-    image = "art/page.bmp"
+    image = "art/page_off.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Page1"
+  Transform
+    position = 21 50
+  Sprite
+    image = "art/page_off.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Page2"
+  Transform
+    position = 30 50
+  Sprite
+    image = "art/page_off.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Page3"
+  Transform
+    position = 39 50
+  Sprite
+    image = "art/page_off.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Page4"
+  Transform
+    position = 48 50
+  Sprite
+    image = "art/page_off.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Page5"
+  Transform
+    position = 57 50
+  Sprite
+    image = "art/page_off.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Page6"
+  Transform
+    position = 66 50
+  Sprite
+    image = "art/page_off.bmp"
+    layer = 71
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Page7"
+  Transform
+    position = 75 50
+  Sprite
+    image = "art/page_off.bmp"
     layer = 71
   Parent
     entity = 0
@@ -127,11 +411,11 @@ entity
   Name
     text = "Keys"
   Transform
-    position = 0 66
+    position = 0 64
   Label
-    text = "< > CHOOSE    ENTER: BACK"
+    text = "<> CHOOSE   ENTER: CLOSE"
     size = 1
-    color = #c8c0b8ff
+    color = #a07850ff
     layer = 71
   Parent
     entity = 0

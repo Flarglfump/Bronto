@@ -20,7 +20,7 @@ entity
     position = 0 64
   Script
     file = "scripts/room.bs"
-    vars = "id = \"ow_6_3\", music = \"overworld\""
+    vars = "id = \"ow_6_3\", music = \"overworld\", region = \"BLUEBERRY LAKE\""
 
 entity
   Name

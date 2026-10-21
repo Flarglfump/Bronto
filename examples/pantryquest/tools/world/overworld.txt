@@ -11,7 +11,8 @@
 # Edges: a screen's open edges meet its neighbours' exactly (same columns or rows).
 #
 #   put <prefab> <column> <row> [script vars]   - a thing from prefabs/, at a tile (halves allowed)
-#   var <name> = <value>                         - a variable of the room's script (scripts/room.bs)
+#   var <name> = <value>                         - a variable of the room's script (scripts/room.bs);
+#                                                  region is the name shown when Pip comes into it
 #
 # Regions:
 #   G G G M M M M M M M M M B B C C
@@ -28,6 +29,7 @@
 
 room ow_0_0
 music overworld
+var region = "FORTUNE COOKIE FIELD"
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTTTTTTTTTT
@@ -49,6 +51,7 @@ end
 
 room ow_1_0
 music overworld
+var region = "FORTUNE COOKIE FIELD"
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTTTTTTTTTT
@@ -69,6 +72,7 @@ end
 
 room ow_2_0
 music overworld
+var region = "FORTUNE COOKIE FIELD"
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTWWWTTTTTT
@@ -90,6 +94,7 @@ end
 
 room ow_3_0
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -110,6 +115,7 @@ end
 
 room ow_4_0
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -130,6 +136,7 @@ end
 
 room ow_5_0
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -151,6 +158,7 @@ end
 
 room ow_6_0
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -170,6 +178,7 @@ end
 
 room ow_7_0
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -190,6 +199,7 @@ end
 
 room ow_8_0
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -209,6 +219,7 @@ end
 
 room ow_9_0
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -229,6 +240,7 @@ end
 
 room ow_10_0
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -249,6 +261,7 @@ end
 
 room ow_11_0
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 WWWWWWWWWWWWWWWW
@@ -269,6 +282,7 @@ end
 
 room ow_12_0
 music overworld
+var region = "PICKLE MARSH"
 map
 TTTTTTTgggTTgTgT
 gTggggTgTTggggTT
@@ -288,6 +302,7 @@ end
 
 room ow_13_0
 music overworld
+var region = "PICKLE MARSH"
 map
 gTgTgTggTggTggTg
 TggggTTTgTgTTggg
@@ -308,6 +323,7 @@ end
 
 room ow_14_0
 music overworld
+var region = "JUICE COAST"
 map
 ~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~
@@ -328,6 +344,7 @@ end
 
 room ow_15_0
 music overworld
+var region = "JUICE COAST"
 map
 ~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~
@@ -349,6 +366,7 @@ end
 
 room ow_0_1
 music overworld
+var region = "FORTUNE COOKIE FIELD"
 map
 TTTTTTT..TTTTTTT
 TTTTTT.........T
@@ -369,6 +387,7 @@ end
 
 room ow_1_1
 music overworld
+var region = "FORTUNE COOKIE FIELD"
 map
 TTTTTTTTTTT..TTT
 TT...WWWWW...T.T
@@ -390,6 +409,7 @@ end
 
 room ow_2_1
 music overworld
+var region = "FORTUNE COOKIE FIELD"
 map
 TTTTTTTTTTTTTTTT
 T....TTT.......T
@@ -410,6 +430,7 @@ end
 
 room ow_3_1
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWW,,WWWWWWW
 WW,,,,,,,,,,,,,W
@@ -431,6 +452,7 @@ end
 
 room ow_4_1
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWW,,WWWWW
 WWWW,,,,,,,,,WWW
@@ -451,6 +473,7 @@ end
 
 room ow_5_1
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWW,,WWW
 WWWW,,,,,,W,,WWW
@@ -470,6 +493,7 @@ end
 
 room ow_6_1
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWW,,WWWWWWWWWWW
 W,,,,,WWWWWWW,WW
@@ -490,6 +514,7 @@ end
 
 room ow_7_1
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWW,,WWWWW
 WWWWWWWWW,,,,,,W
@@ -510,6 +535,7 @@ end
 
 room ow_8_1
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWW,,WWWWWWW
 WW,WWWW,,,,,,,WW
@@ -529,6 +555,7 @@ end
 
 room ow_9_1
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 W,,,,,,,,,,,,,,W
@@ -549,6 +576,7 @@ end
 
 room ow_10_1
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWW,,WWWWWWW
 WW,,,,,,,,WWWWWW
@@ -570,6 +598,7 @@ end
 
 room ow_11_1
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWW,,WWW
 W,,,,,,,,,,,,,,W
@@ -590,6 +619,7 @@ end
 
 room ow_12_1
 music overworld
+var region = "PICKLE MARSH"
 map
 gTTgggg=.TTgTgTg
 TT.............g
@@ -610,6 +640,7 @@ end
 
 room ow_13_1
 music overworld
+var region = "PICKLE MARSH"
 map
 gTT.=TTgTgTgTTgg
 TTg=..........gT
@@ -631,6 +662,7 @@ end
 
 room ow_14_1
 music overworld
+var region = "JUICE COAST"
 map
 TTTssTTTTTTT~~~~
 TTTsssssssss~~~~
@@ -651,6 +683,7 @@ end
 
 room ow_15_1
 music overworld
+var region = "JUICE COAST"
 map
 TTTTTTTssTTT~~~~
 TTTTTTTssTss~~~~
@@ -671,6 +704,7 @@ end
 
 room ow_0_2
 music overworld
+var region = "FORTUNE COOKIE FIELD"
 map
 TTTTTTT..TTTTTTT
 TTTT...........T
@@ -691,6 +725,7 @@ end
 
 room ow_1_2
 music overworld
+var region = "FORTUNE COOKIE FIELD"
 map
 TTTTTTT..TTTTTTT
 TTTT...........T
@@ -711,6 +746,7 @@ end
 
 room ow_2_2
 music overworld
+var region = "FORTUNE COOKIE FIELD"
 map
 TTTTTTTTTTT..TTT
 T.....WWW.T..TTT
@@ -732,6 +768,7 @@ end
 
 room ow_3_2
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTT......TT
@@ -752,6 +789,7 @@ end
 
 room ow_4_2
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTTTTTTTTTTT
 TTTTTT.........T
@@ -772,6 +810,7 @@ end
 
 room ow_5_2
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTT..TTTTTTT
 T........TT...TT
@@ -792,6 +831,7 @@ end
 
 room ow_6_2
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTTTTTTTTTTT
 T..............T
@@ -813,6 +853,7 @@ end
 
 room ow_7_2
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWW,,WWW
 WW,,WWWWWWW,,WWW
@@ -832,6 +873,7 @@ end
 
 room ow_8_2
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWW,,WWWWWWWWW
 WWWWW,,,WWWWWW,W
@@ -853,6 +895,7 @@ end
 
 room ow_9_2
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWW,,WWWWWWWWWWW
 WW,,,,,,,,WWW,,W
@@ -873,6 +916,7 @@ end
 
 room ow_10_2
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWWWWWWWWWWW
 W,,,,,WWW,,,,,,W
@@ -893,6 +937,7 @@ end
 
 room ow_11_2
 music overworld
+var region = "CHOCOLATE MOUNTAINS"
 map
 WWWWWWW,,WWWWWWW
 W,,,,,,,,,WWWWWW
@@ -914,6 +959,7 @@ end
 
 room ow_12_2
 music overworld
+var region = "PICKLE MARSH"
 map
 TggTTTTggTT==gTT
 TggTg.....T=.gTT
@@ -934,6 +980,7 @@ end
 
 room ow_13_2
 music overworld
+var region = "PICKLE MARSH"
 map
 gTggTgTTTTTggggT
 T.....Tggggg..gg
@@ -954,6 +1001,7 @@ end
 
 room ow_14_2
 music overworld
+var region = "PICKLE MARSH"
 map
 ggggTTgTTTgTggTT
 gTgTg...WWW....T
@@ -975,6 +1023,7 @@ end
 
 room ow_15_2
 music overworld
+var region = "JUICE COAST"
 map
 TTTTTTTTTTTT~~~~
 TTsssssssTTT~~~~
@@ -995,6 +1044,7 @@ end
 
 room ow_0_3
 music overworld
+var region = "LETTUCE WOODS"
 map
 bbTbTbT..TbbTbbb
 TbTT.....bTTbT.b
@@ -1015,6 +1065,7 @@ end
 
 room ow_1_3
 music overworld
+var region = "LETTUCE WOODS"
 map
 bTT..bbbTbTTbbbT
 T........bTT...T
@@ -1036,6 +1087,7 @@ end
 
 room ow_2_3
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTT..TTTTTTT
 TT.......T.....T
@@ -1056,6 +1108,7 @@ end
 
 room ow_3_3
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTT..TTTTTTT
 TT.............T
@@ -1075,6 +1128,7 @@ end
 
 room ow_4_3
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTT..TTTTTTT
 TTTT~~~==~~~~~.T
@@ -1095,6 +1149,7 @@ end
 
 room ow_5_3
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTT..TTTTTTT
 T..............T
@@ -1114,6 +1169,7 @@ end
 
 room ow_6_3
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTTTTTT..TTT
 TT....TTTTT...TT
@@ -1133,6 +1189,7 @@ end
 
 room ow_7_3
 music overworld
+var region = "FROSTY FIELDS"
 map
 IIIIIII..IIIIIII
 I.............II
@@ -1152,6 +1209,7 @@ end
 
 room ow_8_3
 music overworld
+var region = "FROSTY FIELDS"
 map
 IIIIIII..IIIIIII
 II..........IIII
@@ -1170,6 +1228,7 @@ end
 
 room ow_9_3
 music overworld
+var region = "FROSTY FIELDS"
 map
 IIIIIIIIIIIIIIII
 IIIII.....IIIIII
@@ -1190,6 +1249,7 @@ end
 
 room ow_10_3
 music overworld
+var region = "SUGAR DESERT"
 map
 rrrrPPPPrPPPrrPP
 PrPPssssrrrrsssP
@@ -1209,6 +1269,7 @@ end
 
 room ow_11_3
 music overworld
+var region = "SUGAR DESERT"
 map
 rPrrPPPPrrPrrPPr
 Pssssssssssssssr
@@ -1228,6 +1289,7 @@ end
 
 room ow_12_3
 music overworld
+var region = "SUGAR DESERT"
 map
 rrPPPPPPPrPssrrP
 PssssssssssssPPr
@@ -1249,6 +1311,7 @@ end
 
 room ow_13_3
 music overworld
+var region = "SUGAR DESERT"
 map
 PrrrrPPssrPrPrrr
 PsssssssssssrPrr
@@ -1269,6 +1332,7 @@ end
 
 room ow_14_3
 music overworld
+var region = "SUGAR DESERT"
 map
 PPrPrrrPrPrPPrPr
 rPrrrssssssssssP
@@ -1289,6 +1353,7 @@ end
 
 room ow_15_3
 music overworld
+var region = "JUICE COAST"
 map
 TTTTTTTssTTT~~~~
 TTTTTTsssTT~~~~~
@@ -1309,6 +1374,7 @@ end
 
 room ow_0_4
 music overworld
+var region = "LETTUCE WOODS"
 map
 TbTbbbTbb..bTbTT
 bTbbTT.........T
@@ -1330,6 +1396,7 @@ end
 
 room ow_1_4
 music overworld
+var region = "LETTUCE WOODS"
 map
 bbTTbbbTTTTTbTbT
 T..............T
@@ -1350,6 +1417,7 @@ end
 
 room ow_2_4
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTT..TTTTTTTTT
 TTTT...T......TT
@@ -1370,6 +1438,7 @@ end
 
 room ow_3_4
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTTTTTTTTTTT
 T..............T
@@ -1389,6 +1458,7 @@ end
 
 room ow_4_4
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTTTTTTTTTTT
 T........TTT...T
@@ -1409,6 +1479,7 @@ end
 
 room ow_5_4
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTT..TTTTTTTTTTT
 TTT............T
@@ -1427,6 +1498,7 @@ end
 
 room ow_6_4
 music overworld
+var region = "FROSTY FIELDS"
 map
 IIIIIIIIIIIIIIII
 IIIII.........II
@@ -1445,6 +1517,7 @@ end
 
 room ow_7_4
 music overworld
+var region = "FROSTY FIELDS"
 map
 IIIIIII..IIIIIII
 IIIII....II...II
@@ -1463,6 +1536,7 @@ end
 
 room ow_8_4
 music overworld
+var region = "FROSTY FIELDS"
 map
 IIIIIII..IIIIIII
 I........II...II
@@ -1481,6 +1555,7 @@ end
 
 room ow_9_4
 music overworld
+var region = "FROSTY FIELDS"
 map
 IIIIIII..IIIIIII
 II...........III
@@ -1500,6 +1575,7 @@ end
 
 room ow_10_4
 music overworld
+var region = "SUGAR DESERT"
 map
 rrPPPrPssrrPPrPr
 rrrPPPPssrrsssrP
@@ -1520,6 +1596,7 @@ end
 
 room ow_11_4
 music overworld
+var region = "SUGAR DESERT"
 map
 PPrrrrrssrPPrPrr
 PPsssssssPPPrrrP
@@ -1540,6 +1617,7 @@ end
 
 room ow_12_4
 music overworld
+var region = "SUGAR DESERT"
 map
 rrPssPPrPPrrrPrP
 rsssssssssssssrr
@@ -1559,6 +1637,7 @@ end
 
 room ow_13_4
 music overworld
+var region = "SUGAR DESERT"
 map
 rrrssPrrrPrPrPPr
 PsssssssPrrPrPsr
@@ -1579,6 +1658,7 @@ end
 
 room ow_14_4
 music overworld
+var region = "SUGAR DESERT"
 map
 PPPrPPPssrPrrrrr
 PsssssssssssssPP
@@ -1600,6 +1680,7 @@ end
 
 room ow_15_4
 music overworld
+var region = "JUICE COAST"
 map
 TTTTTTTssTTT~~~~
 TTTTTsssssTT~~~~
@@ -1620,6 +1701,7 @@ end
 
 room ow_0_5
 music overworld
+var region = "LETTUCE WOODS"
 map
 bbTTbbTTTTTbbTbb
 bT.....bbbTbbbbT
@@ -1640,6 +1722,7 @@ end
 
 room ow_1_5
 music overworld
+var region = "LETTUCE WOODS"
 map
 TbbbTbTbbTTbbbbb
 Tb...bTbTbTTT..T
@@ -1659,6 +1742,7 @@ end
 
 room ow_2_5
 music overworld
+var region = "LETTUCE WOODS"
 map
 TbTTTTbbTbTTTbbb
 bb.........Tbb.b
@@ -1679,6 +1763,7 @@ end
 
 room ow_3_5
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTT..TTTTTTTTT
 TT.....TTT.....T
@@ -1699,6 +1784,7 @@ end
 
 room ow_4_5
 music overworld
+var region = "BLUEBERRY LAKE"
 map
 TTTTTTTTTTTTTTTT
 TT...........TTT
@@ -1718,6 +1804,7 @@ end
 
 room ow_5_5
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTTTTTTTTTTT
 TTTTTTWWW.....TT
@@ -1737,6 +1824,7 @@ end
 
 room ow_6_5
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTTTT..TTTTT
 T..............T
@@ -1755,6 +1843,7 @@ end
 
 room ow_7_5
 music overworld
+var region = "FROSTY FIELDS"
 map
 III..IIIIIIIIIII
 III..IIIIIIIIIII
@@ -1774,6 +1863,7 @@ end
 
 room ow_8_5
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTT..TTTTTTT
 TT....T..TT...TT
@@ -1792,6 +1882,7 @@ end
 
 room ow_9_5
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTTTTTTTTTTT
 TT............TT
@@ -1810,6 +1901,7 @@ end
 
 room ow_10_5
 music overworld
+var region = "SUGAR DESERT"
 map
 rPPPrPPrrssPrPrr
 PrrrPrsssssrPrsP
@@ -1829,6 +1921,7 @@ end
 
 room ow_11_5
 music overworld
+var region = "SUGAR DESERT"
 map
 PPPPrPrrrssrPrPP
 rsssPPPPrssrPPPP
@@ -1849,6 +1942,7 @@ end
 
 room ow_12_5
 music overworld
+var region = "SUGAR DESERT"
 map
 rPPrrrrrrrrrPrPr
 PssrPrPrrWWWssPr
@@ -1870,6 +1964,7 @@ end
 
 room ow_13_5
 music overworld
+var region = "SUGAR DESERT"
 map
 rPPrrrPrrrPrrPrP
 rrsssssssssssssP
@@ -1890,6 +1985,7 @@ end
 
 room ow_14_5
 music overworld
+var region = "CANDY MEADOWS"
 map
 LLLLLLLLLLLLLLLL
 LLLL...LLL.....L
@@ -1910,6 +2006,7 @@ end
 
 room ow_15_5
 music overworld
+var region = "JUICE COAST"
 map
 TTTTTTTssTTT~~~~
 TTsssssssss~~~~~
@@ -1930,6 +2027,7 @@ end
 
 room ow_0_6
 music overworld
+var region = "LETTUCE WOODS"
 map
 TbbTTTb..bbTTTbT
 Tb.bbTT.....TbTb
@@ -1949,6 +2047,7 @@ end
 
 room ow_1_6
 music overworld
+var region = "LETTUCE WOODS"
 map
 bbbTTTbbbbTbTbbT
 TTbT...........b
@@ -1969,6 +2068,7 @@ end
 
 room ow_2_6
 music overworld
+var region = "LETTUCE WOODS"
 map
 TTTTbTT..bTTbTTT
 T....TT...TbTb.T
@@ -1988,6 +2088,7 @@ end
 
 room ow_3_6
 music overworld
+var region = "LETTUCE WOODS"
 map
 bTTTbTbTTbTTTbbb
 b.....bbbb.....T
@@ -2007,6 +2108,7 @@ end
 
 room ow_4_6
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTTTT..TTTTT
 T.............TT
@@ -2025,6 +2127,7 @@ end
 
 room ow_5_6
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTTTTTTTTTTT
 TTTTTTTTTTT....T
@@ -2044,6 +2147,7 @@ end
 
 room ow_6_6
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTT..TTTTTTT
 TTb.....,....bTT
@@ -2063,6 +2167,7 @@ end
 
 room ow_7_6
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTT..TTTTTTT
 TTff.......ffTTT
@@ -2082,6 +2187,7 @@ end
 
 room ow_8_6
 music overworld
+var region = "PANTRY PLAINS"
 map
 WWWWWWWWWWWWWWWW
 W~~~~~~~~~~~~~~W
@@ -2101,6 +2207,7 @@ end
 
 room ow_9_6
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTT..TTTTTTT
 T..WWW.........T
@@ -2120,6 +2227,7 @@ end
 
 room ow_10_6
 music overworld
+var region = "SUGAR DESERT"
 map
 rPrssPPPrrPPPrPr
 Pssssssssssssssr
@@ -2140,6 +2248,7 @@ end
 
 room ow_11_6
 music overworld
+var region = "SUGAR DESERT"
 map
 PrrrPrPPrPPrPrPr
 PPPrrsssssssrrrr
@@ -2158,6 +2267,7 @@ end
 
 room ow_12_6
 music overworld
+var region = "CANDY MEADOWS"
 map
 LLLLLLLLLLLLLLLL
 LLL........LLLLL
@@ -2177,6 +2287,7 @@ end
 
 room ow_13_6
 music overworld
+var region = "CANDY MEADOWS"
 map
 LLLLLLL..LLLLLLL
 L..............L
@@ -2198,6 +2309,7 @@ end
 
 room ow_14_6
 music overworld
+var region = "CANDY MEADOWS"
 map
 LLLLLLL..LLLLLLL
 L..............L
@@ -2217,6 +2329,7 @@ end
 
 room ow_15_6
 music overworld
+var region = "JUICE COAST"
 map
 TTTTTTTTTTTT~~~~
 TTTTTTsssss~~~~~
@@ -2237,6 +2350,7 @@ end
 
 room ow_0_7
 music overworld
+var region = "LETTUCE WOODS"
 map
 bbbTTTbTTbbTTTTb
 TT....TbT..TbTTb
@@ -2257,6 +2371,7 @@ end
 
 room ow_1_7
 music overworld
+var region = "LETTUCE WOODS"
 map
 TTbbTbT..bTbTTTT
 T........TbbTTbT
@@ -2277,6 +2392,7 @@ end
 
 room ow_2_7
 music overworld
+var region = "LETTUCE WOODS"
 map
 bbTTbbTbT..bTbTT
 b..............b
@@ -2295,6 +2411,7 @@ end
 
 room ow_3_7
 music overworld
+var region = "LETTUCE WOODS"
 map
 bbT..bbTbTbbbTTb
 b.......bTTTbTTT
@@ -2313,6 +2430,7 @@ end
 
 room ow_4_7
 music overworld
+var region = "LETTUCE WOODS"
 map
 bbTTTbTTTTbTbTTb
 Tb.........TbbTb
@@ -2331,6 +2449,7 @@ end
 
 room ow_5_7
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTT..TTTTTTT
 T..WWW........TT
@@ -2349,6 +2468,7 @@ end
 
 room ow_6_7
 music overworld
+var region = "PANTRY PLAINS"
 map
 WWWWWWW..TTTTTTT
 WWWWXWW....,..bT
@@ -2368,6 +2488,7 @@ end
 
 room ow_7_7
 music overworld
+var region = "PANTRY PLAINS"
 map
 WWWWWWW..WWWWWWW
 WWWWCWW..WWWWWWW
@@ -2385,6 +2506,7 @@ end
 
 room ow_8_7
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTT..TTTTTTT
 TT.......,..WWWW
@@ -2405,6 +2527,7 @@ end
 
 room ow_9_7
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTTTTTTTTTTT
 TT..........TTTT
@@ -2422,6 +2545,7 @@ end
 
 room ow_10_7
 music overworld
+var region = "PANTRY PLAINS"
 map
 TTTTTTTTTTTTTTTT
 T....WWWTTTTT..T
@@ -2441,6 +2565,7 @@ end
 
 room ow_11_7
 music overworld
+var region = "SUGAR DESERT"
 map
 PPPrPPrPPPrrrrrP
 PPsssrPrrPPrPrrP
@@ -2460,6 +2585,7 @@ end
 
 room ow_12_7
 music overworld
+var region = "CANDY MEADOWS"
 map
 LLL..LLLLLLLLLLL
 LL....LLLL....LL
@@ -2480,6 +2606,7 @@ end
 
 room ow_13_7
 music overworld
+var region = "CANDY MEADOWS"
 map
 LLLLLLLLLLL..LLL
 LLLL..........LL
@@ -2499,6 +2626,7 @@ end
 
 room ow_14_7
 music overworld
+var region = "CANDY MEADOWS"
 map
 LLLLLLLLL..LLLLL
 L..............L
@@ -2519,6 +2647,7 @@ end
 
 room ow_15_7
 music overworld
+var region = "JUICE COAST"
 map
 TTTTTTTTTTTT~~~~
 TTssssTTTTTT~~~~

@@ -1,0 +1,68 @@
+# A guardian's entrance and its strength: black bars close in from the top
+# and bottom, then its name comes in on a card from the right ("THE" / BIG
+# DILL / "KEEPER OF THE PICKLE PANTRY") and goes out to the left (the game
+# times it all: game.intro_t). During the fight its name and a bar of its
+# strength stay at the bottom of the play area.
+
+var game
+var pre
+var title
+var sub
+var top
+var bot
+var name
+var back
+var fill
+var track
+var named = ""
+
+func start() {
+    game = find("Game")
+    pre = child(self, "BossPre")
+    title = child(self, "BossTitle")
+    sub = child(self, "BossSub")
+    top = find("LetterTop")
+    bot = find("LetterBot")
+    name = find("BossName")
+    back = find("BossBarBack")
+    fill = find("BossBarFill")
+    track = find("BossBarTrack")
+}
+
+func ease(k) { return 1 - (1 - k) * (1 - k) }
+
+func update(dt) {
+    var t = -1
+    if game.state == "intro" { t = game.intro_t }
+    var h = 0
+    if t >= 0 { h = 28 * clamp(min(t / 0.3, (3.4 - t) / 0.3), 0, 1) }
+    top.Shape.size = vec2(256, h)
+    top.position = vec2(128, 64 + h / 2)
+    bot.Shape.size = vec2(256, h)
+    bot.position = vec2(128, 240 - h / 2)
+    var b = game.boss
+    var x = 400
+    if t >= 1.3 and b != nil and b.alive {
+        if named != b.title {
+            named = b.title
+            pre.Label.text = "THE"
+            title.Label.text = b.title
+            sub.Label.text = b.subtitle
+        }
+        x = 128 + (1 - ease(clamp((t - 1.3) / 0.35, 0, 1))) * 272 - ease(clamp((t - 2.95) / 0.4, 0, 1)) * 272
+    }
+    self.position = vec2(x, 136)
+    # the bar, while it fights
+    var a = 0
+    if game.state == "play" and b != nil and b.alive and b.appear_t <= 0 { a = 255 }
+    name.Label.color = rgb(255, 240, 208, a)
+    back.Shape.color = rgb(27, 20, 24, a * 0.85)
+    track.Shape.color = rgb(74, 20, 28, a)
+    fill.Shape.color = rgb(216, 52, 58, a)
+    if a > 0 {
+        name.Label.text = "THE " + b.title
+        var w = 126 * clamp(b.hp / b.hp_max, 0, 1)
+        fill.Shape.size = vec2(w, 4)
+        fill.position = vec2(128 - 63 + w / 2, 233)
+    }
+}

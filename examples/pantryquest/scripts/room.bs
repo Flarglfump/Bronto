@@ -3,6 +3,8 @@
 # enemies remain, and remembers when it has been cleared.
 
 var id = ""                 # its file name: "ow_7_7", "d1_2_3", "cave_chef"
+var region = ""             # the part of the land it is in ("LETTUCE WOODS"): shown as Pip comes in
+var title = ""              # a name of its own to show instead (an unbuilt cellar's)
 var music = ""              # the track while Pip is here ("" = silence)
 var shut = ""               # sides whose shutters close while enemies remain, e.g. "s" or "ns"
 var stays_clear = false     # once cleared, its enemies don't come back (the cellars)

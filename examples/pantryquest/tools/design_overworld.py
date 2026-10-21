@@ -576,7 +576,8 @@ def write(rooms, caves_old, seed):
            '# Edges: a screen\'s open edges meet its neighbours\' exactly (same columns or rows).',
            '#',
            '#   put <prefab> <column> <row> [script vars]   - a thing from prefabs/, at a tile (halves allowed)',
-           '#   var <name> = <value>                         - a variable of the room\'s script (scripts/room.bs)',
+           '#   var <name> = <value>                         - a variable of the room\'s script (scripts/room.bs);',
+           '#                                                  region is the name shown when Pip comes into it',
            '#',
            '# Regions:']
     for y in range(8):
@@ -602,6 +603,7 @@ def write(rooms, caves_old, seed):
                 problems += ['%s: %s' % (n, p) for p in pr]
             out.append('room %s' % n)
             out.append('music overworld')
+            out.append('var region = "%s"' % REGION_NAME[reg(x, y)].upper())   # shown as Pip comes in
             out.append('map')
             out += m
             out += puts
@@ -630,7 +632,7 @@ def write(rooms, caves_old, seed):
         for p in rooms['ow_%d_%d' % (x, y)].puts:
             if p[0] == 'warp': door = (p[1], p[2])
         ex = (door[0] * 16 + 8, 64 + (door[1] + 1) * 16 + 8)
-        s += ['room d%d_2_4' % num, 'music cellar', 'doors s=open',
+        s += ['room d%d_2_4' % num, 'music cellar', 'doors s=open', 'var title = "%s"' % title,
               'var exit_s = "ow_%d_%d"' % (x, y), 'var exit_pos = vec2(%d, %d)' % ex, 'var exit_face = "down"',
               'inside', '............', '..P......P..', '............', '............', '............',
               '..P......P..', '............',

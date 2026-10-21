@@ -5,6 +5,9 @@
 # bursts twice. Eight hits.
 
 var hp = 8
+var hp_max = 8
+var title = "SPICE WRAITH"
+var subtitle = "KEEPER OF THE SPICE RACK"
 var size = 13
 var damage = 2
 var game
@@ -21,8 +24,15 @@ var alpha = 0
 func start() {
     game = find("Game")
     hero = find("Hero")
-    appear_t = 0.8
+    appear_t = 1                                       # until its entrance is over (game.boss_arrives)
     set_alpha(0)
+}
+
+func intro_done() {
+    appear_t = 0
+    set_alpha(1)
+    mode = "gather"
+    mode_t = 0.9
 }
 
 func set_alpha(a) {
@@ -55,14 +65,7 @@ func move_on() {
 func update(dt) {
     if game.state != "play" { return }
     if appear_t > 0 {
-        appear_t -= dt
-        set_alpha((0.8 - appear_t) / 0.8)
-        if appear_t <= 0 {
-            play_sound("sfx/roar.wav")
-            game.play_music("boss")
-            mode = "gather"
-            mode_t = 0.9
-        }
+        game.boss_arrives(self)
         return
     }
     t += dt

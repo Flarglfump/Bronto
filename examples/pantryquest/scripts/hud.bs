@@ -69,7 +69,7 @@ func draw_cellar_map() {
         if has_map { all = find("Cellars").rooms(area) }
         for xy in all {
             var c = spawn("prefabs/map_cell.scene", cell_pos(xy))
-            if not contains(seen, xy) { c.Shape.color = rgb(40, 56, 110) }
+            if not contains(seen, xy) { c.Shape.color = rgb(126, 92, 60) }
             push(cells, c)
         }
         if has_compass {
@@ -108,11 +108,11 @@ func update(dt) {
     # the map: the overworld is 16 x 8 rooms in the 64 x 32 box; a cellar, its rooms seen so far
     if game.area == "ow" {
         dot.position = vec2(8 + game.rx * 4 + 2, 16 + game.ry * 4 + 2)
-        map_box.Shape.color = rgb(110, 110, 110)
+        map_box.Shape.color = rgb(200, 164, 104)          # the land: biscuit brown on the recipe card
     } elif game.area == "cave" {
-        map_box.Shape.color = rgb(110, 110, 110)
+        map_box.Shape.color = rgb(200, 164, 104)
     } else {
-        map_box.Shape.color = rgb(0, 0, 0)
+        map_box.Shape.color = rgb(58, 38, 26)             # a cellar: dark chocolate
         dot.position = vec2(8 + game.rx * 8 + 4 + 12, 16 + game.ry * 6 + 3 + 1)
     }
     t += dt

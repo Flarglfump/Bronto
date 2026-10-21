@@ -14,6 +14,7 @@
 #   [1,3 bats ] [2,3 hub, map   ][3,3 soldiers]
 #             [2,4 entrance]  - the door south goes back outside
 
+name The Cold Cellar
 room d1_2_4
 music cellar
 doors n=open s=open

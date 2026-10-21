@@ -9,5 +9,5 @@ entity
   Shape
     kind = rect
     size = 7 5
-    color = #4060c0ff
+    color = #f0dcb0ff
     layer = 41

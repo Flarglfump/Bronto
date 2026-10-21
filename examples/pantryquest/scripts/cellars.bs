@@ -1,5 +1,12 @@
-# What each cellar holds: its rooms ("x_y"), its guardian's room, and where its
+# What each cellar holds: its name, its rooms ("x_y"), its guardian's room, and where its
 # way out leads. Made by tools/make_rooms.py from tools/world/*.txt - edit those.
+
+func name(area) {
+    if area == "d1" { return "THE COLD CELLAR" }
+    if area == "d2" { return "THE PICKLE PANTRY" }
+    if area == "d3" { return "THE SPICE RACK" }
+    return ""
+}
 
 func rooms(area) {
     if area == "d1" { return ["2_4", "2_3", "1_3", "3_3", "3_2", "2_2", "1_2", "2_1", "2_0"] }

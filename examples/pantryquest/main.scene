@@ -13,13 +13,20 @@ entity
     text = "HUD"
   Transform
     position = 128 32
-  Shape
-    kind = rect
-    size = 256 64
-    color = #000000ff
-    layer = 40
+  Sprite
+    image = "art/hud_bg.bmp"
+    layer = 39
   Script
     file = "scripts/hud.bs"
+
+entity
+  Name
+    text = "MapCard"
+  Transform
+    position = 40 32
+  Sprite
+    image = "art/hud_card.bmp"
+    layer = 40
 
 entity
   Name
@@ -29,7 +36,7 @@ entity
   Shape
     kind = rect
     size = 64 32
-    color = #6e6e6eff
+    color = #c8a468ff
     layer = 41
 
 entity
@@ -45,12 +52,41 @@ entity
 
 entity
   Name
+    text = "BeanTag"
+  Transform
+    position = 106 20
+  Sprite
+    image = "art/hud_tag.bmp"
+    layer = 40
+
+entity
+  Name
     text = "BeanIcon"
   Transform
     position = 92 20
   Sprite
     image = "art/hud_bean.bmp"
     layer = 41
+
+entity
+  Name
+    text = "BeanCount"
+  Transform
+    position = 113 20
+  Label
+    text = "x0"
+    size = 1
+    color = #62381aff
+    layer = 41
+
+entity
+  Name
+    text = "KeyTag"
+  Transform
+    position = 106 34
+  Sprite
+    image = "art/hud_tag.bmp"
+    layer = 40
 
 entity
   Name
@@ -63,6 +99,26 @@ entity
 
 entity
   Name
+    text = "KeyCount"
+  Transform
+    position = 113 34
+  Label
+    text = "x0"
+    size = 1
+    color = #62381aff
+    layer = 41
+
+entity
+  Name
+    text = "BombTag"
+  Transform
+    position = 106 48
+  Sprite
+    image = "art/hud_tag.bmp"
+    layer = 40
+
+entity
+  Name
     text = "BombIcon"
   Transform
     position = 92 48
@@ -72,65 +128,29 @@ entity
 
 entity
   Name
-    text = "BeanCount"
-  Transform
-    position = 114 20
-  Label
-    text = "x0"
-    size = 1
-    color = #fff8ecff
-    layer = 41
-
-entity
-  Name
-    text = "KeyCount"
-  Transform
-    position = 114 34
-  Label
-    text = "x0"
-    size = 1
-    color = #fff8ecff
-    layer = 41
-
-entity
-  Name
     text = "BombCount"
   Transform
-    position = 114 48
+    position = 113 48
   Label
     text = "x0"
     size = 1
-    color = #fff8ecff
-    layer = 41
-
-entity
-  Name
-    text = "BLabel"
-  Transform
-    position = 150 16
-  Label
-    text = "B"
-    size = 1
-    color = #fff8ecff
+    color = #62381aff
     layer = 41
 
 entity
   Name
     text = "BBox"
   Transform
-    position = 150 38
-  Shape
-    kind = rect
-    size = 20 28
-    color = #00000000
-    outline = #4060c0ff
-    layer = 41
+    position = 148 36
+  Sprite
+    image = "art/plate.bmp"
+    layer = 40
 
 entity
   Name
     text = "BItem"
   Transform
-    position = 150 40
+    position = 148 36
   Sprite
     image = "art/bomb.bmp"
     tint = #ffffff00
@@ -138,32 +158,38 @@ entity
 
 entity
   Name
-    text = "ALabel"
+    text = "BTag"
   Transform
-    position = 176 16
+    position = 138 25
+  Sprite
+    image = "art/hud_badge.bmp"
+    layer = 43
+
+entity
+  Name
+    text = "BLabel"
+  Transform
+    position = 138 25
   Label
-    text = "A"
+    text = "B"
     size = 1
-    color = #fff8ecff
-    layer = 41
+    color = #fff0d0ff
+    layer = 44
 
 entity
   Name
     text = "ABox"
   Transform
-    position = 176 38
-  Shape
-    kind = rect
-    size = 20 28
-    color = #00000000
-    outline = #4060c0ff
-    layer = 41
+    position = 176 36
+  Sprite
+    image = "art/plate.bmp"
+    layer = 40
 
 entity
   Name
     text = "AItem"
   Transform
-    position = 176 40
+    position = 176 36
   Sprite
     image = "art/spoon.bmp"
     tint = #ffffff00
@@ -171,13 +197,42 @@ entity
 
 entity
   Name
+    text = "ATag"
+  Transform
+    position = 166 25
+  Sprite
+    image = "art/hud_badge.bmp"
+    layer = 43
+
+entity
+  Name
+    text = "ALabel"
+  Transform
+    position = 166 25
+  Label
+    text = "A"
+    size = 1
+    color = #fff0d0ff
+    layer = 44
+
+entity
+  Name
+    text = "LifeRibbon"
+  Transform
+    position = 224 21
+  Sprite
+    image = "art/ribbon_hud.bmp"
+    layer = 40
+
+entity
+  Name
     text = "LifeLabel"
   Transform
     position = 224 20
   Label
-    text = "-LIFE-"
+    text = "HEARTS"
     size = 1
-    color = #d8343aff
+    color = #fff0d0ff
     layer = 41
 
 entity
@@ -188,7 +243,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -198,7 +253,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -208,7 +263,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -218,7 +273,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -228,7 +283,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -238,7 +293,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -248,7 +303,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -258,7 +313,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -268,7 +323,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -278,7 +333,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -288,7 +343,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -298,7 +353,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -308,7 +363,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -318,7 +373,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -328,7 +383,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -338,7 +393,7 @@ entity
   Sprite
     image = "art/hud_heart_full.bmp"
     tint = #ffffff00
-    layer = 42
+    layer = 41
 
 entity
   Name
@@ -394,7 +449,7 @@ entity
     tint = #ffffff00
     layer = 6
   Parent
-    entity = 36
+    entity = 43
 
 entity
   Name
@@ -406,7 +461,7 @@ entity
     tint = #ffffff00
     layer = 6
   Parent
-    entity = 36
+    entity = 43
 
 entity
   Name
@@ -415,3 +470,189 @@ entity
     position = 0 0
   Script
     file = "scripts/cellars.bs"
+
+entity
+  Name
+    text = "Banner"
+  Transform
+    position = 128 84
+  Script
+    file = "scripts/banner.bs"
+
+entity
+  Name
+    text = "BannerL"
+  Transform
+    position = -60 0
+  Sprite
+    image = "art/banner_l.bmp"
+    tint = #ffffff00
+    layer = 56
+  Parent
+    entity = 47
+
+entity
+  Name
+    text = "BannerMid"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/banner_mid.bmp"
+    tint = #ffffff00
+    layer = 55
+  Parent
+    entity = 47
+
+entity
+  Name
+    text = "BannerR"
+  Transform
+    position = 60 0
+  Sprite
+    image = "art/banner_r.bmp"
+    tint = #ffffff00
+    layer = 56
+  Parent
+    entity = 47
+
+entity
+  Name
+    text = "BannerShadow"
+  Transform
+    position = 1 0
+  Label
+    text = ""
+    size = 1
+    color = #4a141c00
+    layer = 57
+  Parent
+    entity = 47
+
+entity
+  Name
+    text = "BannerText"
+  Transform
+    position = 0 -1
+  Label
+    text = ""
+    size = 1
+    color = #fff0d000
+    layer = 58
+  Parent
+    entity = 47
+
+entity
+  Name
+    text = "LetterTop"
+  Transform
+    position = 128 64
+  Shape
+    kind = rect
+    size = 256 0
+    color = #000000ff
+    layer = 64
+
+entity
+  Name
+    text = "LetterBot"
+  Transform
+    position = 128 240
+  Shape
+    kind = rect
+    size = 256 0
+    color = #000000ff
+    layer = 64
+
+entity
+  Name
+    text = "BossCard"
+  Transform
+    position = 400 136
+  Sprite
+    image = "art/card_bg.bmp"
+    layer = 66
+  Script
+    file = "scripts/boss_ui.bs"
+
+entity
+  Name
+    text = "BossPre"
+  Transform
+    position = 0 -21
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 67
+  Parent
+    entity = 55
+
+entity
+  Name
+    text = "BossTitle"
+  Transform
+    position = 0 -4
+  Label
+    text = ""
+    size = 2
+    color = #8e1a2aff
+    layer = 67
+  Parent
+    entity = 55
+
+entity
+  Name
+    text = "BossSub"
+  Transform
+    position = 0 17
+  Label
+    text = ""
+    size = 1
+    color = #62381aff
+    layer = 67
+  Parent
+    entity = 55
+
+entity
+  Name
+    text = "BossBarBack"
+  Transform
+    position = 128 228
+  Shape
+    kind = rect
+    size = 140 22
+    color = #1b141800
+    layer = 57
+
+entity
+  Name
+    text = "BossName"
+  Transform
+    position = 128 223
+  Label
+    text = ""
+    size = 1
+    color = #fff0d000
+    layer = 58
+
+entity
+  Name
+    text = "BossBarTrack"
+  Transform
+    position = 128 233
+  Shape
+    kind = rect
+    size = 126 4
+    color = #4a141c00
+    layer = 58
+
+entity
+  Name
+    text = "BossBarFill"
+  Transform
+    position = 128 233
+  Shape
+    kind = rect
+    size = 126 4
+    color = #d8343a00
+    layer = 59

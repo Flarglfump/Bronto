@@ -1,47 +1,96 @@
-# The inventory: the game waits while it's open. Left and right choose the
-# item for B; Enter closes it.
+# The inventory: a recipe page, with Pip's things on plates. The game waits
+# while it's open. The arrows (or the mouse) choose the item for B - its name
+# and what it does show underneath - and Enter closes it. The recipe pages
+# found so far are along the bottom.
 
 var game
 var slots = []
+var plates = []
 var cursor
 var choice = 0
 var owned = []
+var item_name
+var item_info
+var last_mouse := vec2(-1, -1)
 
 func start() {
     game = find("Game")
     cursor = child(self, "Cursor")
-    for i in 4 { push(slots, child(self, "Slot" + i)) }
+    item_name = child(self, "ItemName")
+    item_info = child(self, "ItemInfo")
+    for i in 8 {
+        push(slots, child(self, "Slot" + i))
+        push(plates, child(self, "Plate" + i))
+    }
     owned = []
     for item in game.items { push(owned, item) }
-    for i in 4 {
+    for i in 8 {
         if i < len(owned) {
             slots[i].Sprite.image = find("HUD").icon(owned[i])
+            slots[i].Sprite.tint = rgb(255, 255, 255)
             if owned[i] == game.b_item { choice = i }
         } else {
-            slots[i].Sprite.tint = rgb(255, 255, 255, 0)
+            plates[i].Sprite.tint = rgb(255, 255, 255, 110)     # an empty plate, waiting
         }
     }
-    child(self, "Pages").Label.text = "RECIPE PAGES  " + game.pages + " / 8"
-    if len(owned) == 0 { cursor.Shape.outline = rgb(0, 0, 0, 0) }
-    place()
+    for i in 8 {
+        if i < game.pages { child(self, "Page" + i).Sprite.image = "art/page_on.bmp" }
+    }
+    child(self, "Pages").Label.text = "RECIPE PAGES"
+    last_mouse = mouse_position()
+    show()
 }
 
-func place() {
-    cursor.position = slots[choice].position
+# What each thing is called, and what it's for.
+func name_of(item) {
+    if item == "bombs" { return "POPCORN BOMBS x" + game.bombs }
+    if item == "cutter" { return "PIZZA CUTTER" }
+    if item == "skewers" { return "SKEWER BOW" }
+    if item == "chili" { return "FIRE CHILI" }
+    return ""
+}
+func info_of(item) {
+    if item == "bombs" { return "POP! CRACKED WALLS OPEN" }
+    if item == "cutter" { return "FLIES OUT AND COMES BACK" }
+    if item == "skewers" { return "A BEAN FOR EACH SKEWER" }
+    if item == "chili" { return "BURNS BUSHES AND FOES" }
+    return ""
+}
+
+func show() {
+    if len(owned) == 0 {
+        cursor.Sprite.tint = rgb(255, 255, 255, 0)
+        item_name.Label.text = "NOTHING HERE YET"
+        item_info.Label.text = "THE CELLARS HIDE THINGS"
+        return
+    }
+    cursor.position = plates[choice].position
+    item_name.Label.text = name_of(owned[choice])
+    item_info.Label.text = info_of(owned[choice])
+    game.b_item = owned[choice]
+}
+
+func pick(i) {
+    if i == choice or i >= len(owned) { return }
+    choice = i
+    play_sound("sfx/menu.wav")
+    show()
 }
 
 func update(dt) {
-    if len(owned) > 0 {
-        if key_pressed("left") or key_pressed("a") {
-            choice = (choice + len(owned) - 1) % len(owned)
-            play_sound("sfx/menu.wav")
+    var n = len(owned)
+    if n > 0 {
+        if key_pressed("left") or key_pressed("a") { pick((choice + n - 1) % n) }
+        if key_pressed("right") or key_pressed("d") { pick((choice + 1) % n) }
+        if key_pressed("up") or key_pressed("w") { if choice >= 4 { pick(choice - 4) } }
+        if key_pressed("down") or key_pressed("s") { if choice + 4 < n { pick(choice + 4) } }
+        var m = mouse_position()                         # the mouse: over a plate, it's chosen
+        if m != last_mouse or mouse_pressed(0) {
+            last_mouse = m
+            for i in n {
+                if distance(plates[i].global_position, m) < 13 { pick(i) }
+            }
         }
-        if key_pressed("right") or key_pressed("d") {
-            choice = (choice + 1) % len(owned)
-            play_sound("sfx/menu.wav")
-        }
-        game.b_item = owned[choice]
-        place()
     }
     if key_pressed("enter") or key_pressed("escape") {
         game.state = "play"

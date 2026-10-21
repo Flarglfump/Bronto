@@ -4,6 +4,9 @@
 # only time a poke or a skewer gets through its tough skin. Six hits.
 
 var hp = 6
+var hp_max = 6
+var title = "BIG DILL"
+var subtitle = "KEEPER OF THE PICKLE PANTRY"
 var size = 14
 var damage = 2
 var game
@@ -21,9 +24,11 @@ func start() {
     game = find("Game")
     hero = find("Hero")
     map = child(self.parent, "Map")
-    appear_t = 0.8
+    appear_t = 1                                       # until its entrance is over (game.boss_arrives)
     self.Sprite.tint = rgb(255, 255, 255, 0)
 }
+
+func intro_done() { appear_t = 0 }
 
 # Would its body bump into a wall with its centre at local point p, moving along d?
 func blocked(p, d) {
@@ -40,13 +45,7 @@ func blocked(p, d) {
 func update(dt) {
     if game.state != "play" { return }
     if appear_t > 0 {
-        appear_t -= dt
-        self.Sprite.tint = rgb(255, 255, 255, clamp((0.8 - appear_t) / 0.8, 0, 1) * 255)
-        if appear_t <= 0 {
-            self.Sprite.tint = rgb(255, 255, 255)
-            play_sound("sfx/roar.wav")
-            game.play_music("boss")
-        }
+        game.boss_arrives(self)
         return
     }
     t += dt

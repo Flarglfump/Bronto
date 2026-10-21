@@ -1239,31 +1239,32 @@ sprite('flame_1',
        "...kk.......kk..")
 
 # ============================================================ the HUD's little icons (8 x 8)
+# Hearts are jam cookies: full of jam, half full, or eaten clean.
 sprite('hud_heart_full',
        ".kk.kk..",
-       "karkrrk.",
-       "krrrrrk.",
-       "krrrrRk.",
-       ".krrRk..",
-       "..kRk...",
+       "kttkttk.",
+       "ktrrrtk.",
+       "ktrmrtk.",
+       ".ktrtk..",
+       "..ktk...",
        "...k....",
        "........")
 sprite('hud_heart_half',
        ".kk.kk..",
-       "karkGGk.",
-       "krrkGGk.",
-       "krrkGGk.",
-       ".krkGk..",
-       "..kkk...",
+       "kttkttk.",
+       "ktrrTtk.",
+       "ktrmTtk.",
+       ".ktrtk..",
+       "..ktk...",
        "...k....",
        "........")
 sprite('hud_heart_empty',
        ".kk.kk..",
-       "kGGkGGk.",
-       "kGGGGGk.",
-       "kGGGGGk.",
-       ".kGGGk..",
-       "..kGk...",
+       "kttkttk.",
+       "ktTTTtk.",
+       "ktTTTtk.",
+       ".ktTtk..",
+       "..ktk...",
        "...k....",
        "........")
 sprite('hud_bean',
@@ -1293,6 +1294,166 @@ sprite('hud_bomb',
        ".kYyYYk.",
        "..kkkk..",
        "........")
+
+# ============================================================ the HUD and menus
+# A kitchen, not a dungeon crawler's black bar: the HUD is a walnut counter
+# with a gingham trim, the map a recipe card, the items sit on plates, and
+# titles are on red ribbons. These are drawn by code (textures rather than
+# pictures); the patterns repeat exactly, so they are the same every run.
+
+def drawn(name, w, h, fn):
+    S[name] = [''.join(fn(x, y) for x in range(w)) for y in range(h)]
+
+
+def grain(x, y, seed=0):
+    """A little deterministic noise for wood grain and paper flecks."""
+    v = (x * 374761393 + y * 668265263 + seed * 2246822519) & 0xffffffff
+    v = ((v ^ (v >> 13)) * 1274126177) & 0xffffffff
+    return (v >> 16) & 0xff
+
+
+def gingham(x, y, size=4):
+    a, b = (x // size) % 2, (y // size) % 2
+    return 'r' if a and b else ('w' if not a and not b else 'p')
+
+
+def counter(x, y):                      # the HUD: walnut planks, then a gingham trim
+    if y >= 59:
+        return 'k' if y == 59 else gingham(x, y - 60)
+    if y == 58:
+        return 'z'
+    plank = y // 15
+    if y % 15 == 14:
+        return 'z'                      # the seam between planks
+    wave = (y * 7 + plank * 13 + (x + plank * 37) // 23) % 9
+    g = grain(x // 3, y, plank)
+    if wave == 0 and g < 150:
+        return 'z'
+    if g > 246:
+        return 'Z'
+    return 'N'
+drawn('hud_bg', 256, 64, counter)
+
+
+def card(w, h, pin=True):               # parchment with a brown edge and a red pin
+    def fn(x, y):
+        if x in (0, w - 1) or y in (0, h - 1):
+            return 'k'
+        if x in (1, w - 2) or y in (1, h - 2):
+            return 'E'
+        if pin and abs(x - w // 2) <= 1 and 2 <= y <= 4:
+            return 'r' if not (x == w // 2 and y == 3) else 'w'
+        return 'E' if grain(x, y, 3) > 238 else 'e'
+    return fn
+drawn('hud_card', 76, 44, card(76, 44))
+
+
+def price_tag(x, y, w=44, h=12):         # a paper tag for each count on the HUD
+    if (x in (0, w - 1) and y in (0, h - 1)):
+        return '.'
+    if x in (0, w - 1) or y in (0, h - 1):
+        return 'k'
+    if x == 1 and y in (1, h - 2) or x == w - 2 and y in (1, h - 2):
+        return 'k'
+    return 'E' if y == h - 2 else 'e'
+drawn('hud_tag', 44, 12, price_tag)
+
+
+def disc(cx, cy, r):
+    return lambda x, y: ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2) ** 0.5 / r
+
+
+def plate(x, y):                        # a china plate: rim, a blue band, the well
+    d = disc(13, 13, 12.5)(x, y)
+    if d > 1:
+        return '.'
+    if d > 0.92:
+        return 'k'
+    if d > 0.80:
+        return 'w'
+    if d > 0.72:
+        return 'c'
+    if d > 0.66:
+        return 'g'
+    return 'w'
+drawn('plate', 26, 26, plate)
+
+
+def plate_ring(x, y):                   # the gold ring round the chosen plate
+    d = disc(15, 15, 15)(x, y)
+    if d > 1 or d < 0.78:
+        return '.'
+    if d > 0.93 or d < 0.83:
+        return 'k' if (d > 0.96 or d < 0.81) else 'Y'
+    return 'y'
+drawn('plate_ring', 30, 30, plate_ring)
+
+
+def badge(x, y):                        # the round red tag that says B or A
+    d = disc(5.5, 5.5, 5.5)(x, y)
+    return '.' if d > 1 else ('k' if d > 0.8 else ('m' if y > 7 else 'r'))
+drawn('hud_badge', 11, 11, badge)
+
+
+def ribbon(w, h=16, tails=True):        # a red ribbon, with folded swallowtail ends
+    mid = (h - 1) / 2.0
+    def fn(x, y):
+        e = min(x, w - 1 - x)           # how far from the nearer end
+        if tails and e < 5:             # the tail: darker, set a little lower, with a V cut in
+            if y < 3 or y > h - 2:
+                return '.'
+            if abs(y - mid - 1) < (5 - e) * 0.8 - 0.5:
+                return '.'
+            if y in (3, h - 2) or e == 0 or abs(y - mid - 1) < (5 - e) * 0.8 + 0.5:
+                return 'k'
+            return 'R'
+        if y < 1 or y > h - 3:
+            return '.'
+        if y in (1, h - 3) or (tails and e == 5):
+            return 'k'
+        if y == 2:
+            return 'p'
+        return 'm' if y >= h - 5 else 'r'
+    return fn
+drawn('ribbon_hud', 60, 16, ribbon(60))
+drawn('banner_l', 12, 20, lambda x, y: ribbon(24, 20)(x, y))
+drawn('banner_r', 12, 20, lambda x, y: ribbon(24, 20)(x + 12, y))
+drawn('banner_mid', 4, 20, lambda x, y: ribbon(64, 20, False)(30 + x, y))
+
+
+def recipe_page(w, h, border=8):        # the inventory: a recipe page in a gingham frame
+    def fn(x, y):
+        if x in (0, w - 1) or y in (0, h - 1):
+            return 'k'
+        if x < border or y < border or x >= w - border or y >= h - border:
+            if x in (border - 1, w - border) and border - 1 <= y <= h - border or \
+               y in (border - 1, h - border) and border - 1 <= x <= w - border:
+                return 'k'
+            return gingham(x - 1, y - 1)
+        if (y - border) % 12 == 11 and border + 6 <= x < w - border - 6:
+            return 'E'                  # faint ruled lines
+        return 'E' if grain(x, y, 5) > 244 else 'e'
+    return fn
+drawn('menu_bg', 232, 160, recipe_page(232, 160))
+drawn('card_bg', 244, 72, recipe_page(244, 72, 6))
+sprite('page_on',
+       "kkkkkk..",
+       "keeeeEk.",
+       "kEEEEek.",
+       "keeeeek.",
+       "kEEEEek.",
+       "keeerek.",
+       "keerrrk.",
+       "kkkkkkk.")
+sprite('page_off',
+       "GG.GG...",
+       "G....G..",
+       "......G.",
+       "G.....G.",
+       "......G.",
+       "G.....G.",
+       "......G.",
+       "GG.GG.G.")
 
 # ============================================================ tiles
 # Overworld (the Pantry Plains): biscuit ground, broccoli trees, cookie

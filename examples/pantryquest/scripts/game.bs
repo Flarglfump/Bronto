@@ -29,7 +29,7 @@ var ry = 7
 var room_name = ""
 var room                    # the room's root entity
 var map                     # its Tilemap
-var state = "boot"          # boot, play, slide, fade_out, fade_in, hold, menu, dead, over, won
+var state = "boot"          # boot, play, slide, fade_out, fade_in, hold, menu, intro, dead, over, won
 var start_room = "ow_7_7"   # (for testing a room in the editor: set these in Game's Script vars,
 var start_items = ""        #  e.g. start_room = "d1_2_4", start_pos = vec2(128, 200), start_items = "bombs,cutter")
 var start_pos := vec2(120, 168)
@@ -64,6 +64,8 @@ var note1 = ""              # a message for when the next room has faded in
 var note2 = ""
 
 var booted = 0
+var boss                    # the guardian in this room, once it has shown itself
+var intro_t = 0             # how far into its entrance (state "intro")
 
 func start() {
     hero = find("Hero")
@@ -100,6 +102,14 @@ func split(s, sep) {
 }
 
 func room_file(name) { return "rooms/" + name + ".scene" }
+
+# The name for the banner as Pip comes in: the part of the land, or the cellar.
+func area_title() {
+    if area == "cave" { return "" }
+    if room.title != "" { return room.title }
+    if area == "ow" { return room.region }
+    return find("Cellars").name(area)
+}
 
 # Makes `name` the current room (spawned at the top of the play area).
 func enter(name, pos, face) {
@@ -227,6 +237,7 @@ func update(dt) {
             state = "play"
             music_for_room()
             room.entered()
+            find("Banner").arrive(area_title())
         }
     } elif state == "fade_out" {
         fade_t += dt
@@ -247,6 +258,7 @@ func update(dt) {
                 say(note1, note2)
                 note1 = ""
             }
+            find("Banner").arrive(area_title())
         }
     } elif state == "hold" {
         hold_t -= dt
@@ -277,6 +289,8 @@ func update(dt) {
                 beep_t = 0.9
             }
         }
+    } elif state == "intro" {
+        intro(dt)
     } elif state == "won" {
         won_t += dt
     }
@@ -418,6 +432,53 @@ func drop_at(local_pos, parent) {
     var p = spawn("prefabs/pickup.scene", local_pos, parent)
     p.kind = kind
     p.timeout = 9
+}
+
+# ---- a guardian's entrance ---------------------------------------------------------
+# Its script calls this the first moment it can (its room has come in). The
+# game waits while bars close in, the guardian swells into view and roars,
+# and its name comes in on a card (scripts/boss_ui.bs draws those); Enter,
+# X or Space skips the rest after the first second.
+func boss_arrives(b) {
+    boss = b
+    state = "intro"
+    intro_t = 0
+    play_music("none_intro")
+    b.Sprite.tint = rgb(255, 255, 255, 0)
+}
+
+func intro(dt) {
+    var before = intro_t
+    intro_t += dt
+    if boss == nil or not boss.alive {
+        state = "play"
+        return
+    }
+    var t = intro_t
+    if t >= 0.4 and t < 1.3 {                          # it swells into view, wobbling
+        var k = (t - 0.4) / 0.9
+        boss.Sprite.tint = rgb(255, 255, 255, min(1, k * 1.6) * 255)
+        boss.scale = 1 + (1 - k) * 0.7 + sin(k * 540) * 0.12 * (1 - k)
+    }
+    if before < 1.3 and t >= 1.3 {
+        boss.scale = 1
+        boss.Sprite.tint = rgb(255, 255, 255)
+        play_sound("sfx/roar.wav")
+        play_music("boss")
+    }
+    if t > 1.0 and (key_pressed("enter") or key_pressed("x") or key_pressed("space")) and t < 3.0 {
+        intro_t = 3.0                                  # skip to the end
+        boss.scale = 1
+        boss.Sprite.tint = rgb(255, 255, 255)
+        if before < 1.3 {
+            play_sound("sfx/roar.wav")
+            play_music("boss")
+        }
+    }
+    if intro_t >= 3.4 {
+        state = "play"
+        boss.intro_done()
+    }
 }
 
 # A cellar's guardian is beaten (its script calls this as it goes).
