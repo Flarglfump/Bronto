@@ -277,6 +277,18 @@ static void view_menu(editor *ed) {
     if (br_ui_menu_check(&ed->ui, "Grid", ed->view.grid)) ed->view.grid = !ed->view.grid;
     if (br_ui_menu_check(&ed->ui, "Snap to Grid", ed->view.snap)) ed->view.snap = !ed->view.snap;
     if (br_ui_menu_check(&ed->ui, "Show Colliders", ed->show_colliders)) ed->show_colliders = !ed->show_colliders;
+    if (br_ui_menu_sub_begin(&ed->ui, "Panels", true)) {      /* (drag their edges to resize them) */
+        int i;
+        for (i = 0; i < ED_PANEL_COUNT; ++i)
+            if (br_ui_menu_check(&ed->ui, ed_panel_name((ed_panel)i), ed->panels.open[i])) ed_panel_set_open(ed, (ed_panel)i, !ed->panels.open[i]);
+        sep(ed);
+        if (item(ed, "Reset Layout", NULL, true)) {
+            ed_panels_default(&ed->panels);
+            ed_prefs_save(ed);
+            ed_status(ed, "The panels are back to their first sizes");
+        }
+        br_ui_menu_sub_end(&ed->ui);
+    }
     sep(ed);
     if (item(ed, d->playing ? "Stop" : "Play", "F5", true)) ed_cmd_play(ed);
     br_ui_menu_end(&ed->ui);
@@ -449,7 +461,7 @@ static void build_menu(editor *ed) {
         int scripts = 0, errors;
         ed_project_reload(ed);
         errors = ed_check_scripts(ed, &scripts);
-        if (errors) { ed_status(ed, "%d of %d scripts have mistakes - see the console", errors, scripts); ed->bottom_tab = ED_TAB_CONSOLE; }
+        if (errors) { ed_status(ed, "%d of %d scripts have mistakes - see the console", errors, scripts); ed->bottom_tab = ED_TAB_CONSOLE; ed_panel_set_open(ed, ED_PANEL_BOTTOM, true); }
         else ed_status(ed, "All %d script%s are fine%s", scripts, scripts == 1 ? "" : "s", ed->project.strict_typing ? " (strict typing)" : "");
     }
     if (item(ed, "Open Builds Folder", NULL, true)) ed_open_builds_folder(ed);

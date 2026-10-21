@@ -276,6 +276,7 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
     if ((errors = ed_check_scripts(ed, &scripts)) > 0) {
         ed_status(ed, "Build failed: %d script%s with mistakes - see the console", errors, errors == 1 ? "" : "s");
         ed->bottom_tab = ED_TAB_CONSOLE;
+        ed_panel_set_open(ed, ED_PANEL_BOTTOM, true);
         return false;
     }
     if (!ed_find_player(ed, t, player, sizeof(player))) {

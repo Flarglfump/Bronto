@@ -192,6 +192,20 @@ typedef struct ed_assets {
 
 typedef enum ed_bottom_tab { ED_TAB_FILES = 0, ED_TAB_CONSOLE } ed_bottom_tab;
 
+/* The panels around the scene view, each resized by dragging its edge and
+ * collapsed with its arrow (main.c lays them out; saved with the settings). */
+typedef enum ed_panel {
+    ED_PANEL_SCENE = 0,                /* the hierarchy, on the left */
+    ED_PANEL_INSPECTOR,                /* on the right */
+    ED_PANEL_BOTTOM,                   /* Files / Console, under the view */
+    ED_PANEL_PREVIEW,                  /* beside the files */
+    ED_PANEL_COUNT
+} ed_panel;
+typedef struct ed_panels {
+    float size[ED_PANEL_COUNT];        /* width (height for the bottom) while open */
+    bool open[ED_PANEL_COUNT];
+} ed_panels;
+
 typedef enum ed_target { ED_TARGET_LINUX = 0, ED_TARGET_MACOS, ED_TARGET_WINDOWS, ED_TARGET_WEB, ED_TARGET_COUNT } ed_target;
 
 /* What a right-click menu is about (menus.c). */
@@ -238,6 +252,11 @@ typedef struct editor {
     bool show_colliders;
 
     ed_bottom_tab bottom_tab;          /* Files or Console under the scene view */
+    ed_panels panels;
+    int split_drag;                    /* the panel whose edge is being dragged, -1: none */
+    float split_grab, split_start;     /* where on the edge it was taken; the size then */
+    int split_hot;                     /* the edge under the mouse (drawn lit), -1: none */
+    bool chrome_clicked;               /* an arrow or edge took this frame's click (a strip under it mustn't) */
     ed_console console;
     bool console_capturing;            /* stdout / stderr come to the console */
     bool console_show[3];              /* the filters, per ED_LEVEL_* */
@@ -304,6 +323,9 @@ void ed_make_icon(br_image *out, int size);
 
 /* settings.c */
 void ed_prefs_load(editor *ed);
+void ed_panels_default(ed_panels *p);
+void ed_panel_set_open(editor *ed, ed_panel panel, bool open);   /* and saves the settings */
+const char *ed_panel_name(ed_panel panel);
 bool ed_prefs_save(editor *ed);
 void ed_script_command(const char *tmpl, const char *file, int line, char *out, size_t size);
 bool ed_open_script(editor *ed, const char *rel, int line);   /* in the chosen text editor */
@@ -374,6 +396,15 @@ void ed_set_collapsed(editor *ed, br_entity e, bool collapsed);
 void ed_inspector(editor *ed, br_rect rect);
 void ed_statusbar(editor *ed, br_rect rect);
 void ed_bottom_tabs(editor *ed, br_rect rect);
+typedef enum ed_arrow { ED_ARROW_LEFT = 0, ED_ARROW_RIGHT, ED_ARROW_UP, ED_ARROW_DOWN } ed_arrow;
+/* A small clickable square (its own little panel, so it takes the mouse
+ * before the panel it sits on). Returns BR_UI_* flags; draw it afterwards,
+ * on top, with ed_draw_arrow. */
+int  ed_corner_button(editor *ed, const char *id, br_rect rect);
+void ed_draw_arrow(br_ui *ui, br_rect rect, ed_arrow dir, bool hot);
+/* A collapsed panel: a strip with an arrow and the panel's name down it.
+ * True when clicked (to open it again). */
+bool ed_collapsed_strip(editor *ed, br_rect rect, ed_panel panel, ed_arrow arrow);
 void ed_console_panel(editor *ed, br_rect rect);
 void ed_dialog(editor *ed, br_rect screen);
 void ed_picker_dialog(editor *ed, br_rect screen);

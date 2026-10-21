@@ -5,6 +5,8 @@
  * %APPDATA%\Bronto, ~/Library/Application Support/Bronto, ~/.config/Bronto)
  * as "key = value" lines in editor.cfg, so they apply to every project.
  *
+ * The panels' sizes are kept too ("scene_panel = 200 shown").
+ *
  * The script editor is a command line with {file} and {line} in it, for
  * example  code -g "{file}:{line}". Empty means the system's default program
  * for .bs files.
@@ -21,6 +23,31 @@ static const struct { const char *label, *command; } k_presets[] = {
     { "Notepad++", "notepad++ -n{line} \"{file}\"" },
     { "Zed", "zed \"{file}:{line}\"" },
 };
+
+/* ---- the panels' layout ---- */
+
+static const struct { const char *key, *name; float size; } k_panels[ED_PANEL_COUNT] = {
+    { "scene_panel", "Scene", 200 },          /* (the sizes the editor first opens with) */
+    { "inspector_panel", "Inspector", 300 },
+    { "bottom_panel", "Files and Console", 196 },
+    { "preview_panel", "Preview", 230 },
+};
+
+void ed_panels_default(ed_panels *p) {
+    int i;
+    for (i = 0; i < ED_PANEL_COUNT; ++i) {
+        p->size[i] = k_panels[i].size;
+        p->open[i] = true;
+    }
+}
+
+const char *ed_panel_name(ed_panel panel) { return panel >= 0 && panel < ED_PANEL_COUNT ? k_panels[panel].name : ""; }
+
+void ed_panel_set_open(editor *ed, ed_panel panel, bool open) {
+    if (panel < 0 || panel >= ED_PANEL_COUNT || ed->panels.open[panel] == open) return;
+    ed->panels.open[panel] = open;
+    ed_prefs_save(ed);
+}
 
 static bool prefs_path(char *out, size_t size) {
     char dir[ED_PATH_MAX];
@@ -46,15 +73,31 @@ void ed_prefs_load(editor *ed) {
         n = strlen(eq);
         while (n && (eq[n - 1] == '\r' || eq[n - 1] == ' ')) eq[--n] = 0;
         if (strcmp(line, "script_editor") == 0) snprintf(ed->prefs.script_editor, sizeof(ed->prefs.script_editor), "%s", eq);
+        else {
+            int i;
+            for (i = 0; i < ED_PANEL_COUNT; ++i) {
+                float px;
+                char shown[16];
+                if (strcmp(line, k_panels[i].key) != 0 || sscanf(eq, "%f %15s", &px, shown) != 2 || !(px > 0 && px < 10000)) continue;
+                ed->panels.size[i] = px;
+                ed->panels.open[i] = strcmp(shown, "hidden") != 0;
+            }
+        }
     }
     br_free(text);
 }
 
 bool ed_prefs_save(editor *ed) {
-    char path[ED_PATH_MAX], text[600];
+    char path[ED_PATH_MAX], text[1024];
+    int i;
+    size_t n;
     if (ed->headless) return true;                     /* the self-test never touches your settings */
     if (!prefs_path(path, sizeof(path))) return false;
     snprintf(text, sizeof(text), "# Bronto editor settings\nscript_editor = %s\n", ed->prefs.script_editor);
+    for (i = 0; i < ED_PANEL_COUNT; ++i) {
+        n = strlen(text);
+        snprintf(text + n, sizeof(text) - n, "%s = %.0f %s\n", k_panels[i].key, (double)ed->panels.size[i], ed->panels.open[i] ? "shown" : "hidden");
+    }
     return br_file_write_all(path, text, strlen(text));
 }
 

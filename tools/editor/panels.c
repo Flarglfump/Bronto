@@ -512,20 +512,24 @@ void ed_bottom_tabs(editor *ed, br_rect rect) {
     char label[64];
     uint32_t errors = ed->console.level_count[ED_LEVEL_ERROR];
     uint32_t fresh = errors > ed->console_errors_seen ? errors - ed->console_errors_seen : 0;
+    bool shown = ed->panels.open[ED_PANEL_BOTTOM];        /* (collapsed: only the tabs, none lit) */
     br_ui_panel_begin(ui, "tabs", rect);
     br_fill_rect(ui->r, rect, ui->style.background);
     s.ui = ui;
     s.x = rect.x + 4;
     s.y = rect.y + (rect.h - ui->style.row) / 2;
     s.h = ui->style.row;
-    if (strip_button(&s, "Files", 60, ed->bottom_tab == ED_TAB_FILES)) ed->bottom_tab = ED_TAB_FILES;
-    if (fresh && ed->bottom_tab != ED_TAB_CONSOLE) snprintf(label, sizeof(label), "Console (%u error%s)##tab", fresh, fresh == 1 ? "" : "s");
+    if (strip_button(&s, "Files", 60, shown && ed->bottom_tab == ED_TAB_FILES)) { ed->bottom_tab = ED_TAB_FILES; ed_panel_set_open(ed, ED_PANEL_BOTTOM, true); }
+    if (fresh && (ed->bottom_tab != ED_TAB_CONSOLE || !shown)) snprintf(label, sizeof(label), "Console (%u error%s)##tab", fresh, fresh == 1 ? "" : "s");
     else snprintf(label, sizeof(label), "Console##tab");
-    if (strip_button(&s, label, fresh && ed->bottom_tab != ED_TAB_CONSOLE ? 150 : 76, ed->bottom_tab == ED_TAB_CONSOLE)) ed->bottom_tab = ED_TAB_CONSOLE;
-    if (fresh && ed->bottom_tab != ED_TAB_CONSOLE)                 /* a red mark on the tab */
+    if (strip_button(&s, label, fresh && (ed->bottom_tab != ED_TAB_CONSOLE || !shown) ? 150 : 76, shown && ed->bottom_tab == ED_TAB_CONSOLE)) {
+        ed->bottom_tab = ED_TAB_CONSOLE;
+        ed_panel_set_open(ed, ED_PANEL_BOTTOM, true);
+    }
+    if (fresh && (ed->bottom_tab != ED_TAB_CONSOLE || !shown))     /* a red mark on the tab */
         br_fill_rect(ui->r, br_rect_make(s.x - 4 - 150 + 3, s.y + 3, 3, s.h - 6), br_rgb(255, 110, 100));
     br_ui_panel_end(ui);
-    if (ed->bottom_tab == ED_TAB_CONSOLE) {
+    if (ed->bottom_tab == ED_TAB_CONSOLE && shown) {
         ed->console_seen = ed->console.added;
         ed->console_errors_seen = errors;
     } else if (ed->console_errors_seen > errors) {
@@ -650,4 +654,50 @@ void ed_console_panel(editor *ed, br_rect rect) {
     }
     if (br_ui_context_area(ui, list)) ed_menu_console(ed, -1);
     br_ui_panel_end(ui);
+}
+
+/* ---- panel chrome: collapse arrows and collapsed strips ------------------------------------ */
+
+int ed_corner_button(editor *ed, const char *id, br_rect rect) {
+    br_ui *ui = &ed->ui;
+    int f;
+    br_ui_panel_begin(ui, id, rect);
+    br_ui_place(ui, rect);
+    f = br_ui_area(ui, "##button", 0);
+    br_ui_panel_end(ui);
+    return f;
+}
+
+void ed_draw_arrow(br_ui *ui, br_rect r, ed_arrow dir, bool hot) {
+    float cx = floorf(r.x + r.w / 2), cy = floorf(r.y + r.h / 2);
+    br_color c = hot ? ui->style.text : ui->style.text_dim;
+    if (hot) br_fill_rect(ui->r, r, ui->style.button_hot);
+    switch (dir) {
+    case ED_ARROW_LEFT:  br_fill_triangle(ui->r, br_v2(cx + 2, cy - 4), br_v2(cx + 2, cy + 4), br_v2(cx - 3, cy), c); break;
+    case ED_ARROW_RIGHT: br_fill_triangle(ui->r, br_v2(cx - 2, cy - 4), br_v2(cx + 3, cy), br_v2(cx - 2, cy + 4), c); break;
+    case ED_ARROW_UP:    br_fill_triangle(ui->r, br_v2(cx - 4, cy + 2), br_v2(cx, cy - 3), br_v2(cx + 4, cy + 2), c); break;
+    case ED_ARROW_DOWN:  br_fill_triangle(ui->r, br_v2(cx - 4, cy - 2), br_v2(cx + 4, cy - 2), br_v2(cx, cy + 3), c); break;
+    }
+}
+
+bool ed_collapsed_strip(editor *ed, br_rect rect, ed_panel panel, ed_arrow arrow) {
+    br_ui *ui = &ed->ui;
+    const char *name = ed_panel_name(panel);
+    char id[32];
+    int f;
+    float y;
+    snprintf(id, sizeof(id), "strip_%d", (int)panel);
+    br_ui_panel_begin(ui, id, rect);
+    br_ui_place(ui, rect);
+    f = br_ui_area(ui, "##strip", 0);
+    if (f & BR_UI_HOVERED) br_fill_rect(ui->r, rect, br_color_lerp(ui->style.panel, ui->style.button_hot, 0.5f));
+    ed_draw_arrow(ui, br_rect_make(rect.x, rect.y + 4, rect.w, 16), arrow, (f & BR_UI_HOVERED) != 0);
+    for (y = rect.y + 28; *name && y + 8 <= rect.y + rect.h - 4; ++name, y += 11) {   /* the name, one letter a line */
+        char ch[2];
+        ch[0] = *name >= 'a' && *name <= 'z' ? (char)(*name - 32) : *name;
+        ch[1] = 0;
+        br_draw_text(ui->r, ch, floorf(rect.x + (rect.w - 8) / 2), y, 1, (f & BR_UI_HOVERED) ? ui->style.text : ui->style.text_dim);
+    }
+    br_ui_panel_end(ui);
+    return (f & BR_UI_CLICKED) != 0 && !ed->chrome_clicked;
 }

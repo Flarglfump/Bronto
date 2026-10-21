@@ -29,34 +29,170 @@
 
 #define TOOLBAR_H 28.0f
 #define STATUS_H 20.0f
-#define HIERARCHY_W 200.0f
-#define INSPECTOR_W 300.0f
-#define ASSETS_H 196.0f
 #define TABS_H 22.0f
-#define PREVIEW_W 230.0f
+#define STRIP_W 20.0f                 /* a collapsed side panel */
+#define VIEW_MIN_W 240.0f             /* the scene view keeps at least this much */
+#define VIEW_MIN_H 120.0f
+#define FILES_MIN_W 220.0f            /* the file browser, beside the preview */
+/* The least each panel can be while open; dragging its edge below half of
+ * this collapses it. */
+static const float k_panel_min[ED_PANEL_COUNT] = { 150, 220, 90, 150 };
 
 static editor ED;
 static const char *g_open_path;
 
 /* ---- layout ---------------------------------------------------------------- */
 
-typedef struct layout { br_rect screen, toolbar, hierarchy, view, tabs, assets, preview, console, inspector, status; } layout;
+typedef struct layout {
+    br_rect screen, toolbar, hierarchy, view, tabs, assets, preview, console, inspector, status;
+    br_rect edge[ED_PANEL_COUNT];     /* where each panel's edge is grabbed (w 0: none now) */
+    br_rect button[ED_PANEL_COUNT];   /* its collapse arrow */
+    float max[ED_PANEL_COUNT];        /* the most it can be in this window */
+} layout;
 
-static layout make_layout(const br_engine *e) {
+static float clampf(float v, float lo, float hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+static layout make_layout(const editor *ed) {
+    const ed_panels *p = &ed->panels;
     layout l;
-    float w = (float)e->framebuffer.width, h = (float)e->framebuffer.height, mid = h - TOOLBAR_H - STATUS_H;
-    float centre_w = w - HIERARCHY_W - INSPECTOR_W, view_h = mid - ASSETS_H - TABS_H, bottom = TOOLBAR_H + view_h + TABS_H;
+    float w = (float)ed->engine->framebuffer.width, h = (float)ed->engine->framebuffer.height, mid = h - TOOLBAR_H - STATUS_H;
+    float left, right, centre_w, bottom_h, view_h, preview_w, bottom_y, over;
+    bool files = ed->bottom_tab == ED_TAB_FILES && p->open[ED_PANEL_BOTTOM];
+    memset(&l, 0, sizeof(l));
+    /* the side panels, then the scene view gets what is left (at least VIEW_MIN_W) */
+    left = p->open[ED_PANEL_SCENE] ? fmaxf(p->size[ED_PANEL_SCENE], k_panel_min[ED_PANEL_SCENE]) : STRIP_W;
+    right = p->open[ED_PANEL_INSPECTOR] ? fmaxf(p->size[ED_PANEL_INSPECTOR], k_panel_min[ED_PANEL_INSPECTOR]) : STRIP_W;
+    over = left + right + VIEW_MIN_W - w;
+    if (over > 0 && p->open[ED_PANEL_INSPECTOR]) { float cut = fminf(over, right - k_panel_min[ED_PANEL_INSPECTOR]); right -= cut; over -= cut; }
+    if (over > 0 && p->open[ED_PANEL_SCENE]) { float cut = fminf(over, left - k_panel_min[ED_PANEL_SCENE]); left -= cut; }
+    left = floorf(left);
+    right = floorf(right);
+    centre_w = w - left - right;
+    l.max[ED_PANEL_SCENE] = fmaxf(k_panel_min[ED_PANEL_SCENE], w - right - VIEW_MIN_W);
+    l.max[ED_PANEL_INSPECTOR] = fmaxf(k_panel_min[ED_PANEL_INSPECTOR], w - left - VIEW_MIN_W);
+    /* under the view: the tabs, and Files / Console when open */
+    l.max[ED_PANEL_BOTTOM] = fmaxf(k_panel_min[ED_PANEL_BOTTOM], mid - TABS_H - VIEW_MIN_H);
+    bottom_h = p->open[ED_PANEL_BOTTOM] ? floorf(clampf(p->size[ED_PANEL_BOTTOM], fminf(k_panel_min[ED_PANEL_BOTTOM], mid - TABS_H - 40),
+                                                        l.max[ED_PANEL_BOTTOM])) : 0;
+    view_h = mid - bottom_h - TABS_H;
+    bottom_y = TOOLBAR_H + view_h + TABS_H;
+    l.max[ED_PANEL_PREVIEW] = fmaxf(k_panel_min[ED_PANEL_PREVIEW], centre_w - FILES_MIN_W);
+    preview_w = p->open[ED_PANEL_PREVIEW] ? floorf(clampf(p->size[ED_PANEL_PREVIEW], fminf(k_panel_min[ED_PANEL_PREVIEW], centre_w / 2),
+                                                          l.max[ED_PANEL_PREVIEW])) : STRIP_W;
     l.screen = br_rect_make(0, 0, w, h);
     l.toolbar = br_rect_make(0, 0, w, TOOLBAR_H);
-    l.hierarchy = br_rect_make(0, TOOLBAR_H, HIERARCHY_W, mid);
-    l.inspector = br_rect_make(w - INSPECTOR_W, TOOLBAR_H, INSPECTOR_W, mid);
-    l.view = br_rect_make(HIERARCHY_W + 1, TOOLBAR_H + 1, centre_w - 2, view_h - 2);
-    l.tabs = br_rect_make(HIERARCHY_W, TOOLBAR_H + view_h, centre_w, TABS_H);
-    l.assets = br_rect_make(HIERARCHY_W, bottom, centre_w - PREVIEW_W - 1, ASSETS_H);
-    l.preview = br_rect_make(HIERARCHY_W + centre_w - PREVIEW_W, bottom, PREVIEW_W, ASSETS_H);
-    l.console = br_rect_make(HIERARCHY_W, bottom, centre_w, ASSETS_H);
+    l.hierarchy = br_rect_make(0, TOOLBAR_H, left, mid);
+    l.inspector = br_rect_make(w - right, TOOLBAR_H, right, mid);
+    l.view = br_rect_make(left + 1, TOOLBAR_H + 1, centre_w - 2, view_h - 2);
+    l.tabs = br_rect_make(left, TOOLBAR_H + view_h, centre_w, TABS_H);
+    l.assets = br_rect_make(left, bottom_y, centre_w - preview_w - 1, bottom_h);
+    l.preview = br_rect_make(left + centre_w - preview_w, bottom_y, preview_w, bottom_h);
+    l.console = br_rect_make(left, bottom_y, centre_w, bottom_h);
     l.status = br_rect_make(0, h - STATUS_H, w, STATUS_H);
+    /* the edges to drag (mostly over the scene view, clear of the panels' scroll bars) */
+    l.edge[ED_PANEL_SCENE] = br_rect_make(left - 1, TOOLBAR_H, 5, mid);
+    l.edge[ED_PANEL_INSPECTOR] = br_rect_make(w - right - 4, TOOLBAR_H, 5, mid);
+    l.edge[ED_PANEL_BOTTOM] = br_rect_make(left, l.tabs.y - 4, centre_w, 5);
+    if (files) l.edge[ED_PANEL_PREVIEW] = br_rect_make(l.preview.x - 1, bottom_y, 5, bottom_h);
+    /* the arrows that collapse them (or open them: the bottom one stays on the tabs) */
+    l.button[ED_PANEL_SCENE] = br_rect_make(left - 22, TOOLBAR_H + 4, 16, 16);
+    l.button[ED_PANEL_INSPECTOR] = br_rect_make(w - 22, TOOLBAR_H + 4, 16, 16);
+    l.button[ED_PANEL_BOTTOM] = br_rect_make(left + centre_w - 22, l.tabs.y + 3, 16, 16);
+    if (files) l.button[ED_PANEL_PREVIEW] = br_rect_make(l.preview.x + preview_w - 22, bottom_y + 4, 16, 16);
     return l;
+}
+
+/* Where a panel's edge is now, along the axis it moves on. */
+static float edge_at(const layout *l, ed_panel i) {
+    switch (i) {
+    case ED_PANEL_SCENE: return l->hierarchy.w;
+    case ED_PANEL_INSPECTOR: return l->inspector.x;
+    case ED_PANEL_BOTTOM: return l->tabs.y;
+    default: return l->preview.x;
+    }
+}
+/* The size a panel has with its edge at `at`. */
+static float size_for_edge(const layout *l, ed_panel i, float at) {
+    switch (i) {
+    case ED_PANEL_SCENE: return at;
+    case ED_PANEL_INSPECTOR: return l->screen.w - at;
+    case ED_PANEL_BOTTOM: return l->status.y - TABS_H - at;
+    default: return l->tabs.x + l->tabs.w - at;
+    }
+}
+
+/* Dragging the panels' edges, double-clicking them (collapse / open), and
+ * the collapse arrows. Runs before the panels, so it gets the mouse first. */
+static void panel_chrome(editor *ed, const layout *l) {
+    const br_input *in = &ed->engine->input;
+    int i;
+    ed->split_hot = -1;
+    ed->chrome_clicked = false;
+    for (i = 0; i < ED_PANEL_COUNT; ++i) {
+        ed_panel pnl = (ed_panel)i;
+        char id[16];
+        bool horizontal = pnl == ED_PANEL_BOTTOM;
+        float mouse = horizontal ? (float)in->mouse_y : (float)in->mouse_x;
+        int f;
+        if (l->edge[i].w <= 0) continue;
+        snprintf(id, sizeof(id), "edge_%d", i);
+        f = ed_corner_button(ed, id, l->edge[i]);
+        if (f & BR_UI_PRESSED) {
+            ed->split_drag = i;
+            ed->split_grab = mouse - edge_at(l, pnl);
+            ed->split_start = ed->panels.size[i];
+        }
+        if (ed->split_drag == i && (f & BR_UI_HELD)) {
+            float size = size_for_edge(l, pnl, mouse - ed->split_grab), least = k_panel_min[i];
+            if (fabsf(mouse - ed->split_grab - edge_at(l, pnl)) >= 1) {
+                if (size < least * 0.5f) {                     /* most of the way closed: collapse */
+                    ed->panels.open[i] = false;
+                    ed->panels.size[i] = fmaxf(ed->split_start, least);
+                } else {
+                    ed->panels.open[i] = true;
+                    ed->panels.size[i] = floorf(clampf(size, least, l->max[i]));
+                }
+            }
+        }
+        if (f & BR_UI_CLICKED) ed->chrome_clicked = true;
+        if (f & BR_UI_DOUBLE_CLICKED) {
+            ed->panels.size[i] = fmaxf(ed->split_start, k_panel_min[i]);
+            ed->panels.open[i] = !ed->panels.open[i];
+        }
+        if (f & BR_UI_RELEASED) {
+            ed->split_drag = -1;
+            ed_prefs_save(ed);
+        }
+        if ((f & BR_UI_HOVERED) || ed->split_drag == i) ed->split_hot = i;
+    }
+    for (i = 0; i < ED_PANEL_COUNT; ++i) {
+        char id[16];
+        if (l->button[i].w <= 0 || (!ed->panels.open[i] && i != ED_PANEL_BOTTOM)) continue;   /* (a collapsed side panel has its strip) */
+        snprintf(id, sizeof(id), "collapse_%d", i);
+        if (ed_corner_button(ed, id, l->button[i]) & BR_UI_CLICKED) {
+            ed_panel_set_open(ed, (ed_panel)i, !ed->panels.open[i]);
+            ed->chrome_clicked = true;
+        }
+    }
+}
+
+/* Drawn last, on top of the panels: the arrows, and the edge under the mouse. */
+static void panel_chrome_draw(editor *ed, const layout *l) {
+    static const ed_arrow k_close[ED_PANEL_COUNT] = { ED_ARROW_LEFT, ED_ARROW_RIGHT, ED_ARROW_DOWN, ED_ARROW_RIGHT };
+    br_ui *ui = &ed->ui;
+    br_vec2 m = br_v2((float)ed->engine->input.mouse_x, (float)ed->engine->input.mouse_y);
+    int i;
+    for (i = 0; i < ED_PANEL_COUNT; ++i) {
+        br_rect b = l->button[i];
+        bool hot = !ui->disabled && m.x >= b.x && m.y >= b.y && m.x < b.x + b.w && m.y < b.y + b.h;
+        if (b.w <= 0 || (!ed->panels.open[i] && i != ED_PANEL_BOTTOM)) continue;
+        ed_draw_arrow(ui, b, ed->panels.open[i] ? k_close[i] : ED_ARROW_UP, hot);
+    }
+    if (ed->split_hot >= 0 && !ui->disabled) {
+        br_rect e = l->edge[ed->split_hot];
+        if (ed->split_hot == ED_PANEL_BOTTOM) br_fill_rect(ui->r, br_rect_make(e.x, l->tabs.y - 1, e.w, 2), ui->style.accent);
+        else br_fill_rect(ui->r, br_rect_make(edge_at(l, (ed_panel)ed->split_hot) - 1, e.y, 2, e.h), ui->style.accent);
+    }
 }
 
 /* ---- shortcuts ---------------------------------------------------------------- */
@@ -79,7 +215,7 @@ static void shortcuts(editor *ed) {
     if (cmd && br_key_pressed(in, BR_KEY_Y)) ed_cmd_redo(ed);
     if (cmd && br_key_pressed(in, BR_KEY_D)) ed_cmd_duplicate(ed);
     if (cmd && br_key_pressed(in, BR_KEY_C)) {
-        layout l = make_layout(ed->engine);                 /* over the console: its selected line */
+        layout l = make_layout(ed);                 /* over the console: its selected line */
         br_vec2 m = br_v2(in->mouse_x, in->mouse_y);
         if (ed->bottom_tab == ED_TAB_CONSOLE && ed->console_selected >= 0 && m.x >= l.console.x && m.y >= l.console.y &&
             m.x < l.console.x + l.console.w && m.y < l.console.y + l.console.h) ed_console_copy(ed, ed->console_selected);
@@ -139,6 +275,8 @@ static bool editor_enter(br_scene *s) {
     ed->console_selected = -1;
     if (!ed->console_capturing)
         ed_console_add(&ed->console, ED_CON_INFO, "Output capture isn't available here: only script print() shows up.", 0);
+    ed_panels_default(&ed->panels);
+    ed->split_drag = ed->split_hot = -1;
     ed_prefs_load(ed);
     ed_doc_init(&ed->doc);
     ed->doc.world.context = ed->engine;              /* Sound components play while playing */
@@ -211,21 +349,29 @@ static void editor_update(br_scene *s, float dt) {
 static void editor_render(br_scene *s) {
     editor *ed = &ED;
     br_engine *e = s->engine;
-    layout l = make_layout(e);
+    layout l = make_layout(ed);
     br_ui_begin(&ed->ui, &e->renderer, &e->input, e->time);
     br_ui_set_disabled(&ed->ui, ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible);
+    panel_chrome(ed, &l);                                   /* edges and arrows first: they get the mouse */
+    l = make_layout(ed);
     ed_view_frame(ed, l.view);
     ed_toolbar(ed, l.toolbar);
-    ed_hierarchy(ed, l.hierarchy);
-    ed_inspector(ed, l.inspector);
+    if (ed->panels.open[ED_PANEL_SCENE]) ed_hierarchy(ed, l.hierarchy);
+    else if (ed_collapsed_strip(ed, l.hierarchy, ED_PANEL_SCENE, ED_ARROW_RIGHT)) ed_panel_set_open(ed, ED_PANEL_SCENE, true);
+    if (ed->panels.open[ED_PANEL_INSPECTOR]) ed_inspector(ed, l.inspector);
+    else if (ed_collapsed_strip(ed, l.inspector, ED_PANEL_INSPECTOR, ED_ARROW_LEFT)) ed_panel_set_open(ed, ED_PANEL_INSPECTOR, true);
     ed_bottom_tabs(ed, l.tabs);
-    if (ed->bottom_tab == ED_TAB_CONSOLE) {
+    if (!ed->panels.open[ED_PANEL_BOTTOM]) {
+        /* only the tabs: clicking one opens it again */
+    } else if (ed->bottom_tab == ED_TAB_CONSOLE) {
         ed_console_panel(ed, l.console);
     } else {
         ed_assets_panel(ed, l.assets);
-        ed_assets_preview(ed, l.preview);
+        if (ed->panels.open[ED_PANEL_PREVIEW]) ed_assets_preview(ed, l.preview);
+        else if (ed_collapsed_strip(ed, l.preview, ED_PANEL_PREVIEW, ED_ARROW_LEFT)) ed_panel_set_open(ed, ED_PANEL_PREVIEW, true);
     }
     ed_statusbar(ed, l.status);
+    panel_chrome_draw(ed, &l);
     if (ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible) br_ui_menu_close(&ed->ui);
     else ed_menus(ed);                                      /* the open right-click menu (drawn on top) */
     ed_dialog(ed, l.screen);
@@ -460,7 +606,7 @@ static int test_menus_console(br_engine *e) {
     ed->bottom_tab = ED_TAB_CONSOLE;
     frames(e, 2);
     {
-        layout l = make_layout(e);
+        layout l = make_layout(&ED);
         inject_right_click(l.console.x + 100, l.console.y + 24 + 6 + 6);   /* the first line */
         frames(e, 2);
         if (!br_ui_menu_is_open(&ed->ui, "console") || (ed->console.count && ed->console_selected < 0))
@@ -483,7 +629,8 @@ static int test_menus_console(br_engine *e) {
 
 /* The middle of tile `i` in the asset browser (toolbar row, breadcrumb row, then tiles). */
 static br_vec2 tile_center(const br_engine *e, int i) {
-    layout l = make_layout(e);
+    layout l = make_layout(&ED);
+    BR_UNUSED(e);
     return br_v2(l.assets.x + 6 + 76.0f * (float)i + 37, l.assets.y + 6 + 19 + 19 + 2 + 35);
 }
 
@@ -675,7 +822,7 @@ static int test_assets(br_engine *e) {
     frames(e, 2);
     br_image_save_bmp(&e->framebuffer, "editor_picker.bmp");
     {   /* go up to editor_project, then choose it */
-        layout l = make_layout(e);
+        layout l = make_layout(&ED);
         float bx = floorf((l.screen.w - 480) / 2), by = floorf((l.screen.h - 380) / 2);
         inject_click(bx + 6 + 50, by + 6 + 19 * 2 + 8);           /* "Up" */
         frames(e, 2);
@@ -797,6 +944,71 @@ static int test_build(br_engine *e) {
     return failures;
 }
 
+/* Resizing and collapsing the panels with the mouse. */
+static br_vec2 mid_of(br_rect r) { return br_v2(r.x + r.w / 2, r.y + r.h / 2); }
+static int test_panels(br_engine *e) {
+    editor *ed = &ED;
+    int failures = 0;
+    layout l = make_layout(ed), before = l;
+    br_vec2 p;
+    if (l.hierarchy.w != 200 || l.inspector.w != 300 || l.assets.h != 196 || l.preview.w != 230)
+        { printf("FAIL: the panels' first sizes\n"); ++failures; }
+    /* drag the scene list's edge 60 px right: it widens, the view narrows */
+    inject_drag(e, br_v2(l.hierarchy.w + 1, 300), br_v2(l.hierarchy.w + 61, 300));
+    l = make_layout(ed);
+    if (fabsf(l.hierarchy.w - 260) > 1 || fabsf(l.view.w - (before.view.w - 60)) > 1)
+        { printf("FAIL: dragging the scene list's edge (%.0f wide)\n", (double)l.hierarchy.w); ++failures; }
+    /* most of the way closed: it collapses to a strip */
+    inject_drag(e, br_v2(l.hierarchy.w + 1, 300), br_v2(30, 300));
+    l = make_layout(ed);
+    if (ed->panels.open[ED_PANEL_SCENE] || l.hierarchy.w != STRIP_W) { printf("FAIL: dragging the scene list shut didn't collapse it\n"); ++failures; }
+    /* the inspector's arrow, and a double-click on the bottom edge, collapse those */
+    p = mid_of(l.button[ED_PANEL_INSPECTOR]);
+    inject_click(p.x, p.y);
+    frames(e, 2);
+    p = mid_of(l.edge[ED_PANEL_BOTTOM]);
+    inject_click(p.x, p.y);
+    frames(e, 2);
+    inject_click(p.x, p.y);
+    frames(e, 2);
+    l = make_layout(ed);
+    if (ed->panels.open[ED_PANEL_INSPECTOR] || l.inspector.w != STRIP_W) { printf("FAIL: the inspector's collapse arrow\n"); ++failures; }
+    if (ed->panels.open[ED_PANEL_BOTTOM] || l.tabs.y + TABS_H != l.status.y) { printf("FAIL: double-clicking the bottom edge didn't collapse it\n"); ++failures; }
+    if (l.view.w < before.view.w + 250 || l.view.h < before.view.h + 190) { printf("FAIL: the view didn't take the room\n"); ++failures; }
+    br_image_save_bmp(&e->framebuffer, "editor_panels.bmp");
+    /* open them again: the strip, and a tab */
+    inject_click(10, 200);
+    frames(e, 2);
+    l = make_layout(ed);
+    if (!ed->panels.open[ED_PANEL_SCENE] || fabsf(l.hierarchy.w - 260) > 1) { printf("FAIL: clicking the strip didn't bring the scene list back as it was\n"); ++failures; }
+    inject_click(l.tabs.x + 4 + 60 + 4 + 30, l.tabs.y + TABS_H / 2);        /* Console */
+    frames(e, 2);
+    if (!ed->panels.open[ED_PANEL_BOTTOM] || ed->bottom_tab != ED_TAB_CONSOLE) { printf("FAIL: clicking a tab didn't open the bottom panel\n"); ++failures; }
+    /* the bottom edge, dragged up 50 px */
+    l = make_layout(ed);
+    inject_drag(e, br_v2(l.tabs.x + 300, l.tabs.y - 1), br_v2(l.tabs.x + 300, l.tabs.y - 51));
+    l = make_layout(ed);
+    if (fabsf(l.console.h - 246) > 1) { printf("FAIL: dragging the bottom edge (%.0f high)\n", (double)l.console.h); ++failures; }
+    /* the preview, beside the files */
+    ed->bottom_tab = ED_TAB_FILES;
+    frames(e, 2);
+    l = make_layout(ed);
+    p = mid_of(l.button[ED_PANEL_PREVIEW]);
+    inject_click(p.x, p.y);
+    frames(e, 2);
+    l = make_layout(ed);
+    if (ed->panels.open[ED_PANEL_PREVIEW] || l.preview.w != STRIP_W) { printf("FAIL: the preview's collapse arrow\n"); ++failures; }
+    br_image_save_bmp(&e->framebuffer, "editor_panels2.bmp");
+    /* too big for the window: the view still keeps its share */
+    ed->panels.size[ED_PANEL_SCENE] = 900;
+    ed->panels.open[ED_PANEL_INSPECTOR] = true;
+    l = make_layout(ed);
+    if (l.view.w < VIEW_MIN_W - 2 || l.inspector.w < k_panel_min[ED_PANEL_INSPECTOR]) { printf("FAIL: oversized panels squeezed the view (%.0f)\n", (double)l.view.w); ++failures; }
+    ed_panels_default(&ed->panels);
+    frames(e, 2);
+    return failures;
+}
+
 static int run_headless(br_engine *e) {
     editor *ed = &ED;
     int failures = 0;
@@ -874,6 +1086,7 @@ static int run_headless(br_engine *e) {
     br_image_save_bmp(&e->framebuffer, "editor_reopened.bmp");
     failures += test_menus_console(e);
     failures += test_assets(e);
+    failures += test_panels(e);
     failures += test_build(e);
     printf("editor (headless): %s - wrote editor*.bmp, editor_demo.scene, editor_project/\n",
            failures ? "FAILED" : "all checks passed");

@@ -106,6 +106,9 @@ the rules.
 - **Inspector:** the selected entity's components, with a widget for every field. It is
   generated from component descriptions, so any described component is editable with
   no editor code.
+- **Panels:** drag the edge between two panels to resize them. The arrow in a panel's
+  corner collapses it to a thin strip (click the strip to bring it back); dragging an edge
+  nearly shut or double-clicking it does the same. The layout is remembered.
 - **Play / Stop:** runs the scene's systems in place. Stop puts everything back exactly
   as it was.
 - **Assets:** a file browser for the project folder, with image thumbnails and a
