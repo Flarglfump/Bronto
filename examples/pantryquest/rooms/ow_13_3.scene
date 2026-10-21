@@ -1,0 +1,96 @@
+# Pantry Quest - room ow_13_3 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   PrrrrPPssrPrPrrr
+#   PsssssssssssrPrr
+#   Pssssssss.sssssr
+#   rs...ssssssssPrr
+#   ss......srssssPr
+#   sssss...ss.sssss
+#   ssssssssssssssss
+#   Psssssssssss.sss
+#   rsrsssssssssssrr
+#   rrssssssssssssrP
+#   rPrssrrrPPPPrrPr
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"ow_13_3\", music = \"overworld\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "PrrrrPPssrPrPrrrPsssssssssssrPrrPssssssss.sssssrrs...ssssssssPrrss......srssssPrsssss...ss.sssssssssssssssssssssPsssssssssss.sssrsrsssssssssssrrrrssssssssssssrPrPrssrrrPPPPrrPr"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 88 88
+  Sprite
+    image = "art/meatball_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/meatball.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 120 72
+  Sprite
+    image = "art/meatball_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/meatball.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 168 88
+  Sprite
+    image = "art/meatball_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/meatball.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 56
+  Sprite
+    image = "art/meatball_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/meatball.bs"
+    vars = ""
+  Parent
+    entity = 0

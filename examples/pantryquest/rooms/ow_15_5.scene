@@ -1,0 +1,96 @@
+# Pantry Quest - room ow_15_5 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   TTTTTTTssTTT~~~~
+#   TTsssssssss~~~~~
+#   TTsssssssss~~~~~
+#   TTsss.sssss~~~~~
+#   TTsssssssss.~~~~
+#   Tsssssssssss~~~~
+#   Tssrss.s.sss~~~~
+#   Tsssssssssss~~~~
+#   TsssssTrsssss~~~
+#   TTTTTTssssTT~~~~
+#   TTTTTTTTTTTT~~~~
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"ow_15_5\", music = \"overworld\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "TTTTTTTssTTT~~~~TTsssssssss~~~~~TTsssssssss~~~~~TTsss.sssss~~~~~TTsssssssss.~~~~Tsssssssssss~~~~Tssrss.s.sss~~~~Tsssssssssss~~~~TsssssTrsssss~~~TTTTTTssssTT~~~~TTTTTTTTTTTT~~~~"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 200 136
+  Sprite
+    image = "art/plum_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 56 72
+  Sprite
+    image = "art/plum_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 120 120
+  Sprite
+    image = "art/tomato_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 88 56
+  Sprite
+    image = "art/tomato_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+  Parent
+    entity = 0

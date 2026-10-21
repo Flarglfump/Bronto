@@ -171,8 +171,8 @@ func on_trigger(other) { if other.name == "Coin" { destroy(other) } }
 
 `examples/platformer` is a complete level made this way, with no C code: open it with
 **Load Project** and press Play. `examples/pantryquest` is a whole adventure game made the
-same way: a top-down quest through rooms built from Tilemaps, with caves, a shop, a cellar
-with keys and a boss, and its own art, sounds and music. The language is
+same way: a top-down quest across a land of 128 screens built from Tilemaps, with caves,
+shops, secrets, a cellar with keys and a boss, and its own art, sounds and music. The language is
 described in [docs/scripting.md](docs/scripting.md). When speed matters, a script can
 instead be a behaviour written in C (`br_script_register_behaviour`).
 

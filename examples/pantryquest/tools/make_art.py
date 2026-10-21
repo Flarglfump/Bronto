@@ -60,6 +60,8 @@ PALETTE = {
     'i': (110, 140, 200),   # cellar wall
     'I': (60, 76, 130),     # cellar wall dark
     'a': (255, 255, 255),   # pure white (shine)
+    'j': (120, 186, 84),    # pickle brine light
+    'J': (62, 128, 58),     # pickle brine
 }
 
 S = {}   # name -> rows
@@ -1004,7 +1006,7 @@ sprite('hud_bomb',
 # ============================================================ tiles
 # Overworld (the Pantry Plains): biscuit ground, broccoli trees, cookie
 # rocks, chocolate cliffs, juice, lettuce bushes, sugar, ice...
-TILE_ORDER_OVERWORLD = ".,TrW~bCs=fIFKX:Yp"
+TILE_ORDER_OVERWORLD = ".,TrW~bCs=fIFKX:YpPLGSg"
 
 
 def tile(name, *rows):
@@ -1285,9 +1287,78 @@ tile('path',
      "TqqqqqqqqqqqqqqT",
      "TqqqqqqqqqqqqqqT",
      "TqqqqqqqqqqqqqqT")
+tile('lollipop',
+     ".....kkkkkk.....",
+     "....kmmmmmmk....",
+     "...kmmppppmmk...",
+     "..kmwwwwwwpmmk..",
+     "..kmwwwwwwppmk..",
+     ".kmwwwppwwwpmwk.",
+     ".kmwwpppwwwpmwk.",
+     ".kmwwpppwwppmwk.",
+     "..kwwwppppppwk..",
+     "..kwwwpppppmwk..",
+     "...kwwwwwwwwk...",
+     "....kwwwwwwk....",
+     ".....kkwgkk.....",
+     "......kwgk......",
+     "......kwgk......",
+     ".......kk.......")
+tile('pickle',
+     "......kkkk......",
+     ".....kLLLLk.....",
+     "....kLlLLLLkkk..",
+     "....kLLdLLLkLLk.",
+     "..kkklLLLLLklLLk",
+     ".kLLkLdLLLLkLdLk",
+     "kLlLkLLLLdLkLLLk",
+     "kLdLklLLLLLLLLLk",
+     "kLLLkLLLLLLkkkk.",
+     "kLLLLLdLLLLk....",
+     ".kkkkLLLLdLk....",
+     "....klLLLLLk....",
+     "....kLLLdLLk....",
+     "....kLLLLLLk....",
+     "....kddddddk....",
+     ".....kkkkkk.....")
+tile('fortune',
+     "................",
+     "................",
+     "................",
+     "....kkkkkkkk....",
+     "...ktttTttttk...",
+     "..kttttTTttttk..",
+     ".ktttttTttttttk.",
+     "kttttttTTttttwtk",
+     "kttttttTtwwrrwwk",
+     "kttttttTTtttttwk",
+     "kTTTTTTTtTTTTTTk",
+     ".kTTTTTTTTTTTTk.",
+     "..kTTTTTTTTTTk..",
+     "...kTTTTTTTTk...",
+     "....kkkkkkkk....",
+     "................")
+
+tile('brine',
+     "JJJJJJJJJJJJJJJJ",
+     "JJJJJJJJJJJJJJJJ",
+     "JJjjJJJJJJJJJJJJ",
+     "JJJJjjJJJJJJJjjJ",
+     "JJJJJJJJJJJjjJJJ",
+     "JJJJJJJJJJJJJJJJ",
+     "JJJJJJJJJJJJJJJJ",
+     "JJJJJJJJJjjJJJJJ",
+     "JJJJJJJjjJJjJJJJ",
+     "JJJJJJJJJJJJJJJJ",
+     "JlJJJJJJJJJJJJJJ",
+     "JJJJJJJJJJJJJlJJ",
+     "JJjjJJJJJJJJJJJJ",
+     "JJJJjjJJJJJJJJJJ",
+     "JJJJJJJJJJJjjJJJ",
+     "JJJJJJJJJjjJJJJJ")
 OVERWORLD_TILES = ['ground', 'crumbs', 'broccoli', 'cookie', 'cliff', 'juice', 'lettuce', 'cave', 'sugar',
                    'bridge', 'flowers', 'ice', 'cellar_door', 'cave_wall', 'secret_cliff', 'cave_floor',
-                   'secret_lettuce', 'path']
+                   'secret_lettuce', 'path', 'pickle', 'lollipop', 'fortune', 'd_statue', 'brine']   # (d_statue: the cellars' pepper mill, here on biscuit ground)
 
 # The cellar (dungeon 1): kitchen tiles, icy brick walls, crates...
 TILE_ORDER_DUNGEON = ".#O~SLHXPV,"

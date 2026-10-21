@@ -32,8 +32,8 @@ entity
     tile_size = 16
     columns = 16
     rows = 11
-    legend = ".,TrW~bCs=fIFKX:Yp"
-    solid = "TrW~bIKXY"
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
     tiles = "WWWWWWW..WWWWWWWWWWWCWW..WWWWWWWWW.............WW..r....,...r..W..............,.....f.....f.....................T..r.....,..r..TTT............TTTTTbTTTTTTTTbTTTTTTTTTTTTTTTTTTT"
     layer = -10
   Parent

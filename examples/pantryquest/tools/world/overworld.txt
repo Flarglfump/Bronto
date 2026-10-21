@@ -1,77 +1,2051 @@
-# The Pantry Plains (the overworld): one room per block, 16 x 11 tiles.
+# The Pantry Plains (the overworld): 16 x 8 screens, ow_<column>_<row>, 16 x 11 tiles each.
 # tools/make_rooms.py turns these into rooms/<name>.scene.
 #
-#   .  biscuit ground     ,  crumbs          f  flowers       s  sugar sand
-#   T  broccoli tree      r  cookie boulder  b  lettuce bush  W  chocolate cliff
-#   ~  blueberry juice    =  bridge          I  ice           C  cave mouth
-#   F  the cellar door    X  a cracked cliff (a bomb opens it)
+#   .  biscuit ground     ,  crumbs          f  flowers        s  sugar sand
+#   T  broccoli tree      r  cookie boulder  b  lettuce bush   W  chocolate cliff
+#   ~  blueberry juice    =  bridge          I  ice            C  cave mouth
+#   F  a cellar door      X  a cracked cliff (a bomb opens it)  Y  a bush hiding a cave (a bomb)
+#   P  pickle cactus      L  lollipop tree   G  fortune cookie S  pepper-mill statue
+#   g  pickle brine       p  path
 #
-# Edges: a room's open edges must meet its neighbours' (north and south
-# through columns 7-8, east and west through rows 4-6).
+# Edges: a screen's open edges meet its neighbours' exactly (same columns or rows).
 #
 #   put <prefab> <column> <row> [script vars]   - a thing from prefabs/, at a tile (halves allowed)
 #   var <name> = <value>                         - a variable of the room's script (scripts/room.bs)
+#
+# Regions:
+#   G G G M M M M M M M M M B B C C
+#   G G G M M M M M M M M M B B C C
+#   G G G L L L L M M M M M B B B C
+#   W W L L L L L I I I D D D D D C
+#   W W L L L L I I I I D D D D D C
+#   W W W L L P P I P P D D D D K C
+#   W W W W P P P P P P D D K K K C
+#   W W W W W P P P P P P D K K K C
+#   G Fortune Cookie Field, M Chocolate Mountains, B Pickle Marsh, C Juice Coast, L Blueberry Lake, I Frosty Fields, W Lettuce Woods, D Sugar Desert, K Candy Meadows, P Pantry Plains
+#
+# Cellars: 1 The Cold Cellar (7,5), 2 The Pickle Pantry (13,1), 3 The Spice Rack (1,6), 4 The Jam Jar (4,3), 5 The Candy Works (13,6), 6 The Fortune Hall (1,1), 7 The Sugar Mill (11,4) hidden, 8 The Soup Cauldron (9,1) hidden, 9 Baron Gorge'S Banquet Hall (5,0)
 
-room ow_7_7
+room ow_0_0
 music overworld
 map
-WWWWWWW..WWWWWWW
-WWWWCWW..WWWWWWW
-WW.............W
-W..r....,...r..W
-..............,.
-....f.....f.....
-................
-T..r.....,..r..T
+TTTTTTTTTTTTTTTT
+TTTTTTTTTTTTTTTT
+TT...,.f......TT
 TT............TT
-TTTbTTTTTTTTbTTT
-TTTTTTTTTTTTTTTT
-put warp 4 1 to = "cave_chef", pos = vec2(128, 216)
+TT.G.....G.G....
+TT..............
+TT.........f.f..
+TT.G.G..,..G..TT
+TT.........f..TT
+TT.......TTTTTTT
+TTTTTTT..TTTTTTT
+put pickup 11 5 kind = "heart_pie", flag = "ow:pie1"
+put breadstick 8 5
+put burger 7 2
+put bat 4 5
+put bat 10 2
 end
 
-room ow_6_7
+room ow_1_0
 music overworld
 map
-WWWWWWW..TTTTTTT
-WWWWXWW....,..bT
-T..............T
-T..~~~~~~~.....T
-T.~~~~~~~~~.....
-T..~~~~~~~~.....
-T...~~~~~~......
-T.....,........T
-Tb....r.....r..T
-TTb..........bTT
 TTTTTTTTTTTTTTTT
-put warp 4 1 to = "cave_secret", pos = vec2(128, 216), hidden = true
-put tomato 12 3
-put tomato 9 8
+TTTTTTTTTTTTTTTT
+TTTTT...f....,TT
+T....G.G......TT
+....TT........TT
+....TT.G......TT
+............f..T
+T........f......
+T...............
+TT...TTTT....TTT
+TTTTTTTTTTT..TTT
+put bat 11 2
+put bat 4 7
+put bat 7 4
+put breadstick 10 4
 end
 
-room ow_8_7
+room ow_2_0
+music overworld
+map
+TTTTTTTTTTTTTTTT
+TTTTTTTWWWTTTTTT
+TTTTTT.WXW.....T
+T.,.,..........T
+T..G.G...G.G....
+T...............
+T...............
+...G.GfG...G..TT
+...,..........TT
+T.............TT
+TTTTTTTTTTTTTTTT
+put warp 8 2 to = "cave_stash1", pos = vec2(128, 216), hidden = true
+put breadstick 7 5
+put burger 4 4
+put burger 4 7
+put bat 8 8
+end
+
+room ow_3_0
+music overworld
+map
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+W,,,,,WWWWrWWW,W
+W,,,,,,,,.,,,,,W
+,,,,,,,,,,,,,,,,
+,,,,,,.,.,,,,,,,
+,,WWWW,,,,,,,,,,
+WW,,WWWW,,,,,,,W
+WW,,,,,.,,,,.,,W
+W,,,,,,,,,,,,,WW
+WWWWWWW,,WWWWWWW
+put breadstick 10 5
+put bat 12 4
+put bat 5 2
+put burger 9 3
+end
+
+room ow_4_0
+music overworld
+map
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+W,,,,,,WWWW,,,,W
+W,,,,,,WWWWWW.,W
+,,,,,,,,WWWWW,,W
+,,.,.,,,,,,,,,,W
+,,,,,,,,,,,,,,,W
+WW,,,,.,,,,,,,,,
+WW,,,,,,,,,r,,,,
+W,,,,,,,,,,,,,,W
+WWWWWWWWW,,WWWWW
+put bat 4 3
+put burger 3 8
+put burger 5 5
+put bat 10 5
+end
+
+room ow_5_0
+music overworld
+map
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+W,,WWWWWWWWWWWWW
+W,.WWFWW,,,r,.,W
+W,,S,,,S,,,,,,,,
+W,WW,,,,,,,,,,,,
+W,WW,,,,,,,,,,,,
+,,,,,,,,WWWW,,,W
+,,,,,,,,,WWW,,,W
+WWWW,,,,,,,,,,,W
+WWWWWWWWWWW,,WWW
+put warp 5 3 to = "d9_2_4", pos = vec2(128, 200)
+put bat 5 8
+put bat 9 5
+put burger 12 4
+put bat 11 6
+end
+
+room ow_6_0
+music overworld
+map
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+W,,,,,WWWW,,,,,W
+W,,,,.WWWW,,,,,W
+,,,,,,.,,,,,r,,W
+,,,,,,,,,,,,r,,W
+,,,,,,,,,,,,,,,W
+W,,,,,,,,,.,,,,W
+W,,,,,,,,,,,,,,W
+WWW,,,,,,,,,,,,W
+WWW,,WWWWWWWWWWW
+put bat 8 8
+put bat 4 4
+put breadstick 6 6
+end
+
+room ow_7_0
+music overworld
+map
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+W,,..,,,,,,,,,,W
+W,,,WrWr,,,,,.,W
+W,,,WWW,,,,,,,,,
+W,,,,,,,,,,,,,,,
+W,,,,,,WWWWr,,,,
+W,.,,,,WWWWW,,,W
+W,,,,,,WWWWW,,,W
+W,,,,,,,,,,,,,,W
+WWWWWWWWW,,WWWWW
+put burger 10 5
+put breadstick 12 2
+put breadstick 12 6
+put burger 7 2
+end
+
+room ow_8_0
+music overworld
+map
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+WWWWWW.,.,,,,,,,
+W,,,,,r,,,,,.,,,
+,,.,,,,,,,,,,,,W
+,,,,,,,,,,,,,,,W
+,,,,,,WWW,,,.,,W
+W,,WWWWWWW,,,,,W
+W,,WWWWW,.,,,,,W
+W,,,,,,,,,,,,,,W
+WWWWWWW,,WWWWWWW
+put breadstick 11 5
+put bat 8 5
+put bat 11 8
+end
+
+room ow_9_0
+music overworld
+map
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+,,,,,WWWWWW,,,WW
+,,,,,,,,,,,,,,WW
+W,,,,,,,,.,,,,WW
+WW,,,W,,,,r,,,WW
+WW,,,,r,,,,,r,WW
+WWWWWWW,,,,,.,,,
+WWWWWWW,,,,,,.,,
+WW,,,,,,,,,,WWWW
+WWWWWWWWWWWWWWWW
+put bat 8 6
+put burger 3 6
+put bat 11 2
+put breadstick 7 3
+end
+
+room ow_10_0
+music overworld
+map
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+W,r,,,.r,,,.,.,W
+WW,,,,,,,,,,,,,W
+WW,.,,,,,,,,,,,W
+WW,..,.,,.,,,.,W
+WW,,,,,,,,,,,,,W
+,,,,,,,,,,WWW,,,
+,,,,,,,,,,WWWW,,
+W,,,,,W,,,WWWWWW
+WWWWWWW,,WWWWWWW
+put bat 3 7
+put burger 4 3
+put breadstick 12 5
+put breadstick 9 2
+end
+
+room ow_11_0
+music overworld
+map
+WWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWW
+WWW,,,,,,,,WWW,W
+W,,,WWWW,,.,,,,W
+W,,,WWWW,,,,,.WW
+W,,,,.,,,,,,,,WW
+W,,,,.,,,,W,,,WW
+,,,,,,,,,,,,,,WW
+,,,,,,.,,,,,,,WW
+W,,,,,,,,,,,,,,W
+WWWWWWWWWWW,,WWW
+put breadstick 7 6
+put bat 3 4
+put burger 9 3
+put bat 4 2
+end
+
+room ow_12_0
+music overworld
+map
+TTTTTTTgggTTgTgT
+gTggggTgTTggggTT
+gg..,........Tgg
+TT.ggg...gg.P..T
+TT.ggg...ggg...g
+gg.......=gg..gT
+Tg.............T
+gg....,.........
+TT..gg.........=
+TTgT..........TT
+gggTgTT..TggTTTT
+put pickup 6 4 kind = "heart"
+put pickup 5 6 kind = "heart"
+put pickup 7 7 kind = "heart"
+end
+
+room ow_13_0
+music overworld
+map
+gTgTgTggTggTggTg
+TggggTTTgTgTTggg
+gTggg.,........=
+T......T..,.....
+T......,.......g
+T.....,....,...T
+g.==...........g
+=.=g.=gggg.P..gT
+=......,.,....gT
+g............TgT
+gTg==TTTggTggggg
+put plum 12 6
+put plum 6 3
+put plum 10 4
+put plum 8 2
+end
+
+room ow_14_0
+music overworld
+map
+~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
+===~ssssssss~~~~
+sssssss.sss~~~~~
+Tssssssssss.~~~~
+Tssssssssss~TT~~
+Tsssss.sssss~~~~
+Tssssssss.ss~~~~
+Tssssssssssss~~~
+TsssssssssTT~~~~
+TTTssTTTTTT~~~~~
+put tomato 5 2
+put tomato 4 7
+put plum 3 4
+put tomato 10 2
+end
+
+room ow_15_0
+music overworld
+map
+~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
+~~~WWWssssss~~~~
+Ts.WCWsssss~~~~~
+Tsssssssssss.~~~
+Tssssssssss~~~~~
+Tss.sssssss~~~~~
+Tssssssssss~~~~~
+TsssssTs.sss.~~~
+TTTTTTTssTTT~~~~
+TTTTTTTssTTT~~~~
+put warp 4 3 to = "cave_pie2", pos = vec2(128, 216)
+put plum 10 2
+put plum 4 8
+put plum 7 7
+put plum 10 6
+end
+
+room ow_0_1
 music overworld
 map
 TTTTTTT..TTTTTTT
-TT.......,..WWWW
-T.....r.....WWWW
-T...........WCWW
-..........,....W
-...............W
-...r...........W
-T........r.....W
-TT.f..........TT
-TTTTbTTTTTTbTTTT
+TTTTTT.........T
+TT.........,...T
+TT.G.G...f.....T
+TT...,..,.....TT
+TT.f......f...TT
+TT.......G.G..TT
+TT............TT
+TT.......f...,TT
+TT............TT
+TTTTTTT..TTTTTTT
+put burger 5 2
+put breadstick 4 5
+put bat 9 3
+put burger 6 6
+end
+
+room ow_1_1
+music overworld
+map
+TTTTTTTTTTT..TTT
+TT...WWWWW...T.T
+TT...WWFWW.,...T
+T..G.S...S.....T
+T...............
+T..........,....
+T.,G.G.......,..
+T........,.....T
+T..............T
+TT.............T
+TTTTTTT..TTTTTTT
+put warp 7 2 to = "d6_2_4", pos = vec2(128, 200)
+put bat 11 5
+put bat 4 7
+put bat 11 8
+put burger 10 3
+end
+
+room ow_2_1
+music overworld
+map
 TTTTTTTTTTTTTTTT
-put warp 13 3 to = "cave_shop", pos = vec2(128, 216)
+T....TTT.......T
+T...f..........T
+T...f...........
+............,...
+...T.......f....
+..TT...........T
+T..G.G.........T
+T...........,..T
+T....TTTTT.....T
+TTTTTTTTTTT..TTT
+put breadstick 4 7
+put breadstick 11 5
+put breadstick 3 3
+put burger 10 3
+end
+
+room ow_3_1
+music overworld
+map
+WWWWWWW,,WWWWWWW
+WW,,,,,,,,,,,,,W
+WW.,,,,,,,WWW,,W
+,,,,,,,,,,WCW,,W
+,,,.,,,,,,,,,,WW
+,,,,.,,W,,.,,,WW
+WWr,,,WWWWW,,,WW
+WW,,.,rWWWW,,,WW
+WW,,,r,,,,,,,.WW
+WW,,,,,,,,,,,,WW
+WWWWWWWWWWWWWWWW
+put warp 11 3 to = "cave_hint5", pos = vec2(128, 216)
+put burger 8 4
+put burger 6 5
+put breadstick 6 2
+put breadstick 3 4
+end
+
+room ow_4_1
+music overworld
+map
+WWWWWWWWW,,WWWWW
+WWWW,,,,,,,,,WWW
+W,,,WWWWW,,,,,,,
+W,,,WWWWWWW,,,,,
+W,.,,,,,,,,,,,,W
+W,,,,.,,,,,,,,,W
+W,,,,,,,,,,,,,,W
+W,,,,,,,,,,,r,,W
+W,,,,,.,,,,,,.,W
+WWWWWWWWW,,,,WWW
+WWWWWWWWWWWWWWWW
+put burger 7 7
+put burger 10 4
+put breadstick 3 2
+put breadstick 5 6
+end
+
+room ow_5_1
+music overworld
+map
+WWWWWWWWWWW,,WWW
+WWWW,,,,,,W,,WWW
+,,,,,,,,,,,,,,WW
+,,,,,,,.,,,,,,,W
+W,,WW,,WWW,.,.,,
+W,,WW,,W,,r,,,,,
+W,,,,,,,,,,,,,,,
+W,,,,,,,,,,,,,,W
+W,,,,.,,,,,,,,,W
+WWWWWWW,,,,,,,,W
+WWWWWWW,,WWWWWWW
+put bat 3 6
+put bat 12 4
+put breadstick 9 7
+end
+
+room ow_6_1
+music overworld
+map
+WWW,,WWWWWWWWWWW
+W,,,,,WWWWWWW,WW
+W,,,,WWWW,WXW,,W
+W,,,,,WWW,,,,,,W
+,,,,,,,,.,,,,,,W
+,,,,,,,,,,,,,,,W
+,,,,WWWW,,,,.,,W
+WW,,,,,,,,,,,.,W
+WWrr,,,,,,,.,.,W
+WW,,,,,WWWW,,,,W
+WWWWWWWWWWWWWWWW
+put warp 11 2 to = "cave_stash2", pos = vec2(128, 216), hidden = true
+put burger 3 7
+put burger 5 4
+put bat 9 8
+end
+
+room ow_7_1
+music overworld
+map
+WWWWWWWWW,,WWWWW
+WWWWWWWWW,,,,,,W
+W,,,r,,,,,,,,,,W
+WW,,,,,,,,,,,,,,
+WW,,,,,,,,,,.,,,
+WW,,,,,,,WW,,,,,
+WW,,,.,,,WW,,,,W
+WW,.,,,,,WW,,,,W
+W,,,,,.,,,,,,,,W
+W,,,,,,,,,,,,,,W
+WWWWWWWWWWW,,WWW
+put breadstick 7 3
+put bat 6 8
+put breadstick 4 5
+put burger 8 6
+end
+
+room ow_8_1
+music overworld
+map
+WWWWWWW,,WWWWWWW
+WW,WWWW,,,,,,,WW
+WW,,,,.,,.,,,,WW
+,,,r,,,,,,,,,,WW
+,,,,,,,,,,,,,,WW
+,,.,,,,,,,,,,,,,
+W,,,,,WW,,,,,,,,
+W,,,,,WWWW,.,,,,
+W,,,,,,,,,,,.,,W
+WWW,,,,,,,,,,,WW
+WWWWW,,WWWWWWWWW
+put bat 10 8
+put breadstick 5 2
+put bat 4 7
+end
+
+room ow_9_1
+music overworld
+map
+WWWWWWWWWWWWWWWW
+W,,,,,,,,,,,,,,W
+W,.WWWWWWWWWW,,,
+W,,WWWWWWWXWW,,,
+W,,.,,,,S,,,S,,W
+,,,,,,,.,,,,,,,W
+,,,,,,,,,,,,,,,W
+,,,,,,,,,,,,,WWW
+W,r,,,rWWW,,,,WW
+W,,,,,WWWWW,,,WW
+WWW,,WWWWWWWWWWW
+put warp 10 3 to = "d8_2_4", pos = vec2(128, 200), hidden = true
+put burger 12 7
+put breadstick 3 5
+put breadstick 5 7
+end
+
+room ow_10_1
+music overworld
+map
+WWWWWWW,,WWWWWWW
+WW,,,,,,,,WWWWWW
+,,,.,,,,,,WCW,WW
+,,,.,.,,,,,,,,WW
+W,,,,,,,,,,,,,,,
+W,..,,,,,,,,,,,,
+W,,,WWWWW,,,,,,,
+W,,,WWrWW,,.,,,W
+W,,,,,,,,,,,,.,W
+WWW,,,,,WWWWW,WW
+WWWWWWWWWWWWWWWW
+put warp 11 2 to = "cave_shop4", pos = vec2(128, 216)
+put burger 3 8
+put burger 3 5
+put breadstick 6 5
+put burger 10 6
+end
+
+room ow_11_1
+music overworld
+map
+WWWWWWWWWWW,,WWW
+W,,,,,,,,,,,,,,W
+W,,,,.,,,,,,,,,,
+WW,,,,,,,,,,,,,,
+,,,WWWW,,,,,,,,W
+,,,,WW,,,,,,,,,W
+,,,.,,,,,,,.,,WW
+WW,,.,,,WWW,,,WW
+WW,,,,,,,,,.,,WW
+W,,WW,,,,WWW,,,W
+WWWWWWW,,WWWWWWW
+put burger 3 5
+put breadstick 6 6
+put breadstick 12 8
+put bat 9 6
+end
+
+room ow_12_1
+music overworld
+map
+gTTgggg=.TTgTgTg
+TT.............g
+=.....,,.......T
+.=.............=
+T...............
+TT,.....==.....=
+TT....,.=g.....T
+Tg.....=ggggP..g
+g...,,...=gg...T
+TTTTgT.......TTg
+TggTTgTTgTg..ggg
+put burger 3 5
+put plum 11 5
+put burger 5 2
+put plum 6 8
+end
+
+room ow_13_1
+music overworld
+map
+gTT.=TTgTgTgTTgg
+TTg=..........gT
+g..,..WWWWW...gg
+=.....WWFWWP...=
+=.....S...S.T...
+..g===g=..,....=
+T.gP.........,.T
+gggg....,......g
+gggg,....gg.,P.g
+gTgggg.......TTT
+gTTTgggggTgTTTgT
+put warp 8 3 to = "d2_2_4", pos = vec2(128, 200)
+put burger 6 8
+put jelly 4 3
+put jelly 11 2
+put plum 11 5
+end
+
+room ow_14_1
+music overworld
+map
+TTTssTTTTTTT~~~~
+TTTsssssssss~~~~
+Tsss.ssss.ss====
+ss.sssssss.s====
+sssssssssssss~~~
+ss.ssssssss==~~~
+Tssss.ss.sTs~~~~
+Tssssssssss~~~~~
+Tssssssssssss~~~
+TssssTTTTss~~~~~
+TTTTTTTTTTT~~~~~
+put plum 8 4
+put tomato 3 8
 put tomato 5 5
-put tomato 9 3
+put plum 12 4
+end
+
+room ow_15_1
+music overworld
+map
+TTTTTTTssTTT~~~~
+TTTTTTTssTss~~~~
+ssssssssssss~~~~
+ss.ssss.ss.s~~~~
+Tss.sssssssss~~~
+TTsssssssssT~~~~
+TTssssssrsss~~~~
+TT.s.sssrss~~~~~
+TTsssss.sss.T~~~
+TTsssssssss~~~~~
+TTTTTTTTTTTT~~~~
+put tomato 11 3
+put tomato 8 3
+put tomato 3 4
+put plum 5 7
+end
+
+room ow_0_2
+music overworld
+map
+TTTTTTT..TTTTTTT
+TTTT...........T
+TT.......,......
+TT.G.G..........
+TT..........TTTT
+TT.G..........TT
+TTT..f.......,TT
+TTTG.GfG....f..T
+TTT............T
+TTT..TT........T
+TTTTTTT..TTTTTTT
+put breadstick 6 5
+put breadstick 11 5
+put bat 10 2
+put burger 8 3
+end
+
+room ow_1_2
+music overworld
+map
+TTTTTTT..TTTTTTT
+TTTT...........T
+...............T
+...............T
+TT.T..f..G......
+TTfTT........f..
+TT.........f....
+TT....,..G.G..TT
+T.,....f......TT
+T.............TT
+TTT..TTTTTTTTTTT
+put breadstick 3 7
+put burger 6 8
+put breadstick 6 4
+put breadstick 8 5
+end
+
+room ow_2_2
+music overworld
+map
+TTTTTTTTTTT..TTT
+T.....WWW.T..TTT
+T.,f..WCW.....TT
+T.,..G...G....TT
+............,...
+......f.........
+.............,..
+TT.G.,...G.....T
+TT.............T
+TT...T...TT...TT
+TTTTTTT..TTTTTTT
+put warp 7 2 to = "cave_hint8", pos = vec2(128, 216)
+put breadstick 4 6
+put burger 9 6
+put breadstick 6 8
+put bat 6 5
+end
+
+room ow_3_2
+music overworld
+map
+TTTTTTTTTTTTTTTT
+TTTTTTTT......TT
+TT.,.........,TT
+TTT......f.....T
+....====~~~~~f.T
+...===~~~~~~~~.T
+...=~~~~~~~~~~.T
+TT..~~~~~~~~~..T
+TT.............T
+T.............TT
+TTTTTTT..TTTTTTT
+put burger 4 2
+put plum 6 8
+put plum 3 7
+put tomato 3 4
+end
+
+room ow_4_2
+music overworld
+map
+TTTTTTTTTTTTTTTT
+TTTTTT.........T
+TT..,..........T
+TT....,.,.....TT
+TT.~~~~====....T
+T.~~~~~~~~~~.,..
+T..~~~~~~~~..f..
+T...............
+T.............TT
+TTTTTTT...T....T
+TTTTTTT..TTTTTTT
+put burger 8 7
+put burger 3 3
+put burger 11 2
+put plum 3 7
+end
+
+room ow_5_2
+music overworld
+map
+TTTTTTT..TTTTTTT
+T........TT...TT
+T.............TT
+T.............TT
+T....~~~==....TT
+..,.~~~~~~=...TT
+.....~~~~~.,...T
+..f...T.........
+T.....f.........
+T.............TT
+TTTTTTT..TTTTTTT
+put burger 8 3
 put plum 10 7
+put burger 10 2
+put tomato 4 4
+end
+
+room ow_6_2
+music overworld
+map
+TTTTTTTTTTTTTTTT
+T..............T
+T.,T...........T
+T.f.,........,.T
+T..======~==...T
+T.==~~~~~~~~=...
+T.=~~~~~~~~~~...
+..=~~~~~~~~~~...
+...~~~~~~~~~f..T
+TT.............T
+TTTTTTTTTTT..TTT
+put pickup 3 3 kind = "heart_pie", flag = "ow:pie2"
+put plum 5 2
+put tomato 7 3
+put tomato 11 3
+put burger 9 2
+end
+
+room ow_7_2
+music overworld
+map
+WWWWWWWWWWW,,WWW
+WW,,WWWWWWW,,WWW
+WW,..,.,.,.,,,,,
+WW,,,,,,,.,,,,,,
+WW,,,,,,,,,,,,WW
+,,,,,,,,,,WWWWWW
+,,,,,,,WWWW,,,,W
+,,,,,,,,,,,,,,,W
+W,,,,,,,,,,,,,,W
+W,,,,WW,,,,,,,WW
+WWWWWWW,,WWWWWWW
+put burger 11 3
+put burger 5 8
+put bat 7 7
+end
+
+room ow_8_2
+music overworld
+map
+WWWWW,,WWWWWWWWW
+WWWWW,,,WWWWWW,W
+,,,,,,,,,,WCW,,,
+,,,,,,,,,,,,,,,,
+W,,,,.,,,,,,,,,W
+W,WWW,,,,..,,,,W
+W,WWW,,,,,,,WWWW
+W,,,.,,,,.,WWWWW
+W,,,,,,,,,,,,,WW
+W,,WWWW,,,,WW,WW
+WWWWWWW,,WWWWWWW
+put warp 11 2 to = "cave_hint6", pos = vec2(128, 216)
+put breadstick 3 7
+put breadstick 3 3
+put burger 10 8
+put bat 8 6
+end
+
+room ow_9_2
+music overworld
+map
+WWW,,WWWWWWWWWWW
+WW,,,,,,,,WWW,,W
+,,,,,,.,,,,,,,,W
+,,,,,,,,,,WWWW,W
+WW,WrW,,,.WWWW,,
+WW,,,,,,,,,,,,,,
+W,,,,,,,,,,,,,,,
+W,,,,,,,,,,,,,,W
+W,,,.,,,,r,,,,,W
+W,,,,,,,,,,,,,,W
+WWWWWWWWWWWWWWWW
+put breadstick 6 2
+put breadstick 10 8
+put bat 5 6
+put breadstick 9 2
+end
+
+room ow_10_2
+music overworld
+map
+WWWWWWWWWWWWWWWW
+W,,,,,WWW,,,,,,W
+W,,,,,r,,,,,,,,W
+W,,,,,,,,,,,.,,,
+,,,,.,,,,,,,,,,,
+,,,,,,,,,,,,.,,,
+,,,,WWWW,,,,,,WW
+W,,,,,,,,,,,,,WW
+W,,,,,,,,,.,,,,W
+WWWWWW,,,,,,,,,W
+WWWWWWWWWWWWWWWW
+put breadstick 4 3
+put burger 7 8
+put bat 3 8
+put breadstick 12 5
+end
+
+room ow_11_2
+music overworld
+map
+WWWWWWW,,WWWWWWW
+W,,,,,,,,,WWWWWW
+W,,WWW,,,W,,,,,W
+,,,WXW,,WW,,,.,W
+,,,,,,,,WWWW,,,,
+,,,,,,,,,WWW,r,,
+W,,,,,,,,,,,,,,,
+WW,,,,,,,,,,,,,W
+WW,,,,,.,.,,,,,W
+WW,,,,,,,,,,,,,W
+WWWWWWWWWWWWWWWW
+put warp 4 3 to = "cave_stash3", pos = vec2(128, 216), hidden = true
+put bat 10 7
+put breadstick 7 3
+put burger 7 7
+put bat 4 7
+end
+
+room ow_12_2
+music overworld
+map
+TggTTTTggTT==gTT
+TggTg.....T=.gTT
+g..,...........g
+T...........,..g
+..====,.......gg
+..=Tgg..........
+...............=
+g.............==
+g...,gg.=ggg.,Tg
+g...........=TTg
+TggTgTTgTTg.=ggT
+put jelly 11 4
+put jelly 6 5
+put burger 7 8
+put jelly 4 2
+end
+
+room ow_13_2
+music overworld
+map
+gTggTgTTTTTggggT
+T.....Tggggg..gg
+T.....,....P..TT
+gT....,.......TT
+Tg............=.
+......==......==
+.=.===gg........
+==.gggg........T
+Tg..........,..g
+g..............g
+ggTTggg==TTTTggT
+put plum 8 7
+put plum 12 6
+put burger 5 3
+put burger 9 2
+end
+
+room ow_14_2
+music overworld
+map
+ggggTTgTTTgTggTT
+gTgTg...WWW....T
+T....P..WCW.,..g
+gT.............g
+.=..............
+...............=
+==.....gTgg.....
+gg..Pgggggg....T
+gg..gggg..ggg..g
+gg...gggTT.....T
+gggggggTTggTgTTT
+put warp 9 2 to = "cave_shop5", pos = vec2(128, 216)
+put jelly 6 4
+put burger 12 3
+put jelly 3 4
+put plum 10 5
+end
+
+room ow_15_2
+music overworld
+map
+TTTTTTTTTTTT~~~~
+TTsssssssTTT~~~~
+TTsssssssTss~~~~
+TTssssssssss~~~~
+sssssssssssss~~~
+ss.ssssssss~~~~~
+ssss.sss.sss~~~~
+Tsssssssssss~~~~
+Ts..ssssss.ss~~~
+TTTTssssssss~~~~
+TTTTTTTssTTT~~~~
+put tomato 5 8
+put plum 5 3
+put tomato 11 8
+put tomato 9 4
+end
+
+room ow_0_3
+music overworld
+map
+bbTbTbT..TbbTbbb
+TbTT.....bTTbT.b
+bT..,.....,....T
+bT..bb......TT.T
+bT..bb...,...T..
+bT..,...........
+bT..............
+bb......bbb....b
+bb.............T
+TT..........TTbb
+bbTTTTbTb..TTTTT
+put burger 5 6
+put plum 4 2
+put plum 3 7
+put burger 6 3
+end
+
+room ow_1_3
+music overworld
+map
+bTT..bbbTbTTbbbT
+T........bTT...T
+T........bYb...b
+T...........,...
+................
+.......,.,..,...
+.....bbb..TT...T
+T....bbb.......b
+b....b.........T
+b...bbTbTTTTT..T
+TbbbbTTbbTTTbbbT
+put warp 10 2 to = "cave_stash6", pos = vec2(128, 216), hidden = true
+put plum 3 4
+put tomato 9 7
+put plum 6 3
+put burger 11 8
+end
+
+room ow_2_3
+music overworld
+map
+TTTTTTT..TTTTTTT
+TT.......T.....T
+TT.............T
+...=~~~~~~~~~..T
+..==~~~~~~~~~~.T
+..==~~~~~~~~~~.T
+T..=~~~~~~~~~..T
+T..............T
+T..,...........T
+T..............T
+TTTTT..TTTTTTTTT
+put plum 9 8
+put tomato 5 7
+put tomato 11 7
+put tomato 3 2
+end
+
+room ow_3_3
+music overworld
+map
+TTTTTTT..TTTTTTT
+TT.............T
+TT.............T
+TT.,.......f.f.T
+TT...~~~~~.T...T
+TT.f~~~~~~~.....
+T....~~~~~......
+T....f..........
+T.............TT
+T.............TT
+TTTTTTTTTTTTTTTT
+put plum 3 4
+put tomato 7 3
+put burger 10 2
+end
+
+room ow_4_3
+music overworld
+map
+TTTTTTT..TTTTTTT
+TTTT~~~==~~~~~.T
+T~~.........~~.T
+T~~..WWWWW..~~.T
+T~~.,WWFWW..~~.T
+.==..S...S..~~.T
+.==.........~~.T
+.==..f..f...~~.T
+T~~~~~~~~~~~~~.T
+T..............T
+TTTTTTTTTTTTTTTT
+put warp 7 4 to = "d4_2_4", pos = vec2(128, 200)
+put burger 11 4
+put plum 3 3
+put tomato 11 7
+end
+
+room ow_5_3
+music overworld
+map
+TTTTTTT..TTTTTTT
+T..............T
+T.f=======......
+T.=~~~~~~~=.....
+T.=~~~~~~~T....T
+T.=~~~~~~~~..f.T
+T.=~~~~~~~~...TT
+T.=~~~~~~~~..fTT
+T..=~~~~~~....TT
+T....TTTTT....TT
+TTT..TTTTTTTTTTT
+put burger 12 8
+put plum 12 3
+put burger 10 2
+end
+
+room ow_6_3
+music overworld
+map
+TTTTTTTTTTT..TTT
+TT....TTTTT...TT
+.......WWW....TT
+.......WCW......
+TT.~~==...~.....
+T.~~~~===~~~....
+T..~~~~==T~,...T
+T.f..........fTT
+T.............TT
+T...TTTTTTTT..TT
+TTTTTTTTTTTTTTTT
+put warp 8 3 to = "cave_hint4", pos = vec2(128, 216)
+put plum 8 8
+put tomato 11 4
+end
+
+room ow_7_3
+music overworld
+map
+IIIIIII..IIIIIII
+I.............II
+I....,.,....IIII
+...........II.II
+...........,....
+................
+I...II.....,.,..
+I.....,....II..I
+I..............I
+I.........III..I
+IIIIIII..IIIIIII
+put jelly 6 2
+put plum 7 6
+put plum 9 3
+end
+
+room ow_8_3
+music overworld
+map
+IIIIIII..IIIIIII
+II..........IIII
+II.............I
+II....,.,......I
+............,...
+................
+....,,...,II,...
+I..............I
+I..............I
+I...III........I
+IIIIIII..IIIIIII
+put jelly 3 8
+put plum 12 3
+end
+
+room ow_9_3
+music overworld
+map
+IIIIIIIIIIIIIIII
+IIIII.....IIIIII
+I...II....b....I
+I.,............I
+.........,,.....
+...II..,.....,..
+...II...........
+II.II.,.......II
+II............II
+IIII.....IIII..I
+IIIIIII..IIIIIII
+put plum 10 3
+put tomato 4 3
+put tomato 5 8
+put tomato 7 7
+end
+
+room ow_10_3
+music overworld
+map
+rrrrPPPPrPPPrrPP
+PrPPssssrrrrsssP
+Pss.....sssssssr
+rsssP...sssssssr
+ssssP.ssrsrsssss
+sssss.sssssss.ss
+sssssss...ssssss
+Psssrss...sssssr
+rssssPsss.sssssr
+PssrPrsssssssssr
+rrPrrPPssPrrrPPr
+put burger 7 7
+put breadstick 10 6
+put meatball 5 2
+end
+
+room ow_11_3
+music overworld
+map
+rPrrPPPPrrPrrPPr
+Pssssssssssssssr
+PssssPsssPsssssr
+Pssss...sssssssr
+sssss...sssssssr
+ssssss.ssssssssP
+sssssPsssss.ssPr
+rsssssss.ss...rr
+rsssPssssss...PP
+PPsssPPsssrsssrr
+PPrrPrrssrPrPPrr
+put breadstick 9 4
+put breadstick 12 8
+put breadstick 8 6
+end
+
+room ow_12_3
+music overworld
+map
+rrPPPPPPPrPssrrP
+PssssssssssssPPr
+PsssWWWs.ssss.sr
+rsssWCWsssss.ssr
+Pss.sssssssss.ss
+Psssssssssssssss
+Pssss.s...ssssss
+Psssss....sssssP
+rsssss...ssssssr
+rPPssrPPPPsssssP
+PPrssPPrPrPPPrrP
+put warp 5 3 to = "cave_hint9", pos = vec2(128, 216)
+put meatball 10 3
+put burger 4 6
+put burger 5 8
+put meatball 11 7
+end
+
+room ow_13_3
+music overworld
+map
+PrrrrPPssrPrPrrr
+PsssssssssssrPrr
+Pssssssss.sssssr
+rs...ssssssssPrr
+ss......srssssPr
+sssss...ss.sssss
+ssssssssssssssss
+Psssssssssss.sss
+rsrsssssssssssrr
+rrssssssssssssrP
+rPrssrrrPPPPrrPr
+put meatball 5 5
+put meatball 7 4
+put meatball 10 5
+put meatball 4 3
+end
+
+room ow_14_3
+music overworld
+map
+PPrPrrrPrPrPPrPr
+rPrrrssssssssssP
+rssssssssssssssr
+Psss.ss.sssssssP
+Pssssssssss.sssr
+sssssssss.sssssr
+ssssssss.ss.sssP
+sss.ss...srsPssr
+Psssss...ssssPsr
+PssrPPrssssssssP
+PrPPPPPssrPPrPrP
+put breadstick 4 3
+put breadstick 11 5
+put breadstick 8 3
+put burger 3 7
+end
+
+room ow_15_3
+music overworld
+map
+TTTTTTTssTTT~~~~
+TTTTTTsssTT~~~~~
+TsssTss.ssss~~~~
+Tssssssssss~~~~~
+TsssssTssssss~~~
+Tsssss..ssss~~~~
+Tssss.ssssss~~~~
+Ts.sss.ssss~~~~~
+Tssssssssssss~~~
+TTssssssssss~~~~
+TTTTTTTssTT~~~~~
+put plum 10 3
+put tomato 8 5
+put plum 10 8
+put plum 5 5
+end
+
+room ow_0_4
+music overworld
+map
+TbTbbbTbb..bTbTT
+bTbbTT.........T
+TTb.WWW....T...b
+bbT.WCW...TT...T
+TTb......Tbb..Tb
+TTb......Tbb.,bT
+bbT.......b.b.Tb
+Tb.....TT...b.bT
+bT.....bb.....Tb
+TTTT..........bT
+TbbbbTbTbbTTTbTb
+put warp 5 3 to = "cave_hint3", pos = vec2(128, 216)
+put plum 10 8
+put tomato 12 5
+put plum 7 5
+put plum 4 6
+end
+
+room ow_1_4
+music overworld
+map
+bbTTbbbTTTTTbTbT
+T..............T
+T.........,.....
+T..,b.,.........
+b...b..b.....,.T
+T.bbTT,.,......b
+T.bbTT....b..,.b
+b..bb......b...T
+bb..,..........T
+TT.TTbbbb......b
+TTbTTTbbTbbTbbTb
+put plum 5 7
+put plum 10 7
+put tomato 5 4
+put plum 11 5
+end
+
+room ow_2_4
+music overworld
+map
+TTTTT..TTTTTTTTT
+TTTT...T......TT
+.....==~WWW~~.TT
+....==~~WCW~~~TT
+TT..=~~~...T~~..
+TT..=~~~==~~~~..
+TT...~~~==~~~...
+TT.............T
+T............f.T
+TTTTTTTTTTT...TT
+TTTTTTTTTTTTTTTT
+put warp 9 3 to = "cave_shop2", pos = vec2(128, 216)
+put tomato 5 8
+put plum 4 2
+put burger 8 8
+end
+
+room ow_3_4
+music overworld
+map
+TTTTTTTTTTTTTTTT
+T..............T
+T...======ff...T
+T..~~~~~~~=..,TT
+...~~~~~~~~...TT
+...~~~~~~~~...TT
+...~~~~~~~~...TT
+T..~~~~~~~~.,T..
+T...~~~~~~.f....
+T..............T
+TTTTT..TTTTTTTTT
+put pickup 12 8 kind = "heart"
+put pickup 10 2 kind = "heart"
+put pickup 12 4 kind = "heart"
+end
+
+room ow_4_4
+music overworld
+map
+TTTTTTTTTTTTTTTT
+T........TTT...T
+T...f.......,..T
+T..............T
+T...===~==.,....
+TT.=~~~~~~~.....
+TT.=~~~~~~~..f..
+....~~~~~~.....T
+...............T
+TTTTTTT........T
+TTTTTTTTTTTTTTTT
+put burger 12 7
+put burger 3 8
+put burger 10 8
+put plum 11 4
+end
+
+room ow_5_4
+music overworld
+map
+TTT..TTTTTTTTTTT
+TTT............T
+T...=~~~~~~~...T
+T..==~~~~~~~~..T
+...=~~~~T~~~~...
+...=~~~~~~~~~...
+....=~~~~~~~....
+T..............T
+T..............T
+TTTTTTTT.......T
+TTTTTTTTTTTTTTTT
+put burger 12 7
+put tomato 3 6
+end
+
+room ow_6_4
+music overworld
+map
+IIIIIIIIIIIIIIII
+IIIII.........II
+I..II.,II.....II
+I.............II
+...I.,.....b..II
+.....,..,....,II
+.....,......b.II
+II..,.........II
+II........,....I
+II.............I
+IIIIIIIII..IIIII
+put tomato 3 7
+put jelly 6 5
+end
+
+room ow_7_4
+music overworld
+map
+IIIIIII..IIIIIII
+IIIII....II...II
+II.......,....II
+II.........,,.II
+II............II
+II.......,......
+II..II,.........
+II..,....III....
+II.......III...I
+II............II
+III..IIIIIIIIIII
+put jelly 12 6
+put tomato 9 3
+end
+
+room ow_8_4
+music overworld
+map
+IIIIIII..IIIIIII
+I........II...II
+I......,......II
+I...III........I
+I..,III.........
+.....,....I.,...
+................
+...............I
+II.....,.......I
+II.IIII........I
+IIIIIII..IIIIIII
+put plum 3 8
+put tomato 9 2
+end
+
+room ow_9_4
+music overworld
+map
+IIIIIII..IIIIIII
+II...........III
+II.II.I........I
+II....II.....,.I
+.....bII........
+....I........,..
+....I......,....
+I...,..........I
+I..............I
+I.....IIIIIIIIII
+IIIIIIIIIIIIIIII
+put jelly 11 2
+put tomato 12 4
+put plum 7 6
+end
+
+room ow_10_4
+music overworld
+map
+rrPPPrPssrrPPrPr
+rrrPPPPssrrsssrP
+PPssss.ss.ssssPP
+rPsssPssssssssrP
+ssssssssssssssPr
+sssssss.PssssssP
+sssssssssssssssr
+PsPsss...ss.sssP
+rsssss...PsssssP
+rsssssPrrssssssr
+PPPrPPrPrssrrPPr
+put breadstick 6 4
+put meatball 11 8
+put burger 12 2
+put meatball 8 8
+end
+
+room ow_11_4
+music overworld
+map
+PPrrrrrssrPPrPrr
+PPsssssssPPPrrrP
+rPssssWWWWWss.sP
+rsssssWWXWWsssss
+Ps.sssSsssS...ss
+rsPssss.s.s...ss
+Psssssssssssssrr
+rsssssssssssssPP
+rsssssssssssssPP
+PsssssPrPsssssPP
+PrPrrrPPrssrPrrP
+put warp 8 3 to = "d7_2_4", pos = vec2(128, 200), hidden = true
+put burger 3 5
+put burger 5 6
+put burger 5 2
+end
+
+room ow_12_4
+music overworld
+map
+rrPssPPrPPrrrPrP
+rsssssssssssssrr
+PsssssssssssssrP
+sssssssssssssssP
+ssssssP...sssPsr
+ss.sss....sss.sr
+rsssss.ssssssssr
+rsssssrsssPssssP
+PssssssssssssssP
+PrssssssssssssPr
+rrPrPPPPrPrPPPPP
+put meatball 9 6
+put breadstick 7 3
+put meatball 12 7
+end
+
+room ow_13_4
+music overworld
+map
+rrrssPrrrPrPrPPr
+PsssssssPrrPrPsr
+rssssssPsssr.rsr
+Psss...sss.ssssr
+rs.s...ssssssPss
+Psss.sssssssssss
+rsssssssssssssss
+Ps.ssssssr.Psssr
+rsssssssssss.ssr
+PsssssssssPPPssP
+rPrPPrPrrrPrrrPP
+put burger 3 8
+put breadstick 3 5
+put meatball 7 3
+put meatball 5 7
+end
+
+room ow_14_4
+music overworld
+map
+PPPrPPPssrPrrrrr
+PsssssssssssssPP
+PssssPssssWWWsPP
+rss.ssssssWXWsss
+ssss.sssssssssss
+ssssssssssssssss
+sssssss...sssssP
+rsss......ssP.sr
+rsss...s.ssssssP
+rPrPrssssssssssP
+PrrPPrrPPrrrPrrP
+put warp 11 3 to = "cave_stash4", pos = vec2(128, 216), hidden = true
+put meatball 5 5
+put burger 12 8
+put burger 4 8
+put meatball 4 3
+end
+
+room ow_15_4
+music overworld
+map
+TTTTTTTssTTT~~~~
+TTTTTsssssTT~~~~
+Tsss.ssssss~~~~~
+sssssssssTss~~~~
+sssssssssss.~~~~
+ssssssssssss~~~~
+Tssssssssss~~~~~
+Tssrsssssss~~~~~
+Ts..s.sssssss~~~
+TTTTssssssTT~~~~
+TTTTTTTssTT~~~~~
+put plum 7 6
+put tomato 10 5
+put tomato 7 3
+put tomato 5 7
+end
+
+room ow_0_5
+music overworld
+map
+bbTTbbTTTTTbbTbb
+bT.....bbbTbbbbT
+bb......,.......
+TT..............
+TT.,...........T
+bTbbb..........T
+bb.bb..........b
+TTT.,,.bb......T
+bTT,...........b
+bTb.......bTTbTb
+bbbbbTT..bTTTbbb
+put burger 9 5
+put tomato 11 3
+put tomato 11 7
+put tomato 7 6
+end
+
+room ow_1_5
+music overworld
+map
+TbbbTbTbbTTbbbbb
+Tb...bTbTbTTT..T
+........bb.bbb.b
+..,....bbb.....T
+b......bbb......
+TT....TT........
+Tb....TT.,......
+b.....,....b...b
+T.............Tb
+TTTTbb....TbbbTT
+bbbbTTTbbTTTbTbb
+put burger 8 8
+put plum 4 4
+put burger 5 8
+end
+
+room ow_2_5
+music overworld
+map
+TbTTTTbbTbTTTbbb
+bb.........Tbb.b
+Tb..TTbbb,bbb..b
+TT..TTbbb.bbb..b
+..,..,......TTTT
+......,..,..TTbT
+..............bb
+T.....,.....TTbT
+T....bb.....TTbT
+b.............TT
+TTbbTbT..bTTbTbb
+put burger 3 3
+put plum 11 4
+put plum 6 7
+put burger 3 7
+end
+
+room ow_3_5
+music overworld
+map
+TTTTT..TTTTTTTTT
+TT.....TTT.....T
+TT..T....f.....T
+TT.............T
+T....~~~====....
+T...~~~~~~~~~...
+T...~~~~~~~~~...
+T...~~~~~~~~~.TT
+T.f,f~~~~~~~..TT
+TTTTTT........TT
+TTTTTTTTTTTTTTTT
+put burger 10 3
+put tomato 12 8
+put tomato 12 4
+put burger 3 8
+end
+
+room ow_4_5
+music overworld
+map
+TTTTTTTTTTTTTTTT
+TT...........TTT
+TT.........,....
+TT,..........,..
+.....========..T
+..f.==~~~~~~~~.T
+....~~~~~~~~~~.T
+T...~~~~~~~~~~.T
+T.,T.~~~~~~~~..T
+TTTTTTTTT......T
+TTTTTTTTT..TTTTT
+put burger 4 3
+put tomato 7 2
+put plum 3 7
+end
+
+room ow_5_5
+music overworld
+map
+TTTTTTTTTTTTTTTT
+TTTTTTWWW.....TT
+....r.WXW.....TT
+.....r........TT
+T..,..........TT
+T.....,.....r.TT
+T.........r....T
+T.fff..f.......T
+T..............T
+TTTT...TTTTTT..T
+TTTTTTTTTTTTTTTT
+put warp 7 2 to = "cave_stash7", pos = vec2(128, 216), hidden = true
+put plum 3 7
+put tomato 10 8
+end
+
+room ow_6_5
+music overworld
+map
+TTTTTTTTT..TTTTT
+T..............T
+T...fff........T
+T..fff.....,...T
+T...TT..r.......
+T.....,..,.ff...
+T...............
+T..............T
+T.r.,...,f.....T
+TTTT...........T
+TTTTTTT..TTTTTTT
+put plum 7 3
+put plum 12 4
+end
+
+room ow_7_5
+music overworld
+map
+III..IIIIIIIIIII
+III..IIIIIIIIIII
+III..IIIIII..III
+II.....III.....I
+.......F........
+................
+....b......b....
+I..............I
+I.....,........I
+IIIIIII..IIIIIII
+IIIIIII..IIIIIII
+put warp 7 4 to = "d1_2_4", pos = vec2(128, 200)
+put plum 3 6
+put plum 12 6
+end
+
+room ow_8_5
+music overworld
+map
+TTTTTTT..TTTTTTT
+TT....T..TT...TT
+TT....,.......TT
+T...TT.........T
+..,.TT.,.......T
+...............T
+.......,.,r....T
+T......fff....TT
+TT.....TT.....TT
+TT.........TTTTT
+TTTTTTTTTTTTTTTT
+put tomato 8 3
+put plum 4 5
+end
+
+room ow_9_5
+music overworld
+map
+TTTTTTTTTTTTTTTT
+TT............TT
+TT....r..fff...T
+T....f.........T
+T....r..........
+T.....f....,....
+T...............
+T...fff.....r.TT
+T.r....,.f....TT
+T.....T...TT..TT
+TTTTTTT..TTTTTTT
+put plum 8 7
+put plum 11 3
+end
+
+room ow_10_5
+music overworld
+map
+rPPPrPPrrssPrPrr
+PrrrPrsssssrPrsP
+Prsssssssssssssr
+rrPssrsssss...sP
+sssssssssss...ss
+ssssss.sssssssss
+sss...ssssssssss
+Pss....ss.sssssP
+rsssPsss.sssssPr
+PrPsssssssssssPP
+PrrssPrPrrrPPrPr
+put meatball 12 5
+put burger 9 8
+put breadstick 11 7
+end
+
+room ow_11_5
+music overworld
+map
+PPPPrPrrrssrPrPP
+rsssPPPPrssrPPPP
+rss.ssssssssssrr
+PsssPss.ssssssPP
+sss...PssssPssrP
+sss....sssPsssrP
+ssssssssssP.sssP
+rsss.ssssss.ssss
+PssssP.sssssssss
+rPrPrrssssssssPr
+PrPPrrrrPPPrPPPr
+put breadstick 8 6
+put burger 5 5
+put burger 6 7
+put meatball 12 8
+end
+
+room ow_12_5
+music overworld
+map
+rPPrrrrrrrrrPrPr
+PssrPrPrrWWWssPr
+rss.ssrssWCWssPP
+rsssssssssssssss
+rsPsssssss...sss
+rssssPssss...sss
+rssss...ssss.ssr
+sssss...sssssssr
+ssss..sssPsssssr
+PPrrrrPrrssssssr
+PrPrrPrPPPPrrrPr
+put warp 10 2 to = "cave_shop3", pos = vec2(128, 216)
+put meatball 11 8
+put breadstick 9 6
+put burger 12 4
+put burger 7 4
+end
+
+room ow_13_5
+music overworld
+map
+rPPrrrPrrrPrrPrP
+rrsssssssssssssP
+PPs.sssss...sssr
+sssssssss...sssr
+ss.ssss.ssssssrP
+ssssssssssPsssPr
+rPssssssss.ss.Pr
+rPssPsssssssPsrP
+rrsssssssrs.sssr
+rrrssssssssssssr
+PrPPPrPssPPrPPrP
+put meatball 10 2
+put burger 3 7
+put meatball 3 3
+put breadstick 9 6
+end
+
+room ow_14_5
+music overworld
+map
+LLLLLLLLLLLLLLLL
+LLLL...LLL.....L
+L..L.ff.f......L
+L..............L
+LL.....f...f...L
+LL.............L
+LL...f.........L
+LL.L.L.ffL.L...L
+L.....ffff.....L
+L..............L
+LLLLLLL..LLLLLLL
+put tomato 8 7
+put jelly 8 3
+put plum 10 2
+put tomato 12 5
+end
+
+room ow_15_5
+music overworld
+map
+TTTTTTTssTTT~~~~
+TTsssssssss~~~~~
+TTsssssssss~~~~~
+TTsss.sssss~~~~~
+TTsssssssss.~~~~
+Tsssssssssss~~~~
+Tssrss.s.sss~~~~
+Tsssssssssss~~~~
+TsssssTrsssss~~~
+TTTTTTssssTT~~~~
+TTTTTTTTTTTT~~~~
+put plum 12 8
+put plum 3 4
+put tomato 7 7
+put tomato 5 3
+end
+
+room ow_0_6
+music overworld
+map
+TbbTTTb..bbTTTbT
+Tb.bbTT.....TbTb
+Tb..TT..,.......
+bb..TT.......,..
+bTbTT........,Tb
+bTbTT.....bb..Tb
+TTb..,...bbb,.bT
+TTT..b..,.bb..bT
+bTb.....bb....bb
+bbT............b
+bbbTTbbbbbTbbTTT
+put burger 9 7
+put plum 3 6
+put tomato 8 5
+end
+
+room ow_1_6
+music overworld
+map
+bbbTTTbbbbTbTbbT
+TTbT...........b
+.....WWWWW.....T
+.....WWFWWTT...b
+T....S...STT,.Tb
+b.............TT
+T..b.......,..bT
+T..bbb...bb..,bb
+b........bb...TT
+TbTb..........bT
+bTTTTTT..TbbTbbb
+put warp 7 3 to = "d3_2_4", pos = vec2(128, 200)
+put plum 6 8
+put tomato 11 8
+put burger 4 5
+end
+
+room ow_2_6
+music overworld
+map
+TTTTbTT..bTTbTTT
+T....TT...TbTb.T
+b..............b
+b......b........
+b......b........
+TTbb....,....,..
+TTbb.,.....Tb..T
+Tb.bTTbb.......b
+TT..TTbb.......b
+bT............bT
+bbTbbTTTb..bbTbb
+put plum 11 4
+put plum 5 2
+put tomato 3 8
+end
+
+room ow_3_6
+music overworld
+map
+bTTTbTbTTbTTTbbb
+b.....bbbb.....T
+T.,...b........b
+..,.........,...
+..........,.....
+.....bbb........
+bb.....T...TbbTT
+bT..TT.TT..,..bb
+T...TT........bb
+T..........bT..T
+TbT..bbbbbbbTbTT
+put burger 12 7
+put burger 5 2
+put plum 11 2
+end
+
+room ow_4_6
+music overworld
+map
+TTTTTTTTT..TTTTT
+T.............TT
+T.......r.fff.TT
+..............TT
+...f.....,.T..TT
+.........,TTr..T
+T.r............T
+T.f........f...T
+T...ffff.....,.T
+T..............T
+TTTTTTTTTTTTTTTT
+put plum 8 8
+put tomato 6 7
+end
+
+room ow_5_6
+music overworld
+map
+TTTTTTTTTTTTTTTT
+TTTTTTTTTTT....T
+T.......ff.....T
+T..........r...T
+T.......f...,..T
+T........,.r...T
+T.......fff...TT
+T.TT..T.......TT
+T.TT..TT......TT
+T.............TT
+TTTTTTT..TTTTTTT
+put plum 5 8
+put tomato 12 3
+put tomato 8 4
 end
 
 room ow_6_6
 music overworld
 map
-TTTTTTTTTTTTTTTT
+TTTTTTT..TTTTTTT
 TTb.....,....bTT
 T...r......r...T
 T.....TTTT.....T
@@ -113,9 +2087,9 @@ WWWWWWWWWWWWWWWW
 W~~~~~~~~~~~~~~W
 W~~~~~~~~~~~~~~W
 T..............W
-.......r.......W
-..~~~====~~~...W
-..~~~~~~~~~~...W
+.......r........
+..~~~====~~~....
+..~~~~~~~~~~....
 T.......r......W
 TT.............W
 TTTTTb.....bTTTT
@@ -125,86 +2099,441 @@ put burger 6 7
 put tomato 12 8
 end
 
-room ow_7_5
+room ow_9_6
 music overworld
 map
-IIIIIIIIIIIIIIII
-IIIIIIIIIIIIIIII
-III..IIIIII..III
-II.....III.....I
-I......F.......I
-I..............I
-I...b......b...I
-I..............I
-I.....,........I
-IIIIIII..IIIIIII
-IIIIIII..IIIIIII
-put warp 7 4 to = "d1_2_4", pos = vec2(128, 200)
+TTTTTTT..TTTTTTT
+T..WWW.........T
+T..WXW.........T
+T..............T
+.....f..........
+................
+..........TT....
+T...fff..fff...T
+T..,......f....T
+T...TTTTT......T
+TTTTTTTTTTTTTTTT
+put warp 4 2 to = "cave_stash5", pos = vec2(128, 216), hidden = true
+put tomato 5 7
+put tomato 8 6
+end
+
+room ow_10_6
+music overworld
+map
+rPrssPPPrrPPPrPr
+Pssssssssssssssr
+rsssssssWWWssssr
+PsssPsssWCWssssr
+sssssssssssssssr
+ssss...sss.ssssP
+ssss....sssssssP
+Pss.Pssssssss.ss
+Psssssssssssssss
+PPrrsssssssssssP
+rrPrPrPrPPrrrrrr
+put warp 9 3 to = "cave_hint2", pos = vec2(128, 216)
+put breadstick 11 3
+put burger 7 5
+put breadstick 11 8
+end
+
+room ow_11_6
+music overworld
+map
+PrrrPrPPrPPrPrPr
+PPPrrsssssssrrrr
+rsssssssssssssss
+PsP.ss...Psssrss
+rsssrs......sssP
+rssssss.s...sssr
+PsssssssssssssPP
+sss.ssssssssssPr
+sssss.s.s.ssPsrP
+PsssssrrPsssssPP
+PPPPrPrrrPrPrPPP
+put breadstick 11 2
+put meatball 3 8
+end
+
+room ow_12_6
+music overworld
+map
+LLLLLLLLLLLLLLLL
+LLL........LLLLL
+....L.L.L...f..L
+...............L
+L....f...f....LL
+LL.ff...........
+LLL.L...........
+LL.ff........f..
+LL......f.....LL
+L..........LLLLL
+LLL..LLLLLLLLLLL
+put jelly 9 4
+put burger 6 5
+put burger 8 6
+end
+
+room ow_13_6
+music overworld
+map
+LLLLLLL..LLLLLLL
+L..............L
+L...WWWWW......L
+L...WWFWW.f....L
+L...S...S....f..
+..........f.....
+.......ff.ff....
+..f...........LL
+LL............LL
+LL.LLLLLL....LLL
+LLLLLLLLLLL..LLL
+put warp 6 3 to = "d5_2_4", pos = vec2(128, 200)
+put tomato 4 8
+put burger 11 2
+put plum 8 5
+put jelly 10 8
+end
+
+room ow_14_6
+music overworld
+map
+LLLLLLL..LLLLLLL
+L..............L
+L..............L
+LLL.L.L..f.....L
+..f.f...ff......
+....f...........
+........f.......
+LLL.L...ff....LL
+L......ff......L
+LLLLLLLLL.....LL
+LLLLLLLLL..LLLLL
+put burger 4 4
+put jelly 7 6
+put burger 3 2
+end
+
+room ow_15_6
+music overworld
+map
+TTTTTTTTTTTT~~~~
+TTTTTTsssss~~~~~
+Tsssssssssss~~~~
+Tsssss..sss~~~~~
+sssssssssssss~~~
+ssssssssss.~~~~~
+sss.sssssss~~~~~
+Tssssssssss~~~~~
+Tsssssssssss~~~~
+Tsssssssssss~~~~
+TTTTTTTTTTT~~~~~
+put plum 5 3
+put tomato 10 4
+put plum 9 8
+put tomato 3 5
+end
+
+room ow_0_7
+music overworld
+map
+bbbTTTbTTbbTTTTb
+TT....TbT..TbTTb
+TTbbb.bYb......b
+bbbbb..........b
+bbbbb..........T
+bb.bbb.........T
+bT.bbb.......,.b
+bTbbbTTT.TT.....
+TbbbbTTT,.......
+TTbbbbTbbbTbbbTb
+TTTbTbTbbTbbbbTb
+put warp 7 2 to = "cave_pie1", pos = vec2(128, 216), hidden = true
+put burger 12 3
+put plum 9 8
+put plum 10 2
+end
+
+room ow_1_7
+music overworld
+map
+TTbbTbT..bTbTTTT
+T........TbbTTbT
+T..............b
+b..............b
+b......,.......T
+T..TT..........T
+T..........bb..b
+.......TT..bb..b
+...bb..,,......T
+bTbTTTTbbbTTbbTT
+TbbTTTTbTbbbbbbT
+put tomato 6 3
+put tomato 9 5
+put burger 3 6
+put tomato 6 7
+end
+
+room ow_2_7
+music overworld
+map
+bbTTbbTbT..bTbTT
+b..............b
+b......b...b...T
+T.,...,........b
+b..TT.....bbb..b
+b..TT,..........
+bb...,..........
+bT.......b,.....
+TT...TTbbbbbTbbb
+bTbTTbbTbTbbbbTb
+bbTTbTTbbbbTbbTb
+put tomato 3 7
+put plum 11 6
+end
+
+room ow_3_7
+music overworld
+map
+bbT..bbTbTbbbTTb
+b.......bTTTbTTT
+T....bTT.......T
+Tb...bTTb......b
+TT..bb.........T
+........,.......
+............,...
+...,.....TT.....
+bTb....TbTT....b
+bbbTTTTTbbTTTTbb
+bTTTTbbTTTTTbTTb
+put plum 11 5
+put plum 3 8
+end
+
+room ow_4_7
+music overworld
+map
+bbTTTbTTTTbTbTTb
+Tb.........TbbTb
+TT,.........,..b
+bb...........,.b
+Tb.......bb.....
+..,.TTT.........
+...,TTT.........
+......,......b.T
+TbTbbbbbb......b
+TbTTbbbTbTbbTTbT
+bTbbbTTbTTbbbTbT
+put tomato 8 3
+put tomato 12 5
+end
+
+room ow_5_7
+music overworld
+map
+TTTTTTT..TTTTTTT
+T..WWW........TT
+T..WCW........TT
+T........r....TT
+...f..r.........
+........fff.....
+.......,........
+T.r........fffTT
+TTr,.,TTTTT.f.TT
+TTTTTTTTTTTTTTTT
+TTTTTTTTTTTTTTTT
+put warp 4 2 to = "cave_hint1", pos = vec2(128, 216)
+put tomato 7 4
+end
+
+room ow_6_7
+music overworld
+map
+WWWWWWW..TTTTTTT
+WWWWXWW....,..bT
+T..............T
+T..~~~~~~~.....T
+..~~~~~~~~~.....
+...~~~~~~~~.....
+....~~~~~~......
+T.....,........T
+Tb....r.....r..T
+TTb..........bTT
+TTTTTTTTTTTTTTTT
+put warp 4 1 to = "cave_secret", pos = vec2(128, 216), hidden = true
+put tomato 12 3
+put tomato 9 8
+end
+
+room ow_7_7
+music overworld
+map
+WWWWWWW..WWWWWWW
+WWWWCWW..WWWWWWW
+WW.............W
+W..r....,...r..W
+..............,.
+....f.....f.....
+................
+T..r.....,..r..T
+TT............TT
+TTTbTTTTTTTTbTTT
+TTTTTTTTTTTTTTTT
+put warp 4 1 to = "cave_chef", pos = vec2(128, 216)
+end
+
+room ow_8_7
+music overworld
+map
+TTTTTTT..TTTTTTT
+TT.......,..WWWW
+T.....r.....WWWW
+T...........WCWW
+..........,.....
+................
+...r............
+T........r.....W
+TT.f..........TT
+TTTTbTTTTTTbTTTT
+TTTTTTTTTTTTTTTT
+put warp 13 3 to = "cave_shop", pos = vec2(128, 216)
+put tomato 5 5
+put tomato 9 3
+put plum 10 7
+end
+
+room ow_9_7
+music overworld
+map
+TTTTTTTTTTTTTTTT
+TT..........TTTT
+TT......r.....TT
+T......f.....,TT
+..fff...........
+................
+................
+TT....r.r.....TT
+TTffff.f.....TTT
+TTTTTTTTTTTTTTTT
+TTTTTTTTTTTTTTTT
+put plum 10 7
+end
+
+room ow_10_7
+music overworld
+map
+TTTTTTTTTTTTTTTT
+T....WWWTTTTT..T
+T....WXW..TT...T
+TT........TT...T
+................
+................
+...,.,TT..r.....
+TTfff.TTf......T
+TTTTTfff..rTT..T
+TTTTTTTTTTTTTTTT
+TTTTTTTTTTTTTTTT
+put warp 6 2 to = "cave_stash8", pos = vec2(128, 216), hidden = true
+put plum 3 3
+put tomato 4 7
+end
+
+room ow_11_7
+music overworld
+map
+PPPrPPrPPPrrrrrP
+PPsssrPrrPPrPrrP
+rPsssssss.sssssr
+PsssssssssPPsssP
+sssssssss.srsssP
+sss...sssssPsssr
+sss...sssssss.sP
+rss...ss.sssssss
+rss...rrPrrrrsss
+rPrrrPPPrPPPrPPP
+PPrPPrrPrrrrPrrP
+put breadstick 6 4
+put meatball 10 2
+put breadstick 5 8
+end
+
+room ow_12_7
+music overworld
+map
+LLL..LLLLLLLLLLL
+LL....LLLL....LL
+LL.....LWWWf..LL
+LL......WCW..f.L
+L..f.ff....fff.L
+L..ff.....f....L
+L.L.L...f......L
+.....f......f...
+........L.......
+LLLLLLLLLLLLLLLL
+LLLLLLLLLLLLLLLL
+put warp 9 3 to = "cave_hint7", pos = vec2(128, 216)
 put plum 3 6
-put plum 12 6
+put burger 6 8
+put jelly 12 8
 end
 
-# ---- caves (overworld tiles: K rock, : floor) ----
-room cave_chef
-var exit_s = "back"
+room ow_13_7
+music overworld
 map
-KKKKKKKKKKKKKKKK
-KKKKKKKKKKKKKKKK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KKKKKKK::KKKKKKK
-put flame 4.5 4
-put flame 10.5 4
-put old_chef 7.5 4 line1 = "BARON GORGE TORE UP THE RECIPE!", line2 = "TAKE MY SPOON, LITTLE COOK."
-put pickup 7.5 6 kind = "spoon", flag = "spoon"
+LLLLLLLLLLL..LLL
+LLLL..........LL
+L....L.Lf.f...LL
+L.............LL
+L...L.Lf......LL
+L..f.......ff.LL
+L.............LL
+..ff............
+...f....f.......
+LLLLLLLLLLLLLLLL
+LLLLLLLLLLLLLLLL
+put tomato 3 5
+put jelly 11 8
+put tomato 6 6
 end
 
-room cave_shop
-var exit_s = "back"
+room ow_14_7
+music overworld
 map
-KKKKKKKKKKKKKKKK
-KKKKKKKKKKKKKKKK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KKKKKKK::KKKKKKK
-put flame 4.5 4
-put flame 10.5 4
-put baker 7.5 4 line1 = "FRESH FROM THE OVEN!", line2 = "TAKE YOUR PICK, LITTLE COOK."
-put pickup 5 6.5 kind = "bombs_item", price = 20
-put pickup 7.5 6.5 kind = "soup", price = 15
-put pickup 10 6.5 kind = "key", price = 40
+LLLLLLLLL..LLLLL
+L..............L
+L.....f.........
+L.....f......f..
+L..............L
+L.......ff.....L
+L............f.L
+...f.f.f..f.ff.L
+....L....f.....L
+LLLLLLLLLLLLLLLL
+LLLLLLLLLLLLLLLL
+put tomato 11 4
+put burger 5 4
+put burger 3 8
+put tomato 12 7
 end
 
-room cave_secret
-var exit_s = "back"
+room ow_15_7
+music overworld
 map
-KKKKKKKKKKKKKKKK
-KKKKKKKKKKKKKKKK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KK::::::::::::KK
-KKKKKKK::KKKKKKK
-put flame 4.5 4
-put flame 10.5 4
-put old_chef 7.5 4 line1 = "SHH! THIS IS MY SECRET STASH.", line2 = "TAKE SOME BEANS - YOU FOUND IT!"
-put pickup 6 6.5 kind = "bean5", flag = "stash1"
-put pickup 7.5 6.5 kind = "bean5", flag = "stash2"
-put pickup 9 6.5 kind = "bean5", flag = "stash3"
+TTTTTTTTTTTT~~~~
+TTssssTTTTTT~~~~
+sssssssss.ss~~~~
+sss..ssssss~~~~~
+TssssssssssTs~~~
+Tsssssssssss~~~~
+Ts.sssssssss~~~~
+Tsssssssssss~~~~
+TssTTTTTsssss~~~
+TTTTTTTTTTT~~~~~
+TTTTTTTTTTT~~~~~
+put pickup 3 3 kind = "heart_pie", flag = "ow:pie3"
+put tomato 9 8
+put plum 8 5
+put plum 6 2
+put plum 5 6
 end

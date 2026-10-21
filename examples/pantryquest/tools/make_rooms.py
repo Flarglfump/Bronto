@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.normpath(os.path.join(HERE, '..'))
 
 TILESETS = {
-    'overworld': dict(image='art/tiles_overworld.bmp', legend='.,TrW~bCs=fIFKX:Yp', solid='TrW~bIKXY'),
+    'overworld': dict(image='art/tiles_overworld.bmp', legend='.,TrW~bCs=fIFKX:YpPLGSg', solid='TrW~bIKXYPLGSg'),
     'dungeon': dict(image='art/tiles_dungeon.bmp', legend='.#O~SLHXPV,', solid='#O~LHXPV'),
 }
 COLS, ROWS = 16, 11

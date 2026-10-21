@@ -1,6 +1,6 @@
 # Pantry Quest - room ow_6_6 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
 #
-#   TTTTTTTTTTTTTTTT
+#   TTTTTTT..TTTTTTT
 #   TTb.....,....bTT
 #   T...r......r...T
 #   T.....TTTT.....T
@@ -32,9 +32,9 @@ entity
     tile_size = 16
     columns = 16
     rows = 11
-    legend = ".,TrW~bCs=fIFKX:Yp"
-    solid = "TrW~bIKXY"
-    tiles = "TTTTTTTTTTTTTTTTTTb.....,....bTTT...r......r...TT.....TTTT.....TT....TbbbbT.....T....TbbbbT.....T.....TTTT......T..r.......r...TT.....,........TTTb.........bTTTTTTTTTT..TTTTTTT"
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "TTTTTTT..TTTTTTTTTb.....,....bTTT...r......r...TT.....TTTT.....TT....TbbbbT.....T....TbbbbT.....T.....TTTT......T..r.......r...TT.....,........TTTb.........bTTTTTTTTTT..TTTTTTT"
     layer = -10
   Parent
     entity = 0

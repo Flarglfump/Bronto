@@ -4,9 +4,9 @@
 #   TT.......,..WWWW
 #   T.....r.....WWWW
 #   T...........WCWW
-#   ..........,....W
-#   ...............W
-#   ...r...........W
+#   ..........,.....
+#   ................
+#   ...r............
 #   T........r.....W
 #   TT.f..........TT
 #   TTTTbTTTTTTbTTTT
@@ -32,9 +32,9 @@ entity
     tile_size = 16
     columns = 16
     rows = 11
-    legend = ".,TrW~bCs=fIFKX:Yp"
-    solid = "TrW~bIKXY"
-    tiles = "TTTTTTT..TTTTTTTTT.......,..WWWWT.....r.....WWWWT...........WCWW..........,....W...............W...r...........WT........r.....WTT.f..........TTTTTTbTTTTTTbTTTTTTTTTTTTTTTTTTTT"
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "TTTTTTT..TTTTTTTTT.......,..WWWWT.....r.....WWWWT...........WCWW..........,........................r............T........r.....WTT.f..........TTTTTTbTTTTTTbTTTTTTTTTTTTTTTTTTTT"
     layer = -10
   Parent
     entity = 0

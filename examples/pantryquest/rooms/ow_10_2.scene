@@ -1,0 +1,96 @@
+# Pantry Quest - room ow_10_2 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   WWWWWWWWWWWWWWWW
+#   W,,,,,WWW,,,,,,W
+#   W,,,,,r,,,,,,,,W
+#   W,,,,,,,,,,,.,,,
+#   ,,,,.,,,,,,,,,,,
+#   ,,,,,,,,,,,,.,,,
+#   ,,,,WWWW,,,,,,WW
+#   W,,,,,,,,,,,,,WW
+#   W,,,,,,,,,.,,,,W
+#   WWWWWW,,,,,,,,,W
+#   WWWWWWWWWWWWWWWW
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"ow_10_2\", music = \"overworld\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "WWWWWWWWWWWWWWWWW,,,,,WWW,,,,,,WW,,,,,r,,,,,,,,WW,,,,,,,,,,,.,,,,,,,.,,,,,,,,,,,,,,,,,,,,,,,.,,,,,,,WWWW,,,,,,WWW,,,,,,,,,,,,,WWW,,,,,,,,,.,,,,WWWWWWW,,,,,,,,,WWWWWWWWWWWWWWWWW"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 56
+  Sprite
+    image = "art/breadstick_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 2, image = \"art/breadstick_\", speed = 34"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 120 136
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 56 136
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 200 88
+  Sprite
+    image = "art/breadstick_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 2, image = \"art/breadstick_\", speed = 34"
+  Parent
+    entity = 0

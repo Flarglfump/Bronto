@@ -1,0 +1,107 @@
+# Pantry Quest - room ow_14_4 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   PPPrPPPssrPrrrrr
+#   PsssssssssssssPP
+#   PssssPssssWWWsPP
+#   rss.ssssssWXWsss
+#   ssss.sssssssssss
+#   ssssssssssssssss
+#   sssssss...sssssP
+#   rsss......ssP.sr
+#   rsss...s.ssssssP
+#   rPrPrssssssssssP
+#   PrrPPrrPPrrrPrrP
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"ow_14_4\", music = \"overworld\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "PPPrPPPssrPrrrrrPsssssssssssssPPPssssPssssWWWsPPrss.ssssssWXWsssssss.ssssssssssssssssssssssssssssssssss...sssssPrsss......ssP.srrsss...s.ssssssPrPrPrssssssssssPPrrPPrrPPrrrPrrP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Warp"
+  Transform
+    position = 184 56
+  Script
+    file = "scripts/warp.bs"
+    vars = "to = \"cave_stash4\", pos = vec2(128, 216), hidden = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 88 88
+  Sprite
+    image = "art/meatball_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/meatball.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 200 136
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 136
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 56
+  Sprite
+    image = "art/meatball_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/meatball.bs"
+    vars = ""
+  Parent
+    entity = 0

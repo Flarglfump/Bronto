@@ -1,0 +1,93 @@
+# Pantry Quest - room ow_6_1 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   WWW,,WWWWWWWWWWW
+#   W,,,,,WWWWWWW,WW
+#   W,,,,WWWW,WXW,,W
+#   W,,,,,WWW,,,,,,W
+#   ,,,,,,,,.,,,,,,W
+#   ,,,,,,,,,,,,,,,W
+#   ,,,,WWWW,,,,.,,W
+#   WW,,,,,,,,,,,.,W
+#   WWrr,,,,,,,.,.,W
+#   WW,,,,,WWWW,,,,W
+#   WWWWWWWWWWWWWWWW
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"ow_6_1\", music = \"overworld\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "WWW,,WWWWWWWWWWWW,,,,,WWWWWWW,WWW,,,,WWWW,WXW,,WW,,,,,WWW,,,,,,W,,,,,,,,.,,,,,,W,,,,,,,,,,,,,,,W,,,,WWWW,,,,.,,WWW,,,,,,,,,,,.,WWWrr,,,,,,,.,.,WWW,,,,,WWWW,,,,WWWWWWWWWWWWWWWWW"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Warp"
+  Transform
+    position = 184 40
+  Script
+    file = "scripts/warp.bs"
+    vars = "to = \"cave_stash2\", pos = vec2(128, 216), hidden = true"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 56 120
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 88 72
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 152 136
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0

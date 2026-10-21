@@ -1,4 +1,4 @@
-# Pantry Quest - room cave_chef (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+# Pantry Quest - room cave_chef (made by tools/make_rooms.py from tools/world/caves.txt: edit it there)
 #
 #   KKKKKKKKKKKKKKKK
 #   KKKKKKKKKKKKKKKK
@@ -32,8 +32,8 @@ entity
     tile_size = 16
     columns = 16
     rows = 11
-    legend = ".,TrW~bCs=fIFKX:Yp"
-    solid = "TrW~bIKXY"
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
     tiles = "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKK::::::::::::KKKKKKKKK::KKKKKKK"
     layer = -10
   Parent

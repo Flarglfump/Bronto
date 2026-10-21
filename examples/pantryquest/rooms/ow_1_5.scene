@@ -1,0 +1,82 @@
+# Pantry Quest - room ow_1_5 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   TbbbTbTbbTTbbbbb
+#   Tb...bTbTbTTT..T
+#   ........bb.bbb.b
+#   ..,....bbb.....T
+#   b......bbb......
+#   TT....TT........
+#   Tb....TT.,......
+#   b.....,....b...b
+#   T.............Tb
+#   TTTTbb....TbbbTT
+#   bbbbTTTbbTTTbTbb
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"ow_1_5\", music = \"overworld\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "TbbbTbTbbTTbbbbbTb...bTbTbTTT..T........bb.bbb.b..,....bbb.....Tb......bbb......TT....TT........Tb....TT.,......b.....,....b...bT.............TbTTTTbb....TbbbTTbbbbTTTbbTTTbTbb"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 136 136
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 72 72
+  Sprite
+    image = "art/plum_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, image = \"art/plum_\", shot = \"prefabs/seed.scene\", shot_chance = 0.4, speed = 36"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 88 136
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0

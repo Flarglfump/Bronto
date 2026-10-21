@@ -5,11 +5,20 @@ prefabs and BrontoScript, with no C code. Greedy Baron Gorge has torn the Grand 
 into eight pages and hidden them all over the land. Pip, a young cook, picks up a wooden
 spoon and sets out to find them.
 
-This is the first part of a bigger game (eight cellars, a much larger land). It's playable
-from start to finish now:
+This is the first part of a bigger game. The whole land is there to explore now, with
+the first of its nine cellars:
 
-- **The Pantry Plains:** seven screens to explore, with three caves. One cave has the
-  spoon, one is a shop, and one is a secret that a bomb opens.
+- **The Pantry Plains:** 128 screens in ten regions: the start plains, the Lettuce Woods,
+  Blueberry Lake, the Frosty Fields, the Fortune Cookie Field, the Chocolate Mountains,
+  the Pickle Marsh, the Sugar Desert, the Candy Meadows and the Juice Coast.
+  - **26 caves:** the old chef with the spoon, five shops, nine chefs with hints, eight
+    secret bean stashes behind cracked cliffs and suspicious bushes (a popcorn bomb
+    finds them), and two heart-pie caves.
+  - **Two healing springs**, and three heart pies hidden out in the land.
+  - **The doors of all nine cellars.** Two are hidden behind cracked cliffs, and the
+    last, Baron Gorge's Banquet Hall, waits at the top of the Chocolate Mountains.
+    Cellars 2 to 9 are still being dug: for now each door leads to an entrance room
+    where a cook says so.
 - **The Cold Cellar:** nine rooms. It has locked doors and keys, shutters that close
   until the enemies are beaten, and a bombable wall with a stash behind it. Its treasure
   is the **pizza cutter**, and its guardian is the **Gelatin Giant**. Behind the guardian
@@ -68,6 +77,13 @@ standard library only:
   triangle and noise voices.
 - `make_rooms.py` turns the maps in `tools/world/*.txt` into `rooms/*.scene`. The maps
   are easier to edit there than tile by tile. Each map is 16 x 11 characters, or a
-  cellar room's 12 x 7 inside with its doors named.
+  cellar room's 12 x 7 inside with its doors named. `overworld.txt` holds the land,
+  `caves.txt` the caves, `cellar1.txt` the Cold Cellar and `cellars_unbuilt.txt` the
+  entrance rooms of the cellars to come.
+- `design_overworld.py --force` lays the whole land out again from its plan (the
+  regions, where every cellar and cave goes, what is in each cave), keeping the
+  hand-made screens around the start. It checks that every screen's edges meet its
+  neighbours' and that every way in and out can be reached. It replaces the world
+  files, so small changes are better made in `overworld.txt` by hand.
 
 `project.bronto` leaves `tools/` out of built games (`exclude = tools`).

@@ -1,0 +1,68 @@
+# Pantry Quest - room ow_4_7 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   bbTTTbTTTTbTbTTb
+#   Tb.........TbbTb
+#   TT,.........,..b
+#   bb...........,.b
+#   Tb.......bb.....
+#   ..,.TTT.........
+#   ...,TTT.........
+#   ......,......b.T
+#   TbTbbbbbb......b
+#   TbTTbbbTbTbbTTbT
+#   bTbbbTTbTTbbbTbT
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"ow_4_7\", music = \"overworld\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "bbTTTbTTTTbTbTTbTb.........TbbTbTT,.........,..bbb...........,.bTb.......bb.......,.TTT............,TTT...............,......b.TTbTbbbbbb......bTbTTbbbTbTbbTTbTbTbbbTTbTTbbbTbT"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 136 56
+  Sprite
+    image = "art/tomato_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 200 88
+  Sprite
+    image = "art/tomato_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "image = \"art/tomato_\", shot = \"prefabs/seed.scene\""
+  Parent
+    entity = 0

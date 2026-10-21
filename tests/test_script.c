@@ -531,6 +531,60 @@ static void test_pantryquest_shutter(void) {
     teardown();
 }
 
+/* Pantry Quest's overworld (examples/pantryquest/rooms, made by its tools):
+ * 16 x 8 screens whose edges meet, sealed all round, with all nine cellar
+ * doors. */
+static bool pq_field(const char *text, const char *key, char *out, size_t size) {
+    const char *p = strstr(text, key), *q;
+    if (!p || !(p = strchr(p, '"')) || !(q = strchr(p + 1, '"')) || (size_t)(q - p - 1) >= size) return false;
+    memcpy(out, p + 1, (size_t)(q - p - 1));
+    out[q - p - 1] = 0;
+    return true;
+}
+static void test_pantryquest_world(void) {
+    static char tiles[16][8][16 * 11 + 1];
+    char solid[64] = "", path[96];
+    int x, y, i, k, cellars = 0;
+    bool ok = true;
+    for (y = 0; y < 8; ++y) {
+        for (x = 0; x < 16; ++x) {
+            size_t size;
+            char *text;
+            snprintf(path, sizeof(path), "examples/pantryquest/rooms/ow_%d_%d.scene", x, y);
+            text = (char *)br_file_read_all(path, &size);
+            CHECK(text != NULL);
+            if (!text) return;
+            CHECK(pq_field(text, "    tiles = ", tiles[x][y], sizeof(tiles[x][y])) && strlen(tiles[x][y]) == 16 * 11);
+            pq_field(text, "    solid = ", solid, sizeof(solid));
+            for (k = 1; k <= 9; ++k) {
+                char door[32];
+                snprintf(door, sizeof(door), "to = \\\"d%d_2_4\\\"", k);
+                if (strstr(text, door)) cellars |= 1 << k;
+            }
+            br_free(text);
+        }
+    }
+    CHECK(solid[0] != 0);
+#define PQ_OPEN(xx, yy, c, r) (strchr(solid, tiles[xx][yy][(r) * 16 + (c)]) == NULL)
+    for (y = 0; y < 8; ++y) {
+        for (x = 0; x < 16; ++x) {
+            for (i = 0; i < 16; ++i) {                          /* top and bottom edges */
+                if (y == 0 && PQ_OPEN(x, y, i, 0)) ok = false;
+                if (y == 7 && PQ_OPEN(x, y, i, 10)) ok = false;
+                if (y < 7 && PQ_OPEN(x, y, i, 10) != PQ_OPEN(x, y + 1, i, 0)) ok = false;
+            }
+            for (i = 0; i < 11; ++i) {                          /* left and right */
+                if (x == 0 && PQ_OPEN(x, y, 0, i)) ok = false;
+                if (x == 15 && PQ_OPEN(x, y, 15, i)) ok = false;
+                if (x < 15 && PQ_OPEN(x, y, 15, i) != PQ_OPEN(x + 1, y, 0, i)) ok = false;
+            }
+            if (!ok) { printf("      ow_%d_%d's edges don't meet its neighbours'\n", x, y); CHECK(ok); return; }
+        }
+    }
+#undef PQ_OPEN
+    CHECK_EQ_INT(cellars, 0x3fe);                               /* cellars 1 to 9 */
+}
+
 typedef struct counter_state { int starts, updates, hits; } counter_state;
 static int g_destroyed;
 static void cb_start(br_world *w, br_entity e, void *s) { BR_UNUSED(w); BR_UNUSED(e); ((counter_state *)s)->starts++; }
@@ -817,6 +871,7 @@ void suite_script(void) {
     RUN(test_saved_data);
     RUN(test_pantryquest_example);
     RUN(test_pantryquest_shutter);
+    RUN(test_pantryquest_world);
     RUN(test_check_and_errors);
     RUN(test_types_checked);
     RUN(test_types_at_run_time);

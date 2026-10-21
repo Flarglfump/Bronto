@@ -1,0 +1,533 @@
+# Caves: one room each, 16 x 11 tiles of rock (K) and floor (:). Leaving by the bottom
+# goes back to where Pip came in (exit_s = "back").
+
+room cave_chef
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "BARON GORGE TORE UP THE RECIPE!", line2 = "TAKE MY SPOON, LITTLE COOK."
+put pickup 7.5 6 kind = "spoon", flag = "spoon"
+end
+
+room cave_shop
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put baker 7.5 4 line1 = "FRESH FROM THE OVEN!", line2 = "TAKE YOUR PICK, LITTLE COOK."
+put pickup 5 6.5 kind = "bombs_item", price = 20
+put pickup 7.5 6.5 kind = "soup", price = 15
+put pickup 10 6.5 kind = "key", price = 40
+end
+
+room cave_secret
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! THIS IS MY SECRET STASH.", line2 = "TAKE SOME BEANS - YOU FOUND IT!"
+put pickup 6 6.5 kind = "bean5", flag = "stash1"
+put pickup 7.5 6.5 kind = "bean5", flag = "stash2"
+put pickup 9 6.5 kind = "bean5", flag = "stash3"
+end
+
+room cave_hint1
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "THE COLD CELLAR LIES NORTH,", line2 = "PAST THE FROSTY FIELDS."
+end
+
+room cave_hint2
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "THE DUNES HIDE A SUGAR MILL.", line2 = "BOMB THE CRACKED CLIFF!"
+end
+
+room cave_hint3
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "THE SPICE RACK SITS DEEP", line2 = "IN THE LETTUCE WOODS."
+end
+
+room cave_hint4
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "A JAM JAR ON THE LAKE...", line2 = "CROSS THE LONG BRIDGE."
+end
+
+room cave_hint5
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "THE BARON FEASTS UP HIGH,", line2 = "ATOP CHOCOLATE MOUNTAIN."
+end
+
+room cave_hint6
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SOME CLIFFS SOUND HOLLOW.", line2 = "A POPCORN BOMB WILL TELL."
+end
+
+room cave_hint7
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SWEETS AND TREATS LIE EAST,", line2 = "IN THE CANDY WORKS."
+end
+
+room cave_hint8
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "THE FORTUNE HALL? IT'S IN", line2 = "THE COOKIE FIELD, NORTHWEST."
+end
+
+room cave_hint9
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "PICKLES! THE PANTRY IS", line2 = "OUT IN THE MARSH, NORTHEAST."
+end
+
+room cave_pie1
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "YOU FOUND MY HIDEAWAY!", line2 = "HAVE A SLICE OF HEART PIE."
+put pickup 7.5 6 kind = "heart_pie", flag = "pie1"
+end
+
+room cave_pie2
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "A LONG WAY OUT HERE, EH?", line2 = "THIS PIE WILL KEEP YOU GOING."
+put pickup 7.5 6 kind = "heart_pie", flag = "pie2"
+end
+
+room cave_shop2
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put baker 7.5 4 line1 = "THE WOODS' FINEST GOODS!", line2 = "BUY SOMETHING, WILL YOU?"
+put pickup 5 6.5 kind = "bombs_item", price = 20
+put pickup 7.5 6.5 kind = "key", price = 60
+put pickup 10 6.5 kind = "heart", price = 10
+end
+
+room cave_shop3
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put baker 7.5 4 line1 = "SWEET DEALS IN THE DESERT!", line2 = "BEANS ONLY, PLEASE."
+put pickup 5 6.5 kind = "soup", price = 30
+put pickup 7.5 6.5 kind = "bombs_item", price = 25
+put pickup 10 6.5 kind = "key", price = 50
+end
+
+room cave_shop4
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put baker 7.5 4 line1 = "A SHOP ON A MOUNTAIN? WHY NOT!", line2 = "TAKE YOUR PICK."
+put pickup 5 6.5 kind = "bombs_item", price = 20
+put pickup 7.5 6.5 kind = "soup", price = 25
+put pickup 10 6.5 kind = "heart", price = 8
+end
+
+room cave_shop5
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put baker 7.5 4 line1 = "FRESH FROM THE MARSH!", line2 = "PICKLED PRICES, TOO."
+put pickup 5 6.5 kind = "key", price = 45
+put pickup 7.5 6.5 kind = "soup", price = 30
+put pickup 10 6.5 kind = "bombs_item", price = 20
+end
+
+room cave_stash1
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! YOU FOUND MY STASH.", line2 = "TAKE FIFTEEN BEANS."
+put pickup 6 6.5 kind = "bean5", flag = "stash11"
+put pickup 7.5 6.5 kind = "bean5", flag = "stash12"
+put pickup 9 6.5 kind = "bean5", flag = "stash13"
+end
+
+room cave_stash2
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! YOU FOUND MY STASH.", line2 = "TAKE TEN BEANS."
+put pickup 6.5 6.5 kind = "bean5", flag = "stash21"
+put pickup 8.5 6.5 kind = "bean5", flag = "stash22"
+end
+
+room cave_stash3
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! YOU FOUND MY STASH.", line2 = "TAKE FIFTEEN BEANS."
+put pickup 6 6.5 kind = "bean5", flag = "stash31"
+put pickup 7.5 6.5 kind = "bean5", flag = "stash32"
+put pickup 9 6.5 kind = "bean5", flag = "stash33"
+end
+
+room cave_stash4
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! YOU FOUND MY STASH.", line2 = "TAKE TEN BEANS."
+put pickup 6.5 6.5 kind = "bean5", flag = "stash41"
+put pickup 8.5 6.5 kind = "bean5", flag = "stash42"
+end
+
+room cave_stash5
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! YOU FOUND MY STASH.", line2 = "TAKE FIVE BEANS."
+put pickup 7.5 6.5 kind = "bean5", flag = "stash51"
+end
+
+room cave_stash6
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! YOU FOUND MY STASH.", line2 = "TAKE TEN BEANS."
+put pickup 6.5 6.5 kind = "bean5", flag = "stash61"
+put pickup 8.5 6.5 kind = "bean5", flag = "stash62"
+end
+
+room cave_stash7
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! YOU FOUND MY STASH.", line2 = "TAKE FIVE BEANS."
+put pickup 7.5 6.5 kind = "bean5", flag = "stash71"
+end
+
+room cave_stash8
+var exit_s = "back"
+map
+KKKKKKKKKKKKKKKK
+KKKKKKKKKKKKKKKK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KK::::::::::::KK
+KKKKKKK::KKKKKKK
+put flame 4.5 4
+put flame 10.5 4
+put old_chef 7.5 4 line1 = "SHH! YOU FOUND MY STASH.", line2 = "TAKE TEN BEANS."
+put pickup 6.5 6.5 kind = "bean5", flag = "stash81"
+put pickup 8.5 6.5 kind = "bean5", flag = "stash82"
+end

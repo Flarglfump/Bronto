@@ -1,0 +1,80 @@
+# Pantry Quest - room d8_2_4 (made by tools/make_rooms.py from tools/world/cellars_unbuilt.txt: edit it there)
+#
+#   ################
+#   ################
+#   ##............##
+#   ##..P......P..##
+#   ##............##
+#   ##............##
+#   ##............##
+#   ##..P......P..##
+#   ##............##
+#   #######,,#######
+#   #######,,#######
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d8_2_4\", music = \"cellar\", stays_clear = true, exit_s = \"ow_9_1\", exit_pos = vec2(168, 136), exit_face = \"down\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,"
+    solid = "#O~LHXPV"
+    tiles = "##################################............####..P......P..####............####............####............####..P......P..####............#########,,##############,,#######"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Flame"
+  Transform
+    position = 80 56
+  Sprite
+    image = "art/flame_0.bmp"
+    layer = 2
+  Script
+    file = "scripts/flame.bs"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Flame"
+  Transform
+    position = 176 56
+  Sprite
+    image = "art/flame_0.bmp"
+    layer = 2
+  Script
+    file = "scripts/flame.bs"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "NPC"
+  Transform
+    position = 128 56
+  Sprite
+    image = "art/old_chef.bmp"
+    layer = 2
+  Script
+    file = "scripts/npc.bs"
+    vars = "line1 = \"THE SOUP CAULDRON\", line2 = \"IS STILL BEING DUG. LATER!\""
+  Parent
+    entity = 0

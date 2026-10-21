@@ -1,0 +1,107 @@
+# Pantry Quest - room ow_5_0 (made by tools/make_rooms.py from tools/world/overworld.txt: edit it there)
+#
+#   WWWWWWWWWWWWWWWW
+#   WWWWWWWWWWWWWWWW
+#   W,,WWWWWWWWWWWWW
+#   W,.WWFWW,,,r,.,W
+#   W,,S,,,S,,,,,,,,
+#   W,WW,,,,,,,,,,,,
+#   W,WW,,,,,,,,,,,,
+#   ,,,,,,,,WWWW,,,W
+#   ,,,,,,,,,WWW,,,W
+#   WWWW,,,,,,,,,,,W
+#   WWWWWWWWWWW,,WWW
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"ow_5_0\", music = \"overworld\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_overworld.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".,TrW~bCs=fIFKX:YpPLGSg"
+    solid = "TrW~bIKXYPLGSg"
+    tiles = "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW,,WWWWWWWWWWWWWW,.WWFWW,,,r,.,WW,,S,,,S,,,,,,,,W,WW,,,,,,,,,,,,W,WW,,,,,,,,,,,,,,,,,,,,WWWW,,,W,,,,,,,,,WWW,,,WWWWW,,,,,,,,,,,WWWWWWWWWWWW,,WWW"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Warp"
+  Transform
+    position = 88 56
+  Script
+    file = "scripts/warp.bs"
+    vars = "to = \"d9_2_4\", pos = vec2(128, 200)"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 88 136
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 152 88
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 200 72
+  Sprite
+    image = "art/burger_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/walker.bs"
+    vars = "hp = 2, damage = 1, image = \"art/burger_\", shot = \"prefabs/toothpick.scene\", aim = true, shot_speed = 140, speed = 26"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 184 104
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
