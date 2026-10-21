@@ -131,18 +131,25 @@ treasures he carries down the right, and the recipe pages along the bottom. What
 the mouse is over - a plate, equipment, a treasure, the pages - shows its name and what
 it does.
 
-| | Keys (at first: SETTINGS changes them) | |
-|---|---|---|
-| Walk | arrows or WASD | Eight directions; Pip slides along walls and round corners |
-| Poke with the spoon | X (or Space) | At full health it also throws a spark (as strong as a poke) |
-| Use the B item | Z (or J) | Popcorn bombs, the pizza cutter, the skewer bow, the fire chili, the whisk |
-| Pocket Pantry | Enter (or I) | Choose the B item, see equipment and treasures; Tab for the map |
-| Map | M | The Pocket Pantry's map page |
-| Next / previous item | E / Q | Changes the B item without opening anything |
-| Quick save | F5 | Saves to the file straight away |
-| Pause | Escape (or P) | Resume, save, settings, quit to the title |
+| | Keys (at first: SETTINGS changes them) | Gamepad | |
+|---|---|---|---|
+| Walk | arrows or WASD | left stick or d-pad | Eight directions; Pip slides along walls and round corners |
+| Poke with the spoon | X (or Space) | A | At full health it also throws a spark (as strong as a poke) |
+| Use the B item | Z (or J) | B | Popcorn bombs, the pizza cutter, the skewer bow, the fire chili, the whisk |
+| Pocket Pantry | Enter (or I) | X | Choose the B item, see equipment and treasures; Tab (LB/RB) for the map |
+| Map | M | Y | The Pocket Pantry's map page |
+| Next / previous item | E / Q | RB / LB | Changes the B item without opening anything |
+| Quick save | F5 | Back (View) | Saves to the file straight away |
+| Pause | Escape (or P) | Start (Menu) | Resume, save, settings, quit to the title |
 
-Every menu works with the mouse too: over an option chooses it, a click does it.
+Every menu works with the mouse too: over an option chooses it, a click does it. With a
+gamepad, the stick or d-pad chooses, A is OK and B goes back, and the menus' hints name
+the gamepad's buttons while it is the one being used. SETTINGS shows the gamepad's buttons
+when opened with the gamepad (one per action: A, then the new button; X clears it), and
+the keys when opened with the keys. Any controller works, in the same Xbox-style layout
+(on a Steam Deck, its own controls); getting hurt makes it rumble. On a Steam Deck, add the
+game to Steam as a non-Steam game and play it from there, so that Steam passes its controls
+on as a gamepad.
 
 **The title** offers PLAY, SETTINGS and QUIT. PLAY shows three files: an empty one starts
 a new game (saved straight away), one with a game in it carries on from where it was
@@ -150,7 +157,7 @@ saved - the screen Pip was on, outside the cave he was in, or the door of the ce
 showing where that is, his hearts, his recipe pages and the time played. ERASE wipes a
 file. **The pause menu** saves the game to its file, opens the settings, or quits to the
 title (saving first, or not). **The settings** set the music's and the sounds' volume and
-two keys for each action (Enter, then the new key; a key does one thing at a time), and
+two keys and a gamepad button for each action (Enter, then the new key; a key does one thing at a time), and
 are kept for every file. Everything is kept with Bronto's saved data (`save_data`): the
 files are `slot1` to `slot3`, the settings `settings`, in the game's folder for saved
 data (on a Mac, `~/Library/Application Support/Pantry Quest`).

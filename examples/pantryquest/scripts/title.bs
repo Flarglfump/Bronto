@@ -57,7 +57,7 @@ func update(dt) {
         panel.Shape.color = rgb(0, 0, 0, min(t, 1) * 225)
         var last = labels[len(labels) - 1]
         if last.y > 150 { for l in labels { l.y -= 16 * dt } }
-        if last_key() != "" or moved or click or t > 30 {
+        if last_key() != "" or last_button() != "" or moved or click or t > 30 {
             phase = "menu"
             t = 0
             panel.Shape.color = rgb(0, 0, 0, 0)
@@ -70,7 +70,8 @@ func update(dt) {
         t = 0
         return
     }
-    if last_key() != "" or moved or click { t = 0 }
+    if last_key() != "" or last_button() != "" or moved or click { t = 0 }
+    find("Footer").Label.text = s.choose_label() + ": CHOOSE   " + s.ok_label() + ": OK"
     var ok = s.nav("ok")
     if moved or click {
         for i in 3 {

@@ -1275,6 +1275,86 @@ static void test_pantryquest_pocket_pantry(void) {
     br_save_set_folder(NULL);
 }
 
+/* Pantry Quest with a gamepad: the stick walks, the shoulder buttons change
+ * the item, Start pauses and B resumes, X opens the Pocket Pantry and the
+ * shoulder buttons turn its page, Y closes the map; the hints name the
+ * buttons; and the settings change a button with the gamepad. */
+static void pq_button(br_gamepad_button b) {
+    g_engine.input.pads[0].connected = true;
+    g_engine.input.pads[0].pressed[b] = g_engine.input.pads[0].buttons[b] = true;
+    steps(1);
+    g_engine.input.pads[0].pressed[b] = g_engine.input.pads[0].buttons[b] = false;
+    steps(2);
+}
+static void test_pantryquest_gamepad(void) {
+    char folder[BR_PATH_MAX], first[32], text[64];
+    br_entity game;
+    const br_transform *t;
+    float x0;
+    size_t size;
+    char *saved;
+    br_path_join(folder, sizeof(folder), g_out_dir, "pq_pad");
+    br_save_set_folder(folder);
+    br_save_delete("settings.txt");
+    game = pq_start("d1_2_4", 128, 200, "start_items = \"bombs,cutter\"");
+    t = (const br_transform *)br_get(&W, named("Hero"), ID.transform);
+    x0 = t ? t->position.x : 0;
+    g_engine.input.pads[0].connected = true;
+    g_engine.input.pads[0].axes[BR_PAD_AXIS_LEFT_X] = -1;          /* the stick, left */
+    steps(30);
+    g_engine.input.pads[0].axes[BR_PAD_AXIS_LEFT_X] = 0;
+    steps(2);
+    t = (const br_transform *)br_get(&W, named("Hero"), ID.transform);
+    CHECK(t && t->position.x < x0 - 20);
+    CHECK(br_script_get_string(&W, game, "b_item", first, sizeof(first)) && first[0]);
+    pq_button(BR_PAD_RIGHT_BUMPER);                                 /* the next item */
+    CHECK(br_script_get_string(&W, game, "b_item", text, sizeof(text)) && strcmp(text, first) != 0);
+    pq_button(BR_PAD_LEFT_BUMPER);
+    CHECK(br_script_get_string(&W, game, "b_item", text, sizeof(text)) && strcmp(text, first) == 0);
+    pq_button(BR_PAD_START);                                       /* pause; B resumes */
+    CHECK(named("PauseMenu") != BR_ENTITY_NULL && strcmp(pq_label("Hint"), "B: BACK TO THE GAME") == 0);
+    pq_button(BR_PAD_B);
+    CHECK(named("PauseMenu") == BR_ENTITY_NULL);
+    pq_button(BR_PAD_X);                                           /* the Pocket Pantry, its hints in buttons */
+    CHECK(named("Menu") != BR_ENTITY_NULL && strcmp(pq_label("Keys"), "LB/RB: MAP   X: CLOSE") == 0);
+    pq_button(BR_PAD_RIGHT_BUMPER);                                 /* the other page */
+    CHECK(named("Menu") == BR_ENTITY_NULL && named("MapView") != BR_ENTITY_NULL);
+    CHECK(strcmp(pq_label("Keys"), "LB/RB: ITEMS  Y: CLOSE") == 0);
+    pq_button(BR_PAD_Y);
+    CHECK(named("MapView") == BR_ENTITY_NULL);
+    CHECK(br_script_get_string(&W, game, "state", text, sizeof(text)) && strcmp(text, "play") == 0);
+    pq_press(BR_KEY_ENTER);                                        /* a key: the hints are keys again */
+    CHECK(named("Menu") != BR_ENTITY_NULL && strcmp(pq_label("Keys"), "TAB: MAP   ENTER: CLOSE") == 0);
+    pq_press(BR_KEY_ENTER);
+    pq_end();
+    /* the settings, with the gamepad: UP's button becomes LB (and PREVIOUS ITEM loses it) */
+    CHECK(pq_load("title.scene"));
+    steps(4);
+    g_engine.input.pads[0].connected = true;
+    pq_button(BR_PAD_DPAD_DOWN);
+    pq_button(BR_PAD_A);                                           /* SETTINGS */
+    CHECK(named("SettingsMenu") != BR_ENTITY_NULL);
+    CHECK(strcmp(pq_label("KeyA0"), "D-UP") == 0 && strcmp(pq_label("KeyB0"), "") == 0);
+    pq_button(BR_PAD_DPAD_DOWN);
+    pq_button(BR_PAD_DPAD_DOWN);                                   /* UP */
+    pq_button(BR_PAD_A);
+    steps(10);
+    pq_button(BR_PAD_LEFT_BUMPER);
+    CHECK(strcmp(pq_label("KeyA0"), "LB") == 0);
+    pq_button(BR_PAD_B);                                           /* leave: saved */
+    CHECK(named("SettingsMenu") == BR_ENTITY_NULL);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+    saved = (char *)br_save_read("settings.txt", &size);
+    CHECK(saved && strstr(saved, "[\"lb\", \"down\", \"left\", \"right\", \"a\", \"b\", \"x\", \"start\", \"back\", \"y\", \"rb\", \"\"]"));
+    br_free(saved);
+    memset(g_engine.input.pads, 0, sizeof(g_engine.input.pads));
+    br_save_delete("settings.txt");
+    br_fs_remove(folder);
+    br_save_set_folder(NULL);
+}
+
 static void test_pantryquest_files_and_settings(void) {
     char folder[BR_PATH_MAX], text[64];
     size_t size;
@@ -1380,7 +1460,7 @@ static void test_pantryquest_files_and_settings(void) {
     if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
     teardown();
     saved = (char *)br_save_read("settings.txt", &size);
-    CHECK(saved && strncmp(saved, "[[[\"i\", \"w\"]", 12) == 0 && strstr(saved, "], 7, 10]"));
+    CHECK(saved && strncmp(saved, "[[[\"i\", \"w\"]", 12) == 0 && strstr(saved, "], 7, 10, ["));
     CHECK(saved && strstr(saved, "[\"enter\", \"\"]"));          /* I was the Pocket Pantry's: a key does one thing */
     br_free(saved);
     g_engine.mixer.bus_volume[BR_BUS_MUSIC] = g_engine.mixer.bus_volume[BR_BUS_SFX] = g_engine.mixer.bus_volume[BR_BUS_UI] = 1;
@@ -1795,6 +1875,7 @@ void suite_script(void) {
     RUN(test_pantryquest_stages);
     RUN(test_pantryquest_eight_ways);
     RUN(test_pantryquest_pocket_pantry);
+    RUN(test_pantryquest_gamepad);
     RUN(test_pantryquest_files_and_settings);
     RUN(test_check_and_errors);
     RUN(test_types_checked);

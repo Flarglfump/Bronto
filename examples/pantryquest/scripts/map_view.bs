@@ -44,7 +44,6 @@ func start() {
     you.Shape.layer = 89
     child(self, "Where").Label.text = "YOU ARE " + game.place_name()
     child(self, "Pages").Label.text = "RECIPE PAGES FOUND: " + game.pages + " OF 8"
-    child(self, "Keys").Label.text = "TAB: ITEMS  " + controls.key_label(controls.keys[9][0]) + ": CLOSE"
     child(self, "TabItems").Label.color = rgb(232, 160, 160)       # (this page's tab is the bright one)
     child(self, "TabMap").Label.color = rgb(255, 240, 208)
 }
@@ -65,8 +64,9 @@ func update(dt) {
     t += dt
     opened += 1
     if floor(t * 4) % 2 == 0 { you.Shape.color = rgb(255, 248, 236) } else { you.Shape.color = rgb(216, 52, 58) }
+    child(self, "Keys").Label.text = controls.page_label() + ": ITEMS  " + controls.label_of("map") + ": CLOSE"
     if opened < 3 { return }                           # (not the key that opened it)
-    if key_pressed("tab") or controls.pressed("pantry") or (controls.clicked() and controls.over_label(child(self, "TabItems"))) {
+    if controls.page() or controls.pressed("pantry") or (controls.clicked() and controls.over_label(child(self, "TabItems"))) {
         to_items()
         return
     }

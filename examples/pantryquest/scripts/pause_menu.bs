@@ -51,6 +51,7 @@ func close() {
 }
 
 func update(dt) {
+    child(self, "Hint").Label.text = controls.back_label() + ": BACK TO THE GAME"
     if len(find_all("SettingsMenu")) > 0 {           # the settings are open over it
         settle = 2
         return

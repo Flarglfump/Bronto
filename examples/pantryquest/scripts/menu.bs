@@ -71,7 +71,6 @@ func start() {
             e.Sprite.tint = rgb(255, 255, 255)
         }
     }
-    child(self, "Keys").Label.text = "TAB: MAP   " + keys.key_label(keys.keys[6][0]) + ": CLOSE"
     mouse_at = mouse_position()
     show()
 }
@@ -209,6 +208,7 @@ func close() {
 
 func update(dt) {
     opened += 1
+    child(self, "Keys").Label.text = keys.page_label() + ": MAP   " + keys.label_of("pantry") + ": CLOSE"
     var n = len(owned)
     if n > 0 {
         if keys.nav("left") { pick((choice + n - 1) % n) }
@@ -218,7 +218,7 @@ func update(dt) {
     }
     if mouse() { return }
     if opened < 3 { return }                            # (not the key that opened it)
-    if key_pressed("tab") or keys.pressed("map") {
+    if keys.page() or keys.pressed("map") {
         to_map()
         return
     }

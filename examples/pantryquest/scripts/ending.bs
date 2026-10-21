@@ -15,6 +15,7 @@ func update(dt) {
     t += dt
     var colours = [rgb(142, 26, 42), rgb(142, 26, 42), rgb(98, 56, 26), rgb(98, 56, 26), rgb(98, 56, 26),
                    rgb(160, 120, 80), rgb(142, 26, 42), rgb(160, 120, 80)]
+    child(self, "Keys").Label.text = find("Settings").ok_label() + " - BACK TO THE TITLE"
     for i in len(names) {
         if t > 0.4 + i * 0.35 { child(self, names[i]).Label.color = colours[i] }
     }

@@ -6,6 +6,10 @@
 #
 # The mouse works too: over a line, it's chosen; click a volume's pip to set
 # it, a key to change it, RESET or BACK to do that, an arrow to scroll.
+#
+# With a gamepad (whichever was used last: scripts/settings.bs using_pad),
+# the actions show their gamepad buttons instead, one each: A waits for the
+# new button, X clears it. Waiting gives up after five seconds.
 # Saved as Pip leaves (scripts/settings.bs).
 
 var s
@@ -14,6 +18,8 @@ var top = 0                 # the first action in view
 var col = 0                 # which key of an action
 var waiting = false
 var wait_t = 0
+var wait_pad = false        # waiting for a gamepad button (not a key)
+var was_pad = false         # (the menu shows the buttons while this is true)
 var labels = []             # the 12 lines on the card: 0 music, 1 sounds, 2 to 9 actions in view, 10 reset, 11 back
 var key_a = []
 var key_b = []
@@ -44,6 +50,7 @@ func start() {
     more_up = child(self, "MoreUp")
     more_down = child(self, "MoreDown")
     mouse_at = mouse_position()
+    was_pad = s.using_pad
     show()
 }
 
@@ -89,10 +96,16 @@ func show() {
             if r == row { labels[l].Label.color = rgb(142, 26, 42) } else { labels[l].Label.color = rgb(98, 56, 26) }
         }
     }
+    if was_pad { col = 0 }                               # (a gamepad button each: one column)
     for k in shown {
         var a = top + k
-        key_a[k].Label.text = s.key_label(s.keys[a][0])
-        key_b[k].Label.text = s.key_label(s.keys[a][1])
+        if was_pad {
+            key_a[k].Label.text = s.pad_label(s.pads[a])
+            key_b[k].Label.text = ""
+        } else {
+            key_a[k].Label.text = s.key_label(s.keys[a][0])
+            key_b[k].Label.text = s.key_label(s.keys[a][1])
+        }
         if waiting and row == a + 2 {
             if col == 0 { key_a[k].Label.text = "?" } else { key_b[k].Label.text = "?" }
         }
@@ -110,10 +123,12 @@ func show() {
     }
     if top > 0 { more_up.Label.color = rgb(142, 26, 42) } else { more_up.Label.color = rgb(0, 0, 0, 0) }
     if top + shown < actions() { more_down.Label.color = rgb(142, 26, 42) } else { more_down.Label.color = rgb(0, 0, 0, 0) }
-    if waiting { hint.Label.text = "PRESS A KEY  (ESC: KEEP)" }
+    if waiting and wait_pad { hint.Label.text = "PRESS A BUTTON" }
+    elif waiting { hint.Label.text = "PRESS A KEY  (ESC: KEEP)" }
+    elif is_action(row) and was_pad { hint.Label.text = "A: CHANGE  X: CLEAR" }
     elif is_action(row) { hint.Label.text = "ENTER: CHANGE  DEL: CLEAR" }
     elif row <= 1 { hint.Label.text = "<> LOUDER / SOFTER" }
-    else { hint.Label.text = "ENTER: CHOOSE  ESC: BACK" }
+    else { hint.Label.text = s.ok_label() + ": CHOOSE  " + s.back_label() + ": BACK" }
 }
 
 func close() {
@@ -133,6 +148,7 @@ func choose(r) {
         return true
     } elif is_action(r) {
         waiting = true
+        wait_pad = was_pad
         wait_t = 0
     }
     return false
@@ -199,19 +215,29 @@ func update(dt) {
     if waiting {
         wait_t += dt
         if wait_t < 0.1 { return }                       # (not the Enter that started it)
-        var k = last_key()
-        if k == "" { return }
-        if k != "escape" { s.set_key(row - 2, col, k) }
+        if wait_pad {
+            var b = last_button()
+            if b == "" and not key_pressed("escape") and wait_t < 5 { return }
+            if b != "" { s.set_pad(row - 2, b) }
+        } else {
+            var k = last_key()
+            if k == "" and wait_t < 5 { return }
+            if k != "escape" and k != "" { s.set_key(row - 2, col, k) }
+        }
         waiting = false
         play_sound("sfx/key.wav", 0.6)
         show()
         return
     }
-    if key_pressed("escape") {
+    if key_pressed("escape") or button_pressed("b") {
         close()
         return
     }
     var moved = false
+    if s.using_pad != was_pad {                          # (keys or buttons: whichever was used last)
+        was_pad = s.using_pad
+        show()
+    }
     var n = last_row() + 1
     if s.nav("up") { row = (row + n - 1) % n; moved = true }
     if s.nav("down") { row = (row + 1) % n; moved = true }
@@ -220,12 +246,16 @@ func update(dt) {
         if s.nav("left") { d = -1 }
         if row == 0 { s.music = clamp(s.music + d, 0, 10) }
         if row == 1 { s.sounds = clamp(s.sounds + d, 0, 10) }
-        if is_action(row) { col = clamp(col + d, 0, 1) }
+        if is_action(row) and not was_pad { col = clamp(col + d, 0, 1) }
         s.apply()
         moved = true
     }
     if is_action(row) and (key_pressed("delete") or key_pressed("backspace")) {
         s.keys[row - 2][col] = ""
+        moved = true
+    }
+    if is_action(row) and was_pad and button_pressed("x") {
+        s.pads[row - 2] = ""
         moved = true
     }
     if s.nav("ok") or key_pressed("enter") {

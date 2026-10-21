@@ -70,7 +70,7 @@ func show() {
     } else {
         row_hi.Shape.color = rgb(0, 0, 0, 0)
     }
-    if confirm { note.Label.text = "ERASE FILE " + (choice + 1) + "? ENTER: YES" }
+    if confirm { note.Label.text = "ERASE FILE " + (choice + 1) + "? " + s.ok_label() + ": YES" }
     elif erasing { note.Label.text = "WHICH FILE SHOULD GO?" }
     else { note.Label.text = "" }
 }

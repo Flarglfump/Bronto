@@ -1,13 +1,21 @@
 # The player's settings, kept between runs as saved data ("settings"): how
-# loud the music and the sounds are, and the keys for each action - two keys
-# each. Everything that reads the keys asks here: down("left"),
-# pressed("spoon"). One "Settings" entity in title.scene and in main.scene
-# runs this; scripts/settings_menu.bs changes it.
+# loud the music and the sounds are, the keys for each action - two keys
+# each - and a gamepad button for each. Everything that reads the controls
+# asks here: down("left"), pressed("spoon"). One "Settings" entity in
+# title.scene and in main.scene runs this; scripts/settings_menu.bs changes it.
+#
+# Gamepads: the left stick and the d-pad always move (and choose in menus), A
+# is always OK and B always back in menus. Whichever Pip was last played with
+# - keys or a gamepad - is what the menus' hints name (using_pad).
 
 var actions = ["up", "down", "left", "right", "spoon", "item", "pantry", "pause", "quicksave", "map", "item_next", "item_prev"]
 var names = ["UP", "DOWN", "LEFT", "RIGHT", "SPOON", "ITEM (B)", "POCKET PANTRY", "PAUSE", "QUICK SAVE", "MAP",
              "NEXT ITEM", "PREVIOUS ITEM"]
 var keys = []               # for each action, [first key, second key] ("" = none)
+var pads = []               # for each action, a gamepad button ("" = none), as button_down() names them
+var using_pad = false       # was a gamepad used last (rather than the keys or the mouse)?
+var stick_on = [false, false, false, false]      # the left stick pushed up, down, left, right
+var stick_hit = [false, false, false, false]     # ... just now (this step)
 var music = 8               # 0 (off) to 10
 var sounds = 10
 
@@ -20,6 +28,7 @@ func defaults() {
     keys = [["up", "w"], ["down", "s"], ["left", "a"], ["right", "d"],
             ["x", "space"], ["z", "j"], ["enter", "i"], ["escape", "p"],
             ["f5", ""], ["m", ""], ["e", ""], ["q", ""]]
+    pads = ["up", "down", "left", "right", "a", "b", "x", "start", "back", "y", "rb", "lb"]
     music = 8
     sounds = 10
 }
@@ -27,7 +36,7 @@ func defaults() {
 func load() {
     defaults()
     var d = load_data("settings")
-    if d == nil or len(d) != 3 or len(d[0]) > len(actions) { return }
+    if d == nil or len(d) < 3 or len(d[0]) > len(actions) { return }
     var saved = d[0]                                   # (older settings have fewer actions: the new ones keep their own keys,
     for i in len(saved) {                              #  unless one of them was given away to an old action)
         keys[i] = saved[i]
@@ -41,9 +50,30 @@ func load() {
     }
     music = clamp(d[1], 0, 10)
     sounds = clamp(d[2], 0, 10)
+    if len(d) >= 4 and len(d[3]) == len(actions) { pads = d[3] }    # (older settings have no buttons: the defaults)
 }
 
-func save() { save_data("settings", [keys, music, sounds]) }
+func save() { save_data("settings", [keys, music, sounds, pads]) }
+
+# Every step: the stick's directions (as buttons), and whether a gamepad or the keys were used last.
+func update(dt) {
+    var s = stick()
+    var on = [s.y < -0.5, s.y > 0.5, s.x < -0.5, s.x > 0.5]
+    for i in 4 {
+        stick_hit[i] = on[i] and not stick_on[i]
+        stick_on[i] = on[i]
+    }
+    if last_button() != "" or length(s) > 0.5 { using_pad = true }
+    if last_key() != "" or mouse_pressed(0) { using_pad = false }
+}
+
+func dir_index(action) {
+    var dirs = ["up", "down", "left", "right"]
+    for i in 4 {
+        if dirs[i] == action { return i }
+    }
+    return -1
+}
 
 func apply() {
     set_volume("music", music / 10)
@@ -58,18 +88,33 @@ func index_of(action) {
     return -1
 }
 
-# Is a key for this action held down / pressed this step?
+# Is a key or the button for this action held down / pressed this step? (The
+# stick counts for the directions.)
 func down(action) {
-    for k in keys[index_of(action)] {
+    var i = index_of(action)
+    for k in keys[i] {
         if k != "" and key_down(k) { return true }
     }
-    return false
+    if pads[i] != "" and button_down(pads[i]) { return true }
+    var d = dir_index(action)
+    return d >= 0 and stick_on[d]
 }
 func pressed(action) {
-    for k in keys[index_of(action)] {
+    var i = index_of(action)
+    for k in keys[i] {
         if k != "" and key_pressed(k) { return true }
     }
-    return false
+    if pads[i] != "" and button_pressed(pads[i]) { return true }
+    var d = dir_index(action)
+    return d >= 0 and stick_hit[d]
+}
+
+# Gives an action a gamepad button; a button does one thing, so it comes off any other action.
+func set_pad(i, button) {
+    for a in len(pads) {
+        if pads[a] == button { pads[a] = "" }
+    }
+    pads[i] = button
 }
 
 # Gives an action a key (as its first or second, which = 0 or 1). A key does
@@ -85,9 +130,42 @@ func set_key(i, which, key) {
 
 # Menus: the arrows always work, and so do the keys chosen for moving.
 func nav(dir) {
-    if dir == "ok" { return key_pressed("enter") or key_pressed("space") or pressed("spoon") }
-    if dir == "back" { return key_pressed("escape") or key_pressed("backspace") }
-    return key_pressed(dir) or pressed(dir)
+    if dir == "ok" { return key_pressed("enter") or key_pressed("space") or pressed("spoon") or button_pressed("a") }
+    if dir == "back" { return key_pressed("escape") or key_pressed("backspace") or button_pressed("b") }
+    return key_pressed(dir) or pressed(dir) or button_pressed(dir)
+}
+
+# The other page (the Pocket Pantry's tabs): Tab, or a shoulder button.
+func page() { return key_pressed("tab") or button_pressed("lb") or button_pressed("rb") }
+
+# What the menus' hints call a control - the keys' or the gamepad's, whichever was used last.
+func label_of(action) {
+    var i = index_of(action)
+    if using_pad { return pad_label(pads[i]) }
+    return key_label(keys[i][0])
+}
+func ok_label() {
+    if using_pad { return "A" }
+    return "ENTER"
+}
+func back_label() {
+    if using_pad { return "B" }
+    return "ESC"
+}
+func page_label() {
+    if using_pad { return "LB/RB" }
+    return "TAB"
+}
+func choose_label() {
+    if using_pad { return "STICK" }
+    return "ARROWS"
+}
+
+# "lb" -> "LB", "up" -> "D-UP", "" -> "-": a gamepad button's name as the menus show it.
+func pad_label(b) {
+    if b == "" { return "-" }
+    if b == "up" or b == "down" or b == "left" or b == "right" { return "D-" + upper(b) }
+    return upper(b)
 }
 
 # ---- the mouse, in the menus ---------------------------------------------------------------
