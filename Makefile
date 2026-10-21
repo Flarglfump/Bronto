@@ -52,6 +52,21 @@ else
   LDLIBS   += -luser32 -lgdi32
 endif
 
+# The C compiler on Linux: cc if there is one, otherwise gcc, otherwise clang
+# (some distributions install gcc or clang without a cc link). Only when CC
+# wasn't chosen on the command line or in the environment: make CC=... wins.
+ifeq ($(PLATFORM),linux)
+  ifneq (,$(filter default undefined file,$(origin CC)))
+    ifeq (,$(shell command -v $(CC) 2>/dev/null))
+      FOUND_CC := $(firstword $(foreach c,gcc clang,$(if $(shell command -v $(c) 2>/dev/null),$(c))))
+      ifeq (,$(FOUND_CC))
+        $(error No C compiler found: install gcc or clang (or say which: make CC=/path/to/compiler))
+      endif
+      CC := $(FOUND_CC)
+    endif
+  endif
+endif
+
 CORE_SRC := $(wildcard src/core/*.c)
 PLAT_SRC := src/platform/platform_headless.c src/platform/platform_native.c src/platform/fs.c src/platform/capture.c
 LIB_SRC  := $(CORE_SRC) $(PLAT_SRC)

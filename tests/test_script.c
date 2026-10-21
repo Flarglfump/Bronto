@@ -1194,6 +1194,87 @@ static void test_pantryquest_stages(void) {
     CHECK(hp == 7 && damage == 6);                     /* x3.5 and x3 */
 }
 
+/* The Pocket Pantry and the shortcuts: E and Q cycle the item on B without
+ * opening anything; keys belong to the cellar they're found in (out on the
+ * land Pip has none; back in, his are there again); the mouse over the
+ * pantry's equipment and treasures says what they are, over a plate it
+ * chooses that item, and a click on the MAP tab turns the page. Older
+ * settings (from before the shortcuts) keep their keys, and a new shortcut
+ * loses its key if an old action already uses it. */
+static void pq_mouse(float x, float y, bool click) {
+    g_engine.input.mouse_x = x;
+    g_engine.input.mouse_y = y;
+    g_engine.input.mouse_pressed[BR_MOUSE_LEFT] = g_engine.input.mouse[BR_MOUSE_LEFT] = click;
+    steps(1);
+    g_engine.input.mouse_pressed[BR_MOUSE_LEFT] = g_engine.input.mouse[BR_MOUSE_LEFT] = false;
+    steps(2);
+}
+static const char *pq_label(const char *name) {
+    const br_label *l = (const br_label *)br_get(&W, named(name), ID.label);
+    return l ? l->text : "";
+}
+static void test_pantryquest_pocket_pantry(void) {
+    char folder[BR_PATH_MAX], first[32], text[32], room[32];
+    const char *old = "[[[\"up\", \"w\"], [\"down\", \"s\"], [\"left\", \"a\"], [\"right\", \"d\"], [\"e\", \"space\"], "
+                      "[\"z\", \"j\"], [\"enter\", \"i\"], [\"escape\", \"p\"]], 8, 10]";
+    br_entity game;
+    br_path_join(folder, sizeof(folder), g_out_dir, "pq_pantry");
+    br_save_set_folder(folder);
+    br_save_delete("settings.txt");
+    game = pq_start("d1_2_4", 128, 200, "start_items = \"bombs,cutter,skewers\", treasures = [\"plank\"]");
+    /* E and Q: the next and the previous item, in play */
+    CHECK(br_script_get_string(&W, game, "b_item", first, sizeof(first)) && first[0]);
+    pq_press(BR_KEY_E);
+    CHECK(br_script_get_string(&W, game, "b_item", text, sizeof(text)) && strcmp(text, first) != 0);
+    pq_press(BR_KEY_Q);
+    CHECK(br_script_get_string(&W, game, "b_item", text, sizeof(text)) && strcmp(text, first) == 0);
+    pq_press(BR_KEY_E); pq_press(BR_KEY_E); pq_press(BR_KEY_E);    /* three items: round again */
+    CHECK(br_script_get_string(&W, game, "b_item", text, sizeof(text)) && strcmp(text, first) == 0);
+    CHECK(named("Menu") == BR_ENTITY_NULL && named("MapView") == BR_ENTITY_NULL);
+    /* the mouse in the Pocket Pantry (at 128, 152) */
+    pq_press(BR_KEY_ENTER);
+    CHECK(named("Menu") != BR_ENTITY_NULL);
+    pq_mouse(128 - 96, 152 - 17, false);                          /* the outfit */
+    CHECK(strcmp(pq_label("ItemName"), "COOK'S APRON") == 0);
+    pq_mouse(128 - 96, 152 - 36, false);                          /* the spoon */
+    CHECK(strcmp(pq_label("ItemName"), "WOODEN SPOON") == 0);
+    pq_mouse(128 + 96, 152 - 36, false);                          /* a treasure */
+    CHECK(strcmp(pq_label("ItemName"), "WAFER PLANK") == 0 && strcmp(pq_label("ItemInfo"), "CROSS JAM ONE TILE WIDE") == 0);
+    pq_mouse(128 + 21, 152 - 30, false);                          /* the third plate: chosen for B */
+    CHECK(br_script_get_string(&W, game, "b_item", text, sizeof(text)) && strcmp(text, "skewers") == 0);
+    CHECK(strcmp(pq_label("ItemName"), "SKEWER BOW") == 0);
+    pq_mouse(128 + 64, 152 - 73, true);                           /* a click on MAP */
+    CHECK(named("Menu") == BR_ENTITY_NULL && named("MapView") != BR_ENTITY_NULL);
+    pq_mouse(128 - 24, 152 - 79, true);                           /* and on POCKET PANTRY */
+    CHECK(named("Menu") != BR_ENTITY_NULL && named("MapView") == BR_ENTITY_NULL);
+    pq_press(BR_KEY_ENTER);
+    CHECK(named("Menu") == BR_ENTITY_NULL);
+    CHECK(br_script_get_string(&W, game, "state", text, sizeof(text)) && strcmp(text, "play") == 0);
+    /* keys: this cellar's two stay in it */
+    br_script_set_number(&W, game, "keys", 2);
+    hold_key(BR_KEY_DOWN, 70);
+    steps(60);
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strncmp(room, "ow_", 3) == 0);
+    CHECK(pq_num(game, "keys") == 0);
+    hold_key(BR_KEY_UP, 70);
+    steps(60);
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "d1_2_4") == 0);
+    CHECK(pq_num(game, "keys") == 2);
+    pq_end();
+    /* older settings: E was the spoon's, so NEXT ITEM has no key; Q still works */
+    CHECK(br_save_write("settings.txt", old, strlen(old)));
+    game = pq_start("d1_2_4", 128, 200, "start_items = \"bombs,cutter\"");
+    CHECK(br_script_get_string(&W, game, "b_item", first, sizeof(first)) && first[0]);
+    pq_press(BR_KEY_E);
+    CHECK(br_script_get_string(&W, game, "b_item", text, sizeof(text)) && strcmp(text, first) == 0);
+    pq_press(BR_KEY_Q);
+    CHECK(br_script_get_string(&W, game, "b_item", text, sizeof(text)) && strcmp(text, first) != 0);
+    pq_end();
+    br_save_delete("settings.txt");
+    br_fs_remove(folder);
+    br_save_set_folder(NULL);
+}
+
 static void test_pantryquest_files_and_settings(void) {
     char folder[BR_PATH_MAX], text[64];
     size_t size;
@@ -1217,18 +1298,34 @@ static void test_pantryquest_files_and_settings(void) {
     CHECK(br_script_get_number(&W, named("Game"), "slot", &slot) && slot == 1);
     CHECK(br_save_exists("slot1.txt") && !br_save_exists("session.txt"));
     br_script_set_number(&W, named("Game"), "beans", 42);          /* something to find again */
-    pq_press(BR_KEY_ESCAPE);
-    CHECK(named("PauseMenu") != BR_ENTITY_NULL);
-    pq_press(BR_KEY_DOWN);
-    pq_press(BR_KEY_ENTER);                                       /* MAP: where Pip is, the rest in fog */
+    pq_press(BR_KEY_M);                                           /* the MAP key: where Pip is, the rest in fog */
     CHECK(named("MapView") != BR_ENTITY_NULL);
     {
         const br_label *where = (const br_label *)br_get(&W, named("Where"), ID.label);
         CHECK(where && strcmp(where->text, "YOU ARE ON THE PANTRY PLAINS") == 0);
         CHECK_EQ_INT(pq_count("MapFog"), 127);                   /* a new game: only the first screen seen */
     }
-    pq_press(BR_KEY_ENTER);                                       /* (closes it, and only it) */
-    CHECK(named("MapView") == BR_ENTITY_NULL && named("PauseMenu") != BR_ENTITY_NULL);
+    pq_press(BR_KEY_TAB);                                         /* the Pocket Pantry's other page: the items */
+    CHECK(named("MapView") == BR_ENTITY_NULL && named("Menu") != BR_ENTITY_NULL);
+    pq_press(BR_KEY_TAB);                                         /* and back */
+    CHECK(named("MapView") != BR_ENTITY_NULL && named("Menu") == BR_ENTITY_NULL);
+    pq_press(BR_KEY_M);                                           /* (closes it, back to play) */
+    CHECK(named("MapView") == BR_ENTITY_NULL);
+    CHECK(br_script_get_string(&W, named("Game"), "state", text, sizeof(text)) && strcmp(text, "play") == 0);
+    steps(2);
+    CHECK(named("MapView") == BR_ENTITY_NULL);                    /* (and it didn't open again) */
+    br_script_set_number(&W, named("Game"), "beans", 41);
+    pq_press(BR_KEY_F5);                                          /* QUICK SAVE, in play */
+    {
+        const br_label *note = (const br_label *)br_get(&W, named("BannerText"), ID.label);
+        CHECK(note && strcmp(note->text, "GAME SAVED!") == 0);
+        saved = (char *)br_save_read("slot1.txt", &size);
+        CHECK(saved && strstr(saved, "\"beans\", 41"));
+        br_free(saved);
+    }
+    br_script_set_number(&W, named("Game"), "beans", 42);
+    pq_press(BR_KEY_ESCAPE);
+    CHECK(named("PauseMenu") != BR_ENTITY_NULL);
     pq_press(BR_KEY_DOWN);
     pq_press(BR_KEY_ENTER);                                       /* SAVE GAME */
     CHECK(br_script_get_string(&W, named("Game"), "state", text, sizeof(text)) && strcmp(text, "pause") == 0);
@@ -1590,6 +1687,7 @@ void suite_script(void) {
     RUN(test_pantryquest_hints);
     RUN(test_pantryquest_stages);
     RUN(test_pantryquest_eight_ways);
+    RUN(test_pantryquest_pocket_pantry);
     RUN(test_pantryquest_files_and_settings);
     RUN(test_check_and_errors);
     RUN(test_types_checked);

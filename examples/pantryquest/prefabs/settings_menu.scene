@@ -724,6 +724,32 @@ entity
 
 entity
   Name
+    text = "MoreUp"
+  Transform
+    position = 106 -36
+  Label
+    text = "^"
+    size = 1
+    color = #8e1a2aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MoreDown"
+  Transform
+    position = 106 34
+  Label
+    text = "V"
+    size = 1
+    color = #8e1a2aff
+    layer = 93
+  Parent
+    entity = 0
+
+entity
+  Name
     text = "Hint"
   Transform
     position = 0 66

@@ -1,9 +1,17 @@
-# The inventory: a recipe page, with Pip's things on plates. The game waits
-# while it's open. The arrows (or the mouse) choose the item for B - its name
-# and what it does show underneath - and Enter closes it. The recipe pages
-# found so far are along the bottom, and the treasures Pip carries (they
-# work by themselves: the wafer plank, the oven mitt, the baking tray) down the right edge - the mouse over
-# one shows what it is.
+# The Pocket Pantry, its items page (the other page is the map: scripts/
+# map_view.bs - Tab, the MAP key, or a click on its tab swaps them). The game
+# waits while it's open.
+#
+#   - Pip's things for B on plates: the arrows (or the mouse) choose one;
+#   - his equipment down the left: his spoon or ladle, his apron, jacket or
+#     coat, and the Big Bomb Bag;
+#   - the treasures he carries down the right (they work by themselves: the
+#     wafer plank, the oven mitt, the baking tray);
+#   - the recipe pages found, along the bottom.
+#
+# Whatever the mouse is over - a plate, equipment, a treasure, the pages - has
+# its name and what it does shown underneath; otherwise, the item on B.
+# Enter (or the Pocket Pantry key, or Escape) closes it.
 
 var game
 var keys
@@ -14,20 +22,24 @@ var choice = 0
 var owned = []
 var item_name
 var item_info
-var last_mouse := vec2(-1, -1)
+var mouse_at := vec2(-1, -1)
 var treasure_spots = []
-var on_treasure = -1        # the treasure the mouse is over, or -1
+var equip_spots = []
+var equipment = []          # what's in the equipment column: "weapon", "outfit", "bag"
+var page_icons = []
+var hovering = ""           # what the mouse is over (a thing's name, as name_of knows it), or ""
+var opened = 0
 
 func start() {
     game = find("Game")
     keys = find("Settings")
-    child(self, "Keys").Label.text = "<> CHOOSE   " + keys.key_label(keys.keys[6][0]) + ": CLOSE"
     cursor = child(self, "Cursor")
     item_name = child(self, "ItemName")
     item_info = child(self, "ItemInfo")
     for i in 8 {
         push(slots, child(self, "Slot" + i))
         push(plates, child(self, "Plate" + i))
+        push(page_icons, child(self, "Page" + i))
     }
     owned = []
     for item in game.items { push(owned, item) }
@@ -39,11 +51,8 @@ func start() {
         } else {
             plates[i].Sprite.tint = rgb(255, 255, 255, 110)     # an empty plate, waiting
         }
+        if i < game.pages { page_icons[i].Sprite.image = "art/page_on.bmp" }
     }
-    for i in 8 {
-        if i < game.pages { child(self, "Page" + i).Sprite.image = "art/page_on.bmp" }
-    }
-    child(self, "Pages").Label.text = "RECIPE PAGES"
     for i in 3 {
         var t = child(self, "Treasure" + i)
         push(treasure_spots, t)
@@ -52,11 +61,32 @@ func start() {
             t.Sprite.tint = rgb(255, 255, 255)
         }
     }
-    last_mouse = mouse_position()
+    equipment = ["weapon", "outfit"]
+    if game.bombs_max > 8 { push(equipment, "bag") }
+    for i in 3 {
+        var e = child(self, "Equip" + i)
+        push(equip_spots, e)
+        if i < len(equipment) {
+            e.Sprite.image = equip_image(equipment[i])
+            e.Sprite.tint = rgb(255, 255, 255)
+        }
+    }
+    child(self, "Keys").Label.text = "TAB: MAP   " + keys.key_label(keys.keys[6][0]) + ": CLOSE"
+    mouse_at = mouse_position()
     show()
 }
 
-# What each thing is called, and what it's for.
+func equip_image(e) {
+    if e == "weapon" { return game.weapon_image() }
+    if e == "outfit" {
+        if game.outfit >= 2 { return "art/coat.bmp" }
+        if game.outfit == 1 { return "art/jacket.bmp" }
+        return "art/apron.bmp"
+    }
+    return "art/bag.bmp"
+}
+
+# What each thing is called, and what it's for (the card holds about 27 letters a line).
 func name_of(item) {
     if item == "bombs" { return "POPCORN BOMBS x" + game.bombs }
     if item == "cutter" { return "PIZZA CUTTER" }
@@ -66,6 +96,16 @@ func name_of(item) {
     if item == "plank" { return "WAFER PLANK" }
     if item == "mitt" { return "OVEN MITT" }
     if item == "tray" { return "BAKING TRAY" }
+    if item == "weapon" {
+        var w = ["NO SPOON YET", "WOODEN SPOON", "COPPER SPOON", "SILVER LADLE", "GOLDEN LADLE"]
+        return w[clamp(game.weapon, 0, 4)]
+    }
+    if item == "outfit" {
+        var o = ["COOK'S APRON", "CHEF'S JACKET", "ROYAL COAT"]
+        return o[clamp(game.outfit, 0, 2)]
+    }
+    if item == "bag" { return "BIG BOMB BAG" }
+    if item == "pages" { return "RECIPE PAGES: " + game.pages + " OF 8" }
     return ""
 }
 func info_of(item) {
@@ -77,65 +117,110 @@ func info_of(item) {
     if item == "plank" { return "CROSS JAM ONE TILE WIDE" }
     if item == "mitt" { return "WALK INTO A CRATE TO PUSH IT" }
     if item == "tray" { return "YOUR LID STOPS EVERY SHOT" }
+    if item == "weapon" {
+        var w = ["THE OLD CHEF HAS ONE", "POKES: 1 POINT A HIT", "POKES: 1.5 POINTS A HIT", "POKES: 2 POINTS A HIT",
+                 "POKES: 3 POINTS A HIT"]
+        return w[clamp(game.weapon, 0, 4)]
+    }
+    if item == "outfit" {
+        var o = ["HITS HURT IN FULL", "HITS HURT HALF AS MUCH", "HITS HURT A QUARTER"]
+        return o[clamp(game.outfit, 0, 2)]
+    }
+    if item == "bag" { return "HOLDS " + game.bombs_max + " POPCORN BOMBS" }
+    if item == "pages" {
+        if game.pages >= 8 { return "THE BARON'S HALL AWAITS" }
+        return "ONE IN EACH CELLAR"
+    }
     return ""
 }
 
 func show() {
-    if on_treasure >= 0 {                                # (just naming it: it isn't for B)
-        item_name.Label.text = name_of(game.treasures[on_treasure])
-        item_info.Label.text = info_of(game.treasures[on_treasure])
-        return
-    }
+    var what = hovering
+    if what == "" and len(owned) > 0 { what = owned[choice] }
     if len(owned) == 0 {
         cursor.Sprite.tint = rgb(255, 255, 255, 0)
+    } else {
+        cursor.position = plates[choice].position
+        game.b_item = owned[choice]
+    }
+    if what == "" {
         item_name.Label.text = "NOTHING HERE YET"
         item_info.Label.text = "THE CELLARS HIDE THINGS"
         return
     }
-    cursor.position = plates[choice].position
-    item_name.Label.text = name_of(owned[choice])
-    item_info.Label.text = info_of(owned[choice])
-    game.b_item = owned[choice]
+    item_name.Label.text = name_of(what)
+    item_info.Label.text = info_of(what)
 }
 
 func pick(i) {
     if i >= len(owned) { return }
-    on_treasure = -1
-    if i == choice {
-        show()
-        return
-    }
+    if i == choice { return }
     choice = i
     play_sound("sfx/menu.wav")
     show()
 }
 
+# What the mouse is over: a plate (chosen for B), equipment, a treasure, the pages.
+# True if a click on the MAP tab turned the page.
+func mouse() {
+    var m = mouse_position()
+    var moved = m != mouse_at
+    mouse_at = m
+    if not moved and not keys.clicked() { return false }
+    var over = ""
+    for i in len(owned) {
+        if keys.over(plates[i], 26, 26) {
+            pick(i)
+            over = owned[i]
+        }
+    }
+    for i in len(equipment) {
+        if keys.over(equip_spots[i], 18, 18) { over = equipment[i] }
+    }
+    for i in min(3, len(game.treasures)) {
+        if keys.over(treasure_spots[i], 18, 18) { over = game.treasures[i] }
+    }
+    if keys.over(child(self, "Pages"), 100, 10) or (m.y > page_icons[0].global_position.y - 6 and m.y < page_icons[0].global_position.y + 6 and
+                                                   m.x > page_icons[0].global_position.x - 6 and m.x < page_icons[7].global_position.x + 6) {
+        over = "pages"
+    }
+    if over != hovering {
+        hovering = over
+        show()
+    }
+    if keys.clicked() and keys.over_label(child(self, "TabMap")) {
+        to_map()
+        return true
+    }
+    return false
+}
+
+func to_map() {
+    play_sound("sfx/menu.wav")
+    spawn("prefabs/map_view.scene", self.position)
+    destroy(self)
+}
+
+func close() {
+    game.state = "play"
+    play_sound("sfx/menu.wav")
+    destroy(self)
+}
+
 func update(dt) {
+    opened += 1
     var n = len(owned)
     if n > 0 {
         if keys.nav("left") { pick((choice + n - 1) % n) }
         if keys.nav("right") { pick((choice + 1) % n) }
         if keys.nav("up") { if choice >= 4 { pick(choice - 4) } }
         if keys.nav("down") { if choice + 4 < n { pick(choice + 4) } }
-        var m = mouse_position()                         # the mouse: over a plate, it's chosen
-        if m != last_mouse or mouse_pressed(0) {
-            last_mouse = m
-            for i in n {
-                if distance(plates[i].global_position, m) < 13 { pick(i) }
-            }
-            var over = -1
-            for i in len(game.treasures) {
-                if i < 3 and distance(treasure_spots[i].global_position, m) < 9 { over = i }
-            }
-            if over != on_treasure {
-                on_treasure = over
-                show()
-            }
-        }
     }
-    if keys.pressed("pantry") or keys.nav("back") {
-        game.state = "play"
-        play_sound("sfx/menu.wav")
-        destroy(self)
+    if mouse() { return }
+    if opened < 3 { return }                            # (not the key that opened it)
+    if key_pressed("tab") or keys.pressed("map") {
+        to_map()
+        return
     }
+    if keys.pressed("pantry") or keys.nav("ok") or keys.nav("back") or keys.pressed("pause") { close() }
 }

@@ -1,6 +1,6 @@
 # The end: the Grand Recipe is whole (scripts/game.bs win()). The lines come
 # in one by one; after a moment, Enter (or the spoon's key) goes back to the
-# title.
+# title (or a click).
 
 var t = 0
 var names = ["Title", "Title2", "Line1", "Line2", "Line3", "Time", "Thanks", "Keys"]
@@ -18,5 +18,5 @@ func update(dt) {
     for i in len(names) {
         if t > 0.4 + i * 0.35 { child(self, names[i]).Label.color = colours[i] }
     }
-    if t > 3.5 and find("Settings").nav("ok") { load_scene("title.scene") }
+    if t > 3.5 and (find("Settings").nav("ok") or find("Settings").clicked()) { load_scene("title.scene") }
 }

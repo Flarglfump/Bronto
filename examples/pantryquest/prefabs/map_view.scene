@@ -1,4 +1,4 @@
-# Pantry Quest - the map of the land (scripts/map_view.bs), from the pause menu
+# Pantry Quest - the Pocket Pantry, its map page (scripts/map_view.bs): the land, a pixel a tile
 bronto_scene 1
 
 entity
@@ -18,7 +18,7 @@ entity
   Name
     text = "Frame"
   Transform
-    position = 0 -22
+    position = 0 -18
   Shape
     kind = rect
     size = 260 92
@@ -31,7 +31,7 @@ entity
   Name
     text = "Map"
   Transform
-    position = 0 -22
+    position = 0 -18
   Sprite
     image = "art/world_map.bmp"
     layer = 82
@@ -42,7 +42,7 @@ entity
   Name
     text = "Names"
   Transform
-    position = 0 -22
+    position = 0 -18
   Sprite
     image = "art/map_names.bmp"
     layer = 85
@@ -53,7 +53,7 @@ entity
   Name
     text = "RibbonL"
   Transform
-    position = -88 -78
+    position = -92 -78
   Sprite
     image = "art/banner_l.bmp"
     layer = 88
@@ -65,7 +65,7 @@ entity
     text = "RibbonMid"
   Transform
     position = 0 -78
-    scale = 41 1
+    scale = 43 1
   Sprite
     image = "art/banner_mid.bmp"
     layer = 87
@@ -76,7 +76,7 @@ entity
   Name
     text = "RibbonR"
   Transform
-    position = 88 -78
+    position = 92 -78
   Sprite
     image = "art/banner_r.bmp"
     layer = 88
@@ -85,11 +85,11 @@ entity
 
 entity
   Name
-    text = "HeadingShadow"
+    text = "TabItemsShadow"
   Transform
-    position = 1 -78
+    position = -23 -78
   Label
-    text = "THE PANTRY KINGDOM"
+    text = "POCKET PANTRY"
     size = 1
     color = #4a141cff
     layer = 89
@@ -98,11 +98,11 @@ entity
 
 entity
   Name
-    text = "Heading"
+    text = "TabItems"
   Transform
-    position = 0 -79
+    position = -24 -79
   Label
-    text = "THE PANTRY KINGDOM"
+    text = "POCKET PANTRY"
     size = 1
     color = #fff0d0ff
     layer = 90
@@ -111,9 +111,48 @@ entity
 
 entity
   Name
+    text = "TabBar"
+  Transform
+    position = 40 -79
+  Label
+    text = "|"
+    size = 1
+    color = #e8a0a0ff
+    layer = 90
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "TabMapShadow"
+  Transform
+    position = 65 -78
+  Label
+    text = "MAP"
+    size = 1
+    color = #4a141cff
+    layer = 89
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "TabMap"
+  Transform
+    position = 64 -79
+  Label
+    text = "MAP"
+    size = 1
+    color = #e8a0a0ff
+    layer = 90
+  Parent
+    entity = 0
+
+entity
+  Name
     text = "Where"
   Transform
-    position = 0 32
+    position = 0 36
   Label
     text = ""
     size = 1
@@ -126,7 +165,7 @@ entity
   Name
     text = "YouMark"
   Transform
-    position = -98 48
+    position = -98 50
   Shape
     kind = rect
     size = 4 4
@@ -139,7 +178,7 @@ entity
   Name
     text = "YouText"
   Transform
-    position = -78 48
+    position = -78 50
   Label
     text = "YOU"
     size = 1
@@ -152,7 +191,7 @@ entity
   Name
     text = "CellarKey"
   Transform
-    position = -42 48
+    position = -42 50
     scale = 2 2
   Sprite
     image = "art/map_1_red.bmp"
@@ -164,7 +203,7 @@ entity
   Name
     text = "CellarText"
   Transform
-    position = -10 48
+    position = -10 50
   Label
     text = "CELLAR"
     size = 1
@@ -177,7 +216,7 @@ entity
   Name
     text = "DoneKey"
   Transform
-    position = 30 48
+    position = 30 50
     scale = 2 2
   Sprite
     image = "art/map_1_gold.bmp"
@@ -189,7 +228,7 @@ entity
   Name
     text = "DoneText"
   Transform
-    position = 66 48
+    position = 66 50
   Label
     text = "CLEARED"
     size = 1
@@ -215,9 +254,9 @@ entity
   Name
     text = "Keys"
   Transform
-    position = 0 80
+    position = 0 78
   Label
-    text = "ESC: BACK"
+    text = ""
     size = 1
     color = #a07850ff
     layer = 86

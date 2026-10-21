@@ -42,7 +42,7 @@ put flame 10.5 4
 put baker 7.5 4 line1 = "FRESH FROM THE OVEN!", line2 = "TAKE YOUR PICK, LITTLE COOK."
 put pickup 5 6.5 kind = "bombs_item", price = 20
 put pickup 7.5 6.5 kind = "soup", price = 15
-put pickup 10 6.5 kind = "key", price = 40
+put pickup 10 6.5 kind = "bag", price = 80, flag = "bag"
 end
 
 room cave_secret
@@ -356,7 +356,7 @@ put flame 4.5 4
 put flame 10.5 4
 put baker 7.5 4 line1 = "THE WOODS' FINEST GOODS!", line2 = "BUY SOMETHING, WILL YOU?"
 put pickup 5 6.5 kind = "bombs_item", price = 20
-put pickup 7.5 6.5 kind = "key", price = 60
+put pickup 7.5 6.5 kind = "soup", price = 30
 put pickup 10 6.5 kind = "heart", price = 10
 end
 
@@ -379,7 +379,7 @@ put flame 10.5 4
 put baker 7.5 4 line1 = "SWEET DEALS IN THE DESERT!", line2 = "BEANS ONLY, PLEASE."
 put pickup 5 6.5 kind = "soup", price = 30
 put pickup 7.5 6.5 kind = "bombs_item", price = 25
-put pickup 10 6.5 kind = "key", price = 50
+put pickup 10 6.5 kind = "heart", price = 10
 end
 
 room cave_shop4
@@ -421,7 +421,7 @@ KKKKKKK::KKKKKKK
 put flame 4.5 4
 put flame 10.5 4
 put baker 7.5 4 line1 = "FRESH FROM THE MARSH!", line2 = "PICKLED PRICES, TOO."
-put pickup 5 6.5 kind = "key", price = 45
+put pickup 5 6.5 kind = "heart", price = 10
 put pickup 7.5 6.5 kind = "soup", price = 30
 put pickup 10 6.5 kind = "bombs_item", price = 20
 end

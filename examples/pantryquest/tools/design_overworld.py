@@ -110,11 +110,12 @@ CELLARS = {(7, 5): (1, 'THE COLD CELLAR', False), (13, 1): (2, 'THE PICKLE PANTR
            (11, 4): (7, 'THE SUGAR MILL', True), (9, 1): (8, 'THE SOUP CAULDRON', True),
            (5, 0): (9, "BARON GORGE'S BANQUET HALL", False)}
 BUILT = {1, 2, 3, 4, 5, 6, 7, 8, 9}       # cellars with their own world file (cellarN.txt): no stand-in entrance room
+# (no keys: each cellar's keys are its own, found inside it)
 SHOP_STOCK = {
-    'cave_shop2': [('bombs_item', 20), ('key', 60), ('heart', 10)],
-    'cave_shop3': [('soup', 30), ('bombs_item', 25), ('key', 50)],
+    'cave_shop2': [('bombs_item', 20), ('soup', 30), ('heart', 10)],
+    'cave_shop3': [('soup', 30), ('bombs_item', 25), ('heart', 10)],
     'cave_shop4': [('bombs_item', 20), ('soup', 25), ('heart', 8)],
-    'cave_shop5': [('key', 45), ('soup', 30), ('bombs_item', 20)],
+    'cave_shop5': [('heart', 10), ('soup', 30), ('bombs_item', 20)],
 }
 SHOP_LINES = {'cave_shop2': ("THE WOODS' FINEST GOODS!", "BUY SOMETHING, WILL YOU?"),
               'cave_shop3': ("SWEET DEALS IN THE DESERT!", "BEANS ONLY, PLEASE."),

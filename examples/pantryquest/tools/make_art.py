@@ -3040,6 +3040,44 @@ DUNGEON_TILES = ['d_floor', 'd_wall', 'd_crate', 'd_soup', 'd_stairs', 'd_locked
 
 
 
+# a cook's apron (the Pocket Pantry's equipment: no jacket yet)
+sprite('apron',
+       "................",
+       ".....k....k.....",
+       "....krk..krk....",
+       ".....kkkkkk.....",
+       ".....kwwwwk.....",
+       ".....kwwwwk.....",
+       "..kkkkwwwwkkkk..",
+       "..krrkwwwwkrrk..",
+       "...kkwwwwwwkk...",
+       "....kwwgwwwk....",
+       "....kwwwwgwk....",
+       "....kwwggwwk....",
+       "....kwwwwwwk....",
+       "....kgwwwwgk....",
+       "....kkkkkkkk....",
+       "................")
+
+# the Big Bomb Bag (a shop's)
+sprite('bag',
+       "................",
+       "......kkkk......",
+       ".....knNNnk.....",
+       "......kyyk......",
+       ".....kttttk.....",
+       "....kttttttk....",
+       "...kttTttttTk...",
+       "..kttTkkkkTttk..",
+       "..kttkrrrrkttk..",
+       "..ktTkrwrrkTtk..",
+       "..kttkrrrrkttk..",
+       "..kTtTkkkkTtTk..",
+       "...kTTttttTTk...",
+       "....kkkkkkkk....",
+       "................",
+       "................")
+
 # the old chef's hint cards (scripts/hint.bs)
 sprite('hint_card',
        "................",

@@ -2,6 +2,7 @@
 # empty one starts a new game; one with a game in it carries on. ERASE, then
 # a file, then Enter again, wipes it. The chosen slot is left in saved data
 # ("session") for the game to pick up as main.scene starts.
+# The mouse works too: over a file (or ERASE, BACK) it's chosen; a click does it.
 
 var s
 var choice = 0              # 0 to 2 the files, 3 erase, 4 back
@@ -15,6 +16,7 @@ var erase_label
 var back_label
 var note
 var filled = [false, false, false]
+var mouse_at := vec2(-1, -1)
 
 func start() {
     s = find("Settings")
@@ -27,6 +29,7 @@ func start() {
     erase_label = child(self, "Erase")
     back_label = child(self, "Back")
     note = child(self, "Note")
+    mouse_at = mouse_position()
     refresh()
 }
 
@@ -72,7 +75,34 @@ func show() {
     else { note.Label.text = "" }
 }
 
+# What the mouse is over (a file 0 to 2, 3 erase, 4 back), or -1.
+func under_mouse() {
+    var m = mouse_position()
+    for i in 3 {
+        if abs(m.y - places[i].global_position.y - 6) <= 10 and abs(m.x - self.global_position.x) <= 100 { return i }
+    }
+    if s.over_label(erase_label) { return 3 }
+    if s.over_label(back_label) { return 4 }
+    return -1
+}
+
 func update(dt) {
+    var m = mouse_position()
+    var moved = m != mouse_at
+    mouse_at = m
+    var click = false
+    if moved or s.clicked() {
+        var u = under_mouse()
+        if u >= 0 {
+            if u != choice {
+                choice = u
+                confirm = false
+                play_sound("sfx/menu.wav")
+                show()
+            }
+            click = s.clicked()
+        }
+    }
     if s.nav("back") {
         if confirm or erasing {
             confirm = false
@@ -96,7 +126,7 @@ func update(dt) {
         play_sound("sfx/menu.wav")
         show()
     }
-    if not s.nav("ok") { return }
+    if not s.nav("ok") and not click { return }
     if choice == 4 {
         destroy(self)
         play_sound("sfx/menu.wav")

@@ -1,5 +1,6 @@
 # The title: PLAY (choose a file), SETTINGS, QUIT. Left alone for a while, the
-# story scrolls up over it; any key brings the menu back.
+# story scrolls up over it; any key (or the mouse) brings the menu back.
+# The mouse chooses too: over an option it's chosen, a click does it.
 
 var t = 0
 var phase = "menu"          # menu, story
@@ -14,6 +15,7 @@ var cursor
 var panel
 var page
 var s
+var mouse_at := vec2(-1, -1)
 
 func start() {
     s = find("Settings")
@@ -27,6 +29,7 @@ func start() {
         l.Label.layer = 32
         push(labels, l)
     }
+    mouse_at = mouse_position()
     show()
 }
 
@@ -42,15 +45,19 @@ func busy() { return len(find_all("FilesMenu")) > 0 or len(find_all("SettingsMen
 func update(dt) {
     t += dt
     page.y = 146 + sin(t * 120) * 3                    # the recipe page bobs over Pip
+    var m = mouse_position()
+    var moved = m != mouse_at
+    mouse_at = m
     if busy() {
         t = 0
         return
     }
+    var click = s.clicked()
     if phase == "story" {
         panel.Shape.color = rgb(0, 0, 0, min(t, 1) * 225)
         var last = labels[len(labels) - 1]
         if last.y > 150 { for l in labels { l.y -= 16 * dt } }
-        if last_key() != "" or t > 30 {
+        if last_key() != "" or moved or click or t > 30 {
             phase = "menu"
             t = 0
             panel.Shape.color = rgb(0, 0, 0, 0)
@@ -63,7 +70,20 @@ func update(dt) {
         t = 0
         return
     }
-    if last_key() != "" { t = 0 }
+    if last_key() != "" or moved or click { t = 0 }
+    var ok = s.nav("ok")
+    if moved or click {
+        for i in 3 {
+            if s.over_label(rows[i]) {
+                if i != choice {
+                    choice = i
+                    play_sound("sfx/menu.wav")
+                    show()
+                }
+                if click { ok = true }
+            }
+        }
+    }
     if s.nav("up") {
         choice = (choice + 2) % 3
         play_sound("sfx/menu.wav")
@@ -74,7 +94,7 @@ func update(dt) {
         play_sound("sfx/menu.wav")
         show()
     }
-    if s.nav("ok") {
+    if ok {
         play_sound("sfx/menu.wav")
         if choice == 0 { spawn("prefabs/files_menu.scene", vec2(128, 120)) }
         elif choice == 1 { spawn("prefabs/settings_menu.scene", vec2(128, 120)) }

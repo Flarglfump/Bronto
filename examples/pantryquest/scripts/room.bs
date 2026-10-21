@@ -36,6 +36,7 @@ var exit_pos := vec2(128, 200)
 var exit_face = "down"
 var game
 var shutting = false
+var shut_tiles = []         # what each shut side was before its shutter came down (a locked door stays locked)
 var started = false
 
 func start() {
@@ -127,7 +128,11 @@ func next_wave() {
 # Pip has arrived (the slide or fade is over).
 func entered() {
     if shut != "" and enemies() > 0 {
-        for i in len(shut) { game.set_door(shut[i], "H") }
+        shut_tiles = []
+        for i in len(shut) {
+            push(shut_tiles, tile_at(tiles, cell_point(game.door_cells(shut[i])[0])))
+            game.set_door(shut[i], "H")
+        }
         shutting = true
         play_sound("sfx/shutter.wav")
     }
@@ -150,7 +155,9 @@ func update(dt) {
         if shutting {
             shutting = false
             for i in len(shut) {
-                if solved or not has_side(sealed, shut[i]) { game.set_door(shut[i], ",") }
+                var back = ","
+                if i < len(shut_tiles) and shut_tiles[i] != "H" { back = shut_tiles[i] }   # (as it was: open, or still locked)
+                if solved or not has_side(sealed, shut[i]) { game.set_door(shut[i], back) }
             }
             play_sound("sfx/shutter.wav")
         }

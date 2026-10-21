@@ -1,9 +1,17 @@
 # GAME OVER: Enter carries on (from the start of the overworld or the cellar
-# Pip was in), Escape goes back to the title.
+# Pip was in), Escape goes back to the title. Or a click on either.
 var t = 0
 func update(dt) {
     t += dt
     if t < 1 { return }
-    if key_pressed("enter") { find("Game").continue_game() }
-    if key_pressed("escape") { load_scene("title.scene") }
+    var s = find("Settings")
+    var c1 = child(self, "Choice1")
+    var c2 = child(self, "Choice2")
+    if s.over_label(c1) { c1.Label.color = rgb(142, 26, 42) } else { c1.Label.color = rgb(98, 56, 26) }
+    if s.over_label(c2) { c2.Label.color = rgb(142, 26, 42) } else { c2.Label.color = rgb(160, 120, 80) }
+    if key_pressed("enter") or (s.clicked() and s.over_label(c1)) {
+        find("Game").continue_game()
+        return
+    }
+    if key_pressed("escape") or (s.clicked() and s.over_label(c2)) { load_scene("title.scene") }
 }

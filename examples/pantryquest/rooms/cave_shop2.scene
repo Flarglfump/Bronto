@@ -103,7 +103,7 @@ entity
     layer = 1
   Script
     file = "scripts/pickup.bs"
-    vars = "kind = \"key\", price = 60"
+    vars = "kind = \"soup\", price = 30"
   Parent
     entity = 0
 

@@ -224,6 +224,8 @@ def main():
     with open(os.path.join(GAME, 'scripts', 'cellars.bs'), 'w') as f:
         f.write(cellars_script(cellars) + '\n')
     print('make_rooms: wrote %d rooms to %s, and scripts/cellars.bs' % (made, os.path.relpath(out_dir)))
+    import check_cellars                     # every cellar still finishable, whatever doors the keys open?
+    check_cellars.main()
 
 
 if __name__ == '__main__':

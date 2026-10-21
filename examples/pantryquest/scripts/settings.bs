@@ -4,8 +4,9 @@
 # pressed("spoon"). One "Settings" entity in title.scene and in main.scene
 # runs this; scripts/settings_menu.bs changes it.
 
-var actions = ["up", "down", "left", "right", "spoon", "item", "pantry", "pause"]
-var names = ["UP", "DOWN", "LEFT", "RIGHT", "SPOON", "ITEM (B)", "POCKET PANTRY", "PAUSE"]
+var actions = ["up", "down", "left", "right", "spoon", "item", "pantry", "pause", "quicksave", "map", "item_next", "item_prev"]
+var names = ["UP", "DOWN", "LEFT", "RIGHT", "SPOON", "ITEM (B)", "POCKET PANTRY", "PAUSE", "QUICK SAVE", "MAP",
+             "NEXT ITEM", "PREVIOUS ITEM"]
 var keys = []               # for each action, [first key, second key] ("" = none)
 var music = 8               # 0 (off) to 10
 var sounds = 10
@@ -17,7 +18,8 @@ func start() {
 
 func defaults() {
     keys = [["up", "w"], ["down", "s"], ["left", "a"], ["right", "d"],
-            ["x", "space"], ["z", "j"], ["enter", "i"], ["escape", "p"]]
+            ["x", "space"], ["z", "j"], ["enter", "i"], ["escape", "p"],
+            ["f5", ""], ["m", ""], ["e", ""], ["q", ""]]
     music = 8
     sounds = 10
 }
@@ -25,8 +27,18 @@ func defaults() {
 func load() {
     defaults()
     var d = load_data("settings")
-    if d == nil or len(d) != 3 or len(d[0]) != len(actions) { return }
-    keys = d[0]
+    if d == nil or len(d) != 3 or len(d[0]) > len(actions) { return }
+    var saved = d[0]                                   # (older settings have fewer actions: the new ones keep their own keys,
+    for i in len(saved) {                              #  unless one of them was given away to an old action)
+        keys[i] = saved[i]
+    }
+    for i in range(len(saved), len(actions)) {
+        for w in 2 {
+            for j in len(saved) {
+                if keys[i][w] != "" and (saved[j][0] == keys[i][w] or saved[j][1] == keys[i][w]) { keys[i][w] = "" }
+            }
+        }
+    }
     music = clamp(d[1], 0, 10)
     sounds = clamp(d[2], 0, 10)
 }
@@ -77,6 +89,16 @@ func nav(dir) {
     if dir == "back" { return key_pressed("escape") or key_pressed("backspace") }
     return key_pressed(dir) or pressed(dir)
 }
+
+# ---- the mouse, in the menus ---------------------------------------------------------------
+# Is the mouse over an entity (within `w` x `h` of its middle)? Over a label (its text)?
+func over(e, w, h) {
+    var m = mouse_position()
+    var p = e.global_position
+    return abs(m.x - p.x) <= w / 2 and abs(m.y - p.y) <= h / 2
+}
+func over_label(e) { return len(e.Label.text) > 0 and over(e, len(e.Label.text) * 8 + 6, 11) }
+func clicked() { return mouse_pressed(0) }
 
 # "space" -> "SPACE", "escape" -> "ESC", "" -> "-": a key's name as the menus show it (six letters at most).
 func key_label(k) {

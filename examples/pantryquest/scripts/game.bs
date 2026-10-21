@@ -11,7 +11,8 @@
 var hearts_max = 3          # heart containers
 var hp = 6                  # in half hearts
 var beans = 0
-var keys = 0
+var keys = 0                # keys for the cellar Pip is in (each cellar's own: cellar_keys)
+var cellar_keys = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]   # the keys found in each cellar and not yet used (by its number)
 var bombs = 0
 var bombs_max = 8
 var weapon = 0              # 0 none, 1 wooden spoon, 2 copper spoon, 3 silver ladle, 4 golden ladle (attack())
@@ -123,7 +124,7 @@ func save_game() {
     var place = area_title()
     if place == "" { place = find("Banner").last }
     var data = [["version", 3], ["outfit", outfit], ["land", land], ["room", r[0]], ["pos", r[1]], ["place", place], ["time", floor(play_time)],
-                ["hearts_max", hearts_max], ["beans", beans], ["keys", keys], ["bombs", bombs],
+                ["hearts_max", hearts_max], ["beans", beans], ["cellar_keys", stored_keys()], ["bombs", bombs],
                 ["bombs_max", bombs_max], ["weapon", weapon], ["items", items], ["b_item", b_item], ["treasures", treasures],
                 ["pages", pages], ["flags", flags], ["visited", visited], ["maps", maps], ["compasses", compasses],
                 ["area_start", area_start], ["area_pos", area_pos]]
@@ -135,6 +136,7 @@ func load_game() {
     if data == nil { return false }
     var version = 1
     var has_land = false
+    var old_keys = 0
     for pair in data {
         var k = pair[0]
         var v = pair[1]
@@ -149,7 +151,8 @@ func load_game() {
         elif k == "time" { play_time = v }
         elif k == "hearts_max" { hearts_max = v }
         elif k == "beans" { beans = v }
-        elif k == "keys" { keys = v }
+        elif k == "keys" { old_keys = v }                     # (a file from before keys were each cellar's own)
+        elif k == "cellar_keys" { cellar_keys = v }
         elif k == "bombs" { bombs = v }
         elif k == "bombs_max" { bombs_max = v }
         elif k == "weapon" { weapon = v }
@@ -165,6 +168,8 @@ func load_game() {
         elif k == "area_pos" { area_pos = v }
     }
     if version < 2 and weapon == 2 { weapon = 3 }      # (a first-version file: 2 was the silver ladle)
+    if old_keys > 0 and key_slot(area_start) > 0 { cellar_keys[key_slot(area_start)] = old_keys }
+    keys = cellar_keys[key_slot(area)]
     if not has_land {                                  # (a file from before the map: no fog on it)
         for y in 8 {
             for x in 16 { push(land, x + "_" + y) }
@@ -227,16 +232,42 @@ func enter(name, pos, face) {
 
 func set_place(name) {
     room_name = name
+    var was = area
     if substr(name, 0, 4) == "cave" {
         area = "cave"
+        switch_keys(was)
         return
     }
     var p = split(name, "_")
     area = p[0]
+    switch_keys(was)
     rx = num(p[1])
     ry = num(p[2])
     if area != "ow" and not contains(visited, name) { push(visited, name) }
     if area == "ow" and not contains(land, p[1] + "_" + p[2]) { push(land, p[1] + "_" + p[2]) }
+}
+
+# ---- keys: each cellar's own -------------------------------------------------------------
+# A key opens a door only in the cellar it was found in. `keys` is the count for
+# the cellar Pip is in; leaving puts it away (cellar_keys), coming back gets it out.
+func key_slot(name) {
+    if substr(name, 0, 1) == "d" {
+        var p = split(name, "_")
+        return clamp(num(substr(p[0], 1, len(p[0]) - 1)), 0, 9)
+    }
+    return 0
+}
+
+func switch_keys(was) {
+    if was == area { return }
+    cellar_keys[key_slot(was)] = keys
+    keys = cellar_keys[key_slot(area)]
+}
+
+# Every cellar's keys, with this one's as they are now (for saving).
+func stored_keys() {
+    cellar_keys[key_slot(area)] = keys
+    return cellar_keys
 }
 
 # Where Pip is on the map of the land (art/world_map.bmp, a pixel a tile): on
@@ -411,10 +442,16 @@ func update(dt) {
             state = "menu"
             spawn("prefabs/menu.scene", vec2(128, 152))
             play_sound("sfx/menu.wav")
+        } elif controls.pressed("map") {
+            state = "menu"
+            spawn("prefabs/map_view.scene", vec2(128, 152))
+            play_sound("sfx/menu.wav")
         } elif controls.pressed("pause") or key_pressed("escape") {      # (Escape always pauses)
             state = "pause"
             spawn("prefabs/pause_menu.scene", vec2(128, 152))
             play_sound("sfx/menu.wav")
+        } else {
+            shortcuts()
         }
         if hp <= 2 and hp > 0 {
             beep_t -= dt
@@ -490,6 +527,11 @@ func collect(kind, thing) {
         give("bombs")
         bombs = min(bombs + 4, bombs_max)
         play_sound("sfx/key.wav")
+    } elif kind == "bag" {                             # the Big Bomb Bag: room for twice the bombs
+        give("bombs")
+        bombs_max = max(bombs_max, 16)
+        bombs = bombs_max
+        hold("art/bag.bmp", 1.6)
     } elif kind == "bombs_item" {
         give("bombs")
         bombs = min(bombs + 4, bombs_max)
@@ -784,6 +826,35 @@ func enemy_killed(e) {
     play_sound("sfx/enemy_die.wav")
     spawn("prefabs/puff.scene", e.position, e.parent)
     drop_at(e.position, e.parent)
+}
+
+# ---- the shortcuts in play: quick save, and the next or previous item for B ----------
+func shortcuts() {
+    if controls.pressed("quicksave") {
+        if save_game() {
+            find("Banner").note("GAME SAVED!")
+            play_sound("sfx/buy.wav")
+        } else {
+            find("Banner").note("START FROM THE TITLE TO SAVE")
+            play_sound("sfx/tink.wav")
+        }
+    }
+    var d = 0
+    if controls.pressed("item_next") { d = 1 }
+    if controls.pressed("item_prev") { d = -1 }
+    if d != 0 { cycle_item(d) }
+}
+
+func cycle_item(d) {
+    var n = len(items)
+    if n == 0 { return }
+    var i = 0
+    for k in n {
+        if items[k] == b_item { i = k }
+    }
+    var was = b_item
+    b_item = items[(i + d + n) % n]
+    if b_item != was { play_sound("sfx/menu.wav") }
 }
 
 # ---- the message at the top of a cave -------------------------------------------------

@@ -2,7 +2,7 @@
 # PANTRY"), on a red ribbon at the top of the play area. It shows when the
 # name changes - not again for the next screen of the same woods - fades in,
 # stays a moment, and fades away. While a cook is talking up there, it sits
-# lower down.
+# lower down. It also carries short notes ("GAME SAVED!"), the same way.
 
 var last = ""
 var t = 0
@@ -28,6 +28,13 @@ func start() {
 func arrive(name) {
     if name == "" or name == last { return }
     last = name
+    put(name)
+}
+
+# A short note on the ribbon (it doesn't count as where Pip is).
+func note(msg) { put(msg) }
+
+func put(name) {
     text.Label.text = name
     shadow.Label.text = name
     var half = len(name) * 4 + 10                     # the ribbon fits the name

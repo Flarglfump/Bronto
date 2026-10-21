@@ -1,10 +1,11 @@
-# The map of the land, from the pause menu: art/world_map.bmp (a pixel for
+# The Pocket Pantry, its map page (the other page is the items: scripts/
+# menu.bs; Tab, the Pocket Pantry key or a click on its tab goes there; the MAP
+# key opens this page straight from play): art/world_map.bmp (a pixel for
 # each tile, the regions in their colours) with the areas' names over it
 # (art/map_names.bmp: tools/make_map.py draws both), the cellar doors Pip has
 # found (numbered, red; gold once cleared), where he is (blinking) and, in fog,
 # the screens he hasn't been to.
-# The game stays paused while it's open; Escape, Enter or the pause key
-# closes it.
+# The game waits while it's open; Escape, Enter or the MAP key closes it.
 
 var game
 var controls
@@ -13,7 +14,7 @@ var t = 0
 var opened = 0
 
 # A spot on the map (in its pixels) as a place in this view.
-func at(p) { return vec2(-128 + p.x, -66 + p.y) }
+func at(p) { return vec2(-128 + p.x, -62 + p.y) }
 
 func start() {
     game = find("Game")
@@ -43,15 +44,31 @@ func start() {
     you.Shape.layer = 89
     child(self, "Where").Label.text = "YOU ARE " + game.place_name()
     child(self, "Pages").Label.text = "RECIPE PAGES FOUND: " + game.pages + " OF 8"
-    child(self, "Keys").Label.text = controls.key_label(controls.keys[7][0]) + ": BACK"
+    child(self, "Keys").Label.text = "TAB: ITEMS  " + controls.key_label(controls.keys[9][0]) + ": CLOSE"
+    child(self, "TabItems").Label.color = rgb(232, 160, 160)       # (this page's tab is the bright one)
+    child(self, "TabMap").Label.color = rgb(255, 240, 208)
+}
+
+func to_items() {
+    play_sound("sfx/menu.wav")
+    spawn("prefabs/menu.scene", self.position)
+    destroy(self)
+}
+
+func close() {
+    game.state = "play"
+    play_sound("sfx/menu.wav")
+    destroy(self)
 }
 
 func update(dt) {
     t += dt
     opened += 1
     if floor(t * 4) % 2 == 0 { you.Shape.color = rgb(255, 248, 236) } else { you.Shape.color = rgb(216, 52, 58) }
-    if opened > 2 and (controls.nav("back") or controls.nav("ok") or controls.pressed("pause")) {
-        play_sound("sfx/menu.wav")
-        destroy(self)
+    if opened < 3 { return }                           # (not the key that opened it)
+    if key_pressed("tab") or controls.pressed("pantry") or (controls.clicked() and controls.over_label(child(self, "TabItems"))) {
+        to_items()
+        return
     }
+    if controls.nav("back") or controls.nav("ok") or controls.pressed("map") or controls.pressed("pause") { close() }
 }

@@ -106,6 +106,11 @@ ending.
        meatball.
   - Behind him, the **Grand Recipe**, whole again, and the ending. The file is saved,
     and Enter goes back to the title.
+- **Keys belong to their cellar:** a key opens any locked door in the cellar it was
+  found in, and nowhere else (the HUD shows that cellar's keys; out on the land, none).
+  Shops don't sell keys. Every cellar has enough keys for all its locked doors, so
+  whichever door a key goes on, Pip can always get to the end (`tools/check_cellars.py`
+  checks this).
 - Every cellar has a **map**, which shows all its rooms on the HUD, and a **compass**,
   which marks the guardian's room until it is beaten. Behind each guardian is a heart
   pie and a page of the recipe (in the Banquet Hall, the Grand Recipe), and the page
@@ -114,17 +119,30 @@ ending.
 **Maps.** On the land, the HUD shows a little colour map of the whole kingdom (each region in
 its own colour), with Pip blinking where he is and the cellar doors he has found: red, or
 gold once cleared. In a cellar it shows that cellar's rooms instead, with its map and
-compass. The pause menu's **MAP** shows the land a pixel a tile, with the areas' names,
-the cellar doors found (numbered), where Pip is, and fog over the screens he hasn't been
-to yet.
+compass. The Pocket Pantry's **MAP** page (the M key, straight from play) shows the land
+a pixel a tile, with the areas' names, the cellar doors found (numbered), where Pip is,
+and fog over the screens he hasn't been to yet.
+
+**The Pocket Pantry** has two pages, ITEMS and MAP: Tab (or a click on the other tab)
+turns between them. On ITEMS, Pip's things for B sit on plates (the arrows or the mouse
+choose one), his equipment is down the left (his spoon or ladle, his apron, jacket or
+coat, and the **Big Bomb Bag**, sold in a cave shop, which holds 16 bombs), the
+treasures he carries down the right, and the recipe pages along the bottom. Whatever
+the mouse is over - a plate, equipment, a treasure, the pages - shows its name and what
+it does.
 
 | | Keys (at first: SETTINGS changes them) | |
 |---|---|---|
 | Walk | arrows or WASD | Eight directions; Pip slides along walls and round corners |
 | Poke with the spoon | X (or Space) | At full health it also throws a spark (as strong as a poke) |
 | Use the B item | Z (or J) | Popcorn bombs, the pizza cutter, the skewer bow, the fire chili, the whisk |
-| Pocket Pantry | Enter (or I) | Choose the B item there; treasures you carry are down the right edge |
+| Pocket Pantry | Enter (or I) | Choose the B item, see equipment and treasures; Tab for the map |
+| Map | M | The Pocket Pantry's map page |
+| Next / previous item | E / Q | Changes the B item without opening anything |
+| Quick save | F5 | Saves to the file straight away |
 | Pause | Escape (or P) | Resume, save, settings, quit to the title |
+
+Every menu works with the mouse too: over an option chooses it, a click does it.
 
 **The title** offers PLAY, SETTINGS and QUIT. PLAY shows three files: an empty one starts
 a new game (saved straight away), one with a game in it carries on from where it was
@@ -187,7 +205,8 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
     wave) and its puzzle: pressure plates (tile `B`), braziers (`brazier.bs`, over tile
     `Q`), a gong (`gong.bs`), or carrying enough pages. A room's `sealed` sides stay shut
     until it is solved; pickups with `on_solve` appear then.
-  - `map_view.bs` is the pause menu's map of the land; `hud.bs` draws the minimap.
+  - `menu.bs` and `map_view.bs` are the Pocket Pantry's two pages (items, and the map of
+    the land); `hud.bs` draws the minimap.
   - `hint.bs` is the old chef's hint cards; `game.bs` works the hints out (`hint_next`,
     `hint_upgrade`) from `hint_data.bs`, which `tools/design_overworld.py` writes.
   - `enemies/baron.bs` is Baron Gorge, all three courses (`cloche.bs` is a dish cover),
@@ -197,7 +216,7 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
     its menus; `settings.bs` keeps the player's keys and volumes, and everything that
     reads a key asks it (`find("Settings").down("left")`). `game.bs` saves and loads a
     file (`save_game`, `load_game`).
-  - `hud.bs` and `menu.bs` run the HUD and the inventory; `banner.bs` shows the name of
+  - `hud.bs` runs the HUD; `banner.bs` shows the name of
     where Pip comes in (a room's `region` var, or its cellar's `name`), and `boss_ui.bs`
     a guardian's entrance and strength (the game times the entrance: `boss_arrives`).
 - To test a room straight away, set the Game entity's Script vars in the editor, for
@@ -222,6 +241,10 @@ standard library only:
   with its own `name` and `tint`), and `cellars_unbuilt.txt` a stand-in entrance room for any
   cellar without its own file (none, now that all nine are built). It also writes `scripts/cellars.bs`, which tells the game each cellar's rooms,
   its guardian's room and its way out (for the HUD's map and compass).
+- `check_cellars.py` tries every order of spending keys on locked doors in every cellar
+  (with the items Pip has by then) and reports any order that leaves him stuck, doors
+  that disagree, or a cellar missing its map, compass or heart pie. `make_rooms.py`
+  runs it at the end.
 - `make_map.py` draws the maps from the land: `art/world_map.bmp` (a pixel a tile, the
   regions' open ground in their colours), `art/map_names.bmp` (the areas' names in a tiny
   pixel font), the cellar numbers, the HUD's `art/minimap.bmp`, and `scripts/map_data.bs`
