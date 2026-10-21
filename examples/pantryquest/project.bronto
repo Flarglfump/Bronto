@@ -6,5 +6,5 @@ width = 256
 height = 240
 window_scale = 3
 icon = art/icon.bmp
-# the tools that make the art, sounds and rooms aren't part of the game
-exclude = tools
+# the tools that make the art, sounds and rooms, and the Steam library art, aren't part of the game
+exclude = tools, SteamData
