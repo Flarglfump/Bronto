@@ -1,22 +1,2 @@
 # The cellars still to come: for now, just an entrance room each, where a cook
 # says it is still being dug. Each will get its own file, like cellar1.txt.
-
-room d9_2_4
-music cellar
-doors s=open
-var title = "BARON GORGE'S BANQUET HALL"
-var exit_s = "ow_5_0"
-var exit_pos = vec2(88, 136)
-var exit_face = "down"
-inside
-............
-..P......P..
-............
-............
-............
-..P......P..
-............
-put flame 4.5 3
-put flame 10.5 3
-put old_chef 7.5 3 line1 = "BARON GORGE'S BANQUET HALL", line2 = "IS STILL BEING DUG. LATER!"
-end

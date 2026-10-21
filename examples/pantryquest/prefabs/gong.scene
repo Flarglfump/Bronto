@@ -1,0 +1,14 @@
+# Pantry Quest - a gong to ring with a skewer (scripts/gong.bs) (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Gong"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/gong.bmp"
+    layer = 2
+  Script
+    file = "scripts/gong.bs"
+    vars = ""

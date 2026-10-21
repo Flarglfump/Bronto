@@ -1,0 +1,14 @@
+# Pantry Quest - Baron Gorge (the Banquet Hall's guardian, the last) (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/baron_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/baron.bs"
+    vars = ""

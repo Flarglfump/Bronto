@@ -61,6 +61,7 @@ var say_t = 0
 var beep_t = 0
 var won_t = 0
 var holding_page = false
+var holding_recipe = false  # the Grand Recipe, whole: the end
 var note1 = ""              # a message for when the next room has faded in
 var note2 = ""
 var whisk_i = -1            # the cellar door the whisk went to last (in the list of those with a page)
@@ -471,6 +472,11 @@ func collect(kind, thing) {
         hearts_max = min(hearts_max + 1, 16)
         hp = hearts_max * 2
         hold("art/heart_pie.bmp", 1.6)
+    } elif kind == "recipe" {
+        hold("art/recipe.bmp", 3.0)
+        play_music("none_recipe")
+        play_sound("sfx/page.wav")
+        holding_recipe = true
     } elif kind == "page" {
         pages += 1
         hold("art/page.bmp", 3.0)
@@ -516,6 +522,11 @@ func hold(image, seconds) {
 }
 
 func after_hold() {
+    if holding_recipe {
+        holding_recipe = false
+        win()
+        return
+    }
     if holding_page {
         holding_page = false
         flag("page:" + area)
@@ -528,6 +539,18 @@ func after_hold() {
         warp(cellars.exit_room(area), cellars.exit_pos(area), "down")
         music_name = ""
     }
+}
+
+# The end: the Grand Recipe is whole. The file is saved (marked as won,
+# carrying on from the Banquet Hall's door), and the ending card comes up.
+func win() {
+    flag("won")
+    state = "won"
+    won_t = 0
+    save_game()
+    set_fade(0.6)
+    play_music("title")
+    spawn("prefabs/ending.scene", vec2(128, 152))
 }
 
 # Something an enemy might leave behind.

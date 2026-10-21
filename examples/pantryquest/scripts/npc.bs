@@ -1,7 +1,16 @@
-# Someone in a cave, with something to say.
+# Someone in a cave, with something to say. With `pages_needed`, once Pip
+# carries that many recipe pages they say `ready1` and `ready2` instead.
 var line1 = ""
 var line2 = ""
+var pages_needed = 0
+var ready1 = ""
+var ready2 = ""
 
 func start() {
-    find("Game").say(line1, line2)
+    var game = find("Game")
+    if pages_needed > 0 and game.pages >= pages_needed {
+        game.say(ready1, ready2)
+    } else {
+        game.say(line1, line2)
+    }
 }

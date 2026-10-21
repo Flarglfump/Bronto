@@ -1,6 +1,18 @@
 # A room: its root entity (all the room's tiles, enemies and things are its
 # children). It keeps its doors as they were left, shuts its shutters while
 # enemies remain, and remembers when it has been cleared.
+#
+# Enemies can come in waves: a "Spawner" child (prefabs/spawner.scene) holds
+# an enemy back until every enemy before it is beaten, wave by wave.
+#
+# A room can also have a puzzle, which keeps the `sealed` sides shut until it
+# is solved (and then for good):
+#   - pressure plates (tile B), each to be covered by a crate (the oven mitt);
+#   - braziers (prefabs/brazier.scene), each to be lit by the fire chili -
+#     some burn out again after a while;
+#   - a gong (prefabs/gong.scene), to be rung with a skewer;
+#   - `need_pages`: Pip must carry that many recipe pages.
+# Pickups with `on_solve` show up when it is solved.
 
 var id = ""                 # its file name: "ow_7_7", "d1_2_3", "cave_chef"
 var region = ""             # the part of the land it is in ("LETTUCE WOODS"): shown as Pip comes in
@@ -8,6 +20,12 @@ var title = ""              # a name of its own to show instead (an unbuilt cell
 var music = ""              # the track while Pip is here ("" = silence)
 var shut = ""               # sides whose shutters close while enemies remain, e.g. "s" or "ns"
 var stays_clear = false     # once cleared, its enemies don't come back (the cellars)
+var sealed = ""             # sides shut (by shutters) until the room's puzzle is solved
+var need_pages = 0          # a puzzle of its own: carrying this many recipe pages
+var puzzle = false          # does it have one?
+var solved = false
+var plates = []             # its pressure plates (cells)
+var tiles                   # its Tilemap
 var exit_n = ""             # leaving by this side goes to this room instead of the next one
 var exit_s = ""             #   ("back" = where Pip came from: for caves)
 var exit_e = ""
@@ -20,18 +38,88 @@ var started = false
 
 func start() {
     game = find("Game")
-    var map = child(self, "Map")
+    tiles = child(self, "Map")
     for side in ["n", "s", "e", "w"] {
-        if game.has_flag("open:" + id + ":" + side) {
-            for c in game.door_cells(side) { set_tile(map, self.global_position + vec2(c.x * 16 + 8, c.y * 16 + 8), ",") }
-        }
+        if game.has_flag("open:" + id + ":" + side) { door(side, ",") }
     }
     if stays_clear and game.has_flag("clear:" + id) {
         for e in children(self) {
-            if e.name == "Enemy" { destroy(e) }
+            if e.name == "Enemy" or e.name == "Spawner" { destroy(e) }
         }
     }
+    for r in range(2, 9) {
+        for c in range(2, 14) {
+            if tile_at(tiles, cell_point(vec2(c, r))) == "B" { push(plates, vec2(c, r)) }
+        }
+    }
+    puzzle = len(plates) > 0 or need_pages > 0 or len(named("Brazier")) > 0 or len(named("Gong")) > 0
+    if puzzle and (game.has_flag("solved:" + id) or (need_pages > 0 and game.pages >= need_pages)) { solved = true }
+    if puzzle and not solved {
+        for i in len(sealed) { door(sealed[i], "H") }
+    }
     started = true
+}
+
+func cell_point(c) { return self.global_position + c * 16 + vec2(8, 8) }
+
+func door(side, tile) {
+    for c in game.door_cells(side) { set_tile(tiles, cell_point(c), tile) }
+}
+
+func named(n) {
+    var out = []
+    for e in children(self) {
+        if e.name == n { push(out, e) }
+    }
+    return out
+}
+
+func has_side(sides, side) {
+    for i in len(sides) {
+        if sides[i] == side { return true }
+    }
+    return false
+}
+
+# What the floor under a crate is: a pressure plate, or plain floor.
+func floor_at(p) {
+    var c = vec2(floor((p.x - self.global_position.x) / 16), floor((p.y - self.global_position.y) / 16))
+    for q in plates {
+        if q.x == c.x and q.y == c.y { return "B" }
+    }
+    return "."
+}
+
+func puzzle_done() {
+    for c in plates {
+        if tile_at(tiles, cell_point(c)) != "O" { return false }
+    }
+    for b in named("Brazier") {
+        if not b.lit { return false }
+    }
+    for g in named("Gong") {
+        if not g.rung { return false }
+    }
+    return need_pages <= 0 or game.pages >= need_pages
+}
+
+func solve() {
+    solved = true
+    game.flag("solved:" + id)
+    for i in len(sealed) { door(sealed[i], ",") }
+    play_sound("sfx/secret.wav")
+}
+
+# The next wave: the spawners with the lowest wave number let their enemies in.
+func next_wave() {
+    var first = 999
+    for s in named("Spawner") { first = min(first, s.wave) }
+    if first == 999 { return false }
+    for s in named("Spawner") {
+        if s.wave == first { s.fire() }
+    }
+    play_sound("sfx/teleport.wav")
+    return true
 }
 
 # Pip has arrived (the slide or fade is over).
@@ -53,11 +141,15 @@ func enemies() {
 
 func update(dt) {
     if not started or game.state != "play" or game.room != self { return }
+    if puzzle and not solved and puzzle_done() { solve() }
+    if enemies() == 0 and next_wave() { return }
     if enemies() == 0 {
         if stays_clear and not game.has_flag("clear:" + id) { game.flag("clear:" + id) }
         if shutting {
             shutting = false
-            for i in len(shut) { game.set_door(shut[i], ",") }
+            for i in len(shut) {
+                if solved or not has_side(sealed, shut[i]) { game.set_door(shut[i], ",") }
+            }
             play_sound("sfx/shutter.wav")
         }
     }

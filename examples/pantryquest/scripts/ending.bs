@@ -1,0 +1,22 @@
+# The end: the Grand Recipe is whole (scripts/game.bs win()). The lines come
+# in one by one; after a moment, Enter (or the spoon's key) goes back to the
+# title.
+
+var t = 0
+var names = ["Title", "Title2", "Line1", "Line2", "Line3", "Time", "Thanks", "Keys"]
+
+func start() {
+    var game = find("Game")
+    child(self, "Time").Label.text = "TIME " + find("Settings").clock(game.play_time)
+    for n in names { child(self, n).Label.color = rgb(0, 0, 0, 0) }
+}
+
+func update(dt) {
+    t += dt
+    var colours = [rgb(142, 26, 42), rgb(142, 26, 42), rgb(98, 56, 26), rgb(98, 56, 26), rgb(98, 56, 26),
+                   rgb(160, 120, 80), rgb(142, 26, 42), rgb(160, 120, 80)]
+    for i in len(names) {
+        if t > 0.4 + i * 0.35 { child(self, names[i]).Label.color = colours[i] }
+    }
+    if t > 3.5 and find("Settings").nav("ok") { load_scene("title.scene") }
+}

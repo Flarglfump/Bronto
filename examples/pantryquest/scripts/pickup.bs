@@ -1,6 +1,6 @@
 # Anything Pip can pick up. `kind` says what (bean, bean5, heart, key, bomb,
 # bombs_item, spoon, cutter, heart_pie, page, soup, map, compass, skewers, chili, plank, whisk,
-# mitt, tray, ladle); `flag`, if set, makes it
+# mitt, tray, ladle, recipe - the Grand Recipe, whole: the end); `flag`, if set, makes it
 # a one-off that stays taken; `price` makes it something to buy; `on_clear`
 # keeps it hidden until every enemy in the room is gone; `timeout` (drops)
 # makes it vanish after a while.
@@ -9,6 +9,7 @@ var kind = "bean"
 var flag = ""
 var price = 0
 var on_clear = false
+var on_solve = false        # hidden until the room's puzzle is solved (scripts/room.bs)
 var timeout = 0
 var game
 var hero
@@ -27,7 +28,7 @@ func start() {
                   "heart_pie", "art/heart_pie.bmp", "page", "art/page.bmp", "soup", "art/soup.bmp",
                   "map", "art/dmap.bmp", "compass", "art/compass.bmp", "skewers", "art/skewer.bmp", "chili", "art/chili.bmp",
                   "plank", "art/plank.bmp", "whisk", "art/whisk.bmp", "mitt", "art/mitt.bmp", "tray", "art/tray.bmp",
-                  "ladle", "art/ladle.bmp"]
+                  "ladle", "art/ladle.bmp", "recipe", "art/recipe.bmp"]
     for i in range(0, len(images), 2) {
         if images[i] == kind { self.Sprite.image = images[i + 1] }
     }
@@ -35,7 +36,7 @@ func start() {
         label = spawn("prefabs/price.scene", vec2(0, 16), self)
         label.Label.text = "" + price
     }
-    if on_clear { show(false) }
+    if on_clear or on_solve { show(false) }
 }
 
 func show(on) {
@@ -48,7 +49,10 @@ func visible() { return shown }
 func update(dt) {
     if game.state != "play" { return }
     if not shown {
-        if on_clear and len(find_all("Enemy")) == 0 {
+        var ready = false
+        if on_clear and len(find_all("Enemy")) == 0 and len(find_all("Spawner")) == 0 { ready = true }
+        if on_solve and self.parent.solved { ready = true }
+        if ready {
             show(true)
             play_sound("sfx/key.wav", 0.6)
         }

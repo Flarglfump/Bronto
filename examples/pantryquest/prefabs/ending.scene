@@ -1,0 +1,117 @@
+# Pantry Quest - the end (scripts/ending.bs), on a recipe page
+bronto_scene 1
+
+entity
+  Name
+    text = "Ending"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/menu_bg.bmp"
+    layer = 79
+  Script
+    file = "scripts/ending.bs"
+
+entity
+  Name
+    text = "Title"
+  Transform
+    position = 0 -56
+  Label
+    text = "HOORAY!"
+    size = 2
+    color = #8e1a2aff
+    layer = 80
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Title2"
+  Transform
+    position = 0 -36
+  Label
+    text = "THE GRAND RECIPE IS WHOLE"
+    size = 1
+    color = #8e1a2aff
+    layer = 80
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Line1"
+  Transform
+    position = 0 -12
+  Label
+    text = "PIP COOKED A FEAST FOR"
+    size = 1
+    color = #62381aff
+    layer = 80
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Line2"
+  Transform
+    position = 0 0
+  Label
+    text = "THE WHOLE PANTRY KINGDOM,"
+    size = 1
+    color = #62381aff
+    layer = 80
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Line3"
+  Transform
+    position = 0 12
+  Label
+    text = "AND BARON GORGE WASHED UP."
+    size = 1
+    color = #62381aff
+    layer = 80
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Time"
+  Transform
+    position = 0 32
+  Label
+    text = ""
+    size = 1
+    color = #a07850ff
+    layer = 80
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Thanks"
+  Transform
+    position = 0 48
+  Label
+    text = "THANKS FOR PLAYING!"
+    size = 1
+    color = #8e1a2aff
+    layer = 80
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Keys"
+  Transform
+    position = 0 64
+  Label
+    text = "ENTER - BACK TO THE TITLE"
+    size = 1
+    color = #a07850ff
+    layer = 80
+  Parent
+    entity = 0

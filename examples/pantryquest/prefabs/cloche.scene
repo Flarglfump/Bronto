@@ -1,0 +1,14 @@
+# Pantry Quest - one of Baron Gorge's dish covers (scripts/enemies/baron.bs moves it; `spot` is where it stands)
+bronto_scene 1
+
+entity
+  Name
+    text = "Cloche"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/cloche.bmp"
+    layer = 6
+  Script
+    file = "scripts/cloche.bs"
+    vars = ""

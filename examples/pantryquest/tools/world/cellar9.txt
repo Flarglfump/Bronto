@@ -1,0 +1,361 @@
+# Baron Gorge's Banquet Hall (the ninth and last cellar, "d9"), atop the
+# Chocolate Mountains. Its door only opens for a cook carrying all eight
+# recipe pages. Inside: puzzles that need everything Pip has found, rooms
+# that shut him in with wave after wave of the kingdom's worst, and the
+# Baron himself in three courses. Behind him lies the Grand Recipe, whole.
+#
+#   .  tiled floor   O  crate   ~  jam   P  pepper-mill statue   #  wall
+#   B  pressure plate (a crate on each solves the room)
+#   Q  brazier (scripts/brazier.bs: the fire chili lights it)
+#   T  banquet table   c  carpet
+#
+#   var sealed = "w"        sides shut until the room's puzzle is solved (scripts/room.bs)
+#   put spawner ... prefab = "toast", wave = 2     an enemy held back for a later wave
+#
+# Map of the cellar (columns 0-4, rows 0-4):
+#
+#              [1,0 stash  ][2,0 Baron Gorge][3,0 the Grand Recipe]
+#              [1,1 waves  ][2,1 the great hall][3,1 key, waves][4,1 stash]
+#   [0,2 key  ][1,2 braziers][                ][3,2 gong     ][4,2 braziers]
+#   [0,3 waves][1,3 crates ][2,3 waves      ][3,3 waves    ][4,3 crates, map]
+#                           [2,4 entrance] - the door south goes back out to the mountains
+name Baron Gorge's Banquet Hall
+tint #b48cd2ff
+
+room d9_2_4
+music cellar
+doors n=open s=open
+var exit_s = "ow_5_0"
+var exit_pos = vec2(88, 136)
+var exit_face = "down"
+var sealed = "n"
+var need_pages = 8
+inside
+............
+..P......P..
+............
+............
+............
+..P......P..
+............
+put flame 4.5 3
+put flame 10.5 3
+put old_chef 7.5 3 line1 = "ONLY A COOK WITH ALL EIGHT", line2 = "PAGES MAY ENTER THE HALL.", pages_needed = 8, ready1 = "THE BARON AWAITS YOU.", ready2 = "GOOD LUCK, LITTLE COOK!"
+end
+
+# The foyer: three waves, shut in.
+room d9_2_3
+music cellar
+doors s=open w=open e=open
+var shut = "swe"
+inside
+............
+.P........P.
+............
+....c..c....
+............
+.P........P.
+............
+put toast 4 4
+put toast 11 4
+put corn 7 7
+put spawner 5 7 prefab = "carrot", wave = 2
+put spawner 10 7 prefab = "carrot", wave = 2
+put spawner 7 4 prefab = "imp", wave = 2
+put spawner 4 5 prefab = "ant", wave = 3
+put spawner 11 5 prefab = "ant", wave = 3
+put spawner 7 6 prefab = "dumpling", wave = 3
+end
+
+# Crates and plates: two crates of four onto the two plates opens the way west.
+room d9_1_3
+music cellar
+doors e=open w=open
+var sealed = "w"
+inside
+##B.#..#.B##
+##..#..#..##
+##.O....O.##
+....#OO#....
+##........##
+##..#..#..##
+############
+end
+
+# Two waves of creatures, shut in.
+room d9_0_3
+music cellar
+doors e=open n=open
+var shut = "en"
+inside
+............
+..O......O..
+............
+.....PP.....
+............
+..O......O..
+............
+put bat 5 4
+put bat 10 4
+put bat 7 7
+put jelly 5 7
+put jelly 10 7
+put spawner 5 5 prefab = "meatball", wave = 2
+put spawner 10 5 prefab = "meatball", wave = 2
+put spawner 7 3 prefab = "toast", wave = 2
+put pickup 7.5 7 kind = "heart", flag = "d9:heart1", on_clear = true
+end
+
+# A key on an island ringed with jam - and the ring's corners are too wide for the plank.
+room d9_0_2
+music cellar
+doors s=open e=open
+inside
+............
+...~~~~~~...
+...~....~...
+...~....~...
+...~~~~~~...
+............
+............
+put toast 3 3
+put toast 12 8
+put corn 3 8
+put pickup 7.5 5 kind = "key", flag = "d9:key1"
+end
+
+# Four braziers, quick: each burns out after nine seconds, until all four are lit at once.
+room d9_1_2
+music cellar
+doors w=open n=open
+inside
+............
+.Q........Q.
+............
+............
+............
+.Q........Q.
+............
+put brazier 3 2.65 burn_time = 9
+put brazier 12 2.65 burn_time = 9
+put brazier 3 6.65 burn_time = 9
+put brazier 12 6.65 burn_time = 9
+put bat 6 5
+put bat 9 5
+put pickup 7.5 5 kind = "key", flag = "d9:key2", on_solve = true
+end
+
+# Three waves, shut in; the compass for surviving them.
+room d9_1_1
+music cellar
+doors s=open e=locked n=bomb
+var shut = "s"
+inside
+............
+.OO......OO.
+............
+....P..P....
+............
+.OO......OO.
+............
+put breadstick 4 4
+put breadstick 11 6
+put olive 7 7
+put spawner 4 6 prefab = "toast", wave = 2
+put spawner 11 4 prefab = "toast", wave = 2
+put spawner 7 3 prefab = "olive", wave = 2
+put spawner 5 5 prefab = "carrot", wave = 3
+put spawner 10 5 prefab = "carrot", wave = 3
+put spawner 7 8 prefab = "imp", wave = 3
+put pickup 7.5 5 kind = "compass", flag = "d9:compass", on_clear = true
+end
+
+room d9_1_0
+music cellar
+doors s=bomb
+inside
+OOOOOOOOOOOO
+O..........O
+O..P....P..O
+O..........O
+O..P....P..O
+O..........O
+OOOOO..OOOOO
+put pickup 6 5 kind = "soup", flag = "d9:stash1"
+put pickup 7.5 5 kind = "bomb", flag = "d9:stash2"
+put pickup 9 5 kind = "bean5", flag = "d9:stash3"
+end
+
+# The east wing: two waves, shut in.
+room d9_3_3
+music cellar
+doors w=open n=open e=open
+var shut = "wne"
+inside
+............
+..~~....~~..
+..~~....~~..
+............
+..~~....~~..
+..~~....~~..
+............
+put corn 7 3
+put corn 7 8
+put dumpling 3 5
+put spawner 12 5 prefab = "toast", wave = 2
+put spawner 7 5 prefab = "carrot", wave = 2
+put spawner 3 8 prefab = "imp", wave = 2
+end
+
+# Crates and plates again; the map for solving it.
+room d9_4_3
+music cellar
+doors w=open
+inside
+#B.#....#.B#
+#..#....#..#
+#.O..##..O.#
+............
+#.O.#..#.O.#
+#...#..#...#
+############
+put pickup 3 5 kind = "map", flag = "d9:map", on_solve = true
+end
+
+# A gong across the jam. A skewer would ring it - if a crate weren't in the way.
+room d9_3_2
+music cellar
+doors s=open e=open n=open
+var sealed = "n"
+inside
+~~~~O.......
+~~~~........
+~.~~O.......
+~~~~........
+~~~~O.......
+............
+............
+put gong 3 4
+put corn 10 3
+put corn 11 7
+put pickup 12 8 kind = "bean5", flag = "d9:beans"
+end
+
+# Two braziers, for good this time: soup and beans for lighting them.
+room d9_4_2
+music cellar
+doors w=open
+inside
+OOOOOOOOOOOO
+O..........O
+O.Q......Q.O
+...........O
+O.Q......Q.O
+O..........O
+OOOOOOOOOOOO
+put brazier 4 3.65
+put brazier 11 3.65
+put brazier 4 5.65
+put brazier 11 5.65
+put pickup 7.5 5 kind = "soup", flag = "d9:soup", on_solve = true
+put pickup 6 5 kind = "bean5", flag = "d9:beans2", on_solve = true
+put pickup 9 5 kind = "bean5", flag = "d9:beans3", on_solve = true
+end
+
+# Two waves, shut in; a key for it.
+room d9_3_1
+music cellar
+doors s=open w=locked e=bomb
+var shut = "s"
+inside
+............
+.P..P..P..P.
+............
+............
+............
+.P..P..P..P.
+............
+put toast 4 4
+put toast 11 6
+put imp 7 7
+put spawner 4 6 prefab = "carrot", wave = 2
+put spawner 11 4 prefab = "carrot", wave = 2
+put spawner 7 3 prefab = "corn", wave = 2
+put spawner 7 8 prefab = "corn", wave = 2
+put pickup 7.5 5 kind = "key", flag = "d9:key3", on_clear = true
+end
+
+room d9_4_1
+music cellar
+doors w=bomb
+inside
+OOOOOOOOOOOO
+O..........O
+O...~~~~...O
+............
+O...~~~~...O
+O..........O
+OOOOOOOOOOOO
+put pickup 6 5 kind = "bean5", flag = "d9:stash4"
+put pickup 7.5 5 kind = "bomb", flag = "d9:stash5"
+put pickup 9 5 kind = "heart", flag = "d9:stash6"
+end
+
+# The great hall, before the Baron's door: three waves of his best.
+room d9_2_1
+music cellar
+doors w=locked e=locked n=locked
+var shut = "we"
+inside
+............
+.P..c..c..P.
+....c..c....
+....c..c....
+....c..c....
+.P..c..c..P.
+............
+put toast 4 4
+put toast 11 4
+put carrot 4 7
+put carrot 11 7
+put spawner 7 4 prefab = "imp", wave = 2
+put spawner 8 4 prefab = "imp", wave = 2
+put spawner 4 6 prefab = "corn", wave = 2
+put spawner 11 6 prefab = "corn", wave = 2
+put spawner 5 5 prefab = "toast", wave = 3
+put spawner 10 5 prefab = "toast", wave = 3
+put spawner 7 8 prefab = "carrot", wave = 3
+put spawner 8 3 prefab = "carrot", wave = 3
+end
+
+# Baron Gorge, at his table.
+room d9_2_0
+music cellar
+doors s=locked e=open
+var shut = "se"
+inside
+............
+............
+TTTTTTTTTTTT
+............
+.....cc.....
+.....cc.....
+.....cc.....
+put baron 7.5 1.75
+put pickup 7.5 7 kind = "heart_pie", flag = "d9:heart", on_clear = true
+end
+
+# The Grand Recipe, whole at last.
+room d9_3_0
+music cellar
+doors w=open
+inside
+............
+....c..c....
+..P.c..c.P..
+....c..c....
+....cccc....
+............
+............
+put pickup 7.5 4 kind = "recipe", flag = "d9:recipe"
+end

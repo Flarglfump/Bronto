@@ -1,0 +1,15 @@
+# Pantry Quest - a brazier's flame (scripts/brazier.bs), set over a brazier tile (Q) (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Brazier"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/flame_0.bmp"
+    tint = #ffffff00
+    layer = 4
+  Script
+    file = "scripts/brazier.bs"
+    vars = ""

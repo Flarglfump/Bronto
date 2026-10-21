@@ -197,14 +197,14 @@ func push_crate(d) {
     var to = cell + d
     if to.x < 2 or to.x > 13 or to.y < 2 or to.y > 8 { return false }
     var dest = room + to * 16 + vec2(8, 8)
-    if tile_at(m, dest) != "." { return false }
+    if tile_at(m, dest) != "." and tile_at(m, dest) != "B" { return false }    # onto bare floor, or a pressure plate
     for e in find_all("Enemy") {
         if distance(e.global_position, dest) < 12 { return false }
     }
     for p in find_all("Pickup") {
-        if distance(p.global_position, dest) < 12 { return false }
+        if p.visible() and distance(p.global_position, dest) < 12 { return false }
     }
-    set_tile(m, centre, ".")
+    set_tile(m, centre, game.room.floor_at(centre))
     set_tile(m, dest, "O")
     play_sound("sfx/push.wav")
     return true

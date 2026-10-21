@@ -1,0 +1,11 @@
+# Pantry Quest - an enemy held back for a later wave (scripts/spawner.bs; vars prefab, wave) (spawned in rooms; tools/make_rooms.py copies it into room scenes)
+bronto_scene 1
+
+entity
+  Name
+    text = "Spawner"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/spawner.bs"
+    vars = ""

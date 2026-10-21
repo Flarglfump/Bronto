@@ -26,11 +26,11 @@ GAME = os.path.normpath(os.path.join(HERE, '..'))
 
 TILESETS = {
     'overworld': dict(image='art/tiles_overworld.bmp', legend='.,TrW~bCs=fIFKX:YpPLGSg', solid='TrW~bIKXYPLGSg'),
-    'dungeon': dict(image='art/tiles_dungeon.bmp', legend='.#O~SLHXPV,', solid='#O~LHXPV'),
+    'dungeon': dict(image='art/tiles_dungeon.bmp', legend='.#O~SLHXPV,BQTc', solid='#O~LHXPVQT'),
 }
 COLS, ROWS = 16, 11
 BOSSES = {'gelatin', 'big_dill', 'spice_wraith', 'jammerwock', 'gumdrop_king',
-          'lucky_cookie', 'sugar_golem', 'noodle_hydra'}     # prefabs that are a cellar's guardian
+          'lucky_cookie', 'sugar_golem', 'noodle_hydra', 'baron'}     # prefabs that are a cellar's guardian
 DOOR_CELLS = {'n': [(7, 0), (8, 0), (7, 1), (8, 1)], 's': [(7, 9), (8, 9), (7, 10), (8, 10)],
               'w': [(0, 5), (1, 5)], 'e': [(14, 5), (15, 5)]}
 DOOR_TILE = {'open': ',', 'locked': 'L', 'bomb': 'X'}
@@ -129,7 +129,9 @@ def parse(path):
     rooms, cur, mode, tint = [], None, None, None
     for n, line in enumerate(open(path).read().split('\n'), 1):
         s = line.strip()
-        if mode in ('map', 'inside') and s and not s.startswith('#') and not re.match(r'(put|var|end)\b', s):
+        row_width = 12 if mode == 'inside' else 16      # (a row of tiles may start with a wall, '#')
+        is_row = s and (not s.startswith('#') or (len(s) == row_width and ' ' not in s))
+        if mode in ('map', 'inside') and is_row and not re.match(r'(put|var|end)\b', s):
             cur[mode].append(s)
             continue
         if not s or s.startswith('#'):

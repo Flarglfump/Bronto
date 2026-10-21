@@ -29,6 +29,12 @@ func start() {
     track = find("BossBarTrack")
 }
 
+# "THE" before a guardian's name - but not a baron's.
+func the(b) {
+    if substr(b.title, 0, 6) == "BARON " { return "" }
+    return "THE"
+}
+
 func ease(k) { return 1 - (1 - k) * (1 - k) }
 
 func update(dt) {
@@ -45,7 +51,7 @@ func update(dt) {
     if t >= 1.3 and b != nil and b.alive {
         if named != b.title {
             named = b.title
-            pre.Label.text = "THE"
+            pre.Label.text = the(b)
             title.Label.text = b.title
             sub.Label.text = b.subtitle
         }
@@ -60,7 +66,8 @@ func update(dt) {
     track.Shape.color = rgb(74, 20, 28, a)
     fill.Shape.color = rgb(216, 52, 58, a)
     if a > 0 {
-        name.Label.text = "THE " + b.title
+        name.Label.text = the(b) + " " + b.title
+        if the(b) == "" { name.Label.text = b.title }
         var w = 126 * clamp(b.hp / b.hp_max, 0, 1)
         fill.Shape.size = vec2(w, 4)
         fill.position = vec2(128 - 63 + w / 2, 233)

@@ -32,8 +32,8 @@ entity
     tile_size = 16
     columns = 16
     rows = 11
-    legend = ".#O~SLHXPV,"
-    solid = "#O~LHXPV"
+    legend = ".#O~SLHXPV,BQTc"
+    solid = "#O~LHXPVQT"
     tiles = "##################################OOOOOOOOOOOO####O..........O####O..P....P..O##XX............####O..P....P..O####O..........O####OOOOOOOOOOOO##################################"
     layer = -10
     tint = #8ce6d2ff

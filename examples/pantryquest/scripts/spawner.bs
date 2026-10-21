@@ -1,0 +1,11 @@
+# Holds an enemy back for a later wave (scripts/room.bs lets it in once
+# every enemy of the waves before is beaten). `prefab` is the enemy's prefab
+# name ("toast"), `wave` 2, 3...
+
+var prefab = ""
+var wave = 2
+
+func fire() {
+    spawn("prefabs/" + prefab + ".scene", self.position, self.parent)
+    destroy(self)
+}

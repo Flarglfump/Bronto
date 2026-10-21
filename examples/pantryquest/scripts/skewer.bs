@@ -1,5 +1,6 @@
-# A skewer from the skewer bow (each costs a bean): it flies straight until
-# it hits a wall or something, and hits twice as hard as a poke.
+# A skewer from the skewer bow (each costs a bean): it flies straight - over
+# jam and broth too - until it hits a wall or something, and hits twice as
+# hard as a poke. It rings a gong.
 
 var vel := vec2(0, 0)
 var game
@@ -10,9 +11,16 @@ func update(dt) {
     if game.state != "play" { return }
     self.position += vel * dt
     var p = self.position
-    if p.x < 4 or p.x > 252 or p.y < 68 or p.y > 236 or tile_solid(game.map, p) {
+    if p.x < 4 or p.x > 252 or p.y < 68 or p.y > 236 or (tile_solid(game.map, p) and tile_at(game.map, p) != "~") {
         stop()
         return
+    }
+    for g in find_all("Gong") {
+        if distance(g.global_position, p) < 9 {
+            g.ring()
+            stop()
+            return
+        }
     }
     for e in find_all("Enemy") {
         if distance(e.global_position, p) < 5 + e.size {

@@ -5,8 +5,8 @@ prefabs and BrontoScript, with no C code. Greedy Baron Gorge has torn the Grand 
 into eight pages and hidden them all over the land. Pip, a young cook, picks up a wooden
 spoon and sets out to find them.
 
-This is the first part of a bigger game. The whole land is there to explore now, with
-eight of its nine cellars:
+The whole game is here, beginning to end: the land to explore, nine cellars, and an
+ending.
 
 - **The Pantry Plains:** 128 screens in ten regions: the start plains, the Lettuce Woods,
   Blueberry Lake, the Frosty Fields, the Fortune Cookie Field, the Chocolate Mountains,
@@ -17,8 +17,6 @@ eight of its nine cellars:
   - **Two healing springs**, and three heart pies hidden out in the land.
   - **The doors of all nine cellars.** Two are hidden behind cracked cliffs, and the
     last, Baron Gorge's Banquet Hall, waits at the top of the Chocolate Mountains.
-    The Banquet Hall is still being dug: for now its door leads to an entrance room
-    where a cook says so.
 - **The Cold Cellar** (in the Frosty Fields): nine rooms. It has locked doors and keys,
   shutters that close until the enemies are beaten, and a bombable wall with a stash
   behind it. Its treasure is the **pizza cutter**, and its guardian is the **Gelatin
@@ -58,9 +56,33 @@ eight of its nine cellars:
   **Noodle Hydra**, is an iron pot with four noodle heads that spit broth. Three hits
   break a head off, and it flies loose round the room until the pot goes down with
   its last head.
+- **Baron Gorge's Banquet Hall** (atop the Chocolate Mountains): the last cellar,
+  seventeen rooms. Its door only opens for a cook carrying all eight recipe pages.
+  - **Puzzles** that need everything Pip has found, each keeping a door shut (or a key
+    hidden) until it is solved:
+    - two crates-and-plates rooms: push crates onto every pressure plate (the oven mitt);
+    - four braziers to light with the fire chili, which burn out again after nine
+      seconds, so all four must be burning at once;
+    - a gong across the jam that only a skewer can ring, once a crate is pushed out of
+      the way;
+    - a key on an island whose jam ring is too wide at the corners for the plank.
+  - **Gauntlets:** rooms that shut Pip in with wave after wave of the kingdom's worst,
+    each wave coming in as soon as the last is beaten.
+  - **Baron Gorge**, in three courses, his bar counting all of them down:
+    1. *The Feast:* behind his banquet table he flings dishes and rings for waiters,
+       and can only be hit when he leans over the table to slam it.
+    2. *Gorge:* he smashes the table and chases Pip, breathing in so hard he drags
+       him closer. His belly turns every hit, but a popcorn bomb pulled into his mouth
+       goes down whole and stuns him. Bombs drop in while Pip is short of them.
+    3. *The Last Course:* he hides under one of three dish covers that shuffle, faster
+       as he weakens. Under his: him, to be hit. Under the others: dishes, or a
+       meatball.
+  - Behind him, the **Grand Recipe**, whole again, and the ending. The file is saved,
+    and Enter goes back to the title.
 - Every cellar has a **map**, which shows all its rooms on the HUD, and a **compass**,
   which marks the guardian's room until it is beaten. Behind each guardian is a heart
-  pie and a page of the recipe, and the page takes Pip back out of the cellar's door.
+  pie and a page of the recipe (in the Banquet Hall, the Grand Recipe), and the page
+  takes Pip back out of the cellar's door.
 
 | | Keys (at first: SETTINGS changes them) | |
 |---|---|---|
@@ -127,6 +149,12 @@ build/bronto_web examples/pantryquest -o pantry/index.html   # a web page (make 
     walkers with their own vars (`prefabs/olive.scene`, `prefabs/imp.scene`).
   - `skewer.bs` and `fire.bs` are the skewer bow's skewers and the fire chili's flame.
   - `pickup.bs` covers anything to pick up or buy.
+  - `room.bs` also runs a room's waves (`spawner.bs` holds an enemy back for a later
+    wave) and its puzzle: pressure plates (tile `B`), braziers (`brazier.bs`, over tile
+    `Q`), a gong (`gong.bs`), or carrying enough pages. A room's `sealed` sides stay shut
+    until it is solved; pickups with `on_solve` appear then.
+  - `enemies/baron.bs` is Baron Gorge, all three courses (`cloche.bs` is a dish cover),
+    and `ending.bs` the ending card.
   - `warp.bs` is for cave mouths and doors.
   - `title.bs`, `files_menu.bs`, `pause_menu.bs` and `settings_menu.bs` are the title and
     its menus; `settings.bs` keeps the player's keys and volumes, and everything that
@@ -153,9 +181,9 @@ standard library only:
 - `make_rooms.py` turns the maps in `tools/world/*.txt` into `rooms/*.scene`. The maps
   are easier to edit there than tile by tile. Each map is 16 x 11 characters, or a
   cellar room's 12 x 7 inside with its doors named. `overworld.txt` holds the land,
-  `caves.txt` the caves, `cellar1.txt` to `cellar8.txt` the cellars built so far (each
-  with its own `name` and `tint`), and `cellars_unbuilt.txt` the entrance rooms of the cellars to
-  come. It also writes `scripts/cellars.bs`, which tells the game each cellar's rooms,
+  `caves.txt` the caves, `cellar1.txt` to `cellar9.txt` the cellars (each
+  with its own `name` and `tint`), and `cellars_unbuilt.txt` a stand-in entrance room for any
+  cellar without its own file (none, now that all nine are built). It also writes `scripts/cellars.bs`, which tells the game each cellar's rooms,
   its guardian's room and its way out (for the HUD's map and compass).
 - `design_overworld.py --force` lays the whole land out again from its plan (the
   regions, where every cellar and cave goes, what is in each cave), keeping the

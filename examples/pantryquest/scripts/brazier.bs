@@ -1,0 +1,48 @@
+# A brazier on a stand (tile Q) in the Banquet Hall: the fire chili's flame
+# lights it (scripts/fire.bs). Some burn out again after `burn_time`
+# seconds, until the room's puzzle is solved (scripts/room.bs) - so all of
+# them have to be burning at once.
+
+var lit = false
+var burn_time = 0           # seconds it stays lit (0: for good)
+var left = 0
+var t = 0
+var game
+
+func start() {
+    game = find("Game")
+    if game.has_flag("solved:" + self.parent.id) { lit = true }
+    draw()
+}
+
+func light() {
+    if lit { return }
+    lit = true
+    left = burn_time
+    play_sound("sfx/fire.wav", 0.6)
+    draw()
+}
+
+func draw() {
+    if not lit {
+        self.Sprite.tint = rgb(255, 255, 255, 0)
+        return
+    }
+    var a = 255
+    if burn_time > 0 and not self.parent.solved and left < 2 and floor(left * 8) % 2 == 0 { a = 110 }   # (going out)
+    self.Sprite.tint = rgb(255, 255, 255, a)
+}
+
+func update(dt) {
+    if game.state != "play" { return }
+    t += dt
+    if floor(t * 8) % 2 == 0 { self.Sprite.image = "art/flame_0.bmp" } else { self.Sprite.image = "art/flame_1.bmp" }
+    if lit and burn_time > 0 and not self.parent.solved {
+        left -= dt
+        if left <= 0 {
+            lit = false
+            play_sound("sfx/shutter.wav", 0.4)
+        }
+    }
+    draw()
+}

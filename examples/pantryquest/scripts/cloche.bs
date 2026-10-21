@@ -1,0 +1,2 @@
+# One of Baron Gorge's three dish covers (scripts/enemies/baron.bs moves it).
+var spot = 0                # which of the three places it stands at

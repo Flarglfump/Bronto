@@ -10,6 +10,7 @@ func name(area) {
     if area == "d6" { return "THE FORTUNE HALL" }
     if area == "d7" { return "THE SUGAR MILL" }
     if area == "d8" { return "THE SOUP CAULDRON" }
+    if area == "d9" { return "BARON GORGE'S BANQUET HALL" }
     return ""
 }
 
@@ -22,7 +23,7 @@ func rooms(area) {
     if area == "d6" { return ["2_4", "2_3", "1_3", "3_3", "3_2", "3_1", "2_2", "1_2", "0_2", "1_1", "0_1", "2_1", "2_0", "1_0"] }
     if area == "d7" { return ["2_4", "2_3", "1_3", "3_3", "1_2", "0_2", "0_1", "1_1", "2_2", "3_2", "4_2", "3_1", "3_0", "2_1", "2_0", "1_0"] }
     if area == "d8" { return ["2_4", "2_3", "1_3", "3_3", "1_2", "0_2", "2_2", "3_2", "4_2", "3_1", "4_1", "1_1", "0_1", "2_1", "1_0", "0_0"] }
-    if area == "d9" { return ["2_4"] }
+    if area == "d9" { return ["2_4", "2_3", "1_3", "0_3", "0_2", "1_2", "1_1", "1_0", "3_3", "4_3", "3_2", "4_2", "3_1", "4_1", "2_1", "2_0", "3_0"] }
     return []
 }
 
@@ -35,6 +36,7 @@ func boss_room(area) {
     if area == "d6" { return "2_0" }
     if area == "d7" { return "2_0" }
     if area == "d8" { return "1_0" }
+    if area == "d9" { return "2_0" }
     return ""
 }
 

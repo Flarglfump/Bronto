@@ -1,6 +1,6 @@
 # The fire chili's flame: it rolls out two tiles, then burns where it
 # stops for a moment. It scorches anything it touches, and a bush hiding a
-# secret (tile Y) burns away.
+# secret (tile Y) burns away, and a brazier it reaches catches light.
 
 var dir := vec2(1, 0)
 var travel = 0.25
@@ -34,6 +34,9 @@ func update(dt) {
             destroy(self)
             return
         }
+    }
+    for b in find_all("Brazier") {
+        if distance(b.global_position, self.position) < 22 { b.light() }
     }
     for e in find_all("Enemy") {
         if not contains(hit_list, e.id) and distance(e.global_position, self.position) < 6 + e.size {

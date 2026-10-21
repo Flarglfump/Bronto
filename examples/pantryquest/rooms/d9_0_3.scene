@@ -1,0 +1,158 @@
+# Pantry Quest - room d9_0_3 (made by tools/make_rooms.py from tools/world/cellar9.txt: edit it there)
+#
+#   #######,,#######
+#   #######,,#######
+#   ##............##
+#   ##..O......O..##
+#   ##............##
+#   ##.....PP.....,,
+#   ##............##
+#   ##..O......O..##
+#   ##............##
+#   ################
+#   ################
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 64
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"d9_0_3\", music = \"cellar\", stays_clear = true, shut = \"en\""
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 88
+  Tilemap
+    tileset = "art/tiles_dungeon.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 11
+    legend = ".#O~SLHXPV,BQTc"
+    solid = "#O~LHXPVQT"
+    tiles = "#######,,##############,,#########............####..O......O..####............####.....PP.....,,##............####..O......O..####............##################################"
+    layer = -10
+    tint = #b48cd2ff
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 88 72
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 168 72
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 120 120
+  Sprite
+    image = "art/bat_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/bat.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 88 120
+  Sprite
+    image = "art/jelly_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Enemy"
+  Transform
+    position = 168 120
+  Sprite
+    image = "art/jelly_0.bmp"
+    layer = 3
+  Script
+    file = "scripts/enemies/jelly.bs"
+    vars = ""
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Spawner"
+  Transform
+    position = 88 88
+  Script
+    file = "scripts/spawner.bs"
+    vars = "prefab = \"meatball\", wave = 2"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Spawner"
+  Transform
+    position = 168 88
+  Script
+    file = "scripts/spawner.bs"
+    vars = "prefab = \"meatball\", wave = 2"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Spawner"
+  Transform
+    position = 120 56
+  Script
+    file = "scripts/spawner.bs"
+    vars = "prefab = \"toast\", wave = 2"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Pickup"
+  Transform
+    position = 128 120
+  Sprite
+    image = "art/bean.bmp"
+    layer = 1
+  Script
+    file = "scripts/pickup.bs"
+    vars = "kind = \"heart\", flag = \"d9:heart1\", on_clear = true"
+  Parent
+    entity = 0

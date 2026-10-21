@@ -161,6 +161,9 @@ def make_sfx():
                         (0, tone(R, 'G3', 0.2, 'triangle', vol=0.3, f1='C3'))])
     sfx('push', 0.35, [(0, tone(R, 260, 0.32, 'noise', vol=0.3, f1=140, decay=0.3)),
                       (0, tone(R, 'C2', 0.3, 'saw', vol=0.12))])
+    sfx('gong', 1.6, [(0, tone(R, 'G2', 1.5, 'triangle', vol=0.45, vibrato=5, release=1.2)),
+                      (0, tone(R, 'D4', 1.2, 'triangle', vol=0.18, vibrato=7, release=1.0)),
+                      (0, tone(R, 3000, 0.08, 'noise', vol=0.25, decay=0.03))])
     sfx('whisk', 1.0, [(0, tone(R, 400, 0.95, 'noise', vol=0.25, f1=2400, decay=0.6)),
                        (0, tone(R, 'C4', 0.9, duty=0.125, vol=0.12, f1='C6', vibrato=14))])
 

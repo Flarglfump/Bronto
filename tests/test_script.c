@@ -870,6 +870,219 @@ static void test_pantryquest_plank_and_whisk(void) {
     teardown();
 }
 
+/* Pantry Quest's last cellar, Baron Gorge's Banquet Hall. */
+static br_entity pq_start(const char *room, float x, float y, const char *more) {
+    br_script *sc;
+    br_entity game;
+    if (!pq_load("main.scene")) return BR_ENTITY_NULL;
+    game = named("Game");
+    sc = (br_script *)br_get(&W, game, SCRIPT);
+    snprintf(sc->vars, sizeof(sc->vars), "start_room = \"%s\", start_pos = vec2(%g, %g), weapon = 1, hearts_max = 16%s%s",
+             room, (double)x, (double)y, more[0] ? ", " : "", more);
+    steps(40);
+    return game;
+}
+static void pq_end(void) {
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+static void pq_place_hero(int col, int row) {          /* Pip in an inside cell (12 x 7) of the room */
+    br_transform *t = (br_transform *)br_get(&W, named("Hero"), ID.transform);
+    if (t) {
+        t->position.x = (float)((col + 2) * 16 + 8);
+        t->position.y = (float)(64 + (row + 2) * 16 + 8 - 4);
+    }
+}
+static br_key pq_key_of(char d) {
+    return d == 'U' ? BR_KEY_UP : d == 'D' ? BR_KEY_DOWN : d == 'L' ? BR_KEY_LEFT : BR_KEY_RIGHT;
+}
+static double pq_num(br_entity e, const char *var) {
+    double v = -1;
+    br_script_get_number(&W, e, var, &v);
+    return v;
+}
+static int pq_count(const char *name) {
+    uint32_t i;
+    int n = 0;
+    for (i = 0; i < W.pools[ID.name].count; ++i)
+        if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)i * W.pools[ID.name].stride))->text, name) == 0) n++;
+    return n;
+}
+
+/* The door in only opens for a cook with all eight recipe pages. */
+static void test_pantryquest_banquet_gate(void) {
+    char room[32];
+    br_entity game;
+    int pages;
+    for (pages = 7; pages <= 8; ++pages) {
+        char more[32];
+        snprintf(more, sizeof(more), "pages = %d", pages);
+        game = pq_start("d9_2_4", 128, 200, more);
+        hold_key(BR_KEY_UP, 150);
+        steps(60);
+        CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)));
+        CHECK(strcmp(room, pages == 8 ? "d9_2_3" : "d9_2_4") == 0);
+        pq_end();
+    }
+}
+
+/* The crates-and-plates rooms, solved the way tools found (the fewest
+ * pushes): Pip set beside each crate in turn, leaning on it. Each push must
+ * move the crate a cell, and the last solves the room, opening its sealed
+ * door for good. */
+typedef struct { int col, row; char dir; } pq_push;
+static void pq_crates(const char *room, const pq_push *plan, int n, const char *sealed_cell_check) {
+    br_entity game;
+    int i;
+    (void)sealed_cell_check;
+    game = pq_start(room, 128, 152, "treasures = [\"mitt\"]");
+    CHECK(pq_num(game, "hp") > 0);
+    for (i = 0; i < n; ++i) {
+        CHECK(pq_num(named("Room"), "solved") == 0);
+        pq_place_hero(plan[i].col, plan[i].row);
+        steps(2);
+        hold_key(pq_key_of(plan[i].dir), 25);
+        steps(4);
+    }
+    CHECK(pq_num(named("Room"), "solved") == 1);
+    pq_end();
+}
+static void test_pantryquest_banquet_puzzles(void) {
+    static const pq_push west[] = { {8, 1, 'D'}, {4, 2, 'L'}, {8, 4, 'U'}, {7, 2, 'R'}, {2, 3, 'U'}, {2, 2, 'U'}, {9, 3, 'U'}, {9, 2, 'U'} };
+    static const pq_push east[] = { {3, 2, 'L'}, {1, 3, 'U'}, {1, 2, 'U'}, {8, 2, 'R'}, {10, 3, 'U'}, {10, 2, 'U'} };
+    char room[32];
+    br_entity game, b[4];
+    uint32_t i;
+    int n = 0;
+    pq_crates("d9_1_3", west, 8, NULL);
+    pq_crates("d9_4_3", east, 6, NULL);
+    /* the braziers: the fire chili lights one for real; all four at once solves the room... */
+    game = pq_start("d9_1_2", 56, 172, "start_items = \"chili\"");
+    pq_place_hero(1, 4);
+    g_engine.input.keys[BR_KEY_UP] = true; steps(1); g_engine.input.keys[BR_KEY_UP] = false;
+    steps(2);
+    pq_press(BR_KEY_Z);
+    steps(30);
+    for (i = 0; i < W.pools[ID.name].count && n < 4; ++i)
+        if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)i * W.pools[ID.name].stride))->text, "Brazier") == 0)
+            b[n++] = W.pools[ID.name].entities[i];
+    CHECK_EQ_INT(n, 4);
+    if (n == 4) {
+        CHECK_EQ_INT((int)(pq_num(b[0], "lit") + pq_num(b[1], "lit") + pq_num(b[2], "lit") + pq_num(b[3], "lit")), 1);
+        steps(60 * 10);                                /* ...but on its own it burns out */
+        CHECK_EQ_INT((int)(pq_num(b[0], "lit") + pq_num(b[1], "lit") + pq_num(b[2], "lit") + pq_num(b[3], "lit")), 0);
+        for (i = 0; i < 4; ++i) { br_script_call(&W, b[i], "light", NULL, 0); steps(60); }
+        CHECK(pq_num(named("Room"), "solved") == 1);
+    }
+    pq_end();
+    /* the gong: push the crate out of the skewer's way, then shoot along the row */
+    game = pq_start("d9_3_2", 200, 152, "treasures = [\"mitt\"], start_items = \"skewers\", beans = 5");
+    pq_place_hero(4, 3);
+    hold_key(BR_KEY_UP, 25);
+    steps(4);
+    pq_place_hero(6, 2);
+    g_engine.input.keys[BR_KEY_LEFT] = true; steps(1); g_engine.input.keys[BR_KEY_LEFT] = false;
+    steps(2);
+    pq_press(BR_KEY_Z);
+    steps(60);
+    CHECK(pq_num(named("Gong"), "rung") == 1);
+    CHECK(pq_num(named("Room"), "solved") == 1);
+    hold_key(BR_KEY_UP, 10);                           /* (the sealed door north is open now) */
+    pq_place_hero(5, 0);
+    hold_key(BR_KEY_UP, 60);
+    steps(40);
+    CHECK(br_script_get_string(&W, game, "room_name", room, sizeof(room)) && strcmp(room, "d9_3_1") == 0);
+    pq_end();
+}
+
+/* A gauntlet: the foyer's three waves come in one after the other, and only
+ * after the last do its shutters open. (Its enemies are simply removed.) */
+static void test_pantryquest_banquet_waves(void) {
+    br_entity game;
+    int i, j, most_spawners, waves_seen = 0, last = -1;
+    uint32_t k;
+    game = pq_start("d9_2_3", 128, 200, "");
+    most_spawners = pq_count("Spawner");
+    CHECK_EQ_INT(most_spawners, 6);
+    CHECK(pq_num(named("Room"), "shutting") == 1);
+    for (i = 0; i < 60 * 30 && (pq_count("Spawner") > 0 || pq_count("Enemy") > 0); ++i) {
+        br_script_set_number(&W, game, "hp", 32);
+        steps(1);
+        if (pq_count("Spawner") != last) { last = pq_count("Spawner"); waves_seen++; }
+        if (i % 10) continue;
+        for (j = 0; j < 8; ++j) {
+            br_entity e = BR_ENTITY_NULL;
+            for (k = 0; k < W.pools[ID.name].count; ++k)
+                if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)k * W.pools[ID.name].stride))->text, "Enemy") == 0) {
+                    e = W.pools[ID.name].entities[k];
+                    break;
+                }
+            if (e == BR_ENTITY_NULL) break;
+            br_entity_destroy(&W, e);
+        }
+    }
+    steps(10);
+    CHECK_EQ_INT(waves_seen, 3);                       /* 6 held back, then 3, then none */
+    CHECK_EQ_INT(pq_count("Enemy"), 0);
+    CHECK(pq_num(named("Room"), "shutting") == 0);
+    pq_end();
+}
+
+/* Baron Gorge, all three courses: hit while he leans over the table; fed a
+ * bomb while he breathes in, then hit while he is stunned; hit when his
+ * dish cover lifts. Down he goes, and the Grand Recipe behind him ends the
+ * game. */
+static void test_pantryquest_baron(void) {
+    static const double poke[3] = { 1, 0, 0 };
+    char mode[32], music[32], scene[64];
+    br_entity game, baron;
+    double hp, phase, most_phase = 0;
+    int i, fed = 0, hits_open = 0;
+    game = pq_start("d9_2_0", 128, 200, "bombs = 8, start_items = \"bombs\"");
+    baron = named("Enemy");
+    CHECK(baron != BR_ENTITY_NULL);
+    if (baron == BR_ENTITY_NULL) { pq_end(); return; }
+    for (i = 0; i < 60 * 240 && br_entity_alive(&W, baron); ++i) {
+        br_script_set_number(&W, game, "hp", 32);
+        br_script_set_number(&W, game, "bombs", 8);
+        steps(1);
+        if (!br_entity_alive(&W, baron)) break;
+        mode[0] = 0;
+        br_script_get_string(&W, baron, "mode", mode, sizeof(mode));
+        phase = pq_num(baron, "phase");
+        if (phase > most_phase) most_phase = phase;
+        if (strcmp(mode, "inhale") == 0 && pq_count("Bomb") == 0 && i % 20 == 0) {   /* a bomb at his feet */
+            br_transform *bt = (br_transform *)br_get(&W, baron, ID.transform);
+            br_transform *ht = (br_transform *)br_get(&W, named("Hero"), ID.transform);
+            if (bt && ht) { ht->position.x = bt->position.x; ht->position.y = bt->position.y + 64 + 30; }
+            pq_press(BR_KEY_Z);
+            fed++;
+        }
+        if (i % 7) continue;
+        hp = pq_num(baron, "hp");
+        br_script_call(&W, baron, "hit", poke, 3);
+        if (br_entity_alive(&W, baron) && pq_num(baron, "hp") < hp) hits_open++;
+    }
+    CHECK(!br_entity_alive(&W, baron));
+    CHECK_EQ_INT((int)most_phase, 3);
+    CHECK(fed > 0);
+    CHECK(hits_open >= 21);
+    steps(2);
+    CHECK(br_script_get_string(&W, game, "music_name", music, sizeof(music)) && strcmp(music, "cellar") == 0);
+    pq_end();
+    /* the Grand Recipe: the end, and back to the title */
+    game = pq_start("d9_3_0", 128, 160, "");
+    hold_key(BR_KEY_UP, 40);
+    steps(60 * 4);
+    CHECK(br_script_get_string(&W, game, "state", mode, sizeof(mode)) && strcmp(mode, "won") == 0);
+    CHECK(named("Ending") != BR_ENTITY_NULL);
+    steps(60 * 4);
+    pq_press(BR_KEY_ENTER);
+    CHECK(br_script_scene_request(&W, scene, sizeof(scene)) && strcmp(scene, "title.scene") == 0);
+    pq_end();
+}
+
 static void test_pantryquest_files_and_settings(void) {
     char folder[BR_PATH_MAX], text[64];
     size_t size;
@@ -1248,6 +1461,10 @@ void suite_script(void) {
     RUN(test_pantryquest_world);
     RUN(test_pantryquest_bosses);
     RUN(test_pantryquest_plank_and_whisk);
+    RUN(test_pantryquest_banquet_gate);
+    RUN(test_pantryquest_banquet_puzzles);
+    RUN(test_pantryquest_banquet_waves);
+    RUN(test_pantryquest_baron);
     RUN(test_pantryquest_eight_ways);
     RUN(test_pantryquest_files_and_settings);
     RUN(test_check_and_errors);
