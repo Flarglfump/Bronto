@@ -19,6 +19,8 @@
 #   make x11-test / audio-test / evdev-test   Linux backend tests
 #   make web        build for the web: the web player (build/web) and a page for each example
 #   make web-test   run the test suite as WebAssembly (in Node) and check the web C library
+#   make playthrough / replay / replay-check / replay-web
+#                   Pantry Quest played through by a bot, and watched back frame for frame
 #   make clean
 
 CC      ?= cc
@@ -342,3 +344,24 @@ audio-test: $(LIB)
 evdev-test: $(LIB)
 	$(CC) $(CFLAGS) -Wno-missing-prototypes tests/platform/evdev_test.c $(LIB) $(LDFLAGS) $(LDLIBS) -o $(BUILD)/evdev_test
 	$(BUILD)/evdev_test
+
+# Pantry Quest, played through by a bot and replayed frame for frame
+# (tools/pantrybot, include/bronto/replay.h, docs/replay.md):
+#   make playthrough      the bot plays the whole game and records it: $(PLAYTHROUGH)
+#   make replay           watch the recording in a window (SEGMENT=N starts at segment N)
+#   make replay-check     play it back headless and check every recorded frame
+#   make replay-web       a one-file web page that plays it: $(WEB)/pantryquest-replay/index.html
+PANTRYBOT   := $(BUILD)/pantrybot
+PLAYTHROUGH ?= examples/pantryquest/tools/playthrough.brec
+$(PANTRYBOT): $(wildcard tools/pantrybot/*.c) tools/pantrybot/bot.h $(LIB)
+	$(CC) $(CFLAGS) -Wno-missing-prototypes $(wildcard tools/pantrybot/*.c) $(LIB) $(LDFLAGS) $(LDLIBS) -pthread -o $@
+pantrybot: $(PANTRYBOT)
+playthrough: $(PANTRYBOT)
+	$(PANTRYBOT) --game examples/pantryquest --out $(PLAYTHROUGH)
+replay: $(PLAYER)
+	$(PLAYER) examples/pantryquest --replay $(PLAYTHROUGH) $(if $(SEGMENT),--segment $(SEGMENT))
+replay-check: $(PLAYER)
+	$(PLAYER) examples/pantryquest --replay $(PLAYTHROUGH) --headless
+replay-web: $(WEB_PLAYER) $(WEB_RUNTIME) $(WEB_TOOL)
+	$(WEB_TOOL) examples/pantryquest --runtime $(WEB) --replay $(PLAYTHROUGH) -o $(WEB)/pantryquest-replay/index.html
+.PHONY: pantrybot playthrough replay replay-check replay-web

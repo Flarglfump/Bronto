@@ -30,5 +30,6 @@
 #include "window.h"
 #include "platform.h"
 #include "engine.h"
+#include "replay.h"
 
 #endif /* BRONTO_H */

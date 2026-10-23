@@ -94,6 +94,8 @@ bool br_script_call(br_world *w, br_entity e, const char *function, const double
 bool br_script_get_number(br_world *w, br_entity e, const char *var, double *out);
 bool br_script_set_number(br_world *w, br_entity e, const char *var, double value);
 bool br_script_get_string(br_world *w, br_entity e, const char *var, char *out, size_t size);
+/* An entity variable (false if it isn't one, or the entity is gone). */
+bool br_script_get_entity(br_world *w, br_entity e, const char *var, br_entity *out);
 
 /* The language's built-in functions, by name (for tools such as editors). */
 int br_script_builtin_count(void);

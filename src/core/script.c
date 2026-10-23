@@ -3564,10 +3564,18 @@ bool br_script_set_number(br_world *w, br_entity e, const char *var, double valu
 void br_script_set_strict(bool strict) { g_strict_default = strict; }
 bool br_script_strict(void) { return g_strict_default; }
 
+bool br_script_get_entity(br_world *w, br_entity e, const char *var, br_entity *out) {
+    sc_instance *inst = sc_running(w, e);
+    int g = inst ? sc_find_global(inst->prog, var) : -1;
+    if (g < 0 || inst->globals[g].t != V_ENT) return false;
+    *out = inst->globals[g].as.e;
+    return br_entity_alive(w, *out);
+}
+
 bool br_script_get_string(br_world *w, br_entity e, const char *var, char *out, size_t size) {
     sc_instance *inst = sc_running(w, e);
     int g = inst ? sc_find_global(inst->prog, var) : -1;
-    char buf[1024];
+    char buf[8192];
     sc_vm vm;
     if (g < 0 || size == 0) return false;
     if (inst->globals[g].t == V_STR) { snprintf(out, size, "%s", inst->globals[g].as.s->chars); return true; }

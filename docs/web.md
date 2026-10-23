@@ -24,7 +24,12 @@ editor (see below).
 make web                          # the web player, plus a page for every example in build/web/
 build/bronto_web my_project       # a project's page -> my_project/builds/web/index.html
 build/bronto_web --wasm game.wasm --title "My Game" -o page.html   # a game written in C
+build/bronto_web my_project --replay run.brec -o watch.html        # a page that plays a recorded run
 ```
+
+A page made with `--replay` plays the recording back instead of the game (see
+[replay.md](replay.md)). Its button says **Watch**, the playback keys are listed on it,
+and `#seg=N` at the end of the page's address starts at segment N.
 
 `make web` writes the following to `build/web/`:
 

@@ -10,7 +10,8 @@ and the math and render APIs are designed so that 3D can be added later.
 Status (v0.1):
 - **Done:** the core systems; native windows, sound output and gamepads on Windows,
   macOS and Linux; web builds (WebAssembly, with no Emscripten); two sample games, Snake
-  and Pop Defense; and a visual scene editor.
+  and Pop Defense; a visual scene editor; and recording and replaying runs frame for
+  frame, with a bot that plays Pantry Quest through.
 - **Next:** see the roadmap below.
 
 ## Quick start
@@ -28,6 +29,7 @@ make examples      # build examples/ into build/examples/
 make sanitize      # tests under AddressSanitizer + UndefinedBehaviorSanitizer
 make web          # web builds: build/web/<example>/index.html, and the web player (needs LLVM's clang)
 make web-test      # the test suite as WebAssembly in Node, and web-specific tests
+make replay        # watch a bot play Pantry Quest from start to finish (frame for frame)
 make x11-test      # Linux: drives a real X11 window (falls back to Xvfb)
 make audio-test    # Linux: plays a tone through ALSA and checks what reached the device
 make evdev-test    # Linux: feeds kernel gamepad events through the evdev backend
@@ -176,7 +178,9 @@ func on_trigger(other) { if other.name == "Coin" { destroy(other) } }
 `examples/platformer` is a complete level made this way, with no C code: open it with
 **Load Project** and press Play. `examples/pantryquest` is a whole adventure game made the
 same way: a top-down quest across a land of 128 screens built from Tilemaps, with caves,
-shops, secrets, cellars with keys, maps, compasses and bosses, and its own art, sounds and music. The language is
+shops, secrets, cellars with keys, maps, compasses and bosses, and its own art, sounds and music.
+`make replay` watches a bot play it from the title to the ending (see
+[Replays](#replays)). The language is
 described in [docs/scripting.md](docs/scripting.md). When speed matters, a script can
 instead be a behaviour written in C (`br_script_register_behaviour`).
 
@@ -220,6 +224,29 @@ The editor's **Build** menu turns a project into a game that runs without the ed
 `--headless --frames N` runs it with no window (for tests). Scripts move between scenes
 with `load_scene("levels/2.scene")` and end the game with `quit()`; in the editor's Play,
 those swap the scene until Stop and stop playing.
+
+## Replays
+
+A run is deterministic, so it can be recorded as just its input (which keys went down or
+up on which frame) and played back exactly. `bronto_player <game> --replay run.brec`
+plays a recording in a window, where Space pauses, `.` steps a frame, 1 to 4 set the speed,
+N and P jump between its segments and H hides the status bar. `--headless` plays it as fast
+as it goes and checks the picture against hashes kept in the recording. `bronto_web
+<project> --replay run.brec` makes a one-file web page that plays it in a browser.
+
+`tools/pantrybot` is a bot that plays all of Pantry Quest and records it in 20 segments
+(each stretch of the land and the cellar it leads to). Its recording is
+`examples/pantryquest/tools/playthrough.brec`:
+
+```sh
+make replay              # watch it (SEGMENT=N to start at segment N)
+make replay-check        # check every recorded frame, headless
+make replay-web          # build/web/pantryquest-replay/index.html
+make playthrough         # the bot plays it again and records a new one
+```
+
+See [docs/replay.md](docs/replay.md) for the file format, the API (`replay.h`) and how the
+bot plays.
 
 ## Saved data
 
@@ -322,8 +349,10 @@ tools/bscheck/       checks .bs scripts from the command line
 tools/player/        bronto_player: runs games (the editor's Build packs projects into it)
 tools/vscode/        the BrontoScript extension for VS Code
 tools/web/           the web runtime (bronto.js), the page template, bronto_web (makes pages)
+tools/pantrybot/     a bot that plays Pantry Quest through and records it
 docs/scripting.md    the BrontoScript reference
 docs/web.md          web builds
+docs/replay.md       recording and replaying runs, and the Pantry Quest bot
 ```
 
 ## Architecture
@@ -352,6 +381,7 @@ docs/web.md          web builds
 | Output capture | `capture.h` | Redirects the program's own stdout and stderr into a buffer it reads back each frame (the editor's console), optionally still echoing to the terminal. Pipes plus a reader thread, in POSIX and Win32 backends in the platform layer; not available on the web (output goes to the browser's console) |
 | GUI | `ui.h` | Immediate-mode widgets: buttons, checkboxes, number fields you drag or type into, vec2 and colour fields, text fields, drop-downs, list rows, collapsible sections, scrolling panels, clickable custom-drawn areas with double-click, drag and drop, and right-click context menus (submenus, ticks, shortcuts, keyboard navigation). The editor uses it, and so can games |
 | Engine | `engine.h` | Fixed-timestep loop, frame limiter, per-frame arena; `br_engine_frame()` runs one frame, `br_engine_loop()` runs them until the game ends (on the web it hands them to the browser) |
+| Replays | `replay.h` | Records a run as the keys pressed on each frame (with picture hashes and named segments) and plays it back exactly: a platform wrapper with a virtual clock that swaps the real input for the recorded keys. Playback controls (pause, step, speed, segments), checking, and skipping the drawing of frames nobody sees |
 
 ## Gamepads
 

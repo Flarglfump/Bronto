@@ -45,6 +45,7 @@
 #include "core/audio.c"
 #include "core/window.c"
 #include "core/engine.c"
+#include "core/replay.c"
 #include "platform/platform_headless.c"
 #include "platform/platform_native.c"
 #include "platform/fs.c"

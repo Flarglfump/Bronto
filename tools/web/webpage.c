@@ -172,10 +172,12 @@ bool webpage_write(const webpage *page, const char *runtime_js_path, const char 
         else if (strcmp(name, "RUNTIME") == 0) wp_puts(&b, js);
         else if (strcmp(name, "WASM") == 0) wp_base64(&b, (const unsigned char *)page->wasm, page->wasm_size);
         else if (strcmp(name, "PACK") == 0) { if (page->pack) wp_base64(&b, (const unsigned char *)page->pack, page->pack_size); }
+        else if (strcmp(name, "REPLAY") == 0) { if (page->replay) wp_base64(&b, (const unsigned char *)page->replay, page->replay_size); }
         else if (strcmp(name, "ARGS") == 0) {
             int i;
             wp_puts(&b, "[");
             for (i = 0; i < page->arg_count; ++i) { if (i) wp_puts(&b, ", "); wp_json_string(&b, page->args[i]); }
+            if (page->replay) wp_puts(&b, page->arg_count ? ", \"--replay\", \"replay.brec\"" : "\"--replay\", \"replay.brec\"");
             wp_puts(&b, "]");
         } else if (strcmp(name, "STORAGE_KEY") == 0) wp_json_string(&b, page->storage_key ? page->storage_key : title);
         else wp_put(&b, open, n + 4);                             /* not ours: leave it */

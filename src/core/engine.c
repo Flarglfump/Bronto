@@ -307,7 +307,7 @@ bool br_engine_frame(br_engine *e) {
     br_events_dispatch(&e->events);
     br_input_end_events(&e->input);
 
-    paused = e->window.minimized && e->config.pause_when_minimized;
+    paused = (e->window.minimized && e->config.pause_when_minimized) || e->suspended;
     if (!paused) {
         /* 4. fixed updates. Each press or release is seen by exactly one fixed
          *    step: the first of this frame (with any left over from frames
@@ -340,19 +340,21 @@ bool br_engine_frame(br_engine *e) {
         /* 5. update */
         br_scenes_update(&e->scenes, (float)dt);
 
-        /* 6. render + present */
-        br_renderer_reset_stats(&e->renderer);
-        br_end_camera(&e->renderer);
-        br_reset_clip(&e->renderer);
-        br_set_blend(&e->renderer, BR_BLEND_ALPHA);
-        if (e->config.auto_clear) br_clear(&e->renderer, e->config.clear_color);
-        br_scenes_render(&e->scenes);
-        if (e->window.viewport.rect.w > 0 && e->window.viewport.rect.h > 0)
-            e->platform->present(&e->framebuffer, e->window.viewport.rect);
+        /* 6. render + present (not when nobody will look: replay.h, flat out) */
+        if (!e->skip_render) {
+            br_renderer_reset_stats(&e->renderer);
+            br_end_camera(&e->renderer);
+            br_reset_clip(&e->renderer);
+            br_set_blend(&e->renderer, BR_BLEND_ALPHA);
+            if (e->config.auto_clear) br_clear(&e->renderer, e->config.clear_color);
+            br_scenes_render(&e->scenes);
+            if (e->window.viewport.rect.w > 0 && e->window.viewport.rect.h > 0)
+                e->platform->present(&e->framebuffer, e->window.viewport.rect);
+        }
         e->time += dt;
-    } else {
+    } else if (!e->suspended) {
         e->accumulator = 0;   /* no catch-up burst when restored */
-    }
+    }                         /* (suspended - a replay's pause - keeps it: the run carries on exactly) */
 
     /* 7. audio keeps flowing (silence/music) even while paused */
     pump_audio(e);

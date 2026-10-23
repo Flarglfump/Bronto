@@ -2246,6 +2246,16 @@ sprite('hud_bomb',
 # titles are on red ribbons. These are drawn by code (textures rather than
 # pictures); the patterns repeat exactly, so they are the same every run.
 
+# ============================================================ menus: the scroll arrows
+# (SETTINGS: there's more above / below). One the other's mirror image, so they match.
+ARROW_UP = ("...R...",
+            "..RRR..",
+            ".RRRRR.",
+            "RRRRRRR")
+sprite('arrow_up', *ARROW_UP)
+sprite('arrow_down', *reversed(ARROW_UP))
+
+
 def drawn(name, w, h, fn):
     S[name] = [''.join(fn(x, y) for x in range(w)) for y in range(h)]
 

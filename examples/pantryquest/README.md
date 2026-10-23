@@ -185,6 +185,24 @@ make pantryquest TARGET=web                                  # one web page: bui
 
 `make web` also builds `build/web/pantryquest/index.html`.
 
+### Watching the whole game
+
+`tools/playthrough.brec` is a recording of the whole game, from the title to the ending,
+played by a bot (`tools/pantrybot` in the engine) in about 33 minutes of game time. It is
+in 20 segments: each stretch of the land, then the cellar it leads to.
+
+```sh
+make replay                     # watch it in a window (from the engine's folder)
+make replay SEGMENT=17          # from segment 17: Cellar 8, the Soup Cauldron
+make replay-web                 # a web page that plays it: build/web/pantryquest-replay/index.html
+build/bronto_player examples/pantryquest --replay examples/pantryquest/tools/playthrough.brec
+```
+
+Space pauses, `.` steps one frame, 1 to 4 set the speed (x1 to x8), 0 runs it as fast as it
+goes, N and P go to the next segment or back, and H hides the status bar. The replay is
+frame for frame: `make replay-check` plays it headless and checks every recorded picture.
+`make playthrough` lets the bot play it again (see `docs/replay.md`).
+
 `SteamData/` holds artwork for adding the game to a Steam library as a non-Steam game,
 drawn with the game's own sprites and font: `icon_256.png` (the shortcut's icon, in the
 game's Properties), `library_capsule_600x900.png` (the library grid),

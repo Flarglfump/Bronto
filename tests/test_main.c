@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
     printf("[scene]\n");  suite_scene();
     printf("[render]\n"); suite_render(); suite_ui();
     printf("[audio]\n");  suite_audio(); suite_audio_ring();
-    printf("[engine]\n"); suite_engine();
+    printf("[engine]\n"); suite_engine(); suite_replay();
     printf("[window]\n"); suite_window();
     printf("[snake]\n");  suite_snake();
     printf("[towerdefense]\n"); suite_towerdefense();

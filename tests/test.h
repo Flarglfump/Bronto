@@ -72,6 +72,7 @@ void suite_fs(void);
 void suite_physics(void);
 void suite_hierarchy(void);
 void suite_script(void);
+void suite_replay(void);
 
 /* Directory for test artefacts (images, wav). */
 extern const char *g_out_dir;

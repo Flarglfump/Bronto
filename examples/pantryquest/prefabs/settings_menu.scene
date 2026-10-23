@@ -727,10 +727,9 @@ entity
     text = "MoreUp"
   Transform
     position = 106 -36
-  Label
-    text = "^"
-    size = 1
-    color = #8e1a2aff
+  Sprite
+    image = "art/arrow_up.bmp"
+    tint = #ffffffff
     layer = 93
   Parent
     entity = 0
@@ -740,10 +739,9 @@ entity
     text = "MoreDown"
   Transform
     position = 106 34
-  Label
-    text = "V"
-    size = 1
-    color = #8e1a2aff
+  Sprite
+    image = "art/arrow_down.bmp"
+    tint = #ffffffff
     layer = 93
   Parent
     entity = 0

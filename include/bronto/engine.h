@@ -105,6 +105,8 @@ struct br_engine {
 
     bool running;
     bool initialized;
+    bool suspended;                  /* skip update and render (as when minimised): replay.h's pause */
+    bool skip_render;                /* update, but don't draw or present this frame (replay.h, unwatched) */
     void (*loop_hook)(br_engine *e);   /* br_engine_loop's after_frame */
     void *user;
 };

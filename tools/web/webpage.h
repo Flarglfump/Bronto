@@ -24,6 +24,8 @@ typedef struct webpage {
     size_t pack_size;
     const char *const *args;        /* the program's command line (after argv[0]) */
     int arg_count;
+    const void *replay;             /* a recorded run to play back (replay.h): the page plays it, not the game */
+    size_t replay_size;
 } webpage;
 
 /* The web runtime: bronto_player.wasm, bronto.js and shell.html, as `make web`

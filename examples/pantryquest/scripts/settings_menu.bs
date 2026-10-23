@@ -121,8 +121,8 @@ func show() -> void {
     } else {
         cell_hi.Shape.color = rgb(0, 0, 0, 0)
     }
-    if top > 0 { more_up.Label.color = rgb(142, 26, 42) } else { more_up.Label.color = rgb(0, 0, 0, 0) }
-    if top + shown < actions() { more_down.Label.color = rgb(142, 26, 42) } else { more_down.Label.color = rgb(0, 0, 0, 0) }
+    if top > 0 { more_up.Sprite.tint = rgb(255, 255, 255) } else { more_up.Sprite.tint = rgb(255, 255, 255, 0) }
+    if top + shown < actions() { more_down.Sprite.tint = rgb(255, 255, 255) } else { more_down.Sprite.tint = rgb(255, 255, 255, 0) }
     if waiting and wait_pad { hint.Label.text = "PRESS A BUTTON" }
     elif waiting { hint.Label.text = "PRESS A KEY  (ESC: KEEP)" }
     elif is_action(row) and was_pad { hint.Label.text = "A: CHANGE  X: CLEAR" }

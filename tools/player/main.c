@@ -12,6 +12,10 @@
  *                       the exit status is 1 if the game didn't load or a script failed
  *   --frames N          (with --headless)
  *   --screenshot f.bmp  (with --headless) save the last frame
+ *   --replay run.brec   play a recorded run back, frame for frame (replay.h): in a
+ *                       window with playback keys, or with --headless as fast as it
+ *                       goes, checking every recorded frame (exit status 1 if one differs)
+ *   --segment N         (with --replay) start at segment N (1 = the start)
  *
  * The game is the project's scenes, scripts and assets: the engine's
  * built-in components and systems do the rest, exactly as in the editor's
@@ -27,6 +31,7 @@ static br_project g_project;
 static char g_root[BR_PATH_MAX];               /* the project folder ("" in a pack) */
 static char g_scene[BR_PATH_MAX];              /* the scene to show, relative to the root */
 static bool g_failed;
+static char g_main_scene[BR_PATH_MAX];         /* the first scene (a replay going back starts here again) */
 
 static bool game_enter(br_scene *s) {
     char path[BR_PATH_MAX * 2], err[256];
@@ -67,6 +72,17 @@ static bool on_init(br_engine *e) {
         if (icon) br_window_set_icon(e, icon);
     }
     return true;
+}
+
+/* A replay going back to an earlier segment starts the game again. */
+static void replay_restart(br_engine *e) {
+    BR_UNUSED(e);
+    snprintf(g_scene, sizeof(g_scene), "%s", g_main_scene);
+    g_failed = false;
+}
+
+static void replay_after_frame(br_engine *e) {
+    if (!br_replay_after_frame(e)) br_engine_quit(e);
 }
 
 static bool has_ext(const char *p, const char *ext) { return br_path_has_ext(p, ext); }
@@ -110,14 +126,18 @@ static bool find_game(const char *arg) {
 int main(int argc, char **argv) {
     br_engine *e;
     br_engine_config cfg = br_engine_default_config();
-    const char *arg = NULL, *shot = NULL;
-    bool headless = false;
+    const char *arg = NULL, *shot = NULL, *replay = NULL;
+    char save_name[160];
+    int segment = 1;
+    bool headless = false, frames_given = false;
     long frames = 120;
     int i, rc = 0;
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--headless") == 0) headless = true;
-        else if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) frames = atol(argv[++i]);
+        else if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) { frames = atol(argv[++i]); frames_given = true; }
         else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) shot = argv[++i];
+        else if (strcmp(argv[i], "--replay") == 0 && i + 1 < argc) replay = argv[++i];
+        else if (strcmp(argv[i], "--segment") == 0 && i + 1 < argc) segment = atoi(argv[++i]);
         else if (argv[i][0] == '-' && argv[i][1] == 'p' && strncmp(argv[i], "-psn_", 5) == 0) { /* macOS Finder's process id: ignore */ }
         else arg = argv[i];
     }
@@ -126,9 +146,12 @@ int main(int argc, char **argv) {
         fprintf(stderr,
                 "bronto_player: no game to play.\n"
                 "  bronto_player <project folder> | <file.scene> | <game.brpak> [--headless [--frames N] [--screenshot f.bmp]]\n"
+                "  bronto_player <game> --replay run.brec [--segment N] [--headless]\n"
                 "Games built by the editor (Build menu) have their project packed in and need no arguments.\n");
         return 1;
     }
+    snprintf(g_main_scene, sizeof(g_main_scene), "%s", g_scene);
+    if (replay && !br_replay_load(replay)) { br_pack_unmount(); return 1; }
     br_script_set_strict(g_project.strict_typing);
     cfg.title = g_project.name;
     cfg.width = g_project.width;
@@ -137,10 +160,42 @@ int main(int argc, char **argv) {
     cfg.initial_scene = &k_game;
     cfg.on_init = on_init;
     if (headless) { cfg.platform = br_platform_headless(); cfg.audio_sample_rate = 0; }
+    if (replay) {
+        /* Its own saved data, starting empty, as the recorded run's did. */
+        snprintf(save_name, sizeof(save_name), "%s (replay)", g_project.name);
+        cfg.save_name = save_name;
+        br_save_set_game(save_name);
+        br_replay_clear_saves();
+        cfg.pause_when_minimized = false;
+        cfg.platform = br_replay_platform(headless ? br_platform_headless() : br_platform_native(), !headless);
+        br_replay_set_restart_hook(replay_restart);
+        if (segment > 1) br_replay_start_at_segment(segment - 1);
+    }
     e = BR_NEW(br_engine);
     if (!e || !br_engine_init(e, &cfg)) { br_free(e); br_pack_unmount(); return 1; }
+    if (replay) br_replay_attach(e);
     if (br_scenes_depth(&e->scenes) == 0 || g_failed) {
         rc = 1;
+    } else if (replay && headless) {
+        uint32_t checked, bad;
+        uint64_t first;
+        while (br_engine_frame(e) && br_replay_after_frame(e)) {
+            if (frames_given && (long)br_replay_frame() >= frames) break;      /* (--frames: stop there) */
+            if (frames_given && (long)br_replay_frame() >= frames - 1) br_replay_draw_every_frame(true);
+        }
+        bad = br_replay_mismatches(&checked, &first);
+        {
+            br_scene *top = br_scenes_top(&e->scenes);
+            uint32_t errors = top ? br_script_error_count(&top->world) : 0;
+            printf("%s (replay): %llu frames, %u of %u checked frames differed, %u script error%s\n", g_project.name,
+                   (unsigned long long)br_replay_frame(), bad, checked, errors, errors == 1 ? "" : "s");
+            if (bad) printf("  first difference: frame %llu\n", (unsigned long long)first);
+            if (shot) br_image_save_bmp(&e->framebuffer, shot);
+            if (bad || errors || (!br_replay_ended() && !frames_given)) rc = 1;
+        }
+    } else if (replay) {
+        br_engine_loop(e, replay_after_frame);
+        if (g_failed) rc = 1;
     } else if (headless) {
         long k;
         for (k = 0; k < frames && br_engine_frame(e); ++k) {}

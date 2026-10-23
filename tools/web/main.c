@@ -12,6 +12,8 @@
  *   --title T       the page's title (default: the project's name / the file's)
  *   --icon image    a BMP or TGA for the tab and the start card (default: the project's icon)
  *   -o page.html    where to write it (default: <project>/builds/web/index.html, or index.html)
+ *   --replay run.brec   (with a project) a page that plays a recorded run back
+ *                   (replay.h) instead of the game: its #seg=N starts at segment N
  *
  * The page runs from a web server or straight from the disk.
  */
@@ -24,7 +26,7 @@
 
 static void usage(void) {
     fprintf(stderr,
-            "usage: bronto_web <project folder> [-o page.html] [--runtime dir]\n"
+            "usage: bronto_web <project folder> [-o page.html] [--runtime dir] [--replay run.brec]\n"
             "       bronto_web --wasm game.wasm [--title T] [--icon image] [-o page.html] [--runtime dir] [-- args]\n");
 }
 
@@ -44,6 +46,10 @@ static bool make_dirs(const char *path) {
 
 int main(int argc, char **argv) {
     const char *project = NULL, *wasm_arg = NULL, *title = NULL, *icon_path = NULL, *out_arg = NULL, *runtime = NULL;
+    const char *replay_arg = NULL;
+    void *replay = NULL;
+    size_t replay_size = 0;
+    char replay_title[160];
     const char **args = NULL;
     int i, arg_count = 0;
     char exe[P], dir[P], player[P], js[P], shell[P], out[P], err[300], name[128];
@@ -62,11 +68,16 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--icon") == 0 && i + 1 < argc) icon_path = argv[++i];
         else if (strcmp(argv[i], "--runtime") == 0 && i + 1 < argc) runtime = argv[++i];
         else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) out_arg = argv[++i];
+        else if (strcmp(argv[i], "--replay") == 0 && i + 1 < argc) replay_arg = argv[++i];
         else if (argv[i][0] == '-') { usage(); return 2; }
         else if (!project) project = argv[i];
         else { usage(); return 2; }
     }
-    if (!project == !wasm_arg) { usage(); return 2; }
+    if (!project == !wasm_arg || (replay_arg && !project)) { usage(); return 2; }
+    if (replay_arg && !(replay = br_file_read_all(replay_arg, &replay_size))) {
+        fprintf(stderr, "bronto_web: can't read the recording %s\n", replay_arg);
+        return 1;
+    }
 
     /* the runtime */
     if (runtime) snprintf(dir, sizeof(dir), "%s", runtime);
@@ -129,6 +140,12 @@ int main(int argc, char **argv) {
     page.pack_size = pack_size;
     page.args = args;
     page.arg_count = arg_count;
+    page.replay = replay;
+    page.replay_size = replay_size;
+    if (replay) {                                       /* (its own title, and its own saved data) */
+        snprintf(replay_title, sizeof(replay_title), "%s - replay", title);
+        page.title = replay_title;
+    }
     ok = webpage_write(&page, js, shell, out, err, sizeof(err));
     if (ok) {
         br_dir_entry e;
@@ -141,5 +158,6 @@ int main(int argc, char **argv) {
     if (have_icon) br_image_destroy(&icon);
     br_free(wasm);
     br_free(pack);
+    br_free(replay);
     return ok ? 0 : 1;
 }
