@@ -50,13 +50,16 @@
 /* 1. values and the heap                                                   */
 /* ======================================================================== */
 
-typedef enum { V_NIL = 0, V_BOOL, V_NUM, V_STR, V_VEC, V_ENT, V_LIST, V_COMP } sc_type;
-enum { OBJ_STR = 1, OBJ_LIST };
+typedef enum { V_NIL = 0, V_BOOL, V_NUM, V_STR, V_VEC, V_ENT, V_LIST, V_COMP, V_OBJ } sc_type;
+enum { OBJ_STR = 1, OBJ_LIST, OBJ_OBJECT };
 
 typedef struct sc_obj { struct sc_obj *next; uint8_t kind, marked, pinned; } sc_obj;
 typedef struct sc_str { sc_obj h; uint32_t len; char chars[1]; } sc_str;
 struct sc_value;
 typedef struct sc_list { sc_obj h; struct sc_value *items; uint32_t count, cap; } sc_list;
+struct sc_class;
+/* a struct's or a class's object: its fields, inherited ones first */
+typedef struct sc_object { sc_obj h; struct sc_class *cls; uint32_t count; struct sc_value *fields; } sc_object;
 
 typedef struct sc_value {
     uint8_t t;
@@ -67,6 +70,7 @@ typedef struct sc_value {
         struct { double x, y; } v;
         br_entity e;
         sc_list *l;
+        sc_object *o;
         struct { br_entity e; uint32_t c; } comp;
     } as;
 } sc_value;
@@ -111,9 +115,30 @@ static sc_list *sc_list_alloc(sc_heap *h) {
     return l;
 }
 
+static sc_object *sc_object_alloc(sc_heap *h, struct sc_class *cls, uint32_t count) {
+    sc_object *o = (sc_object *)br_alloc(sizeof(sc_object) + sizeof(struct sc_value) * (count ? count : 1));
+    if (!o) return NULL;
+    memset(o, 0, sizeof(sc_object) + sizeof(struct sc_value) * (count ? count : 1));
+    o->h.kind = OBJ_OBJECT;
+    o->cls = cls;
+    o->count = count;
+    o->fields = (struct sc_value *)(o + 1);
+    o->h.next = h->objects;
+    h->objects = &o->h;
+    h->bytes += sizeof(sc_object) + sizeof(struct sc_value) * count;
+    h->since_gc += sizeof(sc_object) + sizeof(struct sc_value) * count;
+    return o;
+}
+
 static void sc_obj_free(sc_obj *o) {
     if (o->kind == OBJ_LIST) br_free(((sc_list *)o)->items);
     br_free(o);
+}
+
+static size_t sc_obj_size(const sc_obj *o) {
+    if (o->kind == OBJ_STR) return sizeof(sc_str) + ((const sc_str *)o)->len;
+    if (o->kind == OBJ_OBJECT) return sizeof(sc_object) + sizeof(struct sc_value) * ((const sc_object *)o)->count;
+    return sizeof(sc_list);
 }
 
 static void sc_mark_value(const sc_value *v);
@@ -124,11 +149,15 @@ static void sc_mark_obj(sc_obj *o) {
     if (o->kind == OBJ_LIST) {
         sc_list *l = (sc_list *)o;
         for (i = 0; i < l->count; ++i) sc_mark_value(&l->items[i]);
+    } else if (o->kind == OBJ_OBJECT) {
+        sc_object *ob = (sc_object *)o;
+        for (i = 0; i < ob->count; ++i) sc_mark_value(&ob->fields[i]);
     }
 }
 static void sc_mark_value(const sc_value *v) {
     if (v->t == V_STR) sc_mark_obj(&v->as.s->h);
     else if (v->t == V_LIST) sc_mark_obj(&v->as.l->h);
+    else if (v->t == V_OBJ) sc_mark_obj(&v->as.o->h);
 }
 
 static void sc_sweep(sc_heap *h) {
@@ -137,7 +166,7 @@ static void sc_sweep(sc_heap *h) {
         sc_obj *o = *p;
         if (!o->marked) {
             *p = o->next;
-            h->bytes -= o->kind == OBJ_STR ? sizeof(sc_str) + ((sc_str *)o)->len : sizeof(sc_list);
+            h->bytes -= sc_obj_size(o);
             sc_obj_free(o);
         } else {
             o->marked = 0;
@@ -164,6 +193,7 @@ typedef enum {
     T_EOF = 0, T_NEWLINE, T_NUM, T_STR, T_NAME,
     T_VAR, T_FUNC, T_IF, T_ELIF, T_ELSE, T_WHILE, T_FOR, T_IN, T_RETURN, T_BREAK, T_CONTINUE,
     T_AND, T_OR, T_NOT, T_TRUE, T_FALSE, T_NIL,
+    T_CLASS, T_STRUCT, T_PUBLIC, T_PRIVATE, T_PROTECTED, T_STATIC, T_CONST, T_OVERRIDE, T_THIS, T_SUPER, T_UNSIGNED,
     T_LPAREN, T_RPAREN, T_LBRACE, T_RBRACE, T_LBRACKET, T_RBRACKET, T_COMMA, T_DOT, T_SEMI,
     T_PLUS, T_MINUS, T_STAR, T_SLASH, T_PERCENT,
     T_ASSIGN, T_PLUS_EQ, T_MINUS_EQ, T_STAR_EQ, T_SLASH_EQ,
@@ -180,7 +210,9 @@ static const struct { const char *word; sc_tok t; } k_keywords[] = {
     { "var", T_VAR }, { "func", T_FUNC }, { "if", T_IF }, { "elif", T_ELIF }, { "else", T_ELSE },
     { "while", T_WHILE }, { "for", T_FOR }, { "in", T_IN }, { "return", T_RETURN }, { "break", T_BREAK },
     { "continue", T_CONTINUE }, { "and", T_AND }, { "or", T_OR }, { "not", T_NOT }, { "true", T_TRUE },
-    { "false", T_FALSE }, { "nil", T_NIL },
+    { "false", T_FALSE }, { "nil", T_NIL }, { "class", T_CLASS }, { "struct", T_STRUCT }, { "public", T_PUBLIC },
+    { "private", T_PRIVATE }, { "protected", T_PROTECTED }, { "static", T_STATIC }, { "const", T_CONST },
+    { "override", T_OVERRIDE }, { "this", T_THIS }, { "super", T_SUPER }, { "unsigned", T_UNSIGNED },
 };
 
 static sc_token sc_next(sc_lexer *L) {
@@ -286,17 +318,25 @@ static sc_token sc_next(sc_lexer *L) {
 typedef enum {
     N_NUM, N_STR, N_TRUE, N_FALSE, N_NIL, N_NAME, N_SELF, N_LIST,
     N_NEG, N_NOT, N_BINARY, N_AND, N_OR, N_CALL, N_METHOD, N_MEMBER, N_INDEX,
-    N_BLOCK, N_VAR, N_ASSIGN, N_EXPR, N_IF, N_WHILE, N_FOR, N_RETURN, N_BREAK, N_CONTINUE
+    N_BLOCK, N_VAR, N_ASSIGN, N_EXPR, N_IF, N_WHILE, N_FOR, N_RETURN, N_BREAK, N_CONTINUE,
+    N_THIS, N_SUPER, N_CLASSREF        /* this; super.f(...); a class's name before . */
 } sc_kind;
 
 /* what a name refers to, found by the resolver */
-enum { REF_UNRESOLVED = 0, REF_LOCAL, REF_GLOBAL, REF_FUNC, REF_BUILTIN };
+enum { REF_UNRESOLVED = 0, REF_LOCAL, REF_GLOBAL, REF_FUNC, REF_BUILTIN, REF_CLASS };
 
 /* Static types. TY_NONE: not known until it runs (no annotation). */
 typedef enum {
-    TY_NONE = 0, TY_ANY, TY_NIL, TY_BOOL, TY_INT, TY_NUM, TY_STR, TY_VEC, TY_LIST, TY_ENT, TY_COMP, TY_VOID
+    TY_NONE = 0, TY_ANY, TY_NIL, TY_BOOL, TY_INT, TY_NUM, TY_STR, TY_VEC, TY_LIST, TY_ENT, TY_COMP, TY_VOID, TY_OBJ
 } sc_tyk;
-typedef struct sc_ty { uint8_t t, elem; } sc_ty;         /* elem: a list's items (TY_NONE: any) */
+enum {
+    TYF_UNSIGNED = 1,              /* an unsigned int / number: never below 0 */
+    TYF_ELEM_UNSIGNED = 2,         /* a list of those */
+    TYF_NEGATIVE = 4               /* (the checker: a negative number written in the source) */
+};
+struct sc_class;
+/* elem: a list's items (TY_NONE: any). cls: the struct or class, for TY_OBJ or a list of them */
+typedef struct sc_ty { uint8_t t, elem, flags; struct sc_class *cls; } sc_ty;
 
 typedef struct sc_node {
     uint8_t kind, op;              /* op: a T_* operator token; N_VAR: 1 for := ; N_NUM: 1 if written as a float */
@@ -309,6 +349,8 @@ typedef struct sc_node {
     const char *name;              /* names and string literals (in the program's arena) */
     sc_str *str;                   /* string literals, pinned */
     int ref, index;                /* resolved name */
+    struct sc_class *cls;          /* N_CLASSREF, a REF_CLASS call: the class */
+    struct sc_member *mem;         /* N_SUPER: the parent's function */
 } sc_node;
 
 typedef struct sc_func {
@@ -318,8 +360,44 @@ typedef struct sc_func {
     sc_ty *param_ty;               /* per parameter (arena) */
     const char **param_names;
     sc_ty ret;                     /* TY_NONE: not declared, TY_VOID: returns nothing */
+    struct sc_class *cls;          /* a method's class (NULL: a plain function) */
+    bool has_this;                 /* a method that isn't static: `this` is local slot 0 */
+    bool is_init;                  /* a class's init(): may set its const fields */
 } sc_func;
-typedef struct sc_global { const char *name; sc_node *init; int line; sc_ty ty; bool infer; } sc_global;
+typedef struct sc_global { const char *name; sc_node *init; int line; sc_ty ty; bool infer, is_const; } sc_global;
+
+/* ---- structs and classes ----
+ * A class's members are its own fields and functions; inherited ones are
+ * found through `parent`. Instance fields have slots in the object (the
+ * parent's first); static fields have slots in the class's `statics`,
+ * which live as long as the program (one set per world). */
+enum { ACC_PUBLIC = 0, ACC_PROTECTED, ACC_PRIVATE };
+typedef struct sc_member {
+    const char *name;
+    int line;
+    uint8_t access;
+    bool is_static, is_const, is_override, infer;
+    sc_func *fn;                   /* a function; NULL for a field */
+    sc_ty ty;                      /* a field's type */
+    sc_node *init;                 /* a field's starting value */
+    int slot;
+    struct sc_class *owner;
+} sc_member;
+
+typedef struct sc_class {
+    const char *name;
+    int line;
+    bool is_struct, defined, laid_out, visiting;
+    struct sc_class *parent;
+    const char *parent_name;
+    int parent_line;
+    struct sc_program *prog;
+    sc_member *members;            /* (arena) */
+    int member_count, member_cap;
+    int field_count;               /* instance fields, inherited ones included */
+    int static_count;
+    struct sc_value *statics;      /* (arena) */
+} sc_class;
 
 typedef struct sc_chunk { struct sc_chunk *next; size_t used, size; } sc_chunk;
 
@@ -330,6 +408,9 @@ static const char *const k_callbacks[CB_COUNT] = {
 
 typedef struct sc_program {
     char path[BR_PATH_MAX];
+    sc_class **classes;            /* structs and classes (in the arena), in the order they're written */
+    int class_count, class_cap;
+    bool statics_ready;            /* static fields have their starting values */
     char name[64];                 /* for messages: the file name */
     int64_t modified;
     sc_chunk *arena;
@@ -356,6 +437,11 @@ typedef struct sc_parser {
     /* the type checker: the function being checked and its slots' types */
     const sc_func *fn;
     sc_ty slot_ty[256];
+    bool local_const[256];         /* by slot: declared with const */
+    sc_class *cls;                 /* inside a struct or class (its functions and fields) */
+    bool has_this;                 /* inside a function that has `this` */
+    bool in_func;                  /* inside a function's body (not a field's starting value) */
+    int decls;                     /* top-level declarations so far */
 } sc_parser;
 
 static void *sc_arena_alloc(sc_program *p, size_t size) {
@@ -477,20 +563,53 @@ static sc_str *sc_pin_string(sc_parser *P, const char *s, int len) {
 
 static sc_node *sc_expression(sc_parser *P);
 static sc_node *sc_block(sc_parser *P);
+static int sc_find_builtin(const char *name);              /* the table is in part 5 */
+
+#if defined(__GNUC__) || defined(__clang__)
+#  define SC_NOINLINE __attribute__((noinline))       /* (kept out of sc_compile's setjmp frame) */
+#else
+#  define SC_NOINLINE
+#endif
 
 /* ---- types --------------------------------------------------------------------- */
 
-static sc_ty sc_ty_make(int t, int elem) { sc_ty ty; ty.t = (uint8_t)t; ty.elem = (uint8_t)elem; return ty; }
+static sc_ty sc_ty_make(int t, int elem) { sc_ty ty; ty.t = (uint8_t)t; ty.elem = (uint8_t)elem; ty.flags = 0; ty.cls = NULL; return ty; }
+static sc_ty sc_obj_ty(sc_class *c) { sc_ty ty = sc_ty_make(TY_OBJ, TY_NONE); ty.cls = c; return ty; }
+
+/* A list's item type, and the list type for items of a type. */
+static sc_ty sc_elem_ty(sc_ty list) {
+    sc_ty e = sc_ty_make(list.elem, TY_NONE);
+    if (list.flags & TYF_ELEM_UNSIGNED) e.flags |= TYF_UNSIGNED;
+    if (list.elem == TY_OBJ) e.cls = list.cls;
+    return e;
+}
+static sc_ty sc_list_of(sc_ty item) {
+    sc_ty l = sc_ty_make(TY_LIST, item.t == TY_ANY ? TY_NONE : item.t);
+    if (item.flags & TYF_UNSIGNED) l.flags |= TYF_ELEM_UNSIGNED;
+    if (item.t == TY_OBJ) l.cls = item.cls;
+    return l;
+}
+/* What a := takes from a value's type: lists any items, no source-only marks. */
+static sc_ty sc_ty_plain(sc_ty ty) { ty.flags &= (uint8_t)~TYF_NEGATIVE; return ty; }
+
+/* Is `c` the class `base` or one of its descendants? */
+static bool sc_derives(const sc_class *c, const sc_class *base) {
+    for (; c; c = c->parent) if (c == base) return true;
+    return false;
+}
 
 static const char *sc_tyk_name(int t) {
     static const char *const names[] = { "untyped", "any", "nil", "bool", "int", "number", "string", "vec2", "list",
-                                         "entity", "component", "void" };
-    return t >= 0 && t <= TY_VOID ? names[t] : "?";
+                                         "entity", "component", "void", "object" };
+    return t >= 0 && t <= TY_OBJ ? names[t] : "?";
 }
 
 static const char *sc_ty_name(sc_ty ty, char *buf, size_t size) {
-    if (ty.t == TY_LIST && ty.elem != TY_NONE) snprintf(buf, size, "list[%s]", sc_tyk_name(ty.elem));
-    else snprintf(buf, size, "%s", sc_tyk_name(ty.t));
+    if (ty.t == TY_OBJ && ty.cls) snprintf(buf, size, "%s", ty.cls->name);
+    else if (ty.t == TY_LIST && ty.elem == TY_OBJ && ty.cls) snprintf(buf, size, "list[%s]", ty.cls->name);
+    else if (ty.t == TY_LIST && ty.elem != TY_NONE)
+        snprintf(buf, size, "list[%s%s]", ty.flags & TYF_ELEM_UNSIGNED ? "unsigned " : "", sc_tyk_name(ty.elem));
+    else snprintf(buf, size, "%s%s", ty.flags & TYF_UNSIGNED ? "unsigned " : "", sc_tyk_name(ty.t));
     return buf;
 }
 
@@ -498,6 +617,7 @@ static int sc_type_word(const char *s, int len) {
     static const struct { const char *word; int t; } words[] = {
         { "number", TY_NUM }, { "float", TY_NUM }, { "int", TY_INT }, { "string", TY_STR }, { "bool", TY_BOOL },
         { "vec2", TY_VEC }, { "list", TY_LIST }, { "entity", TY_ENT }, { "any", TY_ANY }, { "void", TY_VOID },
+        { "uint", TY_INT },
     };
     size_t i;
     for (i = 0; i < BR_ARRAY_COUNT(words); ++i)
@@ -505,30 +625,60 @@ static int sc_type_word(const char *s, int len) {
     return -1;
 }
 
-/* After ':' or '->': a type name, or list[T]. */
-static sc_ty sc_parse_type(sc_parser *P, bool allow_void) {
+static sc_class *sc_find_class_n(const sc_program *p, const char *name, int len) {
+    int i;
+    for (i = 0; i < p->class_count; ++i)
+        if ((int)strlen(p->classes[i]->name) == len && strncmp(p->classes[i]->name, name, (size_t)len) == 0) return p->classes[i];
+    return NULL;
+}
+static sc_class *sc_find_class(const sc_program *p, const char *name) { return sc_find_class_n(p, name, (int)strlen(name)); }
+
+/* One type without list[...]: [unsigned] a type word, or a struct's or class's name. */
+static sc_ty sc_parse_one_type(sc_parser *P, bool allow_void, const char *what) {
     sc_token t = P->cur;
+    bool uns = false;
     int k = TY_NONE;
     sc_ty ty;
+    sc_class *c;
+    if (t.t == T_UNSIGNED) {                                 /* unsigned int, unsigned number */
+        uns = true;
+        sc_advance(P);
+        t = P->cur;
+        if (t.t != T_NAME || ((k = sc_type_word(t.start, t.len)) != TY_INT && k != TY_NUM))
+            sc_parse_error(P, t.line, "unsigned is only for number types: unsigned int, unsigned number (or float)");
+    }
+    if (t.t == T_NAME && (c = sc_find_class_n(P->prog, t.start, t.len)) != NULL) {
+        sc_advance(P);
+        return sc_obj_ty(c);
+    }
     if (t.t != T_NAME || (k = sc_type_word(t.start, t.len)) < 0) {
         if (t.t == T_NAME || t.t == T_NIL)
-            sc_parse_error(P, t.line, "unknown type '%.*s' (the types: number, int, string, bool, vec2, list, entity, any)", t.len, t.start);
-        sc_parse_error(P, t.line, "expected a type (number, int, string, bool, vec2, list, entity or any)");
+            sc_parse_error(P, t.line, "unknown type '%.*s' (the types: number, int, uint, string, bool, vec2, list, entity, any, or a struct or class)", t.len, t.start);
+        sc_parse_error(P, t.line, "expected %s (number, int, string, bool, vec2, list, entity, any, or a struct or class)", what);
     }
     if (k == TY_VOID && !allow_void) sc_parse_error(P, t.line, "void is only for what a function returns (-> void)");
+    if (t.len == 4 && strncmp(t.start, "uint", 4) == 0) {
+        if (uns) sc_parse_error(P, t.line, "uint is already unsigned: write uint or unsigned int");
+        uns = true;
+    }
     sc_advance(P);
     ty = sc_ty_make(k, TY_NONE);
-    if (k == TY_LIST && P->cur.t == T_LBRACKET) {           /* list[number] */
-        sc_token e;
-        int ek = TY_NONE;
+    if (uns) ty.flags |= TYF_UNSIGNED;
+    return ty;
+}
+
+/* After ':' or '->': a type name, or list[T]. */
+static sc_ty sc_parse_type(sc_parser *P, bool allow_void) {
+    int line = P->cur.line;
+    sc_ty ty = sc_parse_one_type(P, allow_void, "a type");
+    if (ty.t == TY_LIST && P->cur.t == T_LBRACKET) {           /* list[number] */
+        sc_ty e;
         sc_advance(P);
-        e = P->cur;
-        if (e.t != T_NAME || (ek = sc_type_word(e.start, e.len)) < 0 || ek == TY_VOID)
-            sc_parse_error(P, e.line, "expected the type of the list's items, like list[number]");
-        sc_advance(P);
-        if (ek == TY_LIST && P->cur.t == T_LBRACKET) sc_parse_error(P, e.line, "a list's items can be lists, but not typed lists (use list[list])");
+        if (P->cur.t != T_NAME && P->cur.t != T_UNSIGNED) sc_parse_error(P, P->cur.line, "expected the type of the list's items, like list[number]");
+        e = sc_parse_one_type(P, false, "the type of the list's items, like list[number]");
+        if (e.t == TY_LIST && P->cur.t == T_LBRACKET) sc_parse_error(P, line, "a list's items can be lists, but not typed lists (use list[list])");
         sc_expect(P, T_RBRACKET);
-        ty.elem = (uint8_t)(ek == TY_ANY ? TY_NONE : ek);
+        ty = sc_list_of(e);
     }
     return ty;
 }
@@ -574,6 +724,29 @@ static sc_node *sc_primary(sc_parser *P) {
     case T_TRUE: sc_advance(P); return sc_node_new(P, N_TRUE, t.line);
     case T_FALSE: sc_advance(P); return sc_node_new(P, N_FALSE, t.line);
     case T_NIL: sc_advance(P); return sc_node_new(P, N_NIL, t.line);
+    case T_THIS:
+        sc_advance(P);
+        if (!P->has_this) {
+            if (P->cls && !P->in_func)
+                sc_parse_error(P, t.line, "a field's starting value can't use this (set it in init())");
+            sc_parse_error(P, t.line, P->cls ? "a static function has no this" : "this is only inside a struct's or class's functions");
+        }
+        n = sc_node_new(P, N_THIS, t.line);
+        n->index = 0;
+        return n;
+    case T_SUPER: {                                    /* super.speak(): the parent's version */
+        sc_token name;
+        sc_advance(P);
+        if (!P->has_this) sc_parse_error(P, t.line, "super is only inside a class's functions (not static ones)");
+        sc_expect(P, T_DOT);
+        name = P->cur;
+        sc_expect(P, T_NAME);
+        if (P->cur.t != T_LPAREN) sc_parse_error(P, name.line, "super is for calling the parent's functions, like super.%.*s()", name.len, name.start);
+        sc_advance(P);
+        n = sc_node_new(P, N_SUPER, t.line);
+        n->name = sc_intern(P, name.start, name.len);
+        return sc_call_args(P, n);
+    }
     case T_LPAREN:
         sc_advance(P);
         n = sc_expression(P);
@@ -596,7 +769,10 @@ static sc_node *sc_primary(sc_parser *P) {
     }
     case T_NAME:
         sc_advance(P);
-        if (t.len == 4 && strncmp(t.start, "self", 4) == 0) return sc_node_new(P, N_SELF, t.line);
+        if (t.len == 4 && strncmp(t.start, "self", 4) == 0) {
+            if (P->cls) sc_parse_error(P, t.line, "self (the script's entity) isn't seen inside a struct or class: pass the entity in");
+            return sc_node_new(P, N_SELF, t.line);
+        }
         if (P->cur.t == T_LPAREN) {
             sc_advance(P);
             n = sc_node_new(P, N_CALL, t.line);
@@ -728,9 +904,12 @@ static sc_node *sc_statement(sc_parser *P) {
     sc_token t = P->cur;
     sc_node *n;
     switch (t.t) {
+    case T_CONST:
     case T_VAR: {
         sc_token name;
+        bool is_const = t.t == T_CONST;
         sc_advance(P);
+        if (is_const && P->cur.t == T_VAR) sc_advance(P);      /* const var x = ... reads the same */
         name = P->cur;
         sc_expect(P, T_NAME);
         n = sc_node_new(P, N_VAR, t.line);
@@ -744,10 +923,12 @@ static sc_node *sc_statement(sc_parser *P) {
             sc_parse_error(P, P->cur.line, "':=' takes the value's type, so it can't follow a type: write var %.*s: type = value", name.len, name.start);
         }
         if (P->prog->strict && n->ty.t == TY_NONE && !n->op)
-            sc_parse_error(P, name.line, "@strict: give '%.*s' a type (var %.*s: number = 0, or var %.*s := 0)",
-                           name.len, name.start, name.len, name.start, name.len, name.start);
+            sc_parse_error(P, name.line, "@strict: give '%.*s' a type (%s %.*s: number = 0, or %s %.*s := 0)",
+                           name.len, name.start, is_const ? "const" : "var", name.len, name.start, is_const ? "const" : "var", name.len, name.start);
+        if (is_const && !n->a) sc_parse_error(P, name.line, "a const needs its value: const %.*s = ...", name.len, name.start);
         n->index = sc_add_local(P, sc_intern(P, name.start, name.len), name.line);
         n->name = P->locals[n->index];
+        P->local_const[n->index] = is_const;
         sc_end_statement(P);
         return n;
     }
@@ -797,8 +978,10 @@ static sc_node *sc_statement(sc_parser *P) {
         sc_expect(P, T_IN);
         n->a = sc_expression(P);
         n->index = sc_add_local(P, sc_intern(P, name.start, name.len), name.line);
+        P->local_const[n->index] = false;
         n->c = sc_node_new(P, N_NIL, t.line);            /* a hidden slot for the loop position */
         n->c->index = sc_add_local(P, " for", t.line);
+        P->local_const[n->c->index] = false;
         n->b = sc_block(P);
         P->local_count = saved;
         sc_skip_newlines(P);
@@ -812,16 +995,22 @@ static sc_node *sc_statement(sc_parser *P) {
         return n;
     case T_BREAK: sc_advance(P); n = sc_node_new(P, N_BREAK, t.line); sc_end_statement(P); return n;
     case T_CONTINUE: sc_advance(P); n = sc_node_new(P, N_CONTINUE, t.line); sc_end_statement(P); return n;
-    case T_FUNC: sc_parse_error(P, t.line, "functions can only be defined at the top of a file");
-        /* fall through: not reached */
+    case T_FUNC: sc_parse_error(P, t.line, "functions can only be defined at the top of a file (or in a struct or class)"); break;
+    case T_CLASS: case T_STRUCT: sc_parse_error(P, t.line, "structs and classes can only be defined at the top of a file"); break;
+    case T_PUBLIC: case T_PRIVATE: case T_PROTECTED: case T_STATIC: case T_OVERRIDE:
+        sc_parse_error(P, t.line, "'%.*s' is for the members of a struct or class", t.len, t.start);
+        break;
     default: break;
     }
     {
         sc_node *e = sc_expression(P);
         sc_tok op = P->cur.t;
         if (op == T_ASSIGN || op == T_PLUS_EQ || op == T_MINUS_EQ || op == T_STAR_EQ || op == T_SLASH_EQ) {
+            if (e->kind == N_THIS) sc_parse_error(P, P->cur.line, "can't assign to this (set its fields: this.x = ...)");
             if (e->kind != N_NAME && e->kind != N_MEMBER && e->kind != N_INDEX)
                 sc_parse_error(P, P->cur.line, "can't assign to this (only to variables, properties and list items)");
+            if (e->kind == N_NAME && e->ref == REF_LOCAL && P->local_const[e->index])
+                sc_parse_error(P, e->line, "%s is const, so it can't be changed", e->name);
             sc_advance(P);
             n = sc_node_new(P, N_ASSIGN, e->line);
             n->op = (uint8_t)op;
@@ -865,6 +1054,52 @@ static int sc_find_global(const sc_program *p, const char *name) {
     return -1;
 }
 
+/* From '(' to the end of the body. A method with `this` has it in slot 0. */
+static void sc_func_rest(sc_parser *P, sc_func *f, bool has_this) {
+    int line = f->line;
+    P->local_count = P->max_locals = 0;
+    P->has_this = has_this;
+    P->in_func = true;
+    f->has_this = has_this;
+    if (has_this) { sc_add_local(P, " this", line); P->local_const[0] = true; }
+    sc_expect(P, T_LPAREN);
+    {
+        sc_ty types[64];
+        const char *names[64];
+        if (P->cur.t != T_RPAREN) {
+            do {
+                sc_token pn = P->cur;
+                int slot;
+                sc_expect(P, T_NAME);
+                if (f->params == 64) sc_parse_error(P, pn.line, "too many parameters");
+                names[f->params] = sc_intern(P, pn.start, pn.len);
+                slot = sc_add_local(P, names[f->params], pn.line);
+                P->local_const[slot] = false;
+                types[f->params] = sc_ty_make(TY_NONE, TY_NONE);
+                if (sc_accept(P, T_COLON)) types[f->params] = sc_parse_type(P, false);
+                else if (P->prog->strict)
+                    sc_parse_error(P, pn.line, "@strict: give the parameter '%.*s' a type (%.*s: number)", pn.len, pn.start, pn.len, pn.start);
+                f->params++;
+            } while (sc_accept(P, T_COMMA));
+        }
+        sc_expect(P, T_RPAREN);
+        if (f->params) {
+            f->param_ty = (sc_ty *)sc_arena_alloc(P->prog, sizeof(sc_ty) * (size_t)f->params);
+            f->param_names = (const char **)sc_arena_alloc(P->prog, sizeof(char *) * (size_t)f->params);
+            if (!f->param_ty || !f->param_names) sc_parse_error(P, line, "out of memory");
+            memcpy(f->param_ty, types, sizeof(sc_ty) * (size_t)f->params);
+            memcpy((void *)f->param_names, names, sizeof(char *) * (size_t)f->params);
+        }
+    }
+    if (sc_accept(P, T_ARROW)) f->ret = sc_parse_type(P, true);
+    else if (P->prog->strict)
+        sc_parse_error(P, P->cur.line, "@strict: say what %s() returns (-> void if nothing)", f->name);
+    f->body = sc_block(P);
+    f->locals = P->max_locals;
+    P->has_this = false;
+    P->in_func = false;
+}
+
 static void sc_function(sc_parser *P) {
     sc_token name;
     sc_func f;
@@ -876,39 +1111,7 @@ static void sc_function(sc_parser *P) {
     f.name = sc_intern(P, name.start, name.len);
     f.line = line;
     if (sc_find_func(P->prog, f.name) >= 0) sc_parse_error(P, line, "there already is a function '%s'", f.name);
-    P->local_count = P->max_locals = 0;
-    sc_expect(P, T_LPAREN);
-    {
-        sc_ty types[64];
-        const char *names[64];
-        if (P->cur.t != T_RPAREN) {
-            do {
-                sc_token pn = P->cur;
-                sc_expect(P, T_NAME);
-                if (f.params == 64) sc_parse_error(P, pn.line, "too many parameters");
-                names[f.params] = sc_intern(P, pn.start, pn.len);
-                sc_add_local(P, names[f.params], pn.line);
-                types[f.params] = sc_ty_make(TY_NONE, TY_NONE);
-                if (sc_accept(P, T_COLON)) types[f.params] = sc_parse_type(P, false);
-                else if (P->prog->strict)
-                    sc_parse_error(P, pn.line, "@strict: give the parameter '%.*s' a type (%.*s: number)", pn.len, pn.start, pn.len, pn.start);
-                f.params++;
-            } while (sc_accept(P, T_COMMA));
-        }
-        sc_expect(P, T_RPAREN);
-        if (f.params) {
-            f.param_ty = (sc_ty *)sc_arena_alloc(P->prog, sizeof(sc_ty) * (size_t)f.params);
-            f.param_names = (const char **)sc_arena_alloc(P->prog, sizeof(char *) * (size_t)f.params);
-            if (!f.param_ty || !f.param_names) sc_parse_error(P, line, "out of memory");
-            memcpy(f.param_ty, types, sizeof(sc_ty) * (size_t)f.params);
-            memcpy((void *)f.param_names, names, sizeof(char *) * (size_t)f.params);
-        }
-    }
-    if (sc_accept(P, T_ARROW)) f.ret = sc_parse_type(P, true);
-    else if (P->prog->strict)
-        sc_parse_error(P, P->cur.line, "@strict: say what %s() returns (-> void if nothing)", f.name);
-    f.body = sc_block(P);
-    f.locals = P->max_locals;
+    sc_func_rest(P, &f, false);
     if (P->prog->func_count == P->prog->func_cap) {
         int cap = P->prog->func_cap ? P->prog->func_cap * 2 : 16;
         sc_func *g = (sc_func *)br_realloc(P->prog->funcs, sizeof(sc_func) * (size_t)cap);
@@ -919,24 +1122,30 @@ static void sc_function(sc_parser *P) {
     P->prog->funcs[P->prog->func_count++] = f;
 }
 
+/* var / const at the top: the script's own variables (one set per entity). */
 static void sc_global_var(sc_parser *P) {
     sc_token name;
     sc_global g;
     int line = P->cur.line;
+    bool is_const = P->cur.t == T_CONST;
+    const char *word = is_const ? "const" : "var";
     sc_advance(P);
+    if (is_const && P->cur.t == T_VAR) sc_advance(P);
     name = P->cur;
     sc_expect(P, T_NAME);
     memset(&g, 0, sizeof(g));
     g.name = sc_intern(P, name.start, name.len);
     g.line = line;
+    g.is_const = is_const;
     if (sc_find_global(P->prog, g.name) >= 0) sc_parse_error(P, line, "there already is a variable '%s'", g.name);
     P->local_count = P->max_locals = 0;
     if (sc_accept(P, T_COLON)) g.ty = sc_parse_type(P, false);
     if (g.ty.t == TY_NONE && sc_accept(P, T_DECLARE)) { g.infer = true; g.init = sc_expression(P); }
     else if (sc_accept(P, T_ASSIGN)) g.init = sc_expression(P);
-    else if (P->cur.t == T_DECLARE) sc_parse_error(P, P->cur.line, "':=' takes the value's type, so it can't follow a type: write var %s: type = value", g.name);
+    else if (P->cur.t == T_DECLARE) sc_parse_error(P, P->cur.line, "':=' takes the value's type, so it can't follow a type: write %s %s: type = value", word, g.name);
     if (P->prog->strict && g.ty.t == TY_NONE && !g.infer)
-        sc_parse_error(P, line, "@strict: give '%s' a type (var %s: number = 0, or var %s := 0)", g.name, g.name, g.name);
+        sc_parse_error(P, line, "@strict: give '%s' a type (%s %s: number = 0, or %s %s := 0)", g.name, word, g.name, word, g.name);
+    if (is_const && !g.init) sc_parse_error(P, line, "a const needs its value: const %s = ...", g.name);
     sc_end_statement(P);
     if (P->prog->global_count == P->prog->global_cap) {
         int cap = P->prog->global_cap ? P->prog->global_cap * 2 : 16;
@@ -948,25 +1157,301 @@ static void sc_global_var(sc_parser *P) {
     P->prog->globals[P->prog->global_count++] = g;
 }
 
+/* A class's own member by name (not inherited ones). */
+static sc_member *sc_own_member(const sc_class *c, const char *name) {
+    int i;
+    for (i = 0; i < c->member_count; ++i) if (strcmp(c->members[i].name, name) == 0) return &c->members[i];
+    return NULL;
+}
+/* A member by name, its own or inherited: the nearest one (so an override). */
+static sc_member *sc_class_member(const sc_class *c, const char *name) {
+    for (; c; c = c->parent) {
+        sc_member *m = sc_own_member(c, name);
+        if (m) return m;
+    }
+    return NULL;
+}
+
+static const char *sc_access_word(int a) { return a == ACC_PRIVATE ? "private" : a == ACC_PROTECTED ? "protected" : "public"; }
+
+/* Can code in class `ctx` (NULL: outside every class) use member m? */
+static bool sc_can_access(const sc_class *ctx, const sc_member *m) {
+    if (m->access == ACC_PUBLIC) return true;
+    if (m->access == ACC_PRIVATE) return ctx == m->owner;
+    return ctx && sc_derives(ctx, m->owner);                  /* protected: the class and its children */
+}
+
+static sc_member *sc_new_member(sc_parser *P, sc_class *c, const char *name, int line) {
+    if (sc_own_member(c, name)) sc_parse_error(P, line, "%s already has a member called '%s'", c->name, name);
+    if (c->member_count == c->member_cap) {
+        int cap = c->member_cap ? c->member_cap * 2 : 16;
+        sc_member *g = (sc_member *)sc_arena_alloc(P->prog, sizeof(sc_member) * (size_t)cap);
+        if (!g) sc_parse_error(P, line, "out of memory");
+        if (c->member_count) memcpy(g, c->members, sizeof(sc_member) * (size_t)c->member_count);
+        c->members = g;                                   /* (the old block stays in the arena) */
+        c->member_cap = cap;
+    }
+    {
+        sc_member *m = &c->members[c->member_count++];
+        memset(m, 0, sizeof(*m));
+        m->name = name;
+        m->line = line;
+        m->owner = c;
+        m->slot = -1;
+        return m;
+    }
+}
+
+/* struct Name { ... } / class Name : Parent { ... } (the name was registered by sc_find_classes) */
+static void sc_class_decl(sc_parser *P) {
+    bool is_struct = P->cur.t == T_STRUCT;
+    const char *kind = is_struct ? "struct" : "class";
+    sc_token name;
+    sc_class *c;
+    int line = P->cur.line;
+    sc_advance(P);
+    name = P->cur;
+    sc_expect(P, T_NAME);
+    c = sc_find_class_n(P->prog, name.start, name.len);
+    if (!c || c->defined) sc_parse_error(P, line, "there already is a struct or class '%.*s'", name.len, name.start);
+    c->defined = true;
+    c->line = line;
+    if (sc_accept(P, T_COLON)) {                                 /* class Dog : Animal */
+        sc_token pn = P->cur;
+        if (is_struct) sc_parse_error(P, pn.line, "structs can't inherit (make %s a class to give it a parent)", c->name);
+        sc_expect(P, T_NAME);
+        c->parent_name = sc_intern(P, pn.start, pn.len);
+        c->parent_line = pn.line;
+    }
+    P->cls = c;
+    sc_skip_newlines(P);
+    sc_expect(P, T_LBRACE);
+    sc_skip_newlines(P);
+    while (P->cur.t != T_RBRACE) {
+        int access = -1, mline = P->cur.line;
+        bool is_static = false, is_override = false;
+        sc_token mn;
+        sc_member *m;
+        if (P->cur.t == T_EOF) sc_parse_error(P, line, "this %s's '{' is never closed", kind);
+        for (;;) {                                               /* modifiers, in any order */
+            sc_token t = P->cur;
+            if (t.t == T_PUBLIC || t.t == T_PRIVATE || t.t == T_PROTECTED) {
+                if (access >= 0) sc_parse_error(P, t.line, "a member is public, private or protected: only one of them");
+                access = t.t == T_PUBLIC ? ACC_PUBLIC : t.t == T_PRIVATE ? ACC_PRIVATE : ACC_PROTECTED;
+                if (access == ACC_PROTECTED && is_struct)
+                    sc_parse_error(P, t.line, "structs have no children, so nothing in them is protected (use private)");
+            } else if (t.t == T_STATIC) {
+                if (is_static) sc_parse_error(P, t.line, "static twice");
+                is_static = true;
+            } else if (t.t == T_OVERRIDE) {
+                if (is_override) sc_parse_error(P, t.line, "override twice");
+                if (is_struct) sc_parse_error(P, t.line, "structs have no parent, so there is nothing to override");
+                is_override = true;
+            } else {
+                break;
+            }
+            sc_advance(P);
+        }
+        if (P->cur.t == T_VAR || P->cur.t == T_CONST) {          /* a field */
+            bool is_const = P->cur.t == T_CONST;
+            const char *word = is_const ? "const" : "var";
+            sc_advance(P);
+            if (is_const && P->cur.t == T_VAR) sc_advance(P);
+            mn = P->cur;
+            sc_expect(P, T_NAME);
+            if (is_override) sc_parse_error(P, mline, "override is for functions, not fields");
+            m = sc_new_member(P, c, sc_intern(P, mn.start, mn.len), mline);
+            m->access = (uint8_t)(access < 0 ? ACC_PUBLIC : access);
+            m->is_static = is_static;
+            m->is_const = is_const;
+            P->local_count = P->max_locals = 0;
+            if (sc_accept(P, T_COLON)) m->ty = sc_parse_type(P, false);
+            if (m->ty.t == TY_NONE && sc_accept(P, T_DECLARE)) { m->infer = true; m->init = sc_expression(P); }
+            else if (sc_accept(P, T_ASSIGN)) m->init = sc_expression(P);
+            else if (P->cur.t == T_DECLARE) sc_parse_error(P, P->cur.line, "':=' takes the value's type, so it can't follow a type: write %s %s: type = value", word, m->name);
+            if (P->prog->strict && m->ty.t == TY_NONE && !m->infer)
+                sc_parse_error(P, mline, "@strict: give '%s' a type (%s %s: number = 0, or %s %s := 0)", m->name, word, m->name, word, m->name);
+            if (is_const && is_static && !m->init) sc_parse_error(P, mline, "a static const needs its value: static const %s = ...", m->name);
+            sc_end_statement(P);
+        } else if (P->cur.t == T_FUNC) {                         /* a function (a method) */
+            sc_func *f;
+            sc_advance(P);
+            mn = P->cur;
+            sc_expect(P, T_NAME);
+            m = sc_new_member(P, c, sc_intern(P, mn.start, mn.len), mline);
+            m->access = (uint8_t)(access < 0 ? ACC_PUBLIC : access);
+            m->is_static = is_static;
+            m->is_override = is_override;
+            if (!(f = (sc_func *)sc_arena_alloc(P->prog, sizeof(sc_func)))) sc_parse_error(P, mline, "out of memory");
+            f->name = m->name;
+            f->line = mline;
+            f->cls = c;
+            f->is_init = strcmp(m->name, "init") == 0;
+            if (f->is_init && is_static) sc_parse_error(P, mline, "init() makes an object, so it can't be static");
+            if (f->is_init && is_override) sc_parse_error(P, mline, "every %s has its own init(): no override needed", kind);
+            if (is_static && is_override) sc_parse_error(P, mline, "static functions can't be overridden");
+            m->fn = f;
+            sc_func_rest(P, f, !is_static);
+            if (f->is_init && f->ret.t != TY_NONE && f->ret.t != TY_VOID) sc_parse_error(P, mline, "init() returns nothing (-> void)");
+            sc_skip_newlines(P);
+        } else {
+            if (P->cur.t == T_CLASS || P->cur.t == T_STRUCT) sc_parse_error(P, P->cur.line, "structs and classes can't be inside each other");
+            sc_parse_error(P, P->cur.line, "expected var, const or func in %s %s, found '%.*s'", kind, c->name, P->cur.len, P->cur.start);
+        }
+        sc_skip_newlines(P);
+    }
+    sc_advance(P);
+    P->cls = NULL;
+    sc_end_statement(P);
+}
+
+/* Before parsing: every `struct Name` / `class Name`, so types can name a class written further down. */
+static void sc_find_classes(sc_parser *P, const char *source) {
+    sc_lexer L;
+    sc_token t, prev;
+    L.p = source;
+    L.line = 1;
+    L.depth = 0;
+    prev.t = T_EOF;
+    for (;;) {
+        t = sc_next(&L);
+        if (t.t == T_EOF || t.t == T_ERROR) return;               /* (the parser reports the error) */
+        if (t.t == T_NAME && (prev.t == T_CLASS || prev.t == T_STRUCT)) {
+            sc_class *c;
+            if (sc_find_class_n(P->prog, t.start, t.len)) sc_parse_error(P, t.line, "there already is a struct or class '%.*s'", t.len, t.start);
+            if (sc_type_word(t.start, t.len) >= 0) sc_parse_error(P, t.line, "'%.*s' is a type already", t.len, t.start);
+            if (!(c = (sc_class *)sc_arena_alloc(P->prog, sizeof(sc_class)))) sc_parse_error(P, t.line, "out of memory");
+            c->name = sc_intern(P, t.start, t.len);
+            c->is_struct = prev.t == T_STRUCT;
+            c->line = t.line;
+            c->prog = P->prog;
+            if (P->prog->class_count == P->prog->class_cap) {
+                int cap = P->prog->class_cap ? P->prog->class_cap * 2 : 8;
+                sc_class **g = (sc_class **)br_realloc(P->prog->classes, sizeof(sc_class *) * (size_t)cap);
+                if (!g) sc_parse_error(P, t.line, "out of memory");
+                P->prog->classes = g;
+                P->prog->class_cap = cap;
+            }
+            P->prog->classes[P->prog->class_count++] = c;
+        }
+        prev = t;
+    }
+}
+
+static bool sc_same_ty(sc_ty a, sc_ty b) {
+    return a.t == b.t && a.elem == b.elem && (a.flags & ~TYF_NEGATIVE) == (b.flags & ~TYF_NEGATIVE) && a.cls == b.cls;
+}
+
+/* Field slots, parent first. */
+static void sc_layout(sc_parser *P, sc_class *c) {
+    int i;
+    if (c->laid_out) return;
+    if (c->visiting) sc_parse_error(P, c->line, "%s inherits from itself", c->name);
+    c->visiting = true;
+    if (c->parent) sc_layout(P, c->parent);
+    c->field_count = c->parent ? c->parent->field_count : 0;
+    for (i = 0; i < c->member_count; ++i) {
+        sc_member *m = &c->members[i];
+        if (m->fn) continue;
+        if (m->is_static) m->slot = c->static_count++;
+        else m->slot = c->field_count++;
+    }
+    if (c->static_count) {
+        c->statics = (struct sc_value *)sc_arena_alloc(P->prog, sizeof(sc_value) * (size_t)c->static_count);
+        if (!c->statics) sc_parse_error(P, c->line, "out of memory");
+    }
+    c->visiting = false;
+    c->laid_out = true;
+}
+
+/* A struct holds its struct fields inside it, so it can't hold itself. */
+static void sc_check_contains(sc_parser *P, sc_class *root, sc_class *c, int depth) {
+    int i;
+    if (depth > 64) return;
+    for (i = 0; i < c->member_count; ++i) {
+        const sc_member *m = &c->members[i];
+        if (m->fn || m->is_static || m->ty.t != TY_OBJ || !m->ty.cls->is_struct) continue;
+        if (m->ty.cls == root)
+            sc_parse_error(P, m->line, "struct %s can't hold itself (through '%s'): use a class, a list, or a nil-able class field", root->name, m->name);
+        sc_check_contains(P, root, m->ty.cls, depth + 1);
+    }
+}
+
+/* After parsing: parents, field slots, and what overriding allows. */
+static SC_NOINLINE void sc_link_classes(sc_parser *P) {
+    sc_program *prog = P->prog;
+    int i, k;
+    for (i = 0; i < prog->class_count; ++i) {
+        sc_class *c = prog->classes[i];
+        if (!c->defined) sc_parse_error(P, c->line, "'%s' is never defined", c->name);
+        if (sc_find_func(prog, c->name) >= 0) sc_parse_error(P, c->line, "there is a function called %s too", c->name);
+        if (sc_find_global(prog, c->name) >= 0) sc_parse_error(P, c->line, "there is a variable called %s too", c->name);
+        if (sc_find_builtin(c->name) >= 0) sc_parse_error(P, c->line, "%s() is a built-in function already", c->name);
+        if (c->parent_name) {
+            sc_class *p = sc_find_class(prog, c->parent_name);
+            if (!p) sc_parse_error(P, c->parent_line, "unknown class '%s'", c->parent_name);
+            if (p->is_struct) sc_parse_error(P, c->parent_line, "%s is a struct, and structs can't be inherited from", p->name);
+            c->parent = p;
+        }
+    }
+    for (i = 0; i < prog->class_count; ++i) sc_layout(P, prog->classes[i]);
+    for (i = 0; i < prog->class_count; ++i) {
+        sc_class *c = prog->classes[i];
+        if (c->is_struct) sc_check_contains(P, c, c, 0);
+        for (k = 0; k < c->member_count; ++k) {
+            sc_member *m = &c->members[k];
+            sc_member *base = c->parent ? sc_class_member(c->parent, m->name) : NULL;
+            if (!base) {
+                if (m->is_override) sc_parse_error(P, m->line, "%s() overrides nothing: %s's parents have no %s()", m->name, c->name, m->name);
+                continue;
+            }
+            if (m->fn && m->fn->is_init && base->fn && base->fn->is_init) continue;      /* each class has its own init() */
+            if (!m->fn || !base->fn)
+                sc_parse_error(P, m->line, "%s already has '%s' from %s (a child can't declare it again)", c->name, m->name, base->owner->name);
+            if (base->is_static || m->is_static)
+                sc_parse_error(P, m->line, "%s() is static in %s, and static functions can't be overridden", m->name, base->is_static ? base->owner->name : c->name);
+            if (!m->is_override)
+                sc_parse_error(P, m->line, "%s() is already in %s: write override func %s() to replace it", m->name, base->owner->name, m->name);
+            if (m->access > base->access)
+                sc_parse_error(P, m->line, "%s() is %s in %s, so its override can't be %s", m->name, sc_access_word(base->access),
+                               base->owner->name, sc_access_word(m->access));
+            {
+                const sc_func *f = m->fn, *b = base->fn;
+                int a;
+                bool same = f->params == b->params && sc_same_ty(f->ret, b->ret);
+                for (a = 0; same && a < f->params; ++a) same = sc_same_ty(f->param_ty[a], b->param_ty[a]);
+                if (!same) sc_parse_error(P, m->line, "an override takes the same parameters and returns the same type as %s.%s() (line %d)",
+                                          base->owner->name, m->name, base->line);
+            }
+        }
+    }
+}
+
 /* ---- the resolver: what each name refers to ------------------------------------ */
 
 typedef struct sc_vm sc_vm;
 typedef sc_value (*sc_native)(sc_vm *vm, sc_value *args, int argc, int line);
 /* sig: the parameters' types, '>', the result's (see sc_sig_type), for the type checker */
 typedef struct sc_builtin { const char *name; int min_args, max_args; sc_native fn; const char *sig; } sc_builtin;
-static int sc_find_builtin(const char *name);              /* the table is in part 5 */
 static const sc_builtin *sc_builtin_at(int index);
 
 static void sc_resolve(sc_parser *P, sc_node *n) {
     int i;
     if (!n) return;
     if (n->kind == N_NAME && n->ref == REF_UNRESOLVED) {
-        if ((n->index = sc_find_global(P->prog, n->name)) >= 0) n->ref = REF_GLOBAL;
+        if ((n->cls = sc_find_class(P->prog, n->name)) != NULL) { n->kind = N_CLASSREF; n->ref = REF_CLASS; }
+        else if ((n->index = sc_find_global(P->prog, n->name)) >= 0) {
+            if (P->cls) sc_parse_error(P, n->line, "a struct or class can't see the script's variables ('%s'): pass it in, or use a static field", n->name);
+            n->ref = REF_GLOBAL;
+        }
         else if (sc_find_func(P->prog, n->name) >= 0 || sc_find_builtin(n->name) >= 0)
             sc_parse_error(P, n->line, "'%s' is a function: call it with ()", n->name);
         else sc_parse_error(P, n->line, "unknown name '%s' (declare it with var)", n->name);
     } else if (n->kind == N_CALL) {
-        if ((n->index = sc_find_func(P->prog, n->name)) >= 0) {
+        if ((n->cls = sc_find_class(P->prog, n->name)) != NULL) {
+            n->ref = REF_CLASS;                                    /* Point(1, 2): a new object */
+        } else if ((n->index = sc_find_func(P->prog, n->name)) >= 0) {
+            if (P->cls) sc_parse_error(P, n->line, "a struct or class can't call the script's functions ('%s'): make it a static function", n->name);
             n->ref = REF_FUNC;
             if (n->count > P->prog->funcs[n->index].params)
                 sc_parse_error(P, n->line, "%s() takes %d argument%s, not %d", n->name, P->prog->funcs[n->index].params,
@@ -999,11 +1484,25 @@ static void sc_resolve(sc_parser *P, sc_node *n) {
 static bool sc_numeric(int t) { return t == TY_INT || t == TY_NUM; }
 static bool sc_known(sc_ty ty) { return ty.t != TY_NONE && ty.t != TY_ANY; }
 
+static const char *sc_article(int t) { return t == TY_INT || t == TY_ENT || t == TY_ANY || t == TY_OBJ ? "an" : "a"; }
+static bool sc_vowel(char c) { return c && strchr("AEIOUaeiou", c) != NULL; }
+static const char *sc_ty_article(sc_ty ty) {
+    if (ty.t == TY_OBJ && ty.cls) return sc_vowel(ty.cls->name[0]) ? "an" : "a";
+    if (ty.flags & TYF_UNSIGNED) return "an";                 /* an unsigned int */
+    return sc_article(ty.t);
+}
+
 /* Can a value of type `from` be stored where `to` is declared? */
 static bool sc_fits(sc_ty to, sc_ty from) {
     if (!sc_known(to) || !sc_known(from)) return from.t != TY_VOID;
+    if ((to.flags & TYF_UNSIGNED) && (from.flags & TYF_NEGATIVE)) return false;
+    if (to.t == TY_OBJ) {                                    /* the class or one of its children; classes may be nil */
+        if (from.t == TY_NIL) return !to.cls->is_struct;
+        return from.t == TY_OBJ && sc_derives(from.cls, to.cls);
+    }
     if (to.t == from.t) {
         if (to.t != TY_LIST || to.elem == TY_NONE || from.elem == TY_NONE) return true;
+        if (to.elem == TY_OBJ || from.elem == TY_OBJ) return to.elem == from.elem && sc_derives(from.cls, to.cls);
         return to.elem == from.elem || (to.elem == TY_NUM && from.elem == TY_INT);
     }
     if (to.t == TY_NUM && from.t == TY_INT) return true;
@@ -1015,10 +1514,12 @@ static void sc_need_fit(sc_parser *P, int line, sc_ty to, sc_ty from, const char
     char a[32], b[32];
     if (sc_fits(to, from)) return;
     if (from.t == TY_VOID) sc_parse_error(P, line, "%s: that call returns nothing (-> void)", what);
+    if ((to.flags & TYF_UNSIGNED) && (from.flags & TYF_NEGATIVE)) sc_parse_error(P, line, "%s is unsigned, so it can't hold a negative number", what);
+    if (to.t == TY_OBJ && from.t == TY_NIL) sc_parse_error(P, line, "%s is %s %s, a struct, so it can't be nil", what, sc_ty_article(to), to.cls->name);
     if (to.t == TY_INT && from.t == TY_NUM)
         sc_parse_error(P, line, "%s is an int, and this number may have a fraction (floor() or round() make it whole)", what);
-    sc_parse_error(P, line, "%s is %s %s, so it can't hold %s %s", what, to.t == TY_INT || to.t == TY_ENT || to.t == TY_ANY ? "an" : "a",
-                   sc_ty_name(to, a, sizeof(a)), from.t == TY_INT || from.t == TY_ENT ? "an" : "a", sc_ty_name(from, b, sizeof(b)));
+    sc_parse_error(P, line, "%s is %s %s, so it can't hold %s %s", what, sc_ty_article(to),
+                   sc_ty_name(to, a, sizeof(a)), sc_ty_article(from), sc_ty_name(from, b, sizeof(b)));
 }
 
 /* The type a built-in signature letter stands for. */
@@ -1038,7 +1539,7 @@ static sc_ty sc_sig_type(char c) {
 
 static sc_ty sc_expr_type(sc_parser *P, sc_node *n);
 
-static const char *sc_article(int t) { return t == TY_INT || t == TY_ENT || t == TY_ANY ? "an" : "a"; }
+
 
 static void sc_check_arg(sc_parser *P, const sc_node *call, int i, char code, sc_ty got) {
     char want[48], tmp[32], have[32];
@@ -1056,7 +1557,7 @@ static void sc_check_arg(sc_parser *P, const sc_node *call, int i, char code, sc
         break;
     }
     sc_parse_error(P, call->items[i]->line, "%s() wants %s for argument %d, not %s %s", call->name, want, i + 1,
-                   sc_article(got.t), sc_ty_name(got, have, sizeof(have)));
+                   sc_ty_article(got), sc_ty_name(got, have, sizeof(have)));
 }
 
 static sc_ty sc_builtin_type(sc_parser *P, sc_node *n) {
@@ -1075,8 +1576,8 @@ static sc_ty sc_builtin_type(sc_parser *P, sc_node *n) {
     }
     if (strcmp(n->name, "push") == 0 && n->count == 2 && args[0].t == TY_LIST && args[0].elem != TY_NONE) {
         char a[32], bb[32];
-        if (!sc_fits(sc_ty_make(args[0].elem, 0), args[1]))
-            sc_parse_error(P, n->line, "push(): the list holds %s, not %s", sc_ty_name(sc_ty_make(args[0].elem, 0), a, sizeof(a)), sc_ty_name(args[1], bb, sizeof(bb)));
+        if (!sc_fits(sc_elem_ty(args[0]), args[1]))
+            sc_parse_error(P, n->line, "push(): the list holds %s, not %s", sc_ty_name(sc_elem_ty(args[0]), a, sizeof(a)), sc_ty_name(args[1], bb, sizeof(bb)));
     }
     if (!ret) return sc_ty_make(TY_NONE, 0);
     switch (ret[1]) {
@@ -1093,7 +1594,7 @@ static sc_ty sc_builtin_type(sc_parser *P, sc_node *n) {
         return r;
     }
     case 'E':                                    /* an item of the list: pop, remove */
-        return n->count && args[0].t == TY_LIST ? sc_ty_make(args[0].elem, 0) : sc_ty_make(TY_NONE, 0);
+        return n->count && args[0].t == TY_LIST ? sc_elem_ty(args[0]) : sc_ty_make(TY_NONE, 0);
     default:
         return sc_sig_type(ret[1]);
     }
@@ -1107,10 +1608,44 @@ static const struct { const char *name; uint8_t t; bool settable; } k_props[] = 
     { "parent", TY_ENT, true }, { "velocity", TY_VEC, true }, { "angular_velocity", TY_NUM, true },
 };
 
+/* A struct's or class's member, as code in P->cls sees it: an error if it can't. */
+static sc_member *sc_need_member(sc_parser *P, sc_class *c, const char *name, int line, bool via_class, bool call) {
+    sc_member *m = sc_class_member(c, name);
+    if (!m) {
+        if (call) sc_parse_error(P, line, "%s has no function %s()", c->name, name);
+        sc_parse_error(P, line, "%s has no member '%s'", c->name, name);
+    }
+    if (!sc_can_access(P->cls, m))
+        sc_parse_error(P, line, "'%s' is %s in %s%s", name, sc_access_word(m->access), m->owner->name,
+                       m->access == ACC_PRIVATE ? " (only its own functions can use it)" : " (only it and its children can use it)");
+    if (call && !m->fn) sc_parse_error(P, line, "'%s' is a field of %s, not a function", name, c->name);
+    if (!call && m->fn) sc_parse_error(P, line, "%s() is a function: call it with ()", name);
+    if (via_class && !m->is_static)
+        sc_parse_error(P, line, "'%s' belongs to each %s, not to the class: use an object (or make it static)", name, c->name);
+    return m;
+}
+
 static sc_ty sc_member_type(sc_parser *P, sc_node *n, bool setting) {
-    sc_ty obj = sc_expr_type(P, n->a);
+    sc_ty obj;
     char a[32];
     size_t i;
+    if (n->a->kind == N_CLASSREF || (n->a->kind == N_NAME && n->a->ref == REF_CLASS)) {   /* Counter.total: a static field */
+        sc_member *m = sc_need_member(P, n->a->cls, n->name, n->line, true, false);
+        if (setting && m->is_const) sc_parse_error(P, n->line, "%s.%s is const, so it can't be changed", m->owner->name, n->name);
+        n->mem = m;
+        return m->ty;
+    }
+    obj = sc_expr_type(P, n->a);
+    if (obj.t == TY_OBJ) {
+        sc_member *m = sc_need_member(P, obj.cls, n->name, n->line, false, false);
+        if (setting && m->is_const) {
+            if (m->is_static) sc_parse_error(P, n->line, "%s.%s is const, so it can't be changed", m->owner->name, n->name);
+            if (!(P->fn && P->fn->is_init && P->cls == m->owner && n->a->kind == N_THIS))
+                sc_parse_error(P, n->line, "'%s' is const: only %s's init() can set it (this.%s = ...)", n->name, m->owner->name, n->name);
+        }
+        n->mem = m;
+        return m->ty;
+    }
     if (obj.t == TY_VEC) {
         if (strcmp(n->name, "x") == 0 || strcmp(n->name, "y") == 0) return sc_ty_make(TY_NUM, 0);
         if (strcmp(n->name, "length") == 0 && !setting) return sc_ty_make(TY_NUM, 0);
@@ -1147,15 +1682,66 @@ static sc_ty sc_binary_type(sc_parser *P, int op, sc_ty a, sc_ty b, int line) {
     if (op == T_PLUS && (a.t == TY_STR || b.t == TY_STR)) return sc_ty_make(TY_STR, 0);    /* "score: " + 5 */
     if (!sc_known(a) || !sc_known(b)) return sc_ty_make(TY_NONE, 0);
     if (sc_numeric(a.t) && sc_numeric(b.t)) {
-        if (op == T_SLASH) return sc_ty_make(TY_NUM, 0);
-        return sc_ty_make(a.t == TY_INT && b.t == TY_INT ? TY_INT : TY_NUM, 0);
+        sc_ty r = sc_ty_make(op == T_SLASH ? TY_NUM : a.t == TY_INT && b.t == TY_INT ? TY_INT : TY_NUM, 0);
+        if (op != T_MINUS && (a.flags & b.flags & TYF_UNSIGNED)) r.flags |= TYF_UNSIGNED;   /* stays 0 or more */
+        return r;
     }
     if (a.t == TY_VEC && b.t == TY_VEC && (op == T_PLUS || op == T_MINUS || op == T_STAR)) return a;
     if (a.t == TY_VEC && sc_numeric(b.t) && (op == T_STAR || op == T_SLASH)) return a;
     if (sc_numeric(a.t) && b.t == TY_VEC && op == T_STAR) return b;
-    if (a.t == TY_LIST && b.t == TY_LIST && op == T_PLUS) return sc_ty_make(TY_LIST, a.elem == b.elem ? a.elem : TY_NONE);
+    if (a.t == TY_LIST && b.t == TY_LIST && op == T_PLUS) return sc_same_ty(a, b) ? a : sc_ty_make(TY_LIST, a.elem == b.elem && a.elem != TY_OBJ ? a.elem : TY_NONE);
     sc_parse_error(P, line, "can't use %s on %s %s and %s %s", sym, sc_article(a.t), sc_ty_name(a, an, sizeof(an)), sc_article(b.t), sc_ty_name(b, bn, sizeof(bn)));
     return sc_ty_make(TY_NONE, 0);
+}
+
+/* A call's arguments against a function's parameters. */
+static void sc_check_args(sc_parser *P, sc_node *n, const sc_func *f, const char *label) {
+    int i;
+    if (n->count > f->params)
+        sc_parse_error(P, n->line, "%s() takes %d argument%s, not %d", label, f->params, f->params == 1 ? "" : "s", n->count);
+    for (i = 0; i < n->count; ++i) {
+        sc_ty got = sc_expr_type(P, n->items[i]);
+        if (!sc_fits(f->param_ty[i], got)) {
+            char what[128];
+            snprintf(what, sizeof(what), "%s()'s parameter '%s'", label, f->param_names[i]);
+            sc_need_fit(P, n->items[i]->line, f->param_ty[i], got, what);
+        }
+    }
+}
+
+/* Point(1, 2): init()'s parameters, or (a struct without init) its fields in order. */
+static sc_ty sc_construct_type(sc_parser *P, sc_node *n) {
+    sc_class *c = n->cls;
+    sc_member *init = sc_class_member(c, "init");
+    int i, k;
+    if (init && init->fn && init->fn->is_init) {
+        char label[96];
+        if (!sc_can_access(P->cls, init))
+            sc_parse_error(P, n->line, "%s's init() is %s, so only %s can make one", c->name, sc_access_word(init->access),
+                           init->access == ACC_PRIVATE ? "its own functions" : "it and its children");
+        snprintf(label, sizeof(label), "%s", c->name);
+        sc_check_args(P, n, init->fn, label);
+        return sc_obj_ty(c);
+    }
+    if (!c->is_struct) {
+        if (n->count) sc_parse_error(P, n->line, "%s has no init(), so %s() takes no arguments", c->name, c->name);
+        return sc_obj_ty(c);
+    }
+    if (n->count > c->field_count)
+        sc_parse_error(P, n->line, "%s() takes up to %d argument%s (its fields), not %d", c->name, c->field_count, c->field_count == 1 ? "" : "s", n->count);
+    for (i = 0, k = 0; i < c->member_count && k < n->count; ++i) {
+        sc_member *m = &c->members[i];
+        sc_ty got;
+        char what[96];
+        if (m->fn || m->is_static) continue;
+        if (!sc_can_access(P->cls, m))
+            sc_parse_error(P, n->line, "%s's field '%s' is private, so %s() can't set it (give %s an init())", c->name, m->name, c->name, c->name);
+        got = sc_expr_type(P, n->items[k]);
+        snprintf(what, sizeof(what), "%s's field '%s'", c->name, m->name);
+        sc_need_fit(P, n->items[k]->line, m->ty, got, what);
+        k++;
+    }
+    return sc_obj_ty(c);
 }
 
 static sc_ty sc_expr_type(sc_parser *P, sc_node *n) {
@@ -1163,6 +1749,22 @@ static sc_ty sc_expr_type(sc_parser *P, sc_node *n) {
     char an[32];
     int i;
     switch (n->kind) {
+    case N_THIS: return sc_obj_ty(P->cls);
+    case N_CLASSREF:
+        sc_parse_error(P, n->line, "%s is a %s: make one with %s(...), or use its static members (%s.name)", n->cls->name,
+                       n->cls->is_struct ? "struct" : "class", n->cls->name, n->cls->name);
+        return sc_ty_make(TY_NONE, 0);
+    case N_SUPER: {
+        sc_member *m;
+        char label[96];
+        if (!P->cls->parent) sc_parse_error(P, n->line, "%s has no parent class, so there is no super", P->cls->name);
+        m = sc_need_member(P, P->cls->parent, n->name, n->line, false, true);
+        if (m->is_static) sc_parse_error(P, n->line, "%s() is static: call it as %s.%s()", n->name, m->owner->name, n->name);
+        n->mem = m;
+        snprintf(label, sizeof(label), "%s.%s", m->owner->name, n->name);
+        sc_check_args(P, n, m->fn, label);
+        return m->fn->ret;
+    }
     case N_NUM: return sc_ty_make(!n->op && n->num == floor(n->num) && fabs(n->num) < 9e15 ? TY_INT : TY_NUM, 0);
     case N_STR: return sc_ty_make(TY_STR, 0);
     case N_TRUE: case N_FALSE: return sc_ty_make(TY_BOOL, 0);
@@ -1173,16 +1775,22 @@ static sc_ty sc_expr_type(sc_parser *P, sc_node *n) {
         return n->ty;
     case N_LIST: {
         int elem = -1;
+        sc_class *cls = NULL;
         for (i = 0; i < n->count; ++i) {
             sc_ty it = sc_expr_type(P, n->items[i]);
             if (!sc_known(it) || it.t == TY_NIL || it.t == TY_LIST) elem = TY_NONE;
-            else if (elem < 0) elem = it.t;
+            else if (elem < 0) { elem = it.t; cls = it.cls; }
+            else if (elem == TY_OBJ || it.t == TY_OBJ) { if (elem != it.t || cls != it.cls) elem = TY_NONE; }
             else if (elem != it.t) elem = sc_numeric(elem) && sc_numeric(it.t) ? TY_NUM : TY_NONE;
         }
-        return sc_ty_make(TY_LIST, elem < 0 ? TY_NONE : elem);
+        a = sc_ty_make(TY_LIST, elem < 0 ? TY_NONE : elem);
+        if (a.elem == TY_OBJ) a.cls = cls;
+        return a;
     }
     case N_NEG:
         a = sc_expr_type(P, n->a);
+        a.flags &= (uint8_t)~TYF_UNSIGNED;
+        if (n->a->kind == N_NUM) a.flags |= TYF_NEGATIVE;            /* -3: for unsigned's checks */
         if (!sc_known(a) || sc_numeric(a.t) || a.t == TY_VEC) return a;
         sc_parse_error(P, n->line, "can't negate %s %s", sc_article(a.t), sc_ty_name(a, an, sizeof(an)));
         return a;
@@ -1190,27 +1798,37 @@ static sc_ty sc_expr_type(sc_parser *P, sc_node *n) {
     case N_AND: case N_OR:                       /* one of the two */
         a = sc_expr_type(P, n->a);
         b = sc_expr_type(P, n->b);
-        return a.t == b.t && a.elem == b.elem ? a : sc_ty_make(TY_NONE, 0);
+        return sc_same_ty(a, b) ? sc_ty_plain(a) : sc_ty_make(TY_NONE, 0);
     case N_BINARY:
         a = sc_expr_type(P, n->a);
         b = sc_expr_type(P, n->b);
         return sc_binary_type(P, n->op, a, b, n->line);
     case N_CALL:
         if (n->ref == REF_BUILTIN) return sc_builtin_type(P, n);
+        if (n->ref == REF_CLASS) return sc_construct_type(P, n);
         {
             const sc_func *f = &P->prog->funcs[n->index];
-            for (i = 0; i < n->count; ++i) {
-                sc_ty got = sc_expr_type(P, n->items[i]);
-                if (i < f->params && !sc_fits(f->param_ty[i], got)) {
-                    char what[96];
-                    snprintf(what, sizeof(what), "%s()'s parameter '%s'", f->name, f->param_names[i]);
-                    sc_need_fit(P, n->items[i]->line, f->param_ty[i], got, what);
-                }
-            }
+            sc_check_args(P, n, f, f->name);
             return f->ret;
         }
     case N_METHOD:
+        if (n->a->kind == N_CLASSREF) {                          /* Counter.reset(): a static function */
+            char label[96];
+            sc_member *m = sc_need_member(P, n->a->cls, n->name, n->line, false, true);
+            if (!m->is_static) sc_parse_error(P, n->line, "%s() belongs to each %s, not to the class: call it on an object (or make it static)", n->name, n->a->cls->name);
+            n->mem = m;
+            snprintf(label, sizeof(label), "%s.%s", m->owner->name, n->name);
+            sc_check_args(P, n, m->fn, label);
+            return m->fn->ret;
+        }
         a = sc_expr_type(P, n->a);
+        if (a.t == TY_OBJ) {
+            char label[96];
+            sc_member *m = sc_need_member(P, a.cls, n->name, n->line, false, true);
+            snprintf(label, sizeof(label), "%s.%s", m->owner->name, n->name);
+            sc_check_args(P, n, m->fn, label);
+            return m->fn->ret;
+        }
         if (sc_known(a) && a.t != TY_ENT)
             sc_parse_error(P, n->line, "%s %s has no function %s()", sc_article(a.t), sc_ty_name(a, an, sizeof(an)), n->name);
         for (i = 0; i < n->count; ++i) sc_expr_type(P, n->items[i]);
@@ -1220,8 +1838,8 @@ static sc_ty sc_expr_type(sc_parser *P, sc_node *n) {
         a = sc_expr_type(P, n->a);
         b = sc_expr_type(P, n->b);
         if (sc_known(b) && !sc_numeric(b.t)) sc_parse_error(P, n->b->line, "an index is a number, not %s %s", sc_article(b.t), sc_ty_name(b, an, sizeof(an)));
-        if (a.t == TY_LIST) return sc_ty_make(a.elem, 0);
-        if (a.t == TY_STR) return a;
+        if (a.t == TY_LIST) return sc_elem_ty(a);
+        if (a.t == TY_STR) return sc_ty_make(TY_STR, 0);
         if (sc_known(a)) sc_parse_error(P, n->line, "can't index %s %s with []", sc_article(a.t), sc_ty_name(a, an, sizeof(an)));
         return sc_ty_make(TY_NONE, 0);
     default: return sc_ty_make(TY_NONE, 0);
@@ -1230,7 +1848,10 @@ static sc_ty sc_expr_type(sc_parser *P, sc_node *n) {
 
 /* The declared type of what an assignment stores into. */
 static sc_ty sc_target_type(sc_parser *P, sc_node *t) {
-    if (t->kind == N_NAME) return sc_expr_type(P, t);
+    if (t->kind == N_NAME) {
+        if (t->ref == REF_GLOBAL && P->prog->globals[t->index].is_const) sc_parse_error(P, t->line, "%s is const, so it can't be changed", t->name);
+        return sc_expr_type(P, t);
+    }
     if (t->kind == N_MEMBER) {
         sc_ty ty = sc_member_type(P, t, true);
         if (ty.t == TY_COMP) sc_parse_error(P, t->line, "set a component's fields, like self.%s.color", t->name);
@@ -1240,7 +1861,7 @@ static sc_ty sc_target_type(sc_parser *P, sc_node *t) {
         sc_ty list = sc_expr_type(P, t->a);
         sc_expr_type(P, t->b);
         if (list.t == TY_STR) sc_parse_error(P, t->line, "strings can't be changed (build a new one with +)");
-        return list.t == TY_LIST ? sc_ty_make(list.elem, 0) : sc_ty_make(TY_NONE, 0);
+        return list.t == TY_LIST ? sc_elem_ty(list) : sc_ty_make(TY_NONE, 0);
     }
     return sc_ty_make(TY_NONE, 0);
 }
@@ -1272,7 +1893,7 @@ static void sc_check_stmt(sc_parser *P, sc_node *n) {
             if (a.t == TY_VOID) sc_parse_error(P, n->line, "that call returns nothing (-> void), so there is no type to take");
             if (!sc_known(a) || a.t == TY_NIL)
                 sc_parse_error(P, n->line, "can't tell the type of %s's value before it runs: write var %s: type = ...", n->name, n->name);
-            n->ty = a.t == TY_LIST ? sc_ty_make(TY_LIST, TY_NONE) : a;
+            n->ty = a.t == TY_LIST ? sc_ty_make(TY_LIST, TY_NONE) : sc_ty_plain(a);
         } else if (n->ty.t && n->a) {
             sc_need_fit(P, n->line, n->ty, a, n->name);
         }
@@ -1285,7 +1906,7 @@ static void sc_check_stmt(sc_parser *P, sc_node *n) {
             int op = n->op == T_PLUS_EQ ? T_PLUS : n->op == T_MINUS_EQ ? T_MINUS : n->op == T_STAR_EQ ? T_STAR : T_SLASH;
             b = sc_binary_type(P, op, sc_expr_type(P, n->a), b, n->line);
         }
-        if (n->a->kind == N_MEMBER && strcmp(n->a->name, "scale") == 0 && sc_numeric(b.t)) return;   /* scale = 2 */
+        if (n->a->kind == N_MEMBER && strcmp(n->a->name, "scale") == 0 && sc_numeric(b.t) && !n->a->mem) return;   /* scale = 2 */
         snprintf(what, sizeof(what), "%s", n->a->kind == N_NAME || n->a->kind == N_MEMBER ? n->a->name : "this list's item");
         if (a.t == TY_VOID) a.t = TY_NONE;
         sc_need_fit(P, n->line, a, b, what);
@@ -1303,7 +1924,7 @@ static void sc_check_stmt(sc_parser *P, sc_node *n) {
         sc_ty item;
         a = sc_expr_type(P, n->a);
         if (sc_numeric(a.t)) item = sc_ty_make(TY_INT, 0);
-        else if (a.t == TY_LIST) item = sc_ty_make(a.elem, 0);
+        else if (a.t == TY_LIST) item = sc_elem_ty(a);
         else if (!sc_known(a)) item = sc_ty_make(TY_NONE, 0);
         else { sc_parse_error(P, n->a->line, "for ... in needs a list or a number, not %s %s", sc_article(a.t), sc_ty_name(a, an, sizeof(an))); item = a; }
         if (n->ty.t) sc_need_fit(P, n->line, n->ty, item, "the loop variable");
@@ -1330,15 +1951,46 @@ static void sc_check_stmt(sc_parser *P, sc_node *n) {
 /* What the engine passes to each callback. */
 static const char *const k_callback_sig[CB_COUNT] = { "", "n", "evn", "e", "e", "e" };
 
-#if defined(__GNUC__) || defined(__clang__)
-#  define SC_NOINLINE __attribute__((noinline))       /* (kept out of sc_compile's setjmp frame) */
-#else
-#  define SC_NOINLINE
-#endif
+/* A function's body: its parameters' (and this's) types, then its statements. */
+static void sc_check_func(sc_parser *P, sc_func *f) {
+    int k, off = f->has_this ? 1 : 0;
+    memset(P->slot_ty, 0, sizeof(P->slot_ty));
+    if (f->has_this) P->slot_ty[0] = sc_obj_ty(f->cls);
+    for (k = 0; k < f->params; ++k) P->slot_ty[k + off] = f->param_ty[k];
+    P->fn = f;
+    P->cls = f->cls;
+    sc_check_stmt(P, f->body);
+    if (sc_known(f->ret) && f->ret.t != TY_VOID && f->ret.t != TY_ENT && !(f->ret.t == TY_OBJ && !f->ret.cls->is_struct) &&
+        !sc_always_returns(f->body))
+        sc_parse_error(P, f->line, "not every way through %s() ends with a return (it must return %s %s)", f->name,
+                       sc_article(f->ret.t), sc_tyk_name(f->ret.t));
+    P->fn = NULL;
+    P->cls = NULL;
+}
+
 static SC_NOINLINE void sc_typecheck(sc_parser *P) {
     sc_program *prog = P->prog;
     int i, k;
     P->fn = NULL;
+    for (i = 0; i < prog->class_count; ++i) {                /* fields' starting values first: the rest may use them */
+        sc_class *c = prog->classes[i];
+        P->cls = c;
+        for (k = 0; k < c->member_count; ++k) {
+            sc_member *m = &c->members[k];
+            sc_ty t;
+            if (m->fn || !m->init) continue;
+            memset(P->slot_ty, 0, sizeof(P->slot_ty));
+            t = sc_expr_type(P, m->init);
+            if (m->infer) {
+                if (t.t == TY_VOID) sc_parse_error(P, m->line, "that call returns nothing (-> void), so there is no type to take");
+                if (!sc_known(t) || t.t == TY_NIL) sc_parse_error(P, m->line, "can't tell the type of %s's value before it runs: write var %s: type = ...", m->name, m->name);
+                m->ty = t.t == TY_LIST ? sc_ty_make(TY_LIST, TY_NONE) : sc_ty_plain(t);
+            } else if (m->ty.t) {
+                sc_need_fit(P, m->line, m->ty, t, m->name);
+            }
+        }
+        P->cls = NULL;
+    }
     for (i = 0; i < prog->global_count; ++i) {               /* in order: a := may use the ones above it */
         sc_global *g = &prog->globals[i];
         sc_ty t;
@@ -1348,7 +2000,7 @@ static SC_NOINLINE void sc_typecheck(sc_parser *P) {
         if (g->infer) {
             if (t.t == TY_VOID) sc_parse_error(P, g->line, "that call returns nothing (-> void), so there is no type to take");
             if (!sc_known(t) || t.t == TY_NIL) sc_parse_error(P, g->line, "can't tell the type of %s's value before it runs: write var %s: type = ...", g->name, g->name);
-            g->ty = t.t == TY_LIST ? sc_ty_make(TY_LIST, TY_NONE) : t;
+            g->ty = t.t == TY_LIST ? sc_ty_make(TY_LIST, TY_NONE) : sc_ty_plain(t);
         } else if (g->ty.t) {
             sc_need_fit(P, g->line, g->ty, t, g->name);
         }
@@ -1356,8 +2008,6 @@ static SC_NOINLINE void sc_typecheck(sc_parser *P) {
     for (i = 0; i < prog->func_count; ++i) {
         sc_func *f = &prog->funcs[i];
         int cb;
-        memset(P->slot_ty, 0, sizeof(P->slot_ty));
-        for (k = 0; k < f->params; ++k) P->slot_ty[k] = f->param_ty[k];
         for (cb = 0; cb < CB_COUNT; ++cb) {                   /* the engine calls these: their types are fixed */
             if (strcmp(f->name, k_callbacks[cb]) != 0) continue;
             for (k = 0; k < f->params; ++k) {
@@ -1370,13 +2020,11 @@ static SC_NOINLINE void sc_typecheck(sc_parser *P) {
             }
             if (sc_known(f->ret) && f->ret.t != TY_VOID) sc_parse_error(P, f->line, "the engine ignores what %s() returns: use -> void", f->name);
         }
-        P->fn = f;
-        sc_check_stmt(P, f->body);
-        if (sc_known(f->ret) && f->ret.t != TY_VOID && f->ret.t != TY_ENT && !sc_always_returns(f->body))
-            sc_parse_error(P, f->line, "not every way through %s() ends with a return (it must return %s %s)", f->name,
-                           sc_article(f->ret.t), sc_tyk_name(f->ret.t));
-        P->fn = NULL;
+        sc_check_func(P, f);
     }
+    for (i = 0; i < prog->class_count; ++i)
+        for (k = 0; k < prog->classes[i]->member_count; ++k)
+            if (prog->classes[i]->members[k].fn) sc_check_func(P, prog->classes[i]->members[k].fn);
 }
 
 static void sc_program_free(sc_program *p) {
@@ -1387,6 +2035,7 @@ static void sc_program_free(sc_program *p) {
     br_free(p->pinned);
     br_free(p->funcs);
     br_free(p->globals);
+    br_free(p->classes);
     br_free(p);
 }
 
@@ -1407,6 +2056,7 @@ static sc_program *sc_compile(const char *source, const char *path) {
     P.lex.p = source;
     P.lex.line = 1;
     if (setjmp(P.fail)) { prog->ok = false; return prog; }
+    sc_find_classes(&P, source);
     sc_advance(&P);
     sc_skip_newlines(&P);
     prog->strict = g_strict_default;
@@ -1416,22 +2066,34 @@ static sc_program *sc_compile(const char *source, const char *path) {
             sc_advance(&P);
             if (P.cur.t != T_NAME || P.cur.len != 6 || strncmp(P.cur.start, "strict", 6) != 0)
                 sc_parse_error(&P, line, "unknown annotation '@%.*s' (there is @strict)", P.cur.len, P.cur.start);
-            if (prog->func_count || prog->global_count) sc_parse_error(&P, line, "@strict goes at the top of the file, before any var or func");
+            if (P.decls) sc_parse_error(&P, line, "@strict goes at the top of the file, before any var, func or class");
             sc_advance(&P);
             prog->strict = true;
             sc_end_statement(&P);
             continue;
         }
+        P.decls++;
         if (P.cur.t == T_FUNC) sc_function(&P);
-        else if (P.cur.t == T_VAR) sc_global_var(&P);
-        else sc_parse_error(&P, P.cur.line, "only 'var' and 'func' can be at the top of a script (put code inside start())");
+        else if (P.cur.t == T_VAR || P.cur.t == T_CONST) sc_global_var(&P);
+        else if (P.cur.t == T_CLASS || P.cur.t == T_STRUCT) sc_class_decl(&P);
+        else if (P.cur.t >= T_PUBLIC && P.cur.t <= T_OVERRIDE)
+            sc_parse_error(&P, P.cur.line, "'%.*s' is for the members of a struct or class", P.cur.len, P.cur.start);
+        else sc_parse_error(&P, P.cur.line, "only var, const, func, struct and class can be at the top of a script (put code inside start())");
         sc_skip_newlines(&P);
     }
+    sc_link_classes(&P);
     for (i = 0; i < prog->global_count; ++i) {
         P.local_count = 0;
         sc_resolve(&P, prog->globals[i].init);
     }
     for (i = 0; i < prog->func_count; ++i) sc_resolve(&P, prog->funcs[i].body);
+    for (i = 0; i < prog->class_count; ++i) {
+        sc_class *c = prog->classes[i];
+        int k;
+        P.cls = c;
+        for (k = 0; k < c->member_count; ++k) sc_resolve(&P, c->members[k].fn ? c->members[k].fn->body : c->members[k].init);
+        P.cls = NULL;
+    }
     for (i = 0; i < CB_COUNT; ++i) prog->callbacks[i] = sc_find_func(prog, k_callbacks[i]);
     sc_typecheck(&P);
     prog->ok = true;
@@ -1488,6 +2150,8 @@ struct sc_vm {
     long budget;
     sc_value ret;
     jmp_buf *fail;
+    const sc_class *cls;            /* the class whose function is running (NULL: none): what private and protected allow */
+    bool in_init;                   /* running that class's init(): its const fields can be set */
 };
 
 enum { FLOW_NORMAL = 0, FLOW_BREAK, FLOW_CONTINUE, FLOW_RETURN };
@@ -1515,7 +2179,15 @@ static const char *sc_type_name(const sc_value *v) {
     case V_NIL: return "nil";       case V_BOOL: return "a true/false";
     case V_NUM: return "a number";  case V_STR: return "a string";
     case V_VEC: return "a vec2";    case V_ENT: return "an entity";
-    case V_LIST: return "a list";   default: return "a component";
+    case V_LIST: return "a list";
+    case V_OBJ: {                                    /* "a Point": a few at a time can be in one message */
+        static char names[4][80];
+        static int next;
+        char *b = names[next++ & 3];
+        snprintf(b, sizeof(names[0]), "%s %s", sc_vowel(v->as.o->cls->name[0]) ? "an" : "a", v->as.o->cls->name);
+        return b;
+    }
+    default: return "a component";
     }
 }
 
@@ -1563,6 +2235,26 @@ static void sc_append(sc_vm *vm, char *buf, size_t size, const sc_value *v, int 
         }
         strncat(buf, "]", size - strlen(buf) - 1);
         break;
+    case V_OBJ: {                                    /* Point(x: 1, y: 2): every field, inherited ones first */
+        const sc_object *o = v->as.o;
+        const sc_class *chain[64];
+        int depth_n = 0, c, k, shown = 0;
+        const sc_class *cl;
+        if (depth > 3) { snprintf(p, left, "%s(...)", o->cls->name); break; }
+        snprintf(p, left, "%s(", o->cls->name);
+        for (cl = o->cls; cl && depth_n < 64; cl = cl->parent) chain[depth_n++] = cl;
+        for (c = depth_n - 1; c >= 0; --c)
+            for (k = 0; k < chain[c]->member_count; ++k) {
+                const sc_member *m = &chain[c]->members[k];
+                if (m->fn || m->is_static || m->slot < 0 || (uint32_t)m->slot >= o->count) continue;
+                if (shown++) strncat(buf, ", ", size - strlen(buf) - 1);
+                strncat(buf, m->name, size - strlen(buf) - 1);
+                strncat(buf, ": ", size - strlen(buf) - 1);
+                sc_append(vm, buf, size, &o->fields[m->slot], depth + 1);
+            }
+        strncat(buf, ")", size - strlen(buf) - 1);
+        break;
+    }
     default: break;
     }
 }
@@ -1586,6 +2278,13 @@ static bool sc_equal(const sc_value *a, const sc_value *b) {
     case V_ENT: return a->as.e == b->as.e;
     case V_LIST: return a->as.l == b->as.l;
     case V_COMP: return a->as.comp.e == b->as.comp.e && a->as.comp.c == b->as.comp.c;
+    case V_OBJ: {                                    /* structs: the same fields; class objects: the same object */
+        uint32_t i;
+        if (a->as.o == b->as.o) return true;
+        if (!a->as.o->cls->is_struct || a->as.o->cls != b->as.o->cls) return false;
+        for (i = 0; i < a->as.o->count; ++i) if (!sc_equal(&a->as.o->fields[i], &b->as.o->fields[i])) return false;
+        return true;
+    }
     default: return false;
     }
 }
@@ -1598,8 +2297,11 @@ static bool sc_value_is(const sc_value *v, sc_ty ty) {
     case TY_NONE: case TY_ANY: return true;
     case TY_NIL: return v->t == V_NIL;
     case TY_BOOL: return v->t == V_BOOL;
-    case TY_INT: return v->t == V_NUM && v->as.n == floor(v->as.n);
-    case TY_NUM: return v->t == V_NUM;
+    case TY_INT: return v->t == V_NUM && v->as.n == floor(v->as.n) && (!(ty.flags & TYF_UNSIGNED) || v->as.n >= 0);
+    case TY_NUM: return v->t == V_NUM && (!(ty.flags & TYF_UNSIGNED) || v->as.n >= 0);
+    case TY_OBJ:
+        if (v->t == V_NIL) return !ty.cls->is_struct;
+        return v->t == V_OBJ && sc_derives(v->as.o->cls, ty.cls);
     case TY_STR: return v->t == V_STR;
     case TY_VEC: return v->t == V_VEC;
     case TY_ENT: return v->t == V_ENT || v->t == V_NIL;
@@ -1607,7 +2309,7 @@ static bool sc_value_is(const sc_value *v, sc_ty ty) {
     case TY_LIST:
         if (v->t != V_LIST) return false;
         if (ty.elem == TY_NONE) return true;
-        for (i = 0; i < v->as.l->count; ++i) if (!sc_value_is(&v->as.l->items[i], sc_ty_make(ty.elem, 0))) return false;
+        for (i = 0; i < v->as.l->count; ++i) if (!sc_value_is(&v->as.l->items[i], sc_elem_ty(ty))) return false;
         return true;
     default: return false;
     }
@@ -1619,10 +2321,12 @@ static sc_value sc_default(sc_vm *vm, sc_ty ty, int line);
 static void sc_check_value(sc_vm *vm, sc_ty ty, const sc_value *v, int line, const char *what) {
     char tn[32];
     if (sc_value_is(v, ty)) return;
+    if (sc_numeric(ty.t) && (ty.flags & TYF_UNSIGNED) && v->t == V_NUM && v->as.n < 0)
+        sc_fail(vm, line, "%s is unsigned, and %g is below 0", what, v->as.n);
     if (ty.t == TY_INT && v->t == V_NUM) sc_fail(vm, line, "%s is an int, and %g isn't a whole number", what, v->as.n);
+    if (ty.t == TY_OBJ && v->t == V_NIL) sc_fail(vm, line, "%s is %s %s, a struct, so it can't be nil", what, sc_ty_article(ty), ty.cls->name);
     if (ty.t == TY_LIST && v->t == V_LIST) sc_fail(vm, line, "%s is a %s, and this list holds something else", what, sc_ty_name(ty, tn, sizeof(tn)));
-    sc_fail(vm, line, "%s is %s %s, so it can't hold %s", what, ty.t == TY_INT || ty.t == TY_ENT || ty.t == TY_ANY ? "an" : "a",
-            sc_ty_name(ty, tn, sizeof(tn)), sc_type_name(v));
+    sc_fail(vm, line, "%s is %s %s, so it can't hold %s", what, sc_ty_article(ty), sc_ty_name(ty, tn, sizeof(tn)), sc_type_name(v));
 }
 
 static double sc_need_num(sc_vm *vm, const sc_value *v, int line, const char *what) {
@@ -1635,6 +2339,21 @@ static int sc_exec(sc_vm *vm, sc_node *n);
 static sc_value sc_get_member(sc_vm *vm, const sc_value *obj, const char *name, int line);
 static void sc_set_member(sc_vm *vm, const sc_value *obj, const char *name, const sc_value *val, int line);
 static sc_value sc_call_func(sc_vm *vm, sc_instance *inst, int fn, const sc_value *args, int argc, int line);
+static sc_value sc_invoke(sc_vm *vm, sc_instance *inst, const sc_func *f, const sc_value *self_obj, const sc_value *args, int argc, int line);
+
+/* Structs are values: storing one (in a variable, a field, a list, a
+ * parameter) stores a copy, so every place owns its own. Class objects
+ * are shared. */
+static sc_value sc_own(sc_vm *vm, sc_value v, int line) {
+    sc_object *o, *c;
+    uint32_t i;
+    if (v.t != V_OBJ || !v.as.o->cls->is_struct) return v;
+    o = v.as.o;
+    if (!(c = sc_object_alloc(&vm->rt->heap, o->cls, o->count))) sc_fail(vm, line, "out of memory");
+    for (i = 0; i < o->count; ++i) c->fields[i] = sc_own(vm, o->fields[i], line);
+    v.as.o = c;
+    return v;
+}
 
 static sc_value sc_arith(sc_vm *vm, int op, sc_value a, sc_value b, int line) {
     if (op == T_PLUS && (a.t == V_STR || b.t == V_STR)) {            /* "score: " + 5 */
@@ -1678,6 +2397,7 @@ static sc_value sc_arith(sc_vm *vm, int op, sc_value a, sc_value b, int line) {
         if (a.as.l->count) memcpy(l->items, a.as.l->items, sizeof(sc_value) * a.as.l->count);
         if (b.as.l->count) memcpy(l->items + a.as.l->count, b.as.l->items, sizeof(sc_value) * b.as.l->count);
         l->count = l->cap = n;
+        { uint32_t i; for (i = 0; i < n; ++i) l->items[i] = sc_own(vm, l->items[i], line); }   /* structs: copies */
         r.t = V_LIST;
         r.as.l = l;
         return r;
@@ -1708,8 +2428,11 @@ static sc_value *sc_local(sc_vm *vm, int slot) { return &vm->stack[vm->base + sl
 
 static sc_value sc_new_list(sc_vm *vm, int line);
 
+static sc_value sc_new_object(sc_vm *vm, sc_class *c, int line);
+
 static sc_value sc_default(sc_vm *vm, sc_ty ty, int line) {
     switch (ty.t) {
+    case TY_OBJ: return ty.cls->is_struct ? sc_new_object(vm, ty.cls, line) : sc_nil();   /* a struct with its fields' starting values */
     case TY_INT: case TY_NUM: return sc_num(0);
     case TY_BOOL: return sc_bool(false);
     case TY_STR: return sc_string(vm, "", 0);
@@ -1737,8 +2460,89 @@ static sc_value sc_index_get(sc_vm *vm, sc_value obj, sc_value ix, int line) {
     return sc_nil();
 }
 
+/* An object with every field at its starting value, the parent's fields first (init() isn't called). */
+static sc_value sc_new_object(sc_vm *vm, sc_class *c, int line) {
+    const sc_class *chain[64];
+    const sc_class *saved_cls = vm->cls;
+    bool saved_init = vm->in_init;
+    sc_class *cl;
+    sc_object *o;
+    sc_value v = sc_nil();
+    int n = 0, i, k;
+    if (vm->depth >= SC_MAX_DEPTH) sc_fail(vm, line, "too many nested calls (endless recursion?)");
+    if (!(o = sc_object_alloc(&vm->rt->heap, c, (uint32_t)c->field_count))) sc_fail(vm, line, "out of memory");
+    v.t = V_OBJ;
+    v.as.o = o;
+    for (cl = c; cl && n < 64; cl = cl->parent) chain[n++] = cl;
+    vm->depth++;
+    for (i = n - 1; i >= 0; --i) {
+        vm->cls = chain[i];
+        vm->in_init = false;
+        for (k = 0; k < chain[i]->member_count; ++k) {
+            const sc_member *m = &chain[i]->members[k];
+            sc_value fv;
+            if (m->fn || m->is_static) continue;
+            fv = m->init ? sc_own(vm, sc_eval(vm, m->init), m->line) : sc_default(vm, m->ty, m->line);
+            if (m->ty.t && m->init) sc_check_value(vm, m->ty, &fv, m->line, m->name);
+            o->fields[m->slot] = fv;
+        }
+    }
+    vm->depth--;
+    vm->cls = saved_cls;
+    vm->in_init = saved_init;
+    return v;
+}
+
+/* Point(1, 2): a new object, then its init() (or, a struct without one, its fields in order). */
+static sc_value sc_construct(sc_vm *vm, sc_class *c, const sc_value *args, int argc, int line) {
+    sc_value v = sc_new_object(vm, c, line);
+    sc_member *init = sc_class_member(c, "init");
+    int i, k;
+    if (init && init->fn && init->fn->is_init) {
+        sc_invoke(vm, vm->inst, init->fn, &v, args, argc, line);
+        return v;
+    }
+    if (argc && !c->is_struct) sc_fail(vm, line, "%s has no init(), so %s() takes no arguments", c->name, c->name);
+    for (i = 0, k = 0; i < c->member_count && k < argc; ++i) {
+        const sc_member *m = &c->members[i];
+        char what[96];
+        if (m->fn || m->is_static) continue;
+        snprintf(what, sizeof(what), "%s's field '%s'", c->name, m->name);
+        if (m->ty.t) sc_check_value(vm, m->ty, &args[k], line, what);
+        v.as.o->fields[m->slot] = sc_own(vm, args[k], line);
+        k++;
+    }
+    if (k < argc) sc_fail(vm, line, "%s() takes up to %d arguments (its fields), not %d", c->name, k, argc);
+    return v;
+}
+
+/* A member of an object, as the running code may use it. `hint`: the field the type checker found. */
+static sc_member *sc_obj_member(sc_vm *vm, const sc_object *o, const char *name, sc_member *hint, bool call, int line) {
+    sc_member *m = !call && hint && !hint->fn && sc_derives(o->cls, hint->owner) ? hint : sc_class_member(o->cls, name);
+    if (!m) {
+        if (call) sc_fail(vm, line, "%s has no function %s()", o->cls->name, name);
+        sc_fail(vm, line, "%s has no member '%s'", o->cls->name, name);
+    }
+    if (!sc_can_access(vm->cls, m)) sc_fail(vm, line, "'%s' is %s in %s", name, sc_access_word(m->access), m->owner->name);
+    if (call && !m->fn) sc_fail(vm, line, "'%s' is a field of %s, not a function", name, o->cls->name);
+    if (!call && m->fn) sc_fail(vm, line, "%s() is a function: call it with ()", name);
+    return m;
+}
+
+static sc_value *sc_field_ref(sc_member *m, const sc_object *o) {
+    return m->is_static ? &m->owner->statics[m->slot] : &o->fields[m->slot];
+}
+
+static void sc_store_field(sc_vm *vm, sc_member *m, const sc_object *o, sc_value val, int line) {
+    if (m->is_const && !(vm->in_init && vm->cls == m->owner && !m->is_static))
+        sc_fail(vm, line, "'%s' is const: only %s's init() can set it", m->name, m->owner->name);
+    if (m->ty.t) sc_check_value(vm, m->ty, &val, line, m->name);
+    *sc_field_ref(m, o) = val;
+}
+
 /* Stores `val` into the place `target` describes (a variable, a property, a list item). */
 static void sc_assign(sc_vm *vm, sc_node *target, sc_value val) {
+    val = sc_own(vm, val, target->line);
     switch (target->kind) {
     case N_NAME:
         if (target->ty.t) sc_check_value(vm, target->ty, &val, target->line, target->name);
@@ -1746,7 +2550,14 @@ static void sc_assign(sc_vm *vm, sc_node *target, sc_value val) {
         else vm->inst->globals[target->index] = val;
         return;
     case N_MEMBER: {
-        sc_value obj = sc_eval(vm, target->a);
+        sc_value obj;
+        if (target->a->kind == N_CLASSREF) { sc_store_field(vm, target->mem, NULL, val, target->line); return; }   /* Counter.total = 0 */
+        obj = sc_eval(vm, target->a);
+        if (obj.t == V_OBJ) {
+            sc_member *m = sc_obj_member(vm, obj.as.o, target->name, target->mem, false, target->line);
+            sc_store_field(vm, m, obj.as.o, val, target->line);
+            return;
+        }
         if (obj.t == V_VEC) {                                    /* a copy: change it, store it back */
             if (strcmp(target->name, "x") == 0) obj.as.v.x = sc_need_num(vm, &val, target->line, "x");
             else if (strcmp(target->name, "y") == 0) obj.as.v.y = sc_need_num(vm, &val, target->line, "y");
@@ -1779,6 +2590,7 @@ static sc_value sc_eval_call(sc_vm *vm, sc_node *n) {
     if (n->count > 16) sc_fail(vm, n->line, "too many arguments");
     for (i = 0; i < n->count; ++i) args[i] = sc_eval(vm, n->items[i]);
     if (n->ref == REF_FUNC) return sc_call_func(vm, vm->inst, n->index, args, n->count, n->line);
+    if (n->ref == REF_CLASS) return sc_construct(vm, n->cls, args, n->count, n->line);
     return sc_builtin_at(n->index)->fn(vm, args, n->count, n->line);
 }
 
@@ -1788,10 +2600,20 @@ static sc_instance *sc_instance_of(sc_runtime *rt, br_entity e) {
 }
 
 static sc_value sc_eval_method(sc_vm *vm, sc_node *n) {
-    sc_value obj = sc_eval(vm, n->a), args[16];
+    sc_value obj, args[16];
     sc_instance *target;
     int i, fn;
     if (n->count > 16) sc_fail(vm, n->line, "too many arguments");
+    if (n->a->kind == N_CLASSREF) {                              /* Counter.reset(): static */
+        for (i = 0; i < n->count; ++i) args[i] = sc_eval(vm, n->items[i]);
+        return sc_invoke(vm, vm->inst, n->mem->fn, NULL, args, n->count, n->line);
+    }
+    obj = sc_eval(vm, n->a);
+    if (obj.t == V_OBJ) {                                        /* the object's own class's version: overrides win */
+        sc_member *m = sc_obj_member(vm, obj.as.o, n->name, NULL, true, n->line);
+        for (i = 0; i < n->count; ++i) args[i] = sc_eval(vm, n->items[i]);
+        return sc_invoke(vm, vm->inst, m->fn, m->is_static ? NULL : &obj, args, n->count, n->line);
+    }
     if (obj.t != V_ENT) sc_fail(vm, n->line, "%s has no function %s()", sc_type_name(&obj), n->name);
     target = sc_instance_of(vm->rt, obj.as.e);
     if (!target || !target->prog || target->failed || !target->ready)
@@ -1810,6 +2632,15 @@ static sc_value sc_eval(sc_vm *vm, sc_node *n) {
     case N_FALSE: return sc_bool(false);
     case N_NIL: return sc_nil();
     case N_SELF: return sc_ent(vm->inst->e);
+    case N_THIS: return *sc_local(vm, 0);
+    case N_CLASSREF: sc_fail(vm, n->line, "%s is a class, not a value", n->cls->name); break;
+    case N_SUPER: {                                              /* super.speak(): the parent's version, on this */
+        sc_value self_obj = *sc_local(vm, 0), args[16];
+        int i;
+        if (n->count > 16) sc_fail(vm, n->line, "too many arguments");
+        for (i = 0; i < n->count; ++i) args[i] = sc_eval(vm, n->items[i]);
+        return sc_invoke(vm, vm->inst, n->mem->fn, &self_obj, args, n->count, n->line);
+    }
     case N_NAME: return n->ref == REF_LOCAL ? *sc_local(vm, n->index) : vm->inst->globals[n->index];
     case N_LIST: {
         sc_list *l = sc_list_alloc(&vm->rt->heap);
@@ -1821,7 +2652,7 @@ static sc_value sc_eval(sc_vm *vm, sc_node *n) {
         if (n->count) {
             if (!(l->items = (sc_value *)br_alloc(sizeof(sc_value) * (size_t)n->count))) sc_fail(vm, n->line, "out of memory");
             l->cap = (uint32_t)n->count;
-            for (i = 0; i < n->count; ++i) { l->items[i] = sc_eval(vm, n->items[i]); l->count++; }
+            for (i = 0; i < n->count; ++i) { l->items[i] = sc_own(vm, sc_eval(vm, n->items[i]), n->line); l->count++; }
         }
         return v;
     }
@@ -1842,7 +2673,13 @@ static sc_value sc_eval(sc_vm *vm, sc_node *n) {
     }
     case N_CALL: return sc_eval_call(vm, n);
     case N_METHOD: return sc_eval_method(vm, n);
-    case N_MEMBER: { sc_value o = sc_eval(vm, n->a); return sc_get_member(vm, &o, n->name, n->line); }
+    case N_MEMBER: {
+        sc_value o;
+        if (n->a->kind == N_CLASSREF) return n->mem->owner->statics[n->mem->slot];     /* Counter.total */
+        o = sc_eval(vm, n->a);
+        if (o.t == V_OBJ) return *sc_field_ref(sc_obj_member(vm, o.as.o, n->name, n->mem, false, n->line), o.as.o);
+        return sc_get_member(vm, &o, n->name, n->line);
+    }
     case N_INDEX: { sc_value o = sc_eval(vm, n->a), ix = sc_eval(vm, n->b); return sc_index_get(vm, o, ix, n->line); }
     default: sc_fail(vm, n->line, "internal error: not an expression");
     }
@@ -1862,7 +2699,7 @@ static int sc_exec(sc_vm *vm, sc_node *n) {
     case N_BLOCK: return sc_exec_block(vm, n);
     case N_EXPR: sc_eval(vm, n->a); return FLOW_NORMAL;
     case N_VAR: {
-        sc_value v = n->a ? sc_eval(vm, n->a) : sc_default(vm, n->ty, n->line);   /* first: a call may move the stack */
+        sc_value v = n->a ? sc_own(vm, sc_eval(vm, n->a), n->line) : sc_default(vm, n->ty, n->line);   /* first: a call may move the stack */
         if (n->ty.t && n->a) sc_check_value(vm, n->ty, &v, n->line, n->name);
         *sc_local(vm, n->index) = v;
         return FLOW_NORMAL;
@@ -1908,8 +2745,9 @@ static int sc_exec(sc_vm *vm, sc_node *n) {
         *sc_local(vm, n->c->index) = seq;                         /* keeps the list alive */
         for (i = 0; i < seq.as.l->count; ++i) {
             int flow;
-            if (n->ty.t) sc_check_value(vm, n->ty, &seq.as.l->items[i], n->line, "the loop variable");
-            *sc_local(vm, n->index) = seq.as.l->items[i];
+            sc_value item = sc_own(vm, seq.as.l->items[i], n->line);
+            if (n->ty.t) sc_check_value(vm, n->ty, &item, n->line, "the loop variable");
+            *sc_local(vm, n->index) = item;
             flow = sc_exec(vm, n->b);
             if (flow == FLOW_BREAK) break;
             if (flow == FLOW_RETURN) return flow;
@@ -1924,12 +2762,15 @@ static int sc_exec(sc_vm *vm, sc_node *n) {
     return FLOW_NORMAL;
 }
 
-static sc_value sc_call_func(sc_vm *vm, sc_instance *inst, int fn, const sc_value *args, int argc, int line) {
-    const sc_func *f = &inst->prog->funcs[fn];
+/* Runs a function: a plain one (self_obj NULL) or a method (on self_obj, its `this`). */
+static sc_value sc_invoke(sc_vm *vm, sc_instance *inst, const sc_func *f, const sc_value *self_obj, const sc_value *args, int argc, int line) {
     sc_instance *saved_inst = vm->inst;
-    int saved_base = vm->base, saved_top = vm->top, i;
-    sc_value result;
+    const sc_class *saved_cls = vm->cls;
+    bool saved_init = vm->in_init;
+    int saved_base = vm->base, saved_top = vm->top, i, off = f->has_this ? 1 : 0;
+    sc_value result, self_v = self_obj ? *self_obj : sc_nil();          /* (copied: the stack may move) */
     if (vm->depth >= SC_MAX_DEPTH) sc_fail(vm, line, "too many nested calls (endless recursion?)");
+    if (off && self_v.t != V_OBJ) sc_fail(vm, line, "%s() needs an object to run on", f->name);
     if (vm->top + f->locals > vm->cap) {
         int cap = vm->cap ? vm->cap * 2 : 256;
         sc_value *g;
@@ -1940,12 +2781,16 @@ static sc_value sc_call_func(sc_vm *vm, sc_instance *inst, int fn, const sc_valu
     }
     vm->base = vm->top;
     vm->top += f->locals;
-    for (i = 0; i < f->locals; ++i) vm->stack[vm->base + i] = i < argc && i < f->params ? args[i] : sc_nil();
+    for (i = 0; i < f->locals; ++i) vm->stack[vm->base + i] = sc_nil();
+    if (off) vm->stack[vm->base] = self_v;
+    for (i = 0; i < f->params && i < argc; ++i) vm->stack[vm->base + off + i] = sc_own(vm, args[i], line);
     vm->inst = inst;
+    vm->cls = f->cls;
+    vm->in_init = f->is_init;
     for (i = 0; i < f->params; ++i) {                          /* typed parameters */
         sc_ty ty = f->param_ty[i];
         if (!ty.t) continue;
-        if (i >= argc) { sc_value d = sc_default(vm, ty, line); vm->stack[vm->base + i] = d; continue; }
+        if (i >= argc) { sc_value d = sc_default(vm, ty, line); vm->stack[vm->base + off + i] = d; continue; }
         {
             char what[96];
             snprintf(what, sizeof(what), "%s()'s parameter '%s'", f->name, f->param_names[i]);
@@ -1954,7 +2799,7 @@ static sc_value sc_call_func(sc_vm *vm, sc_instance *inst, int fn, const sc_valu
     }
     vm->depth++;
     vm->ret = sc_nil();
-    result = sc_exec(vm, f->body) == FLOW_RETURN ? vm->ret : sc_nil();
+    result = sc_exec(vm, f->body) == FLOW_RETURN ? sc_own(vm, vm->ret, line) : sc_nil();
     if (f->ret.t && f->ret.t != TY_VOID) {
         char what[96];
         snprintf(what, sizeof(what), "what %s() returns", f->name);
@@ -1962,9 +2807,15 @@ static sc_value sc_call_func(sc_vm *vm, sc_instance *inst, int fn, const sc_valu
     }
     vm->depth--;
     vm->inst = saved_inst;
+    vm->cls = saved_cls;
+    vm->in_init = saved_init;
     vm->base = saved_base;
     vm->top = saved_top;
     return result;
+}
+
+static sc_value sc_call_func(sc_vm *vm, sc_instance *inst, int fn, const sc_value *args, int argc, int line) {
+    return sc_invoke(vm, inst, &inst->prog->funcs[fn], NULL, args, argc, line);
 }
 
 /* ======================================================================== */
@@ -2190,6 +3041,7 @@ static void sc_set_member(sc_vm *vm, const sc_value *obj, const char *name, cons
         if (other && other->prog && other->ready && !other->failed) {
             int g = sc_find_global(other->prog, name);
             if (g >= 0) {
+                if (other->prog->globals[g].is_const) sc_fail(vm, line, "%s is const, so it can't be changed", name);
                 if (other->prog->globals[g].ty.t) sc_check_value(vm, other->prog->globals[g].ty, val, line, name);
                 other->globals[g] = *val;
                 return;
@@ -2288,6 +3140,7 @@ static sc_value bi_rgb(ARGS) {
 
 /* ---- lists ---- */
 static void sc_list_push(sc_vm *vm, sc_list *l, sc_value v, int line) {
+    v = sc_own(vm, v, line);                                     /* (a struct: the list's own copy) */
     if (l->count == l->cap) {
         uint32_t cap = l->cap ? l->cap * 2 : 8;
         sc_value *g = (sc_value *)br_realloc(l->items, sizeof(sc_value) * cap);
@@ -2951,6 +3804,7 @@ static const char *sc_write_value(sc_text *t, const sc_value *v, int depth) {
         return NULL;
     case V_ENT: return "an entity";
     case V_COMP: return "a component";
+    case V_OBJ: return "a struct or class object (save its fields instead)";
     default: return "something unknown";
     }
 }
@@ -3267,8 +4121,11 @@ static sc_program *sc_load(sc_runtime *rt, const char *file) {
     prog->modified = modified;
     if (i < rt->program_count) {
         int k;
-        bool used = false;                             /* the old version may still be running */
+        bool used = false;                             /* the old version may still be running, or have objects about */
+        sc_obj *o;
         for (k = 0; k < rt->instance_count; ++k) used |= rt->instances[k]->prog == rt->programs[i];
+        for (o = rt->heap.objects; o && !used; o = o->next)
+            used = o->kind == OBJ_OBJECT && ((sc_object *)o)->cls->prog == rt->programs[i];
         if (!used) { sc_program_free(rt->programs[i]); rt->programs[i] = prog; return prog; }
         rt->programs[i]->path[0] = 0;                  /* keep it for those, but don't find it again */
     }
@@ -3365,7 +4222,10 @@ static void sc_apply_vars(sc_runtime *rt, sc_instance *inst, const char *vars) {
     sc_report(rt, msg);
 }
 
-/* Runs `fn` (or the variable initialisers, fn == -1) safely: an error stops this script only. */
+enum { SC_RUN_GLOBALS = -1, SC_RUN_STATICS = -2 };
+
+/* Runs `fn` (or the variables' starting values, SC_RUN_GLOBALS, or the
+ * classes' static fields', SC_RUN_STATICS) safely: an error stops this script only. */
 static bool sc_run(sc_runtime *rt, sc_instance *inst, int fn, const sc_value *args, int argc, sc_value *result) {
     sc_vm vm;
     jmp_buf jb;
@@ -3377,11 +4237,25 @@ static bool sc_run(sc_runtime *rt, sc_instance *inst, int fn, const sc_value *ar
     vm.fail = &jb;
     rt->busy++;
     if (setjmp(jb) == 0) {
-        if (fn < 0) {
+        if (fn == SC_RUN_STATICS) {
+            int i, k;
+            for (i = 0; i < inst->prog->class_count; ++i) {
+                sc_class *c = inst->prog->classes[i];
+                vm.cls = c;
+                for (k = 0; k < c->member_count; ++k) {
+                    const sc_member *m = &c->members[k];
+                    sc_value v;
+                    if (m->fn || !m->is_static) continue;
+                    v = m->init ? sc_own(&vm, sc_eval(&vm, m->init), m->line) : sc_default(&vm, m->ty, m->line);
+                    if (m->ty.t && m->init) sc_check_value(&vm, m->ty, &v, m->line, m->name);
+                    c->statics[m->slot] = v;
+                }
+            }
+        } else if (fn < 0) {
             int i;
             for (i = 0; i < inst->prog->global_count; ++i) {
                 const sc_global *g = &inst->prog->globals[i];
-                sc_value v = g->init ? sc_eval(&vm, g->init) : sc_default(&vm, g->ty, g->line);
+                sc_value v = g->init ? sc_own(&vm, sc_eval(&vm, g->init), g->line) : sc_default(&vm, g->ty, g->line);
                 if (g->ty.t && g->init) sc_check_value(&vm, g->ty, &v, g->line, g->name);
                 inst->globals[i] = v;
             }
@@ -3408,7 +4282,11 @@ static void sc_make_ready(sc_runtime *rt, sc_instance *inst, const br_script *s)
     if (inst->ready) return;
     inst->ready = true;
     if (inst->failed || inst->beh) return;
-    if (!sc_run(rt, inst, -1, NULL, 0, NULL)) return;
+    if (!inst->prog->statics_ready) {                          /* once per file (and world): the classes' static fields */
+        inst->prog->statics_ready = true;
+        if (!sc_run(rt, inst, SC_RUN_STATICS, NULL, 0, NULL)) return;
+    }
+    if (!sc_run(rt, inst, SC_RUN_GLOBALS, NULL, 0, NULL)) return;
     if (s->vars[0]) sc_apply_vars(rt, inst, s->vars);
 }
 
@@ -3430,6 +4308,13 @@ static void sc_collect(sc_runtime *rt) {
         const sc_instance *inst = rt->instances[i];
         if (inst->prog && inst->globals)
             for (k = 0; k < inst->prog->global_count; ++k) sc_mark_value(&inst->globals[k]);
+    }
+    for (i = 0; i < rt->program_count; ++i) {                  /* static fields */
+        const sc_program *p = rt->programs[i];
+        for (k = 0; k < p->class_count; ++k) {
+            int s;
+            for (s = 0; s < p->classes[k]->static_count; ++s) sc_mark_value(&p->classes[k]->statics[s]);
+        }
     }
     sc_sweep(&rt->heap);
 }

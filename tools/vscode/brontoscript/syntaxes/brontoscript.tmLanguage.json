@@ -16,6 +16,9 @@
    "include": "#annotation"
   },
   {
+   "include": "#class-def"
+  },
+  {
    "include": "#type"
   },
   {
@@ -98,7 +101,7 @@
     "3": {
      "patterns": [
       {
-       "match": "(:)\\s*([A-Za-z_]\\w*)(?:\\s*\\[\\s*([A-Za-z_]\\w*)\\s*\\])?",
+       "match": "(:)\\s*((?:unsigned\\s+)?[A-Za-z_]\\w*)(?:\\s*\\[\\s*((?:unsigned\\s+)?[A-Za-z_]\\w*)\\s*\\])?",
        "captures": {
         "1": {
          "name": "punctuation.separator.type.brontoscript"
@@ -120,7 +123,7 @@
    }
   },
   "var-def": {
-   "match": "\\b(var)\\s+([A-Za-z_]\\w*)",
+   "match": "\\b(var|const(?:\\s+var)?)\\s+([A-Za-z_]\\w*)",
    "captures": {
     "1": {
      "name": "storage.type.brontoscript"
@@ -142,7 +145,11 @@
     },
     {
      "name": "storage.type.brontoscript",
-     "match": "\\b(?:var|func)\\b"
+     "match": "\\b(?:var|func|const|struct|class)\\b"
+    },
+    {
+     "name": "storage.modifier.brontoscript",
+     "match": "\\b(?:public|private|protected|static|override|unsigned)\\b"
     }
    ]
   },
@@ -155,8 +162,16 @@
    "match": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b|\\B\\.\\d+\\b"
   },
   "self": {
-   "name": "variable.language.self.brontoscript",
-   "match": "\\bself\\b"
+   "patterns": [
+    {
+     "name": "variable.language.self.brontoscript",
+     "match": "\\bself\\b"
+    },
+    {
+     "name": "variable.language.this.brontoscript",
+     "match": "\\b(?:this|super)\\b"
+    }
+   ]
   },
   "member": {
    "patterns": [
@@ -245,7 +260,7 @@
   "type": {
    "patterns": [
     {
-     "match": "(->)\\s*([A-Za-z_]\\w*)(?:\\s*\\[\\s*([A-Za-z_]\\w*)\\s*\\])?",
+     "match": "(->)\\s*((?:unsigned\\s+)?[A-Za-z_]\\w*)(?:\\s*\\[\\s*((?:unsigned\\s+)?[A-Za-z_]\\w*)\\s*\\])?",
      "captures": {
       "1": {
        "name": "keyword.operator.arrow.brontoscript"
@@ -259,7 +274,7 @@
      }
     },
     {
-     "match": "(:)(?!=)\\s*([A-Za-z_]\\w*)(?:\\s*\\[\\s*([A-Za-z_]\\w*)\\s*\\])?",
+     "match": "(:)(?!=)\\s*((?:unsigned\\s+)?[A-Za-z_]\\w*)(?:\\s*\\[\\s*((?:unsigned\\s+)?[A-Za-z_]\\w*)\\s*\\])?",
      "captures": {
       "1": {
        "name": "punctuation.separator.type.brontoscript"
@@ -277,6 +292,23 @@
      "name": "keyword.operator.assignment.infer.brontoscript"
     }
    ]
+  },
+  "class-def": {
+   "match": "\\b(struct|class)\\s+([A-Za-z_]\\w*)(?:\\s*(:)\\s*([A-Za-z_]\\w*))?",
+   "captures": {
+    "1": {
+     "name": "storage.type.brontoscript"
+    },
+    "2": {
+     "name": "entity.name.type.class.brontoscript"
+    },
+    "3": {
+     "name": "punctuation.separator.inheritance.brontoscript"
+    },
+    "4": {
+     "name": "entity.other.inherited-class.brontoscript"
+    }
+   }
   }
  }
 }

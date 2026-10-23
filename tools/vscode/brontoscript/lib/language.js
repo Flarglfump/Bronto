@@ -11,38 +11,72 @@ const KEYWORDS = data.keywords;
 const COMPONENTS = data.components;
 const TYPES = new Map((data.types || []).map(t => [t.name, t]));
 const STRING_ARGS = data.string_args || { lists: {}, args: {} };
-const TYPE_RE = '[A-Za-z_]\\w*(?:\\s*\\[\\s*[A-Za-z_]\\w*\\s*\\])?';
+const TYPE_RE = '(?:unsigned\\s+)?[A-Za-z_]\\w*(?:\\s*\\[\\s*(?:unsigned\\s+)?[A-Za-z_]\\w*\\s*\\])?';
+const MODIFIERS_RE = '(?:(?:public|private|protected|static|override)\\s+)*';
+// Words that only declare things at the top of a file or in a struct or class.
+const DECLARING = new Set(['func', 'class', 'struct', 'public', 'private', 'protected', 'static', 'override', 'unsigned']);
+
+// "list [ unsigned  int ]" -> "list[unsigned int]"
+function normType(t) { return t ? t.trim().replace(/\s*\[\s*/g, '[').replace(/\s*\]/g, ']').replace(/\s+/g, ' ') : ''; }
 
 // "amount: int" -> { name: 'amount', type: 'int' }
 function splitParam(p) {
     const m = /^\s*([A-Za-z_]\w*)\s*(?::\s*(.+?))?\s*$/.exec(p);
-    return m ? { name: m[1], type: m[2] ? m[2].replace(/\s+/g, '') : '' } : { name: p.trim(), type: '' };
+    return m ? { name: m[1], type: normType(m[2]) } : { name: p.trim(), type: '' };
 }
 function paramText(p) { return p.type ? p.name + ': ' + p.type : p.name; }
 function funcHead(f) { return `func ${f.name}(${f.typedParams.map(paramText).join(', ')})` + (f.returns ? ' -> ' + f.returns : ''); }
 
 // ---- the file's own declarations ------------------------------------------
 
-// Top-level vars and funcs, with the comment lines just above each (their docs).
+// Top-level vars, consts, funcs, structs and classes (with their members),
+// with the comment lines just above each (their docs).
 function parseDocument(text) {
     const lines = text.split(/\r?\n/);
-    const vars = [], funcs = [];
-    let depth = 0;
+    const vars = [], funcs = [], classes = [];
+    let depth = 0, cls = null;
+    const varRe = new RegExp('^\\s*(var|const(?:\\s+var)?)\\s+([A-Za-z_]\\w*)\\s*(?::\\s*(' + TYPE_RE + '))?\\s*(?:(:?=)\\s*(.*))?$');
+    const funcRe = new RegExp('^\\s*func\\s+([A-Za-z_]\\w*)\\s*\\(([^)]*)\\)\\s*(?:->\\s*(' + TYPE_RE + '))?');
     for (let i = 0; i < lines.length; ++i) {
         const line = stripComment(lines[i]);
         if (depth === 0) {
-            let m = new RegExp('^\\s*var\\s+([A-Za-z_]\\w*)\\s*(?::\\s*(' + TYPE_RE + '))?\\s*(?:(:?=)\\s*(.*))?$').exec(line);
+            cls = null;
+            let m = varRe.exec(line);
             if (m) vars.push({
-                name: m[1], line: i, value: (m[4] || '').trim(), type: m[2] ? m[2].replace(/\s+/g, '') : '', inferred: m[3] === ':=',
+                name: m[2], line: i, value: (m[5] || '').trim(), type: normType(m[3]), inferred: m[4] === ':=', isConst: m[1] !== 'var',
                 doc: commentAbove(lines, i) || trailingComment(lines[i]),
             });
-            m = new RegExp('^\\s*func\\s+([A-Za-z_]\\w*)\\s*\\(([^)]*)\\)\\s*(?:->\\s*(' + TYPE_RE + '))?').exec(line);
+            m = funcRe.exec(line);
             if (m) {
                 const typed = m[2].split(',').map(s => s.trim()).filter(Boolean).map(splitParam);
                 funcs.push({
                     name: m[1], line: i, doc: commentAbove(lines, i),
-                    params: typed.map(p => p.name), typedParams: typed, returns: m[3] ? m[3].replace(/\s+/g, '') : '',
+                    params: typed.map(p => p.name), typedParams: typed, returns: normType(m[3]),
                 });
+            }
+            m = /^\s*(class|struct)\s+([A-Za-z_]\w*)\s*(?::\s*([A-Za-z_]\w*))?/.exec(line);
+            if (m) {
+                cls = { name: m[2], kind: m[1], parent: m[3] || '', line: i, doc: commentAbove(lines, i), members: [] };
+                classes.push(cls);
+            }
+        } else if (depth === 1 && cls) {                    // a member: [modifiers] var / const / func
+            const m = new RegExp('^\\s*(' + MODIFIERS_RE + ')(var|const(?:\\s+var)?|func)\\s+([A-Za-z_]\\w*)(.*)$').exec(line);
+            if (m) {
+                const mods = m[1].trim().split(/\s+/).filter(Boolean);
+                const member = {
+                    name: m[3], line: i, owner: cls.name, doc: commentAbove(lines, i) || trailingComment(lines[i]),
+                    access: mods.find(x => /^(public|private|protected)$/.test(x)) || 'public',
+                    isStatic: mods.includes('static'), isOverride: mods.includes('override'),
+                };
+                if (m[2] === 'func') {
+                    const f = new RegExp('^\\s*\\(([^)]*)\\)\\s*(?:->\\s*(' + TYPE_RE + '))?').exec(m[4]) || ['', '', ''];
+                    const typed = f[1].split(',').map(x => x.trim()).filter(Boolean).map(splitParam);
+                    Object.assign(member, { kind: 'method', params: typed.map(p => p.name), typedParams: typed, returns: normType(f[2]) });
+                } else {
+                    const v = new RegExp('^\\s*(?::\\s*(' + TYPE_RE + '))?\\s*(?:(:?=)\\s*(.*))?$').exec(m[4]) || [];
+                    Object.assign(member, { kind: 'field', isConst: m[2] !== 'var', type: normType(v[1]), value: (v[3] || '').trim(), inferred: v[2] === ':=' });
+                }
+                cls.members.push(member);
             }
         }
         for (const ch of stripStrings(line)) {
@@ -50,7 +84,39 @@ function parseDocument(text) {
             else if (ch === '}') depth = Math.max(0, depth - 1);
         }
     }
-    return { vars, funcs };
+    return { vars, funcs, classes };
+}
+
+// A class's members with the inherited ones (the nearest one of each name first).
+function classMembers(doc, name) {
+    const out = [], seen = new Set();
+    for (let c = doc.classes.find(x => x.name === name), guard = 0; c && guard < 32; c = doc.classes.find(x => x.name === c.parent), ++guard)
+        for (const m of c.members) if (!seen.has(m.name)) { seen.add(m.name); out.push(m); }
+    return out;
+}
+
+// The struct or class whose body a line is in, or null.
+function classAt(doc, lines, lineNo) {
+    let best = null;
+    for (const c of doc.classes) if (c.line <= lineNo && depthAt(lines, lineNo) >= 1 && (!best || c.line > best.line)) best = c;
+    if (!best) return null;
+    for (let i = best.line + 1; i < lineNo; ++i) if (depthAt(lines, i + 1) === 0) return null;   // it closed before the line
+    return best;
+}
+
+function memberHead(m) {
+    const mods = (m.access !== 'public' ? m.access + ' ' : '') + (m.isStatic ? 'static ' : '') + (m.isOverride ? 'override ' : '');
+    if (m.kind === 'method') return mods + funcHead(m);
+    return mods + (m.isConst ? 'const ' : 'var ') + m.name + (m.type ? ': ' + m.type : '') + (m.value ? (m.inferred ? ' := ' : ' = ') + m.value : '');
+}
+function classHead(c) { return c.kind + ' ' + c.name + (c.parent ? ' : ' + c.parent : ''); }
+
+// Point(1, 2): init()'s parameters, or a struct's fields.
+function constructorParams(doc, c) {
+    const init = classMembers(doc, c.name).find(m => m.kind === 'method' && m.name === 'init');
+    if (init) return init.typedParams;
+    if (c.kind !== 'struct') return [];
+    return c.members.filter(m => m.kind === 'field' && !m.isStatic).map(m => ({ name: m.name, type: m.type }));
 }
 
 // Local variables visible at a line inside a function: params and earlier vars.
@@ -58,17 +124,17 @@ function localsAt(text, lineNo) {
     const lines = text.split(/\r?\n/);
     let start = -1;
     for (let i = Math.min(lineNo, lines.length - 1); i >= 0; --i)
-        if (/^\s*func\s/.test(lines[i])) { start = i; break; }
+        if (new RegExp('^\\s*' + MODIFIERS_RE + 'func\\s').test(lines[i])) { start = i; break; }
     if (start < 0) return [];
     const out = [];
-    const head = /^\s*func\s+\w+\s*\(([^)]*)\)/.exec(lines[start]);
+    const head = new RegExp('^\\s*' + MODIFIERS_RE + 'func\\s+\\w+\\s*\\(([^)]*)\\)').exec(lines[start]);
     if (head) head[1].split(',').map(s => s.trim()).filter(Boolean).map(splitParam)
         .forEach(p => out.push({ name: p.name, kind: 'parameter', type: p.type, line: start }));
     for (let i = start + 1; i <= lineNo && i < lines.length; ++i) {
         const line = stripComment(lines[i]);
         let m;
-        const re = /\bvar\s+([A-Za-z_]\w*)(?:\s*:\s*([A-Za-z_]\w*(?:\[\w+\])?))?/g;
-        while ((m = re.exec(line))) out.push({ name: m[1], kind: 'local', type: m[2] || '', line: i });
+        const re = new RegExp('\\b(?:var|const(?:\\s+var)?)\\s+([A-Za-z_]\\w*)(?:\\s*:\\s*(' + TYPE_RE + '))?', 'g');
+        while ((m = re.exec(line))) out.push({ name: m[1], kind: 'local', type: normType(m[2]), line: i });
         const f = /\bfor\s+([A-Za-z_]\w*)(?:\s*:\s*([A-Za-z_]\w*))?\s+in\b/.exec(line);
         if (f) out.push({ name: f[1], kind: 'local', type: f[2] || '', line: i });
     }
@@ -115,6 +181,7 @@ function completions(text, line, character, otherScripts, assets) {
     if (/(?:(?:^|[^:]):(?!=)|->)\s*\w*$/.test(before) || /\blist\s*\[\s*\w*$/.test(before)) {
         const returning = /->\s*\w*$/.test(before);
         for (const t of TYPES.values()) if (returning || t.name !== 'void') items.push({ label: t.name, kind: 'class', detail: 'type', doc: t.doc });
+        for (const c of parseDocument(text).classes) items.push({ label: c.name, kind: 'class', detail: c.kind, doc: c.doc });
         return items;
     }
     if (/^\s*@\w*$/.test(before)) {
@@ -128,7 +195,24 @@ function completions(text, line, character, otherScripts, assets) {
         for (const f of COMPONENTS[m[1]]) items.push({ label: f, kind: 'field', detail: m[1] + '.' + f });
         return items;
     }
-    // something.|  ->  entity properties, components, vec2 members, other scripts' vars and funcs
+    // this.|  super.|  Counter.|  ->  a struct's or class's members
+    m = /\b(this|super|[A-Z]\w*)\s*\.\s*\w*$/.exec(before);
+    if (m) {
+        const doc = parseDocument(text);
+        const here = classAt(doc, lines, line);
+        let members = null;
+        if (m[1] === 'this' && here) members = classMembers(doc, here.name);
+        else if (m[1] === 'super' && here && here.parent) members = classMembers(doc, here.parent).filter(x => x.kind === 'method' && x.access !== 'private');
+        else if (doc.classes.some(c => c.name === m[1])) members = classMembers(doc, m[1]).filter(x => x.isStatic);
+        if (members) {
+            for (const x of members)
+                items.push(x.kind === 'method'
+                    ? { label: x.name, kind: 'method', detail: memberHead(x) + ' in ' + x.owner, doc: x.doc, snippet: `${x.name}(${placeholders(x.params)})` }
+                    : { label: x.name, kind: 'field', detail: memberHead(x) + ' in ' + x.owner, doc: x.doc });
+            return items;
+        }
+    }
+    // something.|  ->  entity properties, components, vec2 members, other scripts' vars and funcs, objects' members
     if (/\.\s*\w*$/.test(before)) {
         for (const p of data.properties) items.push({ label: p.name, kind: 'property', detail: p.type, doc: p.doc });
         for (const c of Object.keys(COMPONENTS)) items.push({ label: c, kind: 'class', detail: 'component', doc: 'Fields: ' + COMPONENTS[c].join(', ') });
@@ -141,6 +225,13 @@ function completions(text, line, character, otherScripts, assets) {
                 items.push({ label: f.name, kind: 'method', detail: (f.typedParams ? funcHead(f).slice(5) : `${f.name}(${f.params.join(', ')})`) + ` in ${s.name}`, doc: f.doc, snippet: `${f.name}(${placeholders(f.params)})` });
             }
         }
+        for (const c of parseDocument(text).classes)
+            for (const x of c.members) if (!seen.has(x.name) && x.access === 'public' && !x.isStatic && x.name !== 'init') {
+                seen.add(x.name);
+                items.push(x.kind === 'method'
+                    ? { label: x.name, kind: 'method', detail: memberHead(x) + ' in ' + c.name, doc: x.doc, snippet: `${x.name}(${placeholders(x.params)})` }
+                    : { label: x.name, kind: 'field', detail: memberHead(x) + ' in ' + c.name, doc: x.doc });
+            }
         return items;
     }
     // At the top level, a new callback is the likely thing to write.
@@ -150,20 +241,29 @@ function completions(text, line, character, otherScripts, assets) {
         for (const c of data.callbacks)
             if (!doc.funcs.some(f => f.name === c.name))
                 items.push({ label: 'func ' + c.name, kind: 'snippet', detail: c.signature, doc: c.doc, snippet: c.snippet, filter: c.name });
-        items.push({ label: 'var', kind: 'keyword', doc: KEYWORDS.var }, { label: 'func', kind: 'keyword', doc: KEYWORDS.func });
+        for (const k of ['var', 'const', 'func', 'struct', 'class']) items.push({ label: k, kind: 'keyword', doc: KEYWORDS[k] });
         if (!/@strict/.test(text)) items.push({ label: '@strict', kind: 'keyword', doc: KEYWORDS['@strict'] });
         return items;
     }
-    for (const [k, d] of Object.entries(KEYWORDS)) if (k !== 'func' && k[0] !== '@') items.push({ label: k, kind: 'keyword', doc: d });
+    if (depthAt(lines, line) === 1 && classAt(doc, lines, line)) {          // a struct's or class's body: its members
+        for (const k of ['var', 'const', 'func', 'public', 'private', 'protected', 'static', 'override'])
+            items.push({ label: k, kind: 'keyword', doc: KEYWORDS[k] });
+        return items;
+    }
+    for (const [k, d] of Object.entries(KEYWORDS)) if (!DECLARING.has(k) && k[0] !== '@') items.push({ label: k, kind: 'keyword', doc: d });
     for (const b of data.builtins)                 /* the snippet fills in the arguments it needs */
         items.push({ label: b.name, kind: 'function', detail: builtinSignature(b), doc: b.doc, snippet: `${b.name}(${placeholders(b.params.slice(0, b.min))})` });
     for (const v of doc.vars) items.push({ label: v.name, kind: 'variable', detail: varHead(v), doc: v.doc });
     for (const f of doc.funcs) items.push({ label: f.name, kind: 'function', detail: funcHead(f), doc: f.doc, snippet: `${f.name}(${placeholders(f.params)})` });
+    for (const c of doc.classes) {
+        const ps = constructorParams(doc, c);
+        items.push({ label: c.name, kind: 'class', detail: `${c.name}(${ps.map(paramText).join(', ')})`, doc: c.doc, snippet: `${c.name}(${placeholders(ps.map(p => p.name))})` });
+    }
     for (const l of localsAt(text, line)) if (!items.some(i => i.label === l.name)) items.push({ label: l.name, kind: 'variable', detail: l.kind + (l.type ? ': ' + l.type : '') });
     return items;
 }
 
-function varHead(v) { return 'var ' + v.name + (v.type ? ': ' + v.type : '') + (v.value ? (v.inferred ? ' := ' : ' = ') + v.value : ''); }
+function varHead(v) { return (v.isConst ? 'const ' : 'var ') + v.name + (v.type ? ': ' + v.type : '') + (v.value ? (v.inferred ? ' := ' : ' = ') + v.value : ''); }
 
 // "distance(a, b)" -> "distance(a: vec2, b: vec2) -> number"
 function builtinSignature(b) {
@@ -256,8 +356,17 @@ function hover(text, line, character) {
         const p = data.properties.find(x => x.name === w.word);
         if (p) return '`.' + p.name + ': ' + p.type + '`  \n' + p.doc;
         if (COMPONENTS[w.word]) return '**' + w.word + '** component  \nFields: ' + COMPONENTS[w.word].join(', ') + '  \n(nil if the entity doesn\'t have it)';
+        const owner = /\b(this|super|[A-Z]\w*)\s*\.\s*$/.exec(lt.slice(0, w.start));
+        const here = classAt(doc, lines, line);
+        const cname = owner && (owner[1] === 'this' ? here && here.name : owner[1] === 'super' ? here && here.parent : owner[1]);
+        const x = (cname ? classMembers(doc, cname) : doc.classes.flatMap(c => c.members)).find(y => y.name === w.word);
+        if (x) return '```brontoscript\n' + memberHead(x) + '\n```' + (x.doc ? '\n' + x.doc : '') + '\n\n*In ' + x.owner + '*';
     }
     const before = lt.slice(0, w.start);
+    const cls = doc.classes.find(c => c.name === w.word);
+    if (cls) return '```brontoscript\n' + classHead(cls) + '\n```' + (cls.doc ? '\n' + cls.doc : '') +
+        (cls.kind === 'struct' ? '\n\nA struct is a value: storing one stores a copy.' : '\n\nA class object is shared: storing one stores the same object.') +
+        '\n\n' + cls.members.map(m => '`' + memberHead(m) + '`').join('  \n');
     if (TYPES.has(w.word) && /(?::|->|\[)\s*$/.test(before)) return '**' + w.word + '** (a type)  \n' + TYPES.get(w.word).doc;
     if (w.word === 'strict' && /@$/.test(before)) return '**@strict**  \n' + KEYWORDS['@strict'];
     const local = localsAt(text, line).find(l => l.name === w.word);
@@ -287,6 +396,16 @@ function signatureAt(text, line, character) {
                 const m = /([A-Za-z_]\w*)\s*$/.exec(s.slice(0, i));
                 if (!m) return null;
                 const doc = parseDocument(text);
+                const pre = s.slice(0, i - m[0].length);
+                if (/\.\s*$/.test(pre)) {                    // obj.method(  ->  a struct's or class's function
+                    const x = doc.classes.flatMap(c => c.members).find(y => y.kind === 'method' && y.name === m[1]);
+                    if (x) return { name: x.name, signature: funcHead(x).slice(5), params: x.typedParams.map(paramText), active: commas, doc: x.doc };
+                }
+                const c = doc.classes.find(x => x.name === m[1]);
+                if (c) {
+                    const ps = constructorParams(doc, c);
+                    return { name: c.name, signature: `${c.name}(${ps.map(paramText).join(', ')})`, params: ps.map(paramText), active: commas, doc: c.doc };
+                }
                 const f = doc.funcs.find(x => x.name === m[1]);
                 if (f) return { name: f.name, signature: funcHead(f).slice(5), params: f.typedParams.map(paramText), active: commas, doc: f.doc };
                 const b = BUILTINS.get(m[1]);
@@ -308,7 +427,8 @@ function definition(text, line, character) {
     const local = localsAt(text, line).filter(l => l.name === w.word).pop();
     if (local && local.line !== line) return { line: local.line, character: Math.max(0, lines[local.line].indexOf(w.word)) };
     const doc = parseDocument(text);
-    const d = doc.funcs.find(x => x.name === w.word) || doc.vars.find(x => x.name === w.word);
+    const d = doc.funcs.find(x => x.name === w.word) || doc.vars.find(x => x.name === w.word) || doc.classes.find(x => x.name === w.word) ||
+        doc.classes.flatMap(c => c.members).find(x => x.name === w.word);
     if (d) return { line: d.line, character: Math.max(0, lines[d.line].indexOf(w.word)) };
     return null;
 }
@@ -320,7 +440,7 @@ function quickCheck(text) {
     const problems = [];
     const lines = text.split(/\r?\n/);
     const doc = parseDocument(text);
-    const known = new Set([...BUILTINS.keys(), ...doc.funcs.map(f => f.name)]);
+    const known = new Set([...BUILTINS.keys(), ...doc.funcs.map(f => f.name), ...doc.classes.map(c => c.name)]);
     const stack = [];
     for (let i = 0; i < lines.length; ++i) {
         const code = stripStrings(stripComment(lines[i]));
@@ -338,11 +458,11 @@ function quickCheck(text) {
         let m;
         while ((m = re.exec(code))) {
             const name = m[2];
-            if (KEYWORDS[name] || /^\s*func\s+$/.test(code.slice(0, m.index + m[1].length))) continue;
+            if (KEYWORDS[name] || /\bfunc\s+$/.test(code.slice(0, m.index + m[1].length))) continue;
             if (!known.has(name)) problems.push({ line: i, character: m.index + m[1].length, length: name.length, message: `unknown function '${name}'` });
         }
-        const top = /^\s*(?!var\b|func\b|@strict\b|#|$|\}|\{)(\S+)/.exec(lines[i]);
-        if (top && !continued && depthBefore(lines, i) === 0) problems.push({ line: i, character: lines[i].indexOf(top[1]), length: top[1].length, message: "only 'var' and 'func' can be at the top of a script (put code inside start())" });
+        const top = /^\s*(?!var\b|const\b|func\b|class\b|struct\b|@strict\b|#|$|\}|\{)(\S+)/.exec(lines[i]);
+        if (top && !continued && depthBefore(lines, i) === 0) problems.push({ line: i, character: lines[i].indexOf(top[1]), length: top[1].length, message: "only var, const, func, struct and class can be at the top of a script (put code inside start())" });
     }
     for (const open of stack) problems.push({ line: open.line, character: open.character, length: 1, message: `this '${open.c}' is never closed` });
     return problems;
@@ -361,6 +481,6 @@ function parseCheckerOutput(output) {
 }
 
 module.exports = {
-    data, builtinSignature, parseDocument, localsAt, completions, hover, signatureAt, definition, quickCheck, parseCheckerOutput, wordAt,
+    data, builtinSignature, parseDocument, classMembers, localsAt, completions, hover, signatureAt, definition, quickCheck, parseCheckerOutput, wordAt,
     stringArgAt,
 };

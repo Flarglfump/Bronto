@@ -195,6 +195,12 @@ Scripts can be typed, like GDScript: `var hp: int = 3`, `var spot := vec2(1, 2)`
 again when values arrive from untyped code. `@strict` at the top of a file, or **Strict
 typing** in the project's settings, makes them required everywhere.
 
+Scripts can declare their own types too: `struct Point { var x: number = 0 }` (a value,
+copied when stored) and `class Dog : Animal { ... }` (shared by reference, with single
+inheritance, `override` and `super`). Members can be `public`, `private` or `protected`,
+`static` (one per class, shared by every entity running the file) or `const`, and number
+types can be `unsigned` (`uint`): never below 0.
+
 ## Building games
 
 The editor's **Build** menu turns a project into a game that runs without the editor:
@@ -373,7 +379,7 @@ docs/replay.md       recording and replaying runs, and the Pantry Quest bot
 | Built-in components | `components.h` | Name, Transform, Shape, Sprite, Label, Motion, Bounds, Sound, Tilemap (a grid of tiles from one tileset image, one character per cell, with solid characters for scripts to test) and Tags (words such as `enemy, flying` to find entities by kind: `br_tag_has`, `br_tag_add`, `br_find_tagged`; `find_tagged()` in scripts; the editor's hierarchy filters by `#tag`), with motion, audio and layered draw systems: enough to make and play simple scenes |
 | Scene tree | `hierarchy.h` | Parent component, local and world transforms, reparenting that keeps the on-screen position, children, subtrees and cascading destruction. Scene files store entity references (`BR_FIELD_ENTITY`) as positions in the file, reconnected on load |
 | Physics | `physics.h` | RigidBody (dynamic, static, kinematic), Collider (box or circle; friction, bounce, trigger, layers) and PhysicsWorld (gravity). Sort-and-sweep broad phase; circle and oriented-box contacts with clipping; a sequential-impulse solver, warm-started so stacks settle. Contact and trigger events, raycasts and point queries |
-| Scripts | `script.h` | The Script component. BrontoScript is interpreted from `.bs` files, re-read when they change, with a garbage-collected heap. Errors give a file and line and stop only that script. Scripts read the keyboard, the mouse and gamepads (buttons by name, sticks, triggers, rumble). C behaviours can be registered by name |
+| Scripts | `script.h` | The Script component. BrontoScript is interpreted from `.bs` files, re-read when they change, with a garbage-collected heap. Optional static types, plus structs (values) and classes (single inheritance, overrides) with public / private / protected, static and const members, and unsigned numbers. Errors give a file and line and stop only that script. Scripts read the keyboard, the mouse and gamepads (buttons by name, sticks, triggers, rumble). C behaviours can be registered by name |
 | Assets | `assets.h` | Image and sound cache: each file is loaded once, at a stable address, with relative paths resolved against the project folder (the nearest folder holding `project.bronto`, else the scene's own). Forgetting a sound silences it first. Project settings (`br_project`: name, main scene, screen size, strict typing, what built games leave out) live in `project.bronto` |
 | Packs | `pack.h` | A project folder in one file, or added to the end of a program (a built game). Once mounted, `br_file_read_all` finds files in it first, so the asset cache, scenes and scripts need no changes |
 | File system | `fs.h` | List folders (folders first, sorted), stat, make folders, rename without overwriting, replace in one step, remove; the user's folders for settings and saved data; path string helpers. POSIX and Win32 backends in the platform layer |

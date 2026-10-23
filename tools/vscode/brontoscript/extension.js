@@ -84,6 +84,13 @@ function activate(context) {
             return [
                 ...p.vars.map(v => sym(v.name, v.value ? '= ' + v.value : 'var', vscode.SymbolKind.Variable, v.line)),
                 ...p.funcs.map(f => sym(f.name, '(' + f.params.join(', ') + ')', vscode.SymbolKind.Function, f.line)),
+                ...p.classes.map(c => {                          /* structs and classes, with their members inside */
+                    const s = sym(c.name, c.kind + (c.parent ? ' : ' + c.parent : ''), c.kind === 'struct' ? vscode.SymbolKind.Struct : vscode.SymbolKind.Class, c.line);
+                    s.children = c.members.map(m => m.kind === 'method'
+                        ? sym(m.name, '(' + m.params.join(', ') + ')', m.name === 'init' ? vscode.SymbolKind.Constructor : vscode.SymbolKind.Method, m.line)
+                        : sym(m.name, m.type || (m.isConst ? 'const' : 'var'), m.isConst ? vscode.SymbolKind.Constant : vscode.SymbolKind.Field, m.line));
+                    return s;
+                }),
             ];
         },
     }));

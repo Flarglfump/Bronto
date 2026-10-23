@@ -71,7 +71,7 @@ static void test_check_and_errors(void) {
     CHECK(!br_script_check("func f() {\n  jmup()\n}\n", "b.bs", err, sizeof(err)) && strstr(err, "b.bs:2: unknown function 'jmup'"));
     CHECK(!br_script_check("func f() {\n  if true {\n", "c.bs", err, sizeof(err)) && strstr(err, "never closed"));
     CHECK(!br_script_check("func f() {\n  sqrt(1, 2)\n}\n", "d.bs", err, sizeof(err)) && strstr(err, "sqrt() takes 1 argument, not 2"));
-    CHECK(!br_script_check("print(1)\n", "e.bs", err, sizeof(err)) && strstr(err, "only 'var' and 'func'"));
+    CHECK(!br_script_check("print(1)\n", "e.bs", err, sizeof(err)) && strstr(err, "only var, const, func"));
     CHECK(!br_script_check("var s = \"open\n", "f.bs", err, sizeof(err)) && strstr(err, "unfinished string"));
     CHECK(!br_script_check("func f() { var a = 1 2 }\n", "g.bs", err, sizeof(err)) && strstr(err, "end of the line"));
 }
@@ -132,6 +132,244 @@ static void test_language(void) {
     CHECK(num(e, "neg") == -2);
     CHECK(br_script_get_string(&W, e, "elifs", s, sizeof(s)) && strcmp(s, "negzeropos") == 0);
     CHECK(strcmp(g_printed, "done 55") == 0);
+    teardown();
+}
+
+/* ---- structs and classes, access, inheritance, static, const, unsigned ---- */
+
+static void test_classes(void) {
+    br_entity e, e2;
+    char s[512];
+    setup();
+    write_script("classes.bs",
+        "@strict\n"
+        "struct Point {\n"
+        "    var x: number = 0\n"
+        "    var y: number = 0\n"
+        "    func moved(dx: number, dy: number) -> Point { return Point(this.x + dx, this.y + dy) }\n"
+        "    func nudge() -> void { this.x += 1 }\n"
+        "}\n"
+        "class Animal {\n"
+        "    public var name: string = \"?\"\n"
+        "    protected var legs: uint = 4\n"
+        "    private var secret: int = 7\n"
+        "    static var count: uint = 0\n"
+        "    static const KINGDOM: string = \"animalia\"\n"
+        "    const born: int = 0\n"
+        "    func init(name: string) -> void {\n"
+        "        this.name = name\n"
+        "        this.born = Animal.count\n"
+        "        Animal.count += 1\n"
+        "    }\n"
+        "    func speak() -> string { return \"...\" }\n"
+        "    func describe() -> string { return this.name + \" says \" + this.speak() + \" on \" + this.legs + \" legs\" }\n"
+        "    func peek() -> int { return this.secret }\n"
+        "    static func total() -> uint { return Animal.count }\n"
+        "}\n"
+        "class Dog : Animal {\n"
+        "    var tricks: list[string] = []\n"
+        "    func init(name: string, trick: string) -> void {\n"
+        "        super.init(name)\n"
+        "        push(this.tricks, trick)\n"
+        "    }\n"
+        "    override func speak() -> string { return \"woof\" }\n"
+        "}\n"
+        "class Bird : Animal {\n"
+        "    func init(name: string) -> void { super.init(name)\n this.legs = 2 }\n"
+        "    override func speak() -> string { return \"tweet (\" + super.speak() + \")\" }\n"
+        "}\n"
+        "class Node {\n"
+        "    var value: int = 0\n"
+        "    var next: Node = nil\n"
+        "}\n"
+        "var texts: string = \"\"\n"
+        "var copies: string = \"\"\n"
+        "var total: number = 0\n"
+        "var kingdom: string = \"\"\n"
+        "var chain: int = 0\n"
+        "var shown: string = \"\"\n"
+        "var same: string = \"\"\n"
+        "var pet: Animal = nil\n"
+        "var where: Point\n"
+        "func start() -> void {\n"
+        "    var zoo: list[Animal] = [Dog(\"Rex\", \"sit\"), Bird(\"Tweety\"), Animal(\"Blob\")]\n"
+        "    for a: Animal in zoo { texts += a.describe() + \"; \" }\n"
+        "    total = Animal.total() * 100 + zoo[1].born * 10 + zoo[0].peek()\n"
+        "    kingdom = Animal.KINGDOM\n"
+        "    pet = zoo[0]\n"
+        "    var p: Point = Point(1, 2)\n"
+        "    var q: Point = p\n"
+        "    q.x = 10\n"
+        "    var r: Point = p.moved(5, 5)\n"
+        "    p.nudge()\n"
+        "    var pts: list[Point] = [p]\n"
+        "    pts[0].nudge()\n"
+        "    for t: Point in pts { t.x = 99 }\n"
+        "    copies = str(p.x) + \" \" + q.x + \" \" + r.x + \" \" + pts[0].x\n"
+        "    var head: Node = Node()\n"
+        "    head.next = Node()\n"
+        "    head.next.value = 5\n"
+        "    var alias: Node = head\n"
+        "    alias.value = 3\n"
+        "    chain = head.value * 10 + head.next.value\n"
+        "    shown = str(Point(1, 2))\n"
+        "    same = str(Point(1, 2) == Point(1, 2)) + \" \" + (Node() == Node()) + \" \" + (head == alias)\n"
+        "    where.y = 4\n"
+        "}\n");
+    e = scripted("zoo", "classes.bs", NULL, br_v2(0, 0));
+    steps(1);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    CHECK(br_script_get_string(&W, e, "texts", s, sizeof(s)) &&
+          strcmp(s, "Rex says woof on 4 legs; Tweety says tweet (...) on 2 legs; Blob says ... on 4 legs; ") == 0);
+    CHECK(num(e, "total") == 300 + 10 + 7);
+    CHECK(br_script_get_string(&W, e, "kingdom", s, sizeof(s)) && strcmp(s, "animalia") == 0);
+    CHECK(br_script_get_string(&W, e, "copies", s, sizeof(s)) && strcmp(s, "2 10 6 3") == 0);
+    CHECK(num(e, "chain") == 35);
+    CHECK(br_script_get_string(&W, e, "shown", s, sizeof(s)) && strcmp(s, "Point(x: 1, y: 2)") == 0);
+    CHECK(br_script_get_string(&W, e, "same", s, sizeof(s)) && strcmp(s, "true false true") == 0);
+
+    /* statics belong to the file: a second entity with the script shares them */
+    e2 = scripted("zoo2", "classes.bs", NULL, br_v2(0, 0));
+    steps(1);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    CHECK(num(e2, "total") == 600 + 40 + 7);
+
+    teardown();
+}
+
+static void test_class_garbage(void) {
+    br_entity e;
+    char s[128];
+    setup();
+    /* objects kept in statics, globals, lists and other objects survive the collector; the rest go */
+    write_script("objchurn.bs",
+        "struct V {\n  var a: number = 0\n  var tag: string = \"\"\n}\n"
+        "class Box {\n  var v: V\n  var next: Box = nil\n  static var kept: list[Box] = []\n}\n"
+        "var head: Box = nil\nvar n: int = 0\nvar check: string = \"\"\n"
+        "func update(dt: number) -> void {\n"
+        "    for i in 300 {\n"
+        "        var b := Box()\n"
+        "        b.v = V(i, \"tag \" + i)\n"
+        "        if i == 7 { b.next = head\n head = b }\n"
+        "    }\n"
+        "    n += 1\n"
+        "    if n % 50 == 0 {\n"
+        "        var k := Box()\n"
+        "        k.v.tag = \"kept \" + n\n"
+        "        push(Box.kept, k)\n"
+        "        check = Box.kept[0].v.tag + \" \" + head.v.tag + \" \" + head.next.v.a\n"
+        "    }\n"
+        "}\n");
+    e = scripted("churn", "objchurn.bs", NULL, br_v2(0, 0));
+    steps(400);                                            /* ~120000 objects and strings, mostly garbage */
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    CHECK(br_script_get_string(&W, e, "check", s, sizeof(s)) && strcmp(s, "kept 50 tag 7 7") == 0);
+    teardown();                                            /* the leak check covers the heap */
+}
+
+static void test_class_errors(void) {
+    char err[256];
+    static const struct { const char *src, *want; } bad[] = {
+        { "class A {\n  private var x = 1\n}\nfunc f() {\n  var a := A()\n  print(a.x)\n}\n", "'x' is private in A" },
+        { "class A {\n  protected var x = 1\n}\nfunc f() {\n  var a: A = A()\n  a.x = 2\n}\n", "'x' is protected in A" },
+        { "class A {\n  private func f() { }\n}\nclass B : A {\n  func g() { this.f() }\n}\n", "'f' is private in A" },
+        { "class A {\n  func f() { }\n}\nclass B : A {\n  func f() { }\n}\n", "write override func f()" },
+        { "class A {\n  func f() { }\n}\nclass B : A {\n  override func g() { }\n}\n", "g() overrides nothing" },
+        { "class A {\n  func f(x: int) { }\n}\nclass B : A {\n  override func f(x: string) { }\n}\n", "same parameters" },
+        { "class A {\n  func f() { }\n}\nclass B : A {\n  private override func f() { }\n}\n", "can't be private" },
+        { "class A {\n  static func f() { }\n}\nclass B : A {\n  override func f() { }\n}\n", "static functions can't be overridden" },
+        { "class A {\n  var x = 1\n}\nclass B : A {\n  var x = 2\n}\n", "already has 'x' from A" },
+        { "struct S {\n  var x = 1\n}\nclass B : S {\n}\n", "structs can't be inherited" },
+        { "struct S : T {\n}\n", "structs can't inherit" },
+        { "class A : B {\n}\nclass B : A {\n}\n", "inherits from itself" },
+        { "class A : Nope {\n}\n", "unknown class 'Nope'" },
+        { "struct S {\n  var s: S\n}\n", "can't hold itself" },
+        { "struct S {\n  protected var x = 1\n}\n", "nothing in them is protected" },
+        { "class A {\n  const c = 1\n  func f() { this.c = 2 }\n}\n", "only A's init() can set it" },
+        { "class A {\n  static const C = 1\n}\nfunc f() {\n  A.C = 2\n}\n", "A.C is const" },
+        { "class A {\n  static var n = 0\n}\nfunc f() {\n  var a = A()\n  print(A.x)\n}\n", "A has no member 'x'" },
+        { "class A {\n  var n = 0\n}\nfunc f() {\n  print(A.n)\n}\n", "belongs to each A" },
+        { "class A {\n  func f() { }\n}\nfunc g() {\n  A.f()\n}\n", "belongs to each A" },
+        { "class A {\n  static func f() { print(this) }\n}\n", "a static function has no this" },
+        { "func f() {\n  print(this)\n}\n", "this is only inside" },
+        { "class A {\n  func f() { print(self) }\n}\n", "self (the script's entity)" },
+        { "var speed = 3\nclass A {\n  func f() { print(speed) }\n}\n", "can't see the script's variables" },
+        { "func helper() { }\nclass A {\n  func f() { helper() }\n}\n", "can't call the script's functions" },
+        { "class A {\n  var x = this\n}\n", "can't use this" },
+        { "class A {\n  func init(x: int) { }\n}\nfunc f() {\n  var a = A()\n  var b = A(1, 2)\n}\n", "A() takes 1 argument, not 2" },
+        { "class A {\n}\nfunc f() {\n  var a = A(1)\n}\n", "takes no arguments" },
+        { "class A {\n}\nfunc f() {\n  var a = A\n}\n", "make one with A(...)" },
+        { "class A {\n}\nclass B {\n}\nfunc f() {\n  var a: A = B()\n}\n", "a is an A, so it can't hold a B" },
+        { "struct S {\n}\nfunc f() {\n  var s: S = nil\n}\n", "can't be nil" },
+        { "class A {\n  private func init() { }\n}\nfunc f() {\n  var a = A()\n}\n", "only its own functions can make one" },
+        { "class A {\n  func f() { super.f() }\n}\n", "no parent class" },
+        { "class A {\n}\nclass A {\n}\n", "already is a struct or class 'A'" },
+        { "class A {\n}\nfunc A() { }\n", "function called A" },
+        { "func f() {\n  class B {\n  }\n}\n", "only be defined at the top" },
+        { "static var x = 1\n", "for the members of a struct or class" },
+        { "const x = 1\nfunc f() {\n  x = 2\n}\n", "x is const" },
+        { "func f() {\n  const y = 1\n  y += 1\n}\n", "y is const" },
+        { "const z: int\n", "a const needs its value" },
+        { "var u: uint = -1\n", "unsigned, so it can't hold a negative number" },
+        { "var u: unsigned string = \"\"\n", "unsigned is only for number types" },
+        { "var l: list[unsigned int] = [1]\nfunc f() {\n  push(l, -2)\n}\n", "push(): the list holds unsigned int" },
+        { "@strict\nclass A {\n  var x = 1\n}\n", "@strict: give 'x' a type" },
+        { "@strict\nclass A {\n  func f() { }\n}\n", "@strict: say what f() returns" },
+    };
+    size_t i;
+    setup();
+    for (i = 0; i < BR_ARRAY_COUNT(bad); ++i) {
+        bool ok = br_script_check(bad[i].src, "c.bs", err, sizeof(err));
+        if (ok || !strstr(err, bad[i].want)) printf("      case %d: %s\n      wanted: %s\n", (int)i, ok ? "(no error)" : err, bad[i].want);
+        CHECK(!ok && strstr(err, bad[i].want));
+    }
+    /* and the good ones */
+    CHECK(br_script_check("class A {\n  func f() -> int { return 1 }\n}\nclass B : A {\n  public override func f() -> int { return 2 }\n}\n", "g.bs", err, sizeof(err)));
+    CHECK(br_script_check("class T {\n  var next: T\n  var items: list[T] = []\n}\nstruct P {\n  var t: T\n}\n", "g.bs", err, sizeof(err)));
+    CHECK(br_script_check("var a: Later = nil\nclass Later {\n}\n", "g.bs", err, sizeof(err)));
+    CHECK(br_script_check("const var c := 3\nvar u: uint = 3\nvar f: unsigned float = 0.5\nvar w: unsigned int = 2\n", "g.bs", err, sizeof(err)));
+    teardown();
+}
+
+static void test_class_runtime_checks(void) {
+    br_entity e;
+    setup();
+    /* untyped code meets private fields, const fields and unsigned values at run time */
+    write_script("rt1.bs", "class A {\n  private var x = 1\n}\nfunc start() {\n  var a = [A()][0]\n  print(a.x)\n}\n");
+    write_script("rt2.bs", "class A {\n  const c = 1\n}\nfunc start() {\n  var a = [A()][0]\n  a.c = 5\n}\n");
+    write_script("rt3.bs", "var u: uint = 0\nfunc start() {\n  u -= 1\n}\n");
+    write_script("rt4.bs", "class A {\n  var n: unsigned number = 0\n}\nfunc start() {\n  var a = A()\n  a.n = 0 - 0.5\n}\n");
+    write_script("rt5.bs", "class A {\n}\nclass B {\n}\nfunc take(a: A) { }\nfunc start() {\n  var b = [B()][0]\n  take(b)\n}\n");
+    write_script("rt6.bs", "class A {\n}\nfunc start() {\n  save_data(\"objects\", A())\n}\n");
+    write_script("rt7.bs", "class A {\n  func f() { }\n}\nfunc start() {\n  var a = [A()][0]\n  a.g()\n}\n");
+    write_script("rt8.bs", "const k = 3\n");
+    write_script("rt8b.bs", "func start() {\n  find(\"k\").k = 4\n}\n");
+    e = scripted("a", "rt1.bs", NULL, br_v2(0, 0)); steps(1);
+    CHECK(strstr(br_script_last_error(&W), "'x' is private in A"));
+    br_entity_destroy(&W, e);
+    e = scripted("a", "rt2.bs", NULL, br_v2(0, 0)); steps(1);
+    CHECK(strstr(br_script_last_error(&W), "'c' is const"));
+    br_entity_destroy(&W, e);
+    e = scripted("a", "rt3.bs", NULL, br_v2(0, 0)); steps(1);
+    CHECK(strstr(br_script_last_error(&W), "u is unsigned, and -1 is below 0"));
+    br_entity_destroy(&W, e);
+    e = scripted("a", "rt4.bs", NULL, br_v2(0, 0)); steps(1);
+    CHECK(strstr(br_script_last_error(&W), "n is unsigned, and -0.5 is below 0"));
+    br_entity_destroy(&W, e);
+    e = scripted("a", "rt5.bs", NULL, br_v2(0, 0)); steps(1);
+    CHECK(strstr(br_script_last_error(&W), "take()'s parameter 'a' is an A, so it can't hold a B"));
+    br_entity_destroy(&W, e);
+    e = scripted("a", "rt6.bs", NULL, br_v2(0, 0)); steps(1);
+    CHECK(strstr(br_script_last_error(&W), "struct or class object"));
+    br_entity_destroy(&W, e);
+    e = scripted("a", "rt7.bs", NULL, br_v2(0, 0)); steps(1);
+    CHECK(strstr(br_script_last_error(&W), "A has no function g()"));
+    br_entity_destroy(&W, e);
+    scripted("k", "rt8.bs", NULL, br_v2(0, 0));
+    scripted("b", "rt8b.bs", NULL, br_v2(0, 0)); steps(1);
+    CHECK(strstr(br_script_last_error(&W), "k is const"));
     teardown();
 }
 
@@ -1672,6 +1910,21 @@ static void test_c_behaviour_and_reload(void) {
     s2 = scripted("s2", "v.bs", NULL, br_v2(0, 0));
     steps(1);
     CHECK(num(s1, "version") == 1 && num(s2, "version") == 2);   /* running ones keep their version */
+    {   /* an object outlives the script that made it: its class stays when that file is read again */
+        br_entity holder, maker;
+        write_script("holder.bs", "var obj = nil\nvar got = 0\nfunc update(dt) {\n  if obj != nil { got = obj.get() }\n}\n");
+        write_script("maker.bs", "class Thing {\n  var n = 5\n  func get() { return this.n * 2 }\n}\nfunc start() {\n  find(\"holder\").obj = Thing()\n}\n");
+        holder = scripted("holder", "holder.bs", NULL, br_v2(0, 0));
+        maker = scripted("maker", "maker.bs", NULL, br_v2(0, 0));
+        steps(2);
+        br_entity_destroy(&W, maker);
+        write_script("maker.bs", "class Thing {\n  var n = 1\n  func get() { return this.n }\n}\nfunc start() { }\n");
+        br_script_reload(&W);
+        scripted("maker2", "maker.bs", NULL, br_v2(0, 0));
+        steps(2);
+        CHECK_EQ_INT(br_script_error_count(&W), 0);
+        CHECK(num(holder, "got") == 10);
+    }
     teardown();
 }
 
@@ -2031,6 +2284,10 @@ void suite_script(void) {
     RUN(test_types_checked);
     RUN(test_types_at_run_time);
     RUN(test_language);
+    RUN(test_classes);
+    RUN(test_class_errors);
+    RUN(test_class_runtime_checks);
+    RUN(test_class_garbage);
     RUN(test_entities_and_vars);
     RUN(test_runtime_errors);
     RUN(test_physics_callbacks_and_messages);

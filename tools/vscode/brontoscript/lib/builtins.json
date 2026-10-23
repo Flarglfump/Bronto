@@ -1415,6 +1415,17 @@
  "keywords": {
   "var": "Declares a variable. At the top of a file: one per entity, kept between calls.",
   "func": "Declares a function.",
+  "const": "Declares a variable that can't be changed once it has its value (`const MAX: int = 5`). In a class: a field only its init() can set; `static const`: one for the whole class.",
+  "struct": "Declares a struct: fields and functions, used as a value (storing one stores a copy, and `==` compares the fields). `struct Point { var x: number = 0 }`, made with `Point(1, 2)`.",
+  "class": "Declares a class: fields and functions, shared by reference. One parent: `class Dog : Animal { ... }`. Made with `Dog(...)`, which runs its `init()`.",
+  "public": "A member anything can use (the default).",
+  "private": "A member only the struct's or class's own functions can use.",
+  "protected": "A member only the class and the classes that inherit from it can use.",
+  "static": "A member of the class itself, not of each object: `Counter.total`, `Counter.reset()`. Every entity running the file shares it.",
+  "override": "Replaces the parent class's function of the same name (same parameters and result): `override func speak() -> string`.",
+  "this": "Inside a struct's or class's function: the object it runs on (`this.x`).",
+  "super": "Inside a class's function: the parent's version of a function (`super.speak()`, `super.init(name)`).",
+  "unsigned": "Before int or number: never below 0 (`unsigned int`, or `uint`). Checked whenever one is stored.",
   "if": "if condition { ... }",
   "elif": "elif condition { ... }",
   "else": "else { ... }",
@@ -1441,6 +1452,10 @@
   {
    "name": "int",
    "doc": "A whole number. Literals like `3` are ints; `/` gives a number, and `floor()` / `round()` make one whole again."
+  },
+  {
+   "name": "uint",
+   "doc": "An unsigned int: a whole number that is never below 0. The same as `unsigned int`."
   },
   {
    "name": "string",

@@ -24,14 +24,18 @@ func on_trigger(other) {
 
 ## The shape of a file
 
-Only two things can appear at the top level of a file:
+Only these can appear at the top level of a file:
 
 - `var name = value` declares a variable. Each entity running the script has its own copy,
   and the value is kept between calls. **Script › vars** in the inspector overrides the
   starting values for one entity, for example `speed = 120, name = "Rex", wrap = true`
   (only literal values: numbers, strings, `true`/`false`/`nil`, `vec2(x, y)` and lists of
   these, such as `path = [vec2(0, 0), vec2(64, 0)]`).
+- `const name = value` declares a variable that can't be changed (see [const](#const)).
+  **Script › vars** can still give it its starting value.
 - `func name(a, b) { ... }` declares a function.
+- `struct Name { ... }` and `class Name { ... }` declare your own types (see
+  [Structs and classes](#structs-and-classes)).
 - `@strict`, on the first line only, makes types required (see [Types](#types)).
 
 `#` starts a comment. Statements end at the end of the line, or at a `;`. Inside `( )` or
@@ -68,6 +72,7 @@ Every callback can declare fewer parameters than the engine passes.
 | vec2 | `vec2(3, 4)` | `.x`, `.y`, `.length`. `+ -` with another vec2; `* /` by a number |
 | list | `[1, 2, 3]` | `list[0]`, `list[-1]` (the last item), `len(list)`, `push`, `pop`, `remove` |
 | entity | `self`, `find("Player")` | see below |
+| struct / class object | `Point(1, 2)`, `Dog("Rex")` | your own types: see [Structs and classes](#structs-and-classes) |
 
 `nil`, `false` and `0` count as false in `if` and `while`. Everything else counts as true,
 including `""` and `[]`. `and` and `or` stop early and return one of their operands:
@@ -77,6 +82,7 @@ including `""` and `[]`. `and` and `or` stop early and return one of their opera
 
 ```
 var x = 1                     # a local variable (inside a function)
+const limit = 10              # a local that can't be changed
 x = 2;  x += 1;  x -= 1;  x *= 2;  x /= 2
 if a { ... } elif b { ... } else { ... }
 while cond { ... }
@@ -255,6 +261,119 @@ from the end. `text[i]` is one character.
   on the line, or nil.
 - `entity_at(point)` returns the collider at a point, or nil.
 
+## Structs and classes
+
+A `struct` or `class` declares a type of your own: named fields with starting values, and
+functions that work on them. Both go at the top level of a file, and can be written before
+or after the code that uses them.
+
+```
+struct Point {
+    var x: number = 0
+    var y: number = 0
+
+    func moved(dx: number, dy: number) -> Point { return Point(this.x + dx, this.y + dy) }
+    func nudge() -> void { this.x += 1 }
+}
+
+class Animal {
+    var name: string = "?"
+    protected var legs: uint = 4
+    private var mood: int = 0
+    static var count: uint = 0                 # one for the class, not one per animal
+    static const KINGDOM: string = "animalia"
+
+    func init(name: string) -> void {          # runs when one is made: Animal("Blob")
+        this.name = name
+        Animal.count += 1
+    }
+    func speak() -> string { return "..." }
+    func describe() -> string { return this.name + " says " + this.speak() }
+    static func total() -> uint { return Animal.count }
+}
+
+class Dog : Animal {                           # a Dog is an Animal, with more
+    var tricks: list[string] = []
+    func init(name: string, trick: string) -> void {
+        super.init(name)                       # the parent's init()
+        push(this.tricks, trick)
+    }
+    override func speak() -> string { return "woof" }
+}
+
+func start() {
+    var pets: list[Animal] = [Dog("Rex", "sit"), Animal("Blob")]
+    for pet in pets { print(pet.describe()) }  # "Rex says woof", "Blob says ..."
+    print(Animal.total(), Animal.KINGDOM)      # 2 animalia
+}
+```
+
+**Making one.** Call the type like a function: `Dog("Rex", "sit")`. Every field gets its
+starting value (the parent's fields first), then `init()` runs with the arguments, if the
+type has one. A class without `init()` takes no arguments. A struct without `init()` takes
+its fields in order, any number of them: `Point(1, 2)`, `Point(5)`, `Point()`. A field
+without a value starts like a typed variable does (`0`, `""`, `[]`, nil for a class, and
+a fresh struct with its starting values for a struct). A class's `init()` is inherited when
+the child has none.
+
+**this.** Inside a struct's or class's functions, `this` is the object the function runs
+on. Fields and functions are always reached through it: `this.x`, `this.speak()`. A
+function marked `static` has no `this`.
+
+**Structs are values, classes are shared.** Storing a struct (in a variable, a field, a
+list item, or as an argument or a result) stores a copy, so changing one copy never changes
+another, and `==` compares their fields. Storing a class object stores the same object:
+every name for it sees the same fields, and `==` is true only for the same object.
+
+```
+var a := Point(1, 2)
+var b := a          # a copy
+b.x = 10            # a.x is still 1
+pts[0].nudge()      # changes the point in the list itself
+```
+
+A class field or variable can be nil; a struct can't. A struct can't hold itself (use a
+class, or a list, for chains and trees).
+
+**Access.** Each member is `public` (the default: any code can use it), `private` (only the
+type's own functions can use it) or `protected` (the class's own functions, and those of the
+classes that inherit from it). Structs have no children, so nothing in them is protected.
+
+**Inheritance.** A class can have one parent: `class Dog : Animal`. It gets the parent's
+fields and functions, and a `Dog` fits wherever an `Animal` is wanted (`var a: Animal =
+Dog("Rex", "sit")`). A child can't declare a field the parent already has. Structs can't
+inherit or be inherited from.
+
+**Overriding.** To replace a function the parent has, the child writes `override` before
+it, with the same parameters and result type: `override func speak() -> string`. Calls
+always run the object's own version, even through a parent's function or an `Animal`
+variable (above, `describe()` gets `"woof"` from a dog). `super.speak()` runs the parent's
+version from inside the child. An override can make a function more visible (protected to
+public), not less. Static functions can't be overridden. Every class has its own `init()`;
+it needs no `override`.
+
+**static.** A `static var` or `static func` belongs to the type itself, not to each object.
+Use it through the type's name: `Animal.count`, `Animal.total()`. Static fields are shared
+by every entity running the file, so they suit counters, caches and settings; a file's own
+`var`s are still one set per entity. They get their starting values once, before the first
+entity's variables.
+
+**const.** A `const` field can't be changed after the object is made, except by its own
+type's `init()` (`this.born = ...`). A `static const` is a constant of the type, and needs
+its value where it is declared: `static const MAX: int = 8`. (`const` keeps a name from
+changing; a const list's items can still change.)
+
+**What a type can see.** Its functions and starting values see their parameters, `this`,
+the file's structs and classes (and their static members), and the built-in functions. They
+can't use the file's `var`s or `func`s, or `self`: an object can be handed to other
+entities, so pass in what it needs (or keep it in a static field).
+
+**Other things to know.** `print()` and `str()` show an object with its fields:
+`Point(x: 1, y: 2)`. Objects can't be saved with `save_data()` (save their fields instead),
+or set from **Script › vars**. Under `@strict`, fields need types (or `:=`), and functions
+need parameter and result types, like everywhere else. Objects are found by the garbage
+collector like lists, so nothing needs to be freed.
+
 ## Types
 
 Types are optional. Write them, and the script is checked before it runs:
@@ -275,24 +394,38 @@ for i: int in 10 { ... }
 |---|---|---|
 | `number` (or `float`) | any number | `0` |
 | `int` | a whole number | `0` |
+| `unsigned int` (or `uint`), `unsigned number` | the same, but never below 0 | `0` |
 | `string` | text | `""` |
 | `bool` | `true` or `false` | `false` |
 | `vec2` | a vector | `vec2(0, 0)` |
 | `list`, `list[T]` | a list (of T) | `[]` |
 | `entity` | an entity, or nil | `nil` |
+| a struct's name | that struct | one with its fields' starting values |
+| a class's name | that class or one of its children, or nil | `nil` |
 | `any` | anything (checked only when it runs) | `nil` |
 | `void` | only after `->`: the function returns nothing | |
 
 `3` is an int and `3.0` or `1.5` a number. `+ - * %` of ints give an int, `/` always gives a
 number, and `floor ceil round len sign` give ints. An int fits where a number is wanted, but
 not the other way round (`floor()` or `round()` make a number whole). `nil` fits only an
-entity (or `any`).
+entity, a class (or `any`).
+
+<a id="const"></a>**const and unsigned.** `const` declares a name that keeps its first value:
+`const MAX_HP: int = 5` at the top of a file (one per entity, like `var`), `const step := 2`
+inside a function, or `const` / `static const` in a struct or class (see above). Changing
+one is an error before the script runs, or, from another entity's script, when it runs.
+`unsigned` before `int` or `number` (`uint` is short for `unsigned int`) means the value is
+never below 0: `var coins: uint = 0`, `list[unsigned int]`. Storing a negative number in one
+is an error - written in the source (`var u: uint = -1`), it is found before the script runs;
+otherwise when it is stored (`coins -= 1` at 0: `coins is unsigned, and -1 is below 0`).
+Unsigned values mix freely with the others in arithmetic.
 
 Before the script runs, the checker finds: values that don't fit a variable, parameter or
 result (`speed is a number, so it can't hold a string`), functions that don't always return,
 `return` with a value from a `-> void` function, operators on the wrong types (`"a" - 1`),
 wrong argument types for the built-in functions (`key_down(3)`) and the engine's callbacks
-(`update(dt: string)`), and properties that don't exist (`v.z` on a vec2). It knows the types
+(`update(dt: string)`), properties that don't exist (`v.z` on a vec2), members a struct or
+class doesn't have or doesn't let this code use, and changes to `const` names. It knows the types
 of literals, of typed names, of the built-in functions' results and of entity properties
 (`self.position` is a vec2, `self.x` a number).
 
@@ -301,8 +434,8 @@ component's field - is checked when it is stored into a typed variable, paramete
 result: `hp is an int, and 2.5 isn't a whole number`. Untyped code works as it always did.
 
 **Strict typing:** `@strict` on the first line of a file makes types required: every `var`
-needs a type or `:=`, every parameter a type, and every function a `->` result (`-> void`
-when it returns nothing). Loop variables take their type from what they loop over. To make
+needs a type or `:=` (and so does every `const` and struct or class field), every parameter
+a type, and every function a `->` result (`-> void` when it returns nothing). Loop variables take their type from what they loop over. To make
 every script in a project strict, set **Strict typing** in the editor's **Build > Project
 Settings** (`strict_typing = true` in `project.bronto`); `bscheck --strict` does the same
 from the command line.

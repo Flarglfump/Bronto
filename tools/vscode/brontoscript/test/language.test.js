@@ -230,6 +230,83 @@ test('extension.js activates and its providers answer', () => {
     assert.deepStrictEqual(registered.symbols.provideDocumentSymbols(doc).map(s => s.name), ['speed', 'jump', 'spawn_point', 'grounded', 'start', 'update', 'on_ground']);
 });
 
+test('structs and classes: outline, members, completion, hover, signatures, checks', () => {
+    const src = [
+        '@strict',
+        '# A point on the grid.',
+        'struct Point {',
+        '    var x: number = 0',
+        '    var y: number = 0',
+        '}',
+        'class Animal {',
+        '    protected var legs: unsigned int = 4',
+        '    private var secret: int = 1',
+        '    static var count: uint = 0',
+        '    const born: int = 0',
+        '    func init(name: string) -> void {',
+        '        this.legs = 4',
+        '    }',
+        '    func speak() -> string { return "..." }',
+        '    static func total() -> uint { return Animal.count }',
+        '}',
+        'class Dog : Animal {',
+        '    override func speak() -> string {',
+        '        const extra: string = super.speak()',
+        '        return "woof"',
+        '    }',
+        '}',
+        'const LIMIT: int = 3',
+        'func start() -> void {',
+        '    var d: Dog = Dog("Rex")',
+        '    var p: Point = Point(1, 2)',
+        '    d.speak()',
+        '}',
+        '',
+    ].join('\n');
+    const d = lang.parseDocument(src);
+    assert.deepStrictEqual(d.classes.map(c => c.name + ':' + c.kind + ':' + c.parent), ['Point:struct:', 'Animal:class:', 'Dog:class:Animal']);
+    assert.match(d.classes[0].doc, /point on the grid/);
+    assert.deepStrictEqual(d.classes[1].members.map(m => m.name), ['legs', 'secret', 'count', 'born', 'init', 'speak', 'total']);
+    const legs = d.classes[1].members[0];
+    assert.ok(legs.access === 'protected' && legs.type === 'unsigned int' && legs.kind === 'field');
+    assert.ok(d.classes[1].members[2].isStatic && d.classes[1].members[3].isConst && d.classes[2].members[0].isOverride);
+    assert.deepStrictEqual(d.funcs.map(f => f.name), ['start']);              /* methods aren't the file's functions */
+    assert.ok(d.vars.some(v => v.name === 'LIMIT' && v.isConst));
+    assert.deepStrictEqual(lang.classMembers(d, 'Dog').map(m => m.name), ['speak', 'legs', 'secret', 'count', 'born', 'init', 'total']);
+    assert.deepStrictEqual(lang.quickCheck(src), []);                       /* constructors are known functions; classes may be at the top */
+
+    const L = src.split('\n');
+    const line = n => L.findIndex(x => x.includes(n));
+    let items = lang.completions(src, line('this.legs'), L[line('this.legs')].indexOf('legs'), []).map(i => i.label);
+    assert.ok(items.includes('legs') && items.includes('secret') && items.includes('speak'));
+    items = lang.completions(src, line('super.speak'), L[line('super.speak')].indexOf('speak'), []).map(i => i.label);
+    assert.deepStrictEqual(items.sort(), ['init', 'speak', 'total'].sort());
+    items = lang.completions('class A {\n    static var n: int = 0\n    var m: int = 0\n}\nfunc f() {\n    A.\n}\n', 5, 6, []).map(i => i.label);
+    assert.deepStrictEqual(items, ['n']);                                    /* through the class: its static members */
+    items = lang.completions(src, line('var p: Point'), L[line('var p: Point')].indexOf('Point') , []).map(i => i.label);
+    assert.ok(items.includes('Point') && items.includes('uint'));             /* types: the file's structs and classes too */
+    items = lang.completions(src, line('func start'), 0, []).map(i => i.label);
+    assert.ok(items.includes('class') && items.includes('struct') && items.includes('const'));
+    const body = lang.completions(src, line('d.speak()'), 4, []);
+    assert.ok(body.some(i => i.label === 'Dog' && i.snippet === 'Dog(${1:name})'));
+    assert.ok(body.some(i => i.label === 'this') && !body.some(i => i.label === 'class' || i.label === 'private'));
+    const inClass = lang.completions(src, line('const born'), 4, []).map(i => i.label);
+    assert.ok(inClass.includes('private') && inClass.includes('override') && !inClass.includes('raycast'));
+
+    assert.match(lang.hover(src, line('class Dog'), 7), /class Dog : Animal/);
+    assert.match(lang.hover(src, line('var p: Point'), L[line('var p: Point')].indexOf('Point(') + 1), /struct Point[\s\S]*a copy/);
+    assert.match(lang.hover(src, line('d.speak()'), L[line('d.speak()')].indexOf('speak') + 1), /func speak\(\) -> string/);
+    assert.match(lang.hover(src, line('this.legs'), L[line('this.legs')].indexOf('legs') + 1), /protected var legs: unsigned int = 4/);
+    assert.match(lang.hover(src, line('private var'), 5), /only the struct's or class's own functions/);
+
+    const sig = lang.signatureAt(src, line('Point(1, 2)'), L[line('Point(1, 2)')].indexOf('2'));
+    assert.ok(sig && sig.signature === 'Point(x: number, y: number)' && sig.active === 1);
+    assert.strictEqual(lang.signatureAt(src, line('Dog("Rex")'), L[line('Dog("Rex")')].indexOf('"')).signature, 'Dog(name: string)');
+    assert.strictEqual(lang.definition(src, line('var d: Dog'), L[line('var d: Dog')].indexOf('Dog') + 1).line, line('class Dog'));
+    assert.ok(lang.localsAt(src, line('return "woof"')).some(l => l.name === 'extra' && l.type === 'string'));
+    assert.ok(lang.quickCheck('static var x = 1\n').some(p => /top of a script/.test(p.message)));
+});
+
 test('the extension icon is the editor app icon: a 256x256 PNG', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     assert.strictEqual(pkg.icon, 'images/icon.png');
