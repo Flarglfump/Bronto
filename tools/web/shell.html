@@ -47,6 +47,16 @@
   .made { color: var(--dim); font-size: 12px; margin-top: 16px; }
   .keys { color: var(--dim); font-size: 13px; margin: 14px 0 0; }
   .keys[hidden] { display: none; }
+  /* (a short frame - a game embedded in a page, on a phone - still shows the Play button) */
+  @media (max-height: 440px) {
+    #card { padding: 8px; }
+    .box { padding: 14px 18px; }
+    .box img { width: 48px; height: 48px; margin-bottom: 6px; }
+    h1 { font-size: 18px; margin-bottom: 10px; }
+    #status { margin-top: 8px; }
+    .made { display: none; }
+  }
+  @media (max-height: 260px) { .box img { display: none; } h1 { font-size: 16px; margin-bottom: 8px; } #status { min-height: 0; } }
 </style>
 </head>
 <body>
