@@ -1,0 +1,118 @@
+@strict
+# The dialogue box: a scene pushed over the game (push_scene), so everything underneath
+# waits. What to say comes in the global "talk": a list of pages, each
+# [speaker, portrait, text] (portrait: a frame of art/portraits.bmp, -1 for none). The
+# text is typed out a letter at a time; jump, fire or Enter goes on (or finishes the page).
+# When the last page is done, the global "talk_done" names this talk (the global
+# "talk_id") and the scene is popped, so the game can carry on from there.
+
+var draw_layer: int = 80
+var pages: list = []
+var page: int = 0
+var shown: number = 0                     # letters shown so far
+var lines: list[string] = []
+var t: number = 0
+var done: bool = false
+
+func start() -> void {
+    pages = global("talk", [])
+    if len(pages) == 0 { pages = [["", -1, "..."]] }
+    open_page()
+}
+
+func open_page() -> void {
+    var p: list = pages[page]
+    lines = wrap(p[2], 25)
+    if p[1] < 0 { lines = wrap(p[2], 29) }
+    shown = 0
+}
+
+# Breaks text into lines of up to `width` letters, at spaces ('|' forces a new line).
+func wrap(text: string, width: int) -> list[string] {
+    var out: list[string] = []
+    var line: string = ""
+    var word: string = ""
+    for i in len(text) + 1 {
+        var c: string = " "
+        if i < len(text) { c = text[i] }
+        if c == " " or c == "|" {
+            if len(line) + len(word) + 1 > width and line != "" {
+                push(out, line)
+                line = word
+            } elif line == "" {
+                line = word
+            } else {
+                line = line + " " + word
+            }
+            word = ""
+            if c == "|" {
+                push(out, line)
+                line = ""
+            }
+        } else {
+            word = word + c
+        }
+    }
+    if line != "" { push(out, line) }
+    return out
+}
+
+func total() -> int {
+    var n: int = 0
+    for l in lines { n += len(l) }
+    return n
+}
+
+func update(dt: number) -> void {
+    t += dt
+    if done { return }
+    var before: int = floor(shown)
+    shown = min(shown + dt * 45, total())
+    if floor(shown) != before and floor(shown) % 3 == 0 { play_sound("sfx/text.wav", 0.4) }
+    if action_pressed("jump") or action_pressed("fire") or key_pressed("enter") or mouse_pressed(0) {
+        if shown < total() {
+            shown = total()
+        } else {
+            page += 1
+            if page >= len(pages) {
+                done = true
+                set_global("talk_done", global("talk_id", ""))
+                play_sound("sfx/select.wav", 0.5)
+                pop_scene()
+            } else {
+                play_sound("sfx/blip.wav", 0.5)
+                open_page()
+            }
+        }
+    }
+}
+
+func draw() -> void {
+    if done { return }
+    var p: list = pages[page]
+    var box_y: number = 166
+    draw_rect(vec2(6, box_y), vec2(244, 68), "#000000")
+    draw_rect(vec2(7, box_y + 1), vec2(242, 66), "#f8e8b0", false)
+    draw_rect(vec2(9, box_y + 3), vec2(238, 62), "#806030", false)
+    var x: number = 16
+    if p[1] >= 0 {
+        draw_rect(vec2(13, box_y + 7), vec2(36, 36), "#302030")
+        draw_image("art/portraits.bmp", vec2(31, box_y + 25), p[1], vec2(32, 32))
+        x = 56
+    }
+    if p[0] != "" {
+        draw_text(p[0], vec2(x, box_y + 8), "#f8c860")
+    }
+    var left: int = floor(shown)
+    var y: number = box_y + 22
+    if p[0] == "" { y = box_y + 12 }
+    for l in lines {
+        if left <= 0 { break }
+        draw_text(substr(l, 0, left), vec2(x, y), "#ffffff")
+        left -= len(l)
+        y += 11
+    }
+    if shown >= total() and floor(t * 3) % 2 == 0 {
+        draw_text(">", vec2(236, box_y + 56), "#f8c860")
+    }
+}

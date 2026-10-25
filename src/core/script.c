@@ -5061,6 +5061,12 @@ void br_script_step(br_world *w, float dt) {
     if (g_music.mixer == &((br_engine *)w->context)->mixer) sc_music_tick(((br_engine *)w->context)->time);   /* fades */
     count = w->pools[rt->script_id].count;              /* scripts spawned now start next step */
     arg = sc_num(dt);
+    for (i = 0; i < count && i < w->pools[rt->script_id].count; ++i) {   /* every script's variables first, */
+        br_component_pool *p = &w->pools[rt->script_id];                  /* so each start() can use the others' */
+        br_script *s = (br_script *)(p->data + (size_t)i * p->stride);
+        if (!s->instance) s->instance = sc_instance_create(rt, p->entities[i], s);
+        if (s->instance && !((sc_instance *)s->instance)->ready) sc_make_ready(rt, (sc_instance *)s->instance, s);
+    }
     for (i = 0; i < count && i < w->pools[rt->script_id].count; ++i) {
         br_component_pool *p = &w->pools[rt->script_id];
         br_entity e = p->entities[i];

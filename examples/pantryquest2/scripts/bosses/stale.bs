@@ -1,0 +1,180 @@
+@strict
+# SIR STALE, First Knight of Spoilage: a loaf gone hard as stone, in armour, with a baguette
+# for a lance. His crust turns pepper - except while his visor is up: after he slams into a
+# wall (dizzy), and while he throws crumbs. He walks at Basil, then charges, leaps (a crumb
+# shockwave where he lands), or throws.
+
+const NAME: string = "SIR STALE"
+const HP: number = 22
+var home := vec2(0, 0)
+var gate: list = []
+var game: entity
+var basil: entity
+var map: entity
+var state: string = "sleep"               # sleep, intro, walk, windup, charge, dizzy, leap, throw, dying
+var hp: number = 22
+var t: number = 0
+var vel := vec2(0, 0)
+var facing: int = -1
+var flash_t: number = 0
+var next_move: int = 0
+
+func start() -> void {
+    game = find("Game")
+    basil = find("Basil")
+    map = child(self.parent, "Map")
+    if game.flag("boss:stale") {
+        game.boss_beaten_again("stale", [["seal_salt", "seal_salt"], ["popcorn", "popcorn"]], home)
+        destroy(self)
+    }
+}
+
+func feet_y() -> number { return self.y + 24 }
+func vulnerable() -> bool { return state == "dizzy" or state == "throw" }
+
+func hit_by(p: vec2, r: number) -> bool {
+    return state != "sleep" and state != "dying" and abs(p.x - self.x) < 12 + r and abs(p.y - self.y) < 20 + r
+}
+
+func hit(amount: number, kind: string, from: vec2) -> bool {
+    if state == "intro" { return true }
+    if not vulnerable() and kind != "rocket" {
+        play_sound("sfx/clank.wav", 0.5)
+        return true
+    }
+    var a: number = amount
+    if kind == "rocket" and not vulnerable() { a = 3 }
+    hp -= a
+    flash_t = 0.12
+    play_sound("sfx/boss_hit.wav", 0.6)
+    game.boss_health(hp)
+    if hp <= 0 {
+        state = "dying"
+        t = 0
+        stop_music(0.5)
+    }
+    return true
+}
+
+func face_basil() -> void {
+    facing = sign(basil.x - self.x)
+    if facing == 0 { facing = 1 }
+    self.Sprite.flip_x = facing > 0
+}
+
+func update(dt: number) -> void {
+    if game.state != "play" and state != "intro" { return }
+    t += dt
+    if flash_t > 0 {
+        flash_t -= dt
+        self.Sprite.tint = rgb(255, 140, 140)
+    } else {
+        self.Sprite.tint = rgb(255, 255, 255)
+    }
+    if state == "sleep" {
+        self.Sprite.frame = 0
+        if basil.x > 64 and basil.x < 460 {
+            state = "intro"
+            game.boss_start(NAME, HP, "music/boss.wav")
+            game.talk("stale_intro")
+            play_sound("sfx/roar.wav")
+        }
+        return
+    }
+    if state == "intro" {
+        if game.state == "play" and game.talking == "" { begin("walk") }
+        return
+    }
+    if state == "dying" {
+        self.Sprite.frame = 5
+        if floor(t * 8) != floor((t - dt) * 8) { spawn("prefabs/burst.scene", self.position + vec2(random(-16, 16), random(-20, 20))) }
+        if floor(t * 4) != floor((t - dt) * 4) { play_sound("sfx/blast.wav", 0.5) }
+        self.Sprite.tint = rgb(255, 255, 255, 255 * max(0, 1 - t / 2.2))
+        if t > 2.2 {
+            game.boss_beaten("stale", [["seal_salt", "seal_salt"], ["popcorn", "popcorn"]], vec2(home.x, home.y + 8), "stale_beaten")
+            destroy(self)
+        }
+        return
+    }
+    if basil.touches(self.position, vec2(12, 20)) { basil.hurt(16, self.position) }
+    if state == "walk" {
+        face_basil()
+        self.Sprite.frame = 1 + floor(t * 6) % 2
+        walk(facing * 0.7)
+        if t > 1.4 {
+            next_move = (next_move + 1) % 3
+            if next_move == 0 { begin("windup") }
+            elif next_move == 1 { begin("leap") }
+            else { begin("throw") }
+        }
+    } elif state == "windup" {
+        self.Sprite.frame = 3
+        if t > 0.6 {
+            begin("charge")
+            play_sound("sfx/roar.wav", 0.6)
+        }
+    } elif state == "charge" {
+        self.Sprite.frame = 4
+        if not walk(facing * 4) {
+            shake_camera(4, 0.5)
+            play_sound("sfx/blast.wav")
+            for i in 3 {
+                var c := spawn("prefabs/spit.scene", vec2(random(48, 464), 40))
+                c.launch(vec2(0, 2.4), "bone")
+            }
+            begin("dizzy")
+        }
+    } elif state == "dizzy" {
+        self.Sprite.frame = 5
+        if t > 1.8 { begin("walk") }
+    } elif state == "leap" {
+        if t < 0.3 {
+            self.Sprite.frame = 3
+            face_basil()
+            vel = vec2(clamp((basil.x - self.x) / 50, -3, 3), -5)
+        } else {
+            self.Sprite.frame = 7
+            vel.y += 0.25
+            walk(vel.x)
+            self.y += vel.y
+            if vel.y > 0 and feet_y() >= 208 {
+                self.y = 208 - 24
+                shake_camera(3, 0.3)
+                play_sound("sfx/blast.wav", 0.7)
+                for d in [-1, 1] {
+                    var w := spawn("prefabs/spit.scene", vec2(self.x + d * 16, 200))
+                    w.launch(vec2(d * 2.6, 0), "bone")
+                }
+                begin("walk")
+            }
+        }
+    } elif state == "throw" {
+        face_basil()
+        self.Sprite.frame = 6
+        if t > 0.3 and t - dt <= 0.3 {
+            var aim: vec2 = normalize(basil.middle() - (self.position + vec2(0, -10)))
+            for a in [-14, 0, 14] {
+                var s := spawn("prefabs/spit.scene", self.position + vec2(facing * 14, -10))
+                s.launch(from_angle(angle(aim) + a, 2.2), "bone")
+            }
+            play_sound("sfx/pepper.wav", 0.6)
+        }
+        if t > 1.0 { begin("walk") }
+    }
+}
+
+func begin(s: string) -> void {
+    state = s
+    t = 0
+}
+
+# Moves sideways, stopping at walls; returns false if a wall stopped it.
+func walk(dx: number) -> bool {
+    var next := self.x + dx
+    if next < 32 or next > 480 {
+        self.x = clamp(next, 32, 480)
+        return false
+    }
+    self.x = next
+    return true
+}

@@ -1,0 +1,293 @@
+@strict
+# The title screen: Castle Fromage under the cheese moon, the logo, and the menus.
+#   PRESS START -> START (three journeys to pick from: continue one, or begin a new one)
+#               -> OPTIONS (music and sound volume, fullscreen; kept in the save "settings")
+#               -> QUIT
+# A new journey goes to the story (intro.scene); a saved one straight into the game
+# (main.scene), with the globals "slot" and "load" saying which.
+
+var draw_layer: int = 60
+var state: string = "press"               # press, menu, slots, options, erase
+var sel: int = 0
+var t: number = 0
+var slots: list = []                      # each: nil (empty) or the saved list
+var leaving: number = -1                  # fading out: seconds gone (-1: not leaving)
+var go_to: string = ""
+var menu: list[string] = ["START", "OPTIONS", "QUIT"]
+var options: list[string] = ["MUSIC", "SOUND", "FULLSCREEN", "BACK"]
+
+func start() -> void {
+    bind_keys()
+    apply_settings()
+    play_music("music/title.wav", 1.0)
+    read_slots()
+}
+
+# The same controls the game uses (see game.bs), so menus answer to them too.
+func bind_keys() -> void {
+    for a in ["left", "right", "up", "down", "jump", "fire", "rocket", "pause", "map"] { unbind(a) }   # (bound afresh)
+    bind("left", "left", "a", "pad:left", "pad:left_x-")
+    bind("right", "right", "d", "pad:right", "pad:left_x+")
+    bind("up", "up", "w", "pad:up", "pad:left_y-")
+    bind("down", "down", "s", "pad:down", "pad:left_y+")
+    bind("jump", "z", "k", "space", "pad:a")
+    bind("fire", "x", "j", "pad:x")
+    bind("rocket", "c", "l", "pad:b", "pad:rb")
+    bind("pause", "enter", "escape", "pad:start")
+    bind("map", "m", "tab", "pad:back")
+}
+
+# Settings live in their own save, so every journey shares them.
+func apply_settings() -> void {
+    var s: any = load_data("settings")
+    if s == nil { return }
+    var l: list = s
+    if len(l) < 3 { return }
+    set_global("music_volume", l[0])
+    set_volume("music", l[0])
+    set_volume("sfx", l[1])
+    if l[2] != fullscreen() { set_fullscreen(l[2]) }
+}
+
+func save_settings() -> void {
+    save_data("settings", [global("music_volume", 0.8), volume("sfx"), fullscreen()])
+}
+
+func read_slots() -> void {
+    slots = []
+    for i in 3 {
+        var s: any = load_data("slot" + (i + 1))
+        push(slots, s)
+    }
+}
+
+func ok() -> bool {
+    return action_pressed("jump") or action_pressed("fire") or key_pressed("enter") or button_pressed("start")
+}
+
+func back() -> bool {
+    return action_pressed("rocket") or key_pressed("escape")
+}
+
+func move(n: int) -> void {
+    var before: int = sel
+    if action_pressed("up") { sel -= 1 }
+    if action_pressed("down") { sel += 1 }
+    sel = clamp(sel, 0, n - 1)
+    if sel != before { play_sound("sfx/blip.wav", 0.4) }
+}
+
+func leave(scene: string) -> void {
+    go_to = scene
+    leaving = 0
+    play_sound("sfx/select.wav", 0.6)
+    if scene == "intro.scene" { return }        # (the title music plays on under the story)
+    stop_music(0.8)
+}
+
+func update(dt: number) -> void {
+    t += dt
+    if leaving >= 0 {
+        leaving += dt
+        if leaving > 0.8 { load_scene(go_to) }
+        return
+    }
+    if state == "press" {
+        if t > 0.5 and (ok() or action_pressed("pause") or mouse_pressed(0)) {
+            state = "menu"
+            sel = 0
+            play_sound("sfx/select.wav", 0.6)
+        }
+        return
+    }
+    if state == "menu" {
+        move(len(menu))
+        if back() {
+            state = "press"
+            return
+        }
+        if ok() {
+            play_sound("sfx/select.wav", 0.6)
+            var m: string = menu[sel]
+            if m == "START" {
+                read_slots()
+                state = "slots"
+                sel = 0
+            } elif m == "OPTIONS" {
+                state = "options"
+                sel = 0
+            } else {
+                quit()
+            }
+        }
+        return
+    }
+    if state == "slots" {
+        move(3)
+        if back() {
+            state = "menu"
+            sel = 0
+            return
+        }
+        if action_pressed("map") and slots[sel] != nil {
+            state = "erase"
+            play_sound("sfx/select.wav", 0.6)
+            return
+        }
+        if ok() {
+            set_global("slot", "slot" + (sel + 1))
+            if slots[sel] == nil {
+                set_global("load", false)
+                leave("intro.scene")
+            } else {
+                set_global("load", true)
+                leave("main.scene")
+            }
+        }
+        return
+    }
+    if state == "erase" {
+        if ok() {
+            delete_data("slot" + (sel + 1))
+            read_slots()
+            play_sound("sfx/crumble.wav", 0.7)
+            state = "slots"
+        } elif back() or action_pressed("map") {
+            state = "slots"
+        }
+        return
+    }
+    if state == "options" {
+        move(len(options))
+        var lr: int = 0
+        if action_pressed("left") { lr = -1 }
+        if action_pressed("right") { lr = 1 }
+        var o: string = options[sel]
+        if o == "MUSIC" and lr != 0 {
+            var v: number = clamp(global("music_volume", 0.8) + lr * 0.1, 0, 1)
+            set_global("music_volume", v)
+            set_volume("music", v)
+            save_settings()
+        }
+        if o == "SOUND" and lr != 0 {
+            set_volume("sfx", clamp(volume("sfx") + lr * 0.1, 0, 1))
+            play_sound("sfx/blip.wav", 0.8)
+            save_settings()
+        }
+        if o == "FULLSCREEN" and (ok() or lr != 0) {
+            set_fullscreen(not fullscreen())
+            save_settings()
+        }
+        if back() or (o == "BACK" and ok()) {
+            state = "menu"
+            sel = 1
+            play_sound("sfx/select.wav", 0.6)
+        }
+    }
+}
+
+# ---- drawing ---------------------------------------------------------------------------------------
+func centred(s: string, y: number, colour: string) -> void {
+    var w: number = text_size(s).x
+    draw_text(s, vec2(128 - w / 2 + 1, y + 1), "#000000")
+    draw_text(s, vec2(128 - w / 2, y), colour)
+}
+
+func two(n: int) -> string {
+    if n < 10 { return "0" + n }
+    return "" + n
+}
+
+func clock(secs: number) -> string {
+    var m: int = floor(secs / 60)
+    return two(floor(m / 60)) + ":" + two(m % 60)
+}
+
+func bar(v: number) -> string {
+    var s: string = ""
+    for i in 10 {
+        if i < round(v * 10) { s = s + "#" } else { s = s + "-" }
+    }
+    return s
+}
+
+# One saved journey, in a line: its time, its seals, and a crown if it was finished.
+func slot_text(i: int) -> list[string] {
+    var s: any = slots[i]
+    if s == nil { return ["JOURNEY " + (i + 1), "- NEW -"] }
+    var l: list = s
+    var inv: list = l[1]
+    var items: list = inv[0]
+    var seals: int = 0
+    for it in items {
+        if len(it) > 5 and substr(it, 0, 5) == "seal_" { seals += 1 }
+    }
+    var flags: list = l[2]
+    var top: string = "JOURNEY " + (i + 1) + "   " + clock(l[6])
+    var bottom: string = "SEALS " + seals + "/4   ENERGY " + (99 + inv[2] * 100)
+    if contains(flags, "won") { bottom = "* THE COUNT IS BEATEN *" }
+    return [top, bottom]
+}
+
+func panel(pos: vec2, size: vec2) -> void {
+    draw_rect(pos, size, "#000000")
+    draw_rect(pos + vec2(1, 1), size - vec2(2, 2), "#f8e8b0", false)
+    draw_rect(pos + vec2(3, 3), size - vec2(6, 6), "#806030", false)
+}
+
+func draw() -> void {
+    draw_image("art/title_night.bmp", vec2(128, 120))
+    var bob: number = round(sin(t * 1.6) * 2)
+    draw_image("art/logo.bmp", vec2(128, 46 + bob))
+    if state == "press" {
+        if floor(t * 2) % 2 == 0 { centred("PRESS START", 168, "#ffffff") }
+        centred("A SEQUEL OF THE DEEP LARDERS", 196, "#c0a0d0")
+    }
+    if state == "menu" {
+        for i in len(menu) {
+            var col: string = "#c0a0d0"
+            if i == sel { col = "#ffe070" }
+            var label: string = menu[i]
+            if i == sel { label = "> " + label + " <" }
+            centred(label, 150 + i * 16, col)
+        }
+    }
+    if state == "slots" or state == "erase" {
+        for i in 3 {
+            var y: number = 100 + i * 36
+            panel(vec2(24, y), vec2(208, 32))
+            if i == sel { draw_rect(vec2(28, y + 4), vec2(200, 24), "#503040") }
+            var lines: list[string] = slot_text(i)
+            draw_text(lines[0], vec2(36, y + 7), "#ffe070")
+            draw_text(lines[1], vec2(36, y + 18), "#ffffff")
+        }
+        if state == "erase" {
+            panel(vec2(32, 140), vec2(192, 40))
+            draw_rect(vec2(36, 144), vec2(184, 32), "#301018")
+            centred("FORGET JOURNEY " + (sel + 1) + "?", 150, "#ff8080")
+            centred("JUMP: YES   C: NO", 164, "#ffffff")
+        } else {
+            centred("JUMP: GO   C: BACK   M: FORGET", 214, "#c0a0d0")
+        }
+    }
+    if state == "options" {
+        panel(vec2(24, 132), vec2(208, 84))
+        for i in len(options) {
+            var o: string = options[i]
+            var y: number = 142 + i * 18
+            var label: string = o
+            if o == "MUSIC" { label = "MUSIC   " + bar(global("music_volume", 0.8)) }
+            if o == "SOUND" { label = "SOUND   " + bar(volume("sfx")) }
+            if o == "FULLSCREEN" {
+                label = "FULLSCREEN: OFF"
+                if fullscreen() { label = "FULLSCREEN: ON" }
+            }
+            if i == sel { draw_rect(vec2(30, y - 4), vec2(196, 16), "#503040") }
+            draw_text(label, vec2(40, y), "#ffffff")
+        }
+    }
+    draw_text("(C) THE BRONTO PANTRY", vec2(4, 229), "#605070")
+    if leaving >= 0 {
+        draw_rect(vec2(0, 0), vec2(256, 240), rgb(0, 0, 0, 255 * clamp(leaving / 0.7, 0, 1)))
+    }
+}

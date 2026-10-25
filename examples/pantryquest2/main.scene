@@ -1,0 +1,65 @@
+# Pantry Quest II - the game: the world's facts, the Game entity (scripts/game.bs) that brings
+# the rooms in, Basil, the camera that follows him, and the HUD. Press Play in the editor to play;
+# set the Game's Script vars to start somewhere else (start_room, start_pos, start_items).
+bronto_scene 1
+
+entity
+  Name
+    text = "World"
+  Script
+    file = "scripts/world_data.bs"
+
+entity
+  Name
+    text = "Story"
+  Script
+    file = "scripts/story.bs"
+
+entity
+  Name
+    text = "Game"
+  Script
+    file = "scripts/game.bs"
+
+entity
+  Name
+    text = "Basil"
+  Transform
+    position = 72 192
+  Sprite
+    image = "art/basil.bmp"
+    layer = 5
+    frame_size = 24 32
+  Animation
+    frames = "0"
+    fps = 10
+    loop = true
+    playing = true
+  Script
+    file = "scripts/basil.bs"
+  Tags
+    list = "player"
+
+entity
+  Name
+    text = "Camera"
+  Transform
+    position = 128 120
+  Camera
+    current = true
+    zoom = 1
+    follow = 3
+    follow_offset = 0 -8
+    deadzone = 12 20
+    smoothing = 0.06
+    limit = true
+    limit_min = 0 0
+    limit_max = 256 240
+    ui_layer = 50
+    pixel_snap = true
+
+entity
+  Name
+    text = "HUD"
+  Script
+    file = "scripts/hud.bs"

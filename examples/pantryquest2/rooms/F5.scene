@@ -1,0 +1,166 @@
+# Pantry Quest II - room F5, Frozen Pipes (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"F5\", area = \"frost\", w = 3, h = 1, music = \"music/frost.wav\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 384 120
+  Tilemap
+    tileset = "art/tiles_frost.bmp"
+    tile_size = 16
+    columns = 48
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "##$###$###%###%###%###%#########################%##############################################################################$###$###$###$###$#########${##$###$###$##*$###$#+#$###$###%###%#####$#T#$###T###$#T#%###T###%#T#%###T#####T#######%###%###%##############################################################################$###$#####################*###$##+$###$###$###$###$###$#$###$###$###$###$###$###$###%###%###%###%#########$###%###%###%###%#########################################################################################*######+#######$###$###$###${##$###$#####$###$###$###$###$###$###$###$###%###%###%#####$###$###$###%###%###%###%#####################%###%##########################################"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 384 120
+  Tilemap
+    tileset = "art/tiles_frost.bmp"
+    tile_size = 16
+    columns = 48
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "QPPPPPPPPPPQPPPPPPPSPPPPRPPPPPPPPPPRPPPPQPPPPPPPPPPPQPPLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLPPPPPPPN........................................HPQPPPPN........................................HPPPPPQN........................................HPPPPPPN........................................HPPQPPPN........................................HPLLLLLJ........................................HN..............................................HN..CKI.........................................DN...............................................N.......GOM.....................................N.......HPN...............^^^^^^^^^^^^^.........POOOOOOOPPROOOOOOOOOOOM..GOOOOOOOOOOOOOOOOOOOOOOPPPRPPPPPPPPPPRPPPPQPPN..HPSPPPPPPPPPPSPPPPRPPPP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 760 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+    flip_x = true
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"E\", index = 0, kind = \"blue\", to = \"F4\", arrive = \"W1\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 384 232
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"S\", index = 1, kind = \"blue\", to = \"F8\", arrive = \"N0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slider"
+  Transform
+    position = 488 168
+  Sprite
+    image = "art/slider.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"slider\", hp = 4, damage = 12"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Slider"
+  Transform
+    position = 584 168
+  Sprite
+    image = "art/slider.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"slider\", hp = 4, damage = 12"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Crawler"
+  Transform
+    position = 200 200
+  Sprite
+    image = "art/crawler.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"crawler\", hp = 2, damage = 8"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Crawler"
+  Transform
+    position = 712 200
+  Sprite
+    image = "art/crawler.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"crawler\", hp = 2, damage = 8"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0

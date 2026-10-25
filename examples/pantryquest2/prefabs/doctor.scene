@@ -1,0 +1,16 @@
+# Pantry Quest II - Doctor Brine in his jar (bosses/brine.bs spawns him) (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Doctor"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/boss_doctor.bmp"
+    layer = 4
+    frame_size = 24 32
+  Script
+    file = "scripts/bosses/doctor.bs"
+  Tags
+    list = "enemy, boss, transient"

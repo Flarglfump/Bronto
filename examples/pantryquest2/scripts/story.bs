@@ -1,0 +1,172 @@
+@strict
+# Everything anyone says, and the names of things: the Story entity holds the words, and
+# the Game asks for them by name (find("Story").talk("mozz_meet")). A talk is a list of
+# pages, each [speaker, portrait, text]; the portraits are frames of art/portraits.bmp.
+# In the text, '|' starts a new line.
+
+const BASIL: int = 0
+const MOZZ: int = 1
+const PIP: int = 2
+const COUNT: int = 3
+const STALE: int = 4
+const SUNDAE: int = 5
+const BRINE: int = 6
+const WYRM: int = 7
+const NONE: int = -1
+
+func talk(id: string) -> list {
+    # ---- Old Mozz, the Count's butler, who left him
+    if id == "mozz_meet" {
+        return [["???", MOZZ, "Hold, little sprout! Put down that pepper mill. I'm a friend."],
+                ["OLD MOZZ", MOZZ, "Old Mozz, they call me. I was the Count's butler, once... until I saw what he meant to do."],
+                ["BASIL", BASIL, "He took Chef Pip! I'm his apprentice. I'm going to bring him home."],
+                ["OLD MOZZ", MOZZ, "Then listen. The castle gate is shut with four seals: SALT, SUGAR, VINEGAR and PEPPER."],
+                ["OLD MOZZ", MOZZ, "The Count gave one to each of his Spoiled Knights. Beat them, take their seals, and the gate must open."],
+                ["OLD MOZZ", MOZZ, "The old well in the market square goes down to the Rye Catacombs. Start there."],
+                ["OLD MOZZ", MOZZ, "Rest at a hearth when you find one: its fire keeps your journey safe. And Basil..."],
+                ["OLD MOZZ", MOZZ, "If you find pages of the Count's diary, read them. He was not always a monster."]]
+    }
+    if id == "mozz_catacombs" {
+        return [["OLD MOZZ", MOZZ, "You found the Dough Wrap! Curled up in dough, you'll fit where nobody else can."],
+                ["OLD MOZZ", MOZZ, "Sir Stale guards the Seal of Salt, east along the bone corridor. His crust is hard - aim for his face when he lifts his visor."]]
+    }
+    if id == "mozz_frost" {
+        return [["OLD MOZZ", MOZZ, "Brr! The old ice cellar. The Count keeps a beast down here that was a sundae, once."],
+                ["OLD MOZZ", MOZZ, "They say there's Frost Sugar in the vaults. Pepper with frost on it freezes what it hits - solid enough to stand on."]]
+    }
+    if id == "mozz_brine" {
+        return [["OLD MOZZ", MOZZ, "Mind the vats. Doctor Brine pickles anything that holds still."],
+                ["OLD MOZZ", MOZZ, "Here is a secret, Basil: the Count fears GARLIC. The doctor grows it in his gardens, to keep it from his master."],
+                ["OLD MOZZ", MOZZ, "Find the Garlic Wave. Without it, you can't hurt the Count at all."]]
+    }
+    if id == "mozz_molten" {
+        return [["OLD MOZZ", MOZZ, "The Molten Kitchens. Down there the floors run with melted cheese, and the air itself will cook you."],
+                ["OLD MOZZ", MOZZ, "Without Oven Mitts, don't go where the walls glow red. Doctor Brine keeps a pair in his locker, I believe."]]
+    }
+    if id == "mozz_gate" {
+        return [["OLD MOZZ", MOZZ, "Four seals! Look how they shine. The gate can't hold against them now."],
+                ["OLD MOZZ", MOZZ, "The Count's tower rises from the far end of the castle. You'll need to fly, near enough, to climb it."],
+                ["OLD MOZZ", MOZZ, "I'll keep watch here. When it's over... run. A castle made of cheese won't stand long without him."]]
+    }
+    if id == "mozz_idle" {
+        return [["OLD MOZZ", MOZZ, "The well in the square goes down to the catacombs. Rest at the hearths, and read the Count's diary if you find it."]]
+    }
+    # ---- the Spoiled Knights
+    if id == "stale_intro" {
+        return [["SIR STALE", STALE, "WHO DARES WAKE THE CATACOMBS? I am Sir Stale, First Knight of Spoilage!"],
+                ["SIR STALE", STALE, "I was the finest loaf in the kingdom, boy. Then they left me on the shelf. Now my crust is hard as stone!"]]
+    }
+    if id == "stale_beaten" {
+        return [["SIR STALE", STALE, "Crumbled... by an apprentice... Take the seal. I'm... toast..."]]
+    }
+    if id == "sundae_intro" {
+        return [["", NONE, "Something vast stirs in the frost. Ice cream, melted and frozen and melted again for a hundred years... it has forgotten it was ever sweet."],
+                ["", SUNDAE, "BRRRRAAAAAHHHH!!"]]
+    }
+    if id == "sundae_beaten" {
+        return [["", NONE, "The Abominable Sundae slumps into slush. In the puddle lies the Seal of Sugar, and the faint smell of vanilla."]]
+    }
+    if id == "brine_intro" {
+        return [["DR. BRINE", BRINE, "Ah! A FRESH specimen! I am Doctor Brine, and you, my boy, are going in the jar."],
+                ["DR. BRINE", BRINE, "Frankenfurter! Wake up! Dinner has arrived!"]]
+    }
+    if id == "brine_beaten" {
+        return [["DR. BRINE", BRINE, "My beautiful monster... my vinegar... Go on, take the seal. The Count never once thanked me for anything."]]
+    }
+    if id == "wyrm_intro" {
+        return [["FLAMBE WYRM", WYRM, "Hssss... a little green thing, come to the furnace. Do you know how long I have burned, waiting for someone to taste me?"],
+                ["FLAMBE WYRM", WYRM, "Nobody ever does. They are all too afraid of being BURNED!"]]
+    }
+    if id == "wyrm_beaten" {
+        return [["FLAMBE WYRM", WYRM, "The flame... goes out at last... Take the Seal of Pepper. It's warm. Like I was."]]
+    }
+    # ---- the Count
+    if id == "count_intro" {
+        return [["COUNT FROMAGE", COUNT, "So. The cook's little sprout climbs my tower."],
+                ["COUNT FROMAGE", COUNT, "Do you know how long I aged in the dark, Basil? A hundred years. Alone. Forgotten. While up above, they FEASTED."],
+                ["BASIL", BASIL, "Where's Chef Pip?"],
+                ["COUNT FROMAGE", COUNT, "Cooking my Eternal Fondue. When it's done, the Blight will spoil the whole world - and nobody will ever be forgotten again, because there will be nobody left to forget."],
+                ["COUNT FROMAGE", COUNT, "Now... let me show you what it is to SPOIL."]]
+    }
+    if id == "count_phase2" {
+        return [["COUNT FROMAGE", COUNT, "ENOUGH! You think a pepper mill can stop the BIG CHEESE?!"]]
+    }
+    if id == "count_no_garlic" {
+        return [["", NONE, "The pepper sinks into the Big Cheese and vanishes. Nothing in Basil's mill can hurt it. (Old Mozz spoke of garlic...)"]]
+    }
+    if id == "count_beaten" {
+        return [["COUNT FROMAGE", COUNT, "The garlic... the light... It's warm. I'd forgotten..."],
+                ["COUNT FROMAGE", COUNT, "Basil... would you... remember my name?"],
+                ["BASIL", BASIL, "Fromage. I'll remember."],
+                ["", NONE, "The Count melts away, and with him the Blight. The castle groans. Cheese walls begin to drip..."]]
+    }
+    if id == "pip_rescue" {
+        return [["CHEF PIP", PIP, "Basil?! You came all this way - with a pot on your head and a pepper mill!"],
+                ["BASIL", BASIL, "Chef! The Count's gone. But the castle -"],
+                ["CHEF PIP", PIP, "- is melting, yes, I can see that. Fondue doesn't keep. RUN! Back across the bridge, as fast as you can!"]]
+    }
+    if id == "escape" {
+        return [["", NONE, "The castle is melting! Get out across the bridge before it comes down!"]]
+    }
+    # ---- the hearths and map tables
+    if id == "hearth" {
+        return [["", NONE, "Basil warms his hands at the old oven. Energy and hot sauce restored, and your journey is saved."]]
+    }
+    if id == "hearth_nosave" {
+        return [["", NONE, "Basil warms his hands at the old oven. Energy and hot sauce restored. (The journey couldn't be saved.)"]]
+    }
+    if id == "gate_shut" {
+        return [["", NONE, "The great gate of Castle Fromage. Four empty hollows are set in it: one each for the seals of SALT, SUGAR, VINEGAR and PEPPER."]]
+    }
+    if id == "heat" {
+        return [["", NONE, "The heat here is unbearable! Basil can't stay long without something to protect him..."]]
+    }
+    return [["", NONE, "..."]]
+}
+
+# ---- the Count's diary ---------------------------------------------------------------------------
+func diary() -> list {
+    return [["page1", "DAY 1. The new cheesemonger set me in the deepest cellar to age. 'Be patient,' he said, 'and you will be the finest cheese in the kingdom.'"],
+            ["page2", "DAY 400. I can hear them upstairs at their feasts: laughter, music, the clatter of plates. Soon it will be my turn, surely."],
+            ["page3", "DAY 3,000. The cheesemonger has not come down for years. The candles have gone out. Still I wait."],
+            ["page4", "DAY 9,000. A mould has found me. It whispers that they have all forgotten me. It is very good at whispering."],
+            ["page5", "DAY 20,000. The mould and I are friends now. It says everything up there will spoil too, in the end. It says we could help it along."],
+            ["page6", "DAY 36,500. One hundred years. I have aged into something new. Let them call me COUNT. Let them call me FROMAGE."],
+            ["page7", "My knights: a stale loaf, a melted sundae, a pickler gone sour, a flame that burned too long. Like me, they were left too long. Like me, they are angry."],
+            ["page8", "If only someone had come down the stairs. Just once. Just to say my name."]]
+}
+
+func page_text(id: string) -> string {
+    for p in diary() {
+        if p[0] == id { return p[1] }
+    }
+    return ""
+}
+
+# ---- the names of things ---------------------------------------------------------------------------
+func item_name(kind: string) -> string {
+    var names := [["dough", "DOUGH WRAP"], ["popcorn", "POPCORN KERNELS"], ["sauce", "HOT SAUCE"], ["frost", "FROST SUGAR"],
+                  ["leaven", "LEAVEN BOOTS"], ["mitts", "OVEN MITTS"], ["garlic", "GARLIC WAVE"], ["whisk", "WHISK SPIN"],
+                  ["cake", "CAKE SLICE"], ["packet", "SAUCE PACKET"], ["page", "DIARY PAGE"],
+                  ["seal_salt", "SEAL OF SALT"], ["seal_sugar", "SEAL OF SUGAR"], ["seal_vinegar", "SEAL OF VINEGAR"], ["seal_pepper", "SEAL OF PEPPER"]]
+    for n in names {
+        if n[0] == kind { return n[1] }
+    }
+    return kind
+}
+
+func item_text(kind: string, keys: string) -> string {
+    if kind == "dough" { return "Press DOWN on the ground to curl up in dough and roll through narrow tunnels. UP or JUMP to stand." }
+    if kind == "popcorn" { return "While rolled up, FIRE drops popcorn. It pops cracked blocks - and pops Basil up if he's on top!" }
+    if kind == "sauce" { return "Press ROCKET (" + keys + ") to fire hot sauce. It melts red wax seals. Enemies may drop more." }
+    if kind == "frost" { return "Peppercorns now freeze what they hit. Frozen enemies can be stood on. (Turn it off in the pause menu.)" }
+    if kind == "leaven" { return "Springy soles: Basil jumps far higher." }
+    if kind == "mitts" { return "Quilted against the heat: the hottest kitchens can't harm Basil, and every hurt is halved." }
+    if kind == "garlic" { return "Peppercorns now carry garlic: they fly further, hit harder, pass through walls... and the Count fears them." }
+    if kind == "whisk" { return "Run and jump to spin. While spinning, JUMP again in mid-air to keep climbing - as high as you like." }
+    if kind == "cake" { return "A whole extra 100 energy, and every bit of it restored." }
+    if kind == "packet" { return "Basil can carry 5 more hot sauce rockets." }
+    if kind == "page" { return "A page of Count Fromage's diary. Read it in the pause menu." }
+    if kind == "seal_salt" or kind == "seal_sugar" or kind == "seal_vinegar" or kind == "seal_pepper" { return "One of the four seals that shut the castle gate." }
+    return ""
+}

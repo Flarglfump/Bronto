@@ -24,6 +24,7 @@ make tools         # the editor, bscheck and bronto_player (which the editor's B
 make game GAME=examples/pantryquest   # pack a project into a game: build/games/pantryquest/<system>/
                    #   (TARGET=web|linux|macos|windows; default: this computer)
 make pantryquest   # the same for Pantry Quest
+make pantryquest2  # the same for Pantry Quest II (TARGET=web for a web page)
 make test          # build libbronto.a and run the test suite
 make examples      # build examples/ into build/examples/
 make sanitize      # tests under AddressSanitizer + UndefinedBehaviorSanitizer
@@ -179,6 +180,9 @@ func on_trigger(other) { if other.name == "Coin" { destroy(other) } }
 **Load Project** and press Play. `examples/pantryquest` is a whole adventure game made the
 same way: a top-down quest across a land of 128 screens built from Tilemaps, with caves,
 shops, secrets, cellars with keys, maps, compasses and bosses, and its own art, sounds and music.
+`examples/pantryquest2` is its sequel, a side-scrolling exploration game in the old 8-bit
+castle-and-cave style: 54 rooms, eight abilities that open the way to new places, five
+guardians, a map, save slots, a story told in dialogue and a diary, and an ending.
 `make replay` watches a bot play it from the title to the ending (see
 [Replays](#replays)). The language is
 described in [docs/scripting.md](docs/scripting.md). When speed matters, a script can
@@ -350,6 +354,7 @@ examples/snake/      sample game: Snake
 examples/towerdefense/  sample game: Pop Defense (tower defense)
 examples/platformer/    a level built only from the editor: physics + scripts, no C
 examples/pantryquest/   an adventure game made of scenes, Tilemaps, prefabs and scripts, no C
+examples/pantryquest2/  its sequel: a side-scrolling exploration game, no C (tools/ makes its assets)
 tools/editor/        the visual scene editor
 tools/bscheck/       checks .bs scripts from the command line
 tools/player/        bronto_player: runs games (the editor's Build packs projects into it)

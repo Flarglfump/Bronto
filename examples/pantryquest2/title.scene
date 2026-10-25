@@ -1,0 +1,8 @@
+# Pantry Quest II - the title screen (scripts/title.bs): the logo, the three journeys, the options.
+bronto_scene 1
+
+entity
+  Name
+    text = "Title"
+  Script
+    file = "scripts/title.bs"

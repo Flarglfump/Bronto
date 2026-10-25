@@ -185,6 +185,20 @@ game: $(EDITOR) $(PLAYER) $(if $(filter web,$(GAME_TARGET)),web)
 pantryquest:
 	@$(MAKE) --no-print-directory game GAME=examples/pantryquest TARGET=$(TARGET)
 
+# Pantry Quest II: pack it like any game; remake its art, sound, music, rooms and prefabs
+# from the Python tools in examples/pantryquest2/tools (standard library only); and play the
+# world through on paper to be sure every room, item and guardian can be reached.
+PQ2 := examples/pantryquest2
+pantryquest2:
+	@$(MAKE) --no-print-directory game GAME=$(PQ2) TARGET=$(TARGET)
+pantryquest2-assets:
+	python3 $(PQ2)/tools/make_art.py && python3 $(PQ2)/tools/make_sound.py && python3 $(PQ2)/tools/make_music.py
+	python3 $(PQ2)/tools/make_rooms.py && python3 $(PQ2)/tools/make_prefabs.py
+pantryquest2-check: $(BSCHECK)
+	$(BSCHECK) --strict --project $(PQ2) $(wildcard $(PQ2)/scripts/*.bs) $(wildcard $(PQ2)/scripts/bosses/*.bs)
+	python3 $(PQ2)/tools/check_world.py
+.PHONY: pantryquest2 pantryquest2-assets pantryquest2-check
+
 # The VS Code extension for .bs scripts: package it, and test it with node.
 vscode:
 	python3 tools/vscode/package_vsix.py $(BUILD)

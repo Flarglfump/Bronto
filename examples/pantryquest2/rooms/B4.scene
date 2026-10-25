@@ -1,0 +1,83 @@
+# Pantry Quest II - room B4, Mitt Locker (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"B4\", area = \"brine\", w = 1, h = 1, music = \"music/brine.wav\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 128 120
+  Tilemap
+    tileset = "art/tiles_brine.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "#####################$###$###$#####$###$###$###%#%#{#%########################################$#$###$###$###$#####%###%###%*##%##################################$###$###$###$#####$###$###%+##%#%########################################$###$#"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 120
+  Tilemap
+    tileset = "art/tiles_brine.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "QPPPPPPPPPPQPPPPPLLLLLLLLLLLLLLPN..............HN..............HN..............HN..............HN..............HN..............HN..............HN..............DN...............N..GOOM.........N..HPPN.........POOPPSPOOOOOOOOOPPPRPPPPPPPPPPRP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 248 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+    flip_x = true
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"E\", index = 0, kind = \"blue\", to = \"B3\", arrive = \"W1\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Item"
+  Transform
+    position = 88 168
+  Sprite
+    image = "art/items.bmp"
+    layer = 3
+    frame_size = 16 16
+    frame = 5
+  Script
+    file = "scripts/item.bs"
+    vars = "kind = \"mitts\", iid = \"mitts\""
+  Tags
+    list = "item"
+  Parent
+    entity = 0

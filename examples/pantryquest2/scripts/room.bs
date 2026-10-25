@@ -1,0 +1,57 @@
+@strict
+# A room: its map (the "Map" child, solid tiles), what grows back (crumb blocks), and
+# whether it is too hot to stand in without the Oven Mitts. Made by tools/make_rooms.py.
+
+var id: string = ""
+var area: string = ""
+var w: int = 1
+var h: int = 1
+var music: string = ""
+var heat: bool = false
+var boss: string = ""
+var map: entity
+var regrow: list = []                     # [column, row, seconds left] for broken crumb blocks
+
+func start() -> void {
+    map = child(self, "Map")
+    var game := find("Game")
+    var key: string = "block:" + id + ":"               # blocks broken for good (cracked and wax ones)
+    for f in game.flags {
+        if substr(f, 0, len(key)) == key {
+            var rest: string = substr(f, len(key))
+            var i: int = 0
+            while i < len(rest) and rest[i] != "_" { i += 1 }
+            tile_put(map, num(substr(rest, 0, i)), num(substr(rest, i + 1)), ".")
+        }
+    }
+    if heat and not game.has("mitts") and not game.flag("talked:heat") {
+        game.set_flag("talked:heat")
+        game.talk("heat")
+    }
+}
+
+# A shot or popcorn broke a block at a cell: crumb blocks grow back after a while.
+func broke(col: int, row: int, ch: string) -> void {
+    if ch == "c" { push(regrow, [col, row, 5.0]) }
+}
+
+func update(dt: number) -> void {
+    var i: int = 0
+    while i < len(regrow) {
+        var g: list = regrow[i]
+        g[2] = g[2] - dt
+        if g[2] <= 0 {
+            var c := tile_cell_center(map, g[0], g[1])
+            var basil := find("Basil")
+            if basil.touches(c, vec2(8, 8)) or tile_get(map, g[0], g[1]) != "." {
+                g[2] = 0.5                         # not on top of him: wait
+                i += 1
+            } else {
+                tile_put(map, g[0], g[1], "c")
+                remove(regrow, i)
+            }
+        } else {
+            i += 1
+        }
+    }
+}

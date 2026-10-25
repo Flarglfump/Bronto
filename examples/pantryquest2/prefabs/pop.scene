@@ -1,0 +1,21 @@
+# Pantry Quest II - an effect: pop (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Pop"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/fx_pop.bmp"
+    layer = 7
+    frame_size = 16 16
+  Animation
+    frames = "0-3"
+    fps = 14
+    loop = false
+    playing = true
+  Script
+    file = "scripts/fx.bs"
+  Tags
+    list = "transient"

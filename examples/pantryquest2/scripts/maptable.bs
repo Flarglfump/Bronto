@@ -1,0 +1,24 @@
+@strict
+# A map table: standing at it and pressing up copies the map of its part of the world.
+
+var area: string = "village"
+var game: entity
+var basil: entity
+var draw_layer: int = 6
+var near: bool = false
+var t: number = 0
+
+func start() -> void {
+    game = find("Game")
+    basil = find("Basil")
+}
+
+func update(dt: number) -> void {
+    t += dt
+    near = game.state == "play" and abs(basil.x - self.x) < 20 and abs(basil.y - self.y) < 30
+    if near and action_pressed("up") { game.read_map(area) }
+}
+
+func draw() -> void {
+    if near and not contains(game.maps, area) and floor(t * 3) % 2 == 0 { draw_text("^", vec2(self.x - 4, self.y - 28), "#ffffff") }
+}

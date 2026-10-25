@@ -1,0 +1,22 @@
+@strict
+# A piece of the Flambe Wyrm's body: it goes where the head puts it, burns Basil, and turns shots.
+
+var game: entity
+var basil: entity
+
+func start() -> void {
+    game = find("Game")
+    basil = find("Basil")
+}
+
+func hit_by(p: vec2, r: number) -> bool { return abs(p.x - self.x) < 7 + r and abs(p.y - self.y) < 7 + r }
+
+func hit(amount: number, kind: string, from: vec2) -> bool {
+    play_sound("sfx/clank.wav", 0.4)
+    return true
+}
+
+func update(dt: number) -> void {
+    if game.state != "play" { return }
+    if basil.touches(self.position, vec2(7, 7)) { basil.hurt(14, self.position) }
+}

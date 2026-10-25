@@ -1,0 +1,21 @@
+# Pantry Quest II - something an enemy throws (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Spit"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/spit.bmp"
+    layer = 6
+    frame_size = 8 8
+  Animation
+    frames = "0-1"
+    fps = 8
+    loop = true
+    playing = true
+  Script
+    file = "scripts/spit.bs"
+  Tags
+    list = "spit, transient"

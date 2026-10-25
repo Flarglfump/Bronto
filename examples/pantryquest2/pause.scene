@@ -1,0 +1,21 @@
+# Pantry Quest II - the pause menu (scripts/pause.bs), pushed over the game: the map, the items,
+# the Count's diary, and the system settings. It reads what to show from globals.
+bronto_scene 1
+
+entity
+  Name
+    text = "World"
+  Script
+    file = "scripts/world_data.bs"
+
+entity
+  Name
+    text = "Story"
+  Script
+    file = "scripts/story.bs"
+
+entity
+  Name
+    text = "Pause"
+  Script
+    file = "scripts/pause.bs"

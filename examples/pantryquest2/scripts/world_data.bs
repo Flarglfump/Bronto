@@ -1,0 +1,117 @@
+# Pantry Quest II - the world's rooms: where each sits on the map, its size, area and name.
+# Made by tools/make_rooms.py from tools/world.py: change it there.
+@strict
+
+func rooms() -> list {
+    # [id, x, y, w, h, area, name, doors ("W0", "E1", ...), boss room]
+    return [
+        ["V0", 2, 3, 2, 1, "village", "Outskirts", ["E0"], false],
+        ["V1", 4, 3, 2, 1, "village", "Bakery Ruins", ["W0", "E0"], false],
+        ["V2", 6, 3, 3, 1, "village", "Market Square", ["W0", "E0", "S1", "N2"], false],
+        ["V2r", 8, 2, 1, 1, "village", "Rooftops", ["S0"], false],
+        ["V3", 9, 3, 3, 1, "village", "Chapel Road", ["W0", "E0"], false],
+        ["V4", 12, 3, 2, 1, "village", "Castle Gate", ["W0", "E0:gate"], false],
+        ["V5", 14, 3, 4, 1, "village", "The Bridge", ["W0", "E0"], false],
+        ["C0", 7, 4, 1, 3, "catacombs", "Well Shaft", ["N0", "W1", "E2"], false],
+        ["C1", 4, 5, 3, 1, "catacombs", "Ossuary", ["W0", "E0", "S1"], false],
+        ["C2", 3, 5, 1, 1, "catacombs", "Dough Alcove", ["E0"], false],
+        ["C3", 8, 6, 1, 1, "catacombs", "Map Room", ["W0", "E0", "S0"], false],
+        ["C8", 9, 6, 4, 1, "catacombs", "Bone Corridor", ["W0", "E0"], false],
+        ["C9", 13, 6, 2, 1, "catacombs", "Sir Stale's Hall", ["W0:boss", "E0"], true],
+        ["C10", 15, 5, 1, 3, "catacombs", "East Stair", ["W1", "N0"], false],
+        ["C4", 4, 6, 3, 2, "catacombs", "Crumbling Crypt", ["N1", "E1", "W1"], false],
+        ["C5", 7, 7, 1, 1, "catacombs", "Rye Hearth", ["W0", "E0"], false],
+        ["C11", 8, 7, 3, 1, "catacombs", "Sunken Chapel", ["W0", "N0", "E0:wax"], false],
+        ["C7", 3, 7, 1, 3, "catacombs", "Deep Stair", ["E0", "S0"], false],
+        ["F0", 3, 10, 1, 3, "frost", "Ice Shaft", ["N0", "W1", "W2", "E1"], false],
+        ["F7", 2, 11, 1, 1, "frost", "Frost Map", ["E0"], false],
+        ["F2", 2, 12, 1, 1, "frost", "Sauce Shrine", ["E0"], false],
+        ["F1", 4, 11, 4, 1, "frost", "Icebox Hall", ["W0", "E0"], false],
+        ["F3", 8, 11, 1, 1, "frost", "Frost Hearth", ["W0", "S0"], false],
+        ["F4", 7, 12, 2, 2, "frost", "Glacier Steps", ["N1", "W1", "E1:wax"], false],
+        ["F6", 9, 13, 1, 1, "frost", "Sugar Vault", ["W0:wax"], false],
+        ["F5", 4, 13, 3, 1, "frost", "Frozen Pipes", ["E0", "S1"], false],
+        ["F8", 5, 14, 3, 1, "frost", "Slush Pit", ["N0", "E0"], false],
+        ["F9", 8, 14, 2, 1, "frost", "Sundae's Den", ["W0:boss"], true],
+        ["M0", 11, 7, 1, 3, "molten", "Scalding Stair", ["W0", "S0"], false],
+        ["M1", 9, 10, 4, 1, "molten", "Simmer Hall", ["N2", "W0", "E0"], false],
+        ["M2", 13, 10, 1, 1, "molten", "Leaven Shrine", ["W0", "S0"], false],
+        ["M3", 8, 10, 1, 1, "molten", "Molten Hearth", ["E0"], false],
+        ["M4", 13, 11, 1, 3, "molten", "Furnace Drop", ["N0", "E2", "S0"], false],
+        ["M5", 14, 13, 3, 1, "molten", "Boiler Room", ["W0", "E0"], false],
+        ["M6", 17, 13, 2, 1, "molten", "Whisk Pantry", ["W0", "N1"], false],
+        ["M10", 18, 10, 1, 3, "molten", "Steam Pipe", ["N0", "S0"], false],
+        ["M7", 13, 14, 1, 2, "molten", "Cheese Falls", ["N0", "W1"], false],
+        ["M8", 11, 15, 2, 1, "molten", "Wyrm's Furnace", ["E0:boss"], true],
+        ["B0", 15, 4, 2, 1, "brine", "Drain Gate", ["S0", "E0"], false],
+        ["B1", 17, 4, 3, 1, "brine", "Pickling Vats", ["W0", "E0"], false],
+        ["B2", 20, 4, 1, 1, "brine", "Brine Hearth", ["W0", "S0"], false],
+        ["B3", 20, 5, 1, 4, "brine", "Brine Shaft", ["N0", "W1", "E2", "S0"], false],
+        ["B4", 19, 6, 1, 1, "brine", "Mitt Locker", ["E0"], false],
+        ["B6", 21, 7, 2, 1, "brine", "Garlic Garden", ["W0"], false],
+        ["B7", 20, 9, 1, 1, "brine", "Lab Door", ["N0", "W0"], false],
+        ["B8", 18, 9, 2, 1, "brine", "Dr. Brine's Lab", ["E0:boss", "S0"], true],
+        ["X0", 18, 2, 2, 2, "castle", "Grand Foyer", ["W1", "E0", "E1"], false],
+        ["X1", 20, 2, 3, 1, "castle", "Portrait Gallery", ["W0", "E0"], false],
+        ["X2", 20, 3, 3, 1, "castle", "Wine Cellar", ["W0", "E0"], false],
+        ["X3", 23, 1, 2, 2, "castle", "Library", ["W1", "E0"], false],
+        ["X4", 23, 3, 2, 1, "castle", "Fondue Kitchen", ["W0", "E0"], false],
+        ["X6", 25, 0, 1, 4, "castle", "Clock Tower", ["W0", "W1", "W3"], false],
+        ["X7", 23, 0, 2, 1, "castle", "Throne Room", ["E0:boss", "W0:boss"], true],
+        ["X8", 22, 0, 1, 1, "castle", "Pip's Cell", ["E0"], false]
+    ]
+}
+
+func areas() -> list {
+    # [area, title, map colour]
+    return [
+        ["village", "CRUMB VILLAGE", rgb(110, 100, 170)],
+        ["catacombs", "RYE CATACOMBS", rgb(170, 110, 60)],
+        ["frost", "FROSTBITE CELLAR", rgb(90, 160, 220)],
+        ["molten", "MOLTEN KITCHENS", rgb(220, 90, 50)],
+        ["brine", "BRINE WORKS", rgb(90, 170, 100)],
+        ["castle", "CASTLE FROMAGE", rgb(200, 170, 70)]
+    ]
+}
+
+func things() -> list {
+    # what the map marks: [room, kind, x, y] (kind: item, hearth, map, boss) - x, y in tiles
+    return [
+        ["V1", "hearth", 20, 12, ""],
+        ["V2r", "item", 13, 6, "cake_v2r"],
+        ["V3", "item", 22, 10, "page1"],
+        ["C1", "item", 42, 12, "packet_c1"],
+        ["C2", "item", 8, 10, "dough"],
+        ["C3", "maptable", 3, 12, ""],
+        ["C8", "item", 31, 3, "cake_c8"],
+        ["C10", "item", 7, 42, "packet_c10"],
+        ["C4", "item", 24, 18, "page2"],
+        ["C5", "hearth", 8, 12, ""],
+        ["F7", "maptable", 6, 12, ""],
+        ["F2", "item", 7, 10, "sauce"],
+        ["F1", "item", 21, 3, "page3"],
+        ["F3", "hearth", 4, 12, ""],
+        ["F4", "item", 1, 13, "packet_f4"],
+        ["F6", "item", 9, 10, "frost"],
+        ["M1", "item", 6, 3, "page4"],
+        ["M2", "item", 5, 10, "leaven"],
+        ["M3", "hearth", 4, 12, ""],
+        ["M3", "maptable", 10, 12, ""],
+        ["M5", "item", 26, 3, "cake_m5"],
+        ["M6", "item", 7, 10, "whisk"],
+        ["B1", "item", 26, 12, "page6"],
+        ["B1", "item", 42, 3, "packet_b1"],
+        ["B2", "hearth", 4, 12, ""],
+        ["B2", "maptable", 11, 12, ""],
+        ["B4", "item", 5, 10, "mitts"],
+        ["B6", "item", 27, 12, "garlic"],
+        ["B6", "item", 25, 12, "page5"],
+        ["X0", "hearth", 5, 27, ""],
+        ["X2", "item", 19, 6, "page7"],
+        ["X3", "maptable", 15, 11, ""],
+        ["X3", "item", 22, 11, "page8"],
+        ["X3", "item", 2, 6, "packet_x3"],
+        ["X4", "item", 6, 7, "cake_x4"],
+        ["X4", "hearth", 26, 12, ""]
+    ]
+}

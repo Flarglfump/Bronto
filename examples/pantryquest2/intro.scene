@@ -1,0 +1,8 @@
+# Pantry Quest II - the story so far (scripts/intro.bs), shown before a new journey.
+bronto_scene 1
+
+entity
+  Name
+    text = "Intro"
+  Script
+    file = "scripts/intro.bs"

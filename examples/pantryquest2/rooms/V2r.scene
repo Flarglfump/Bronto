@@ -1,0 +1,78 @@
+# Pantry Quest II - room V2r, Rooftops (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"V2r\", area = \"village\", w = 1, h = 1, music = \"music/village.wav\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 128 120
+  Tilemap
+    tileset = "art/tiles_village.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "000010000000000100000001000000000000000000123000001000000004510000000100000000000000000010000000@@@@@@@@@@@@@@@@99999999999999999999999999999999666666666666666688887777777788888888777777778888888877777777888888887777777788888888777777778888"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 120
+  Tilemap
+    tileset = "art/tiles_village.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "YYYYYYYYYYYYYYYYY..............YY..............YY..............YY..............YY..............YY..............YY...........GOMYY...........HPNYY...........HPNYM.GOM....GM.HPPON.HPN....HN.HRPPN.HPN....HN.HPPPPOPPPOM..HROPPPQPPPRPPN..HPPPPRP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 128 232
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"S\", index = 0, kind = \"blue\", to = \"V2\", arrive = \"N2\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Item"
+  Transform
+    position = 216 104
+  Sprite
+    image = "art/items.bmp"
+    layer = 3
+    frame_size = 16 16
+    frame = 8
+  Script
+    file = "scripts/item.bs"
+    vars = "kind = \"cake\", iid = \"cake_v2r\""
+  Tags
+    list = "item"
+  Parent
+    entity = 0

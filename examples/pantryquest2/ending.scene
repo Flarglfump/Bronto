@@ -1,0 +1,8 @@
+# Pantry Quest II - the ending (scripts/ending.bs): dawn, the way home, the journey's verdict, the cast.
+bronto_scene 1
+
+entity
+  Name
+    text = "Ending"
+  Script
+    file = "scripts/ending.bs"

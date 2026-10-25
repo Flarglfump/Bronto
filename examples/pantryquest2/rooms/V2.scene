@@ -1,0 +1,168 @@
+# Pantry Quest II - room V2, Market Square (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"V2\", area = \"village\", w = 3, h = 1, music = \"music/village.wav\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 384 120
+  Tilemap
+    tileset = "art/tiles_village.bmp"
+    tile_size = 16
+    columns = 48
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "001000000000010000000000100000000001000000000010000001000000000010000000000100000000001000000000000000001000000000010000000000100000000001000000100000000001000000000010000000000100000000001000000100000000001000000000010000000000100000000001000000100000000001000000000010000000000100000000@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999666666666666666666666666666666666666666666666666888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777888877777777"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 384 120
+  Tilemap
+    tileset = "art/tiles_village.bmp"
+    tile_size = 16
+    columns = 48
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY..YYYYYYYY..............................................YY..............................................YY..............................................YY........................................CKI...YY..............................................YY..............................................YY..........CKI.................................YY..............................................YY..................................CKKKI.......Y.....CKKI....................CKKI.....................................................................................E..E......................OOOOOOOOOOOOOOOOOOOOOON..HOOOOOOOOOOOOOOOOOOOOOOPPPRPPPPPPPPPPRPPPPQPPN..HPSPPPPPPPPPPSPPPPRPPPP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 8 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"W\", index = 0, kind = \"blue\", to = \"V1\", arrive = \"E0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 760 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+    flip_x = true
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"E\", index = 0, kind = \"blue\", to = \"V3\", arrive = \"W0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 384 232
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"S\", index = 1, kind = \"blue\", to = \"C0\", arrive = \"N0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 640 8
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"N\", index = 2, kind = \"blue\", to = \"V2r\", arrive = \"S0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Gnat"
+  Transform
+    position = 248 88
+  Sprite
+    image = "art/gnat.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"flyer\", hp = 1, damage = 6"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Gnat"
+  Transform
+    position = 536 104
+  Sprite
+    image = "art/gnat.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"flyer\", hp = 1, damage = 6"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Sign"
+  Transform
+    position = 344 200
+  Sprite
+    image = "art/sign.bmp"
+    layer = -4
+  Script
+    file = "scripts/sign.bs"
+    vars = "text = \"THE OLD WELL. IT GOES DOWN A LONG WAY.\""
+  Tags
+    list = "sign"
+  Parent
+    entity = 0

@@ -1,0 +1,412 @@
+@strict
+# Every ordinary enemy: what they share (health, getting hit, freezing solid with Frost
+# Sugar, hurting Basil, dropping something when beaten) is here, and how each kind moves
+# is a Brain - a class, one for each way of moving, chosen by the `brain` var:
+#
+#   crawler   creeps round the edges of walls, floors and ceilings (bread mites, frost ticks)
+#   flyer     drifts about in a wavy line, turning at walls (gnats)
+#   swooper   hangs from the ceiling and dives at Basil when he passes under (batter bats)
+#   hopper    leaps at Basil (jumping beans, snow cones)
+#   walker    walks along a floor, turning at walls and edges; can throw things (pickles)
+#   slider    glides back and forth, and only Frost Sugar or a rocket stops it (frost flies)
+#   leaper    jumps up out of lava and drops back in (fire beans)
+#   ghost     floats through walls towards Basil, seen only now and then (cheese ghosts)
+#   turret    stays put and fires at Basil (olive guns)
+#   knight    walks at Basil behind a shield that turns pepper (cheese knights)
+#
+# A Brain can't see this file's vars or `self` (an object can be handed about), so each
+# of its functions is given the entity it moves and the Body it shares with this file.
+
+class Body {
+    var map: entity
+    var basil: entity
+    var hp: number = 1
+    var half := vec2(7, 7)                # half the size of what can be hit and what hurts
+    var vel := vec2(0, 0)
+    var facing: int = 1
+    var armored: bool = false             # pepper bounces off (rockets and frost still work)
+    var shield: bool = false              # pepper from the front bounces off
+    var visible: bool = true
+    var shoot: string = ""                # what it fires, if anything ("seed", "brine", "fire")
+
+    func solid(p: vec2) -> bool { return tile_solid(this.map, p) }
+    func near_basil(me: entity, dist: number) -> bool { return distance(me.position, this.basil.position) < dist }
+    func toward_basil(me: entity) -> vec2 { return normalize(this.basil.middle() - me.position) }
+    func fire(me: entity, at: vec2, speed: number) -> void {
+        var p := spawn("prefabs/spit.scene", me.position)
+        p.launch(at * speed, this.shoot)
+    }
+}
+
+class Brain {
+    var t: number = 0
+    func setup(me: entity, b: Body) -> void { }
+    func step(me: entity, b: Body, dt: number) -> void { }
+    func name() -> string { return "brain" }
+}
+
+# Creeps along surfaces at half a pixel a step, turning round corners (a Metroid zoomer).
+class Crawler : Brain {
+    var dir := vec2(1, 0)                 # along the surface
+    var up := vec2(0, -1)                 # away from it
+    var acc: number = 0
+    var speed: number = 0.5
+    var clockwise: bool = true
+
+    override func setup(me: entity, b: Body) -> void {
+        var c := tile_cell(b.map, me.position)
+        me.position = tile_cell_center(b.map, c.x, c.y)
+        var downs := [vec2(0, 1), vec2(-1, 0), vec2(1, 0), vec2(0, -1)]
+        for d in downs {
+            if b.solid(me.position + d * 16) {
+                this.up = d * -1
+                break
+            }
+        }
+        this.dir = vec2(-this.up.y, this.up.x)            # clockwise: floor -> right
+        if not this.clockwise { this.dir = this.dir * -1 }
+        this.turn_sprite(me)
+    }
+    func turn_sprite(me: entity) -> void { me.rotation = angle(this.up) + 90 }
+    override func step(me: entity, b: Body, dt: number) -> void {
+        this.acc += this.speed
+        while this.acc >= 1 {
+            this.acc -= 1
+            me.position = me.position + this.dir
+            var c := tile_cell(b.map, me.position)
+            var centre := tile_cell_center(b.map, c.x, c.y)
+            if abs(me.x - centre.x) < 0.01 and abs(me.y - centre.y) < 0.01 {   # at a cell's middle: corners?
+                if b.solid(me.position + this.dir * 16) {               # a wall ahead: up it
+                    var d := this.dir
+                    this.dir = this.up
+                    this.up = d * -1
+                } elif not b.solid(me.position - this.up * 16) {        # the surface ends: round the edge
+                    var d := this.dir
+                    this.dir = this.up * -1
+                    this.up = d
+                }
+                this.turn_sprite(me)
+            }
+        }
+    }
+    override func name() -> string { return "crawler" }
+}
+
+# Drifts along in a wavy line, turning at walls; once Basil is close it drifts towards him.
+class Flyer : Brain {
+    var origin := vec2(0, 0)
+    var speed: number = 0.6
+    override func setup(me: entity, b: Body) -> void {
+        this.origin = me.position
+        this.t = random(6.28)
+    }
+    override func step(me: entity, b: Body, dt: number) -> void {
+        this.t += dt
+        if b.near_basil(me, 90) {
+            var d := b.toward_basil(me)
+            b.vel = lerp(b.vel, d * 0.9, 0.04)
+        } else {
+            b.vel = vec2(b.facing * this.speed, cos(this.t * 160) * 0.6)
+        }
+        var next := me.position + b.vel
+        if b.solid(next + vec2(sign(b.vel.x) * 7, 0)) {
+            b.facing = -b.facing
+            b.vel.x = -b.vel.x
+        } elif b.solid(next + vec2(0, sign(b.vel.y) * 7)) {
+            b.vel.y = -b.vel.y
+        } else {
+            me.position = next
+        }
+        me.Sprite.flip_x = b.vel.x < 0
+    }
+}
+
+# Hangs upside down; when Basil passes underneath it dives at him, then flaps back up.
+class Swooper : Brain {
+    var state: string = "hang"
+    var home := vec2(0, 0)
+    override func setup(me: entity, b: Body) -> void { this.home = me.position }
+    override func step(me: entity, b: Body, dt: number) -> void {
+        var bp: vec2 = b.basil.middle()
+        if this.state == "hang" {
+            me.Sprite.frame = 0
+            if abs(bp.x - me.x) < 48 and bp.y > me.y and bp.y - me.y < 160 {
+                this.state = "dive"
+                b.vel = vec2(sign(bp.x - me.x) * 1.2, 1.5)
+                play_sound("sfx/screech.wav", 0.4)
+            }
+        } elif this.state == "dive" {
+            b.vel.y = min(b.vel.y + 0.12, 4)
+            b.vel.x = clamp(b.vel.x + sign(bp.x - me.x) * 0.06, -2, 2)
+            var next := me.position + b.vel
+            if b.solid(next + vec2(0, 8)) or b.solid(next + vec2(sign(b.vel.x) * 8, 0)) {
+                this.state = "return"
+            } else {
+                me.position = next
+            }
+            me.Sprite.frame = 1 + floor(this.t * 12) % 2
+        } else {
+            var d := this.home - me.position
+            if length(d) < 2 {
+                me.position = this.home
+                this.state = "hang"
+            } else {
+                me.position = me.position + normalize(d) * 1.2
+            }
+            me.Sprite.frame = 1 + floor(this.t * 12) % 2
+        }
+        this.t += dt
+    }
+}
+
+# Leaps at Basil every so often, falling with gravity.
+class Hopper : Brain {
+    var rest: number = 1
+    var grounded: bool = true
+    override func step(me: entity, b: Body, dt: number) -> void {
+        if this.grounded {
+            this.rest -= dt
+            me.Sprite.frame = 0
+            if this.rest <= 0 and b.near_basil(me, 140) {
+                b.vel = vec2(sign(b.basil.x - me.x) * 1.3, -4.2)
+                this.grounded = false
+                this.rest = 0.8 + random(0.8)
+            }
+        } else {
+            b.vel.y = min(b.vel.y + 0.2, 5)
+            me.Sprite.frame = 1
+            var nx := me.position + vec2(b.vel.x, 0)
+            if b.solid(nx + vec2(sign(b.vel.x) * 7, 0)) { b.vel.x = -b.vel.x } else { me.position = nx }
+            var ny := me.position + vec2(0, b.vel.y)
+            if b.vel.y > 0 and b.solid(ny + vec2(0, 7)) {
+                var c := tile_cell(b.map, ny + vec2(0, 7))
+                me.y = tile_cell_center(b.map, c.x, c.y).y - 15
+                this.grounded = true
+                b.vel = vec2(0, 0)
+            } elif b.vel.y < 0 and b.solid(ny + vec2(0, -7)) {
+                b.vel.y = 0
+            } else {
+                me.position = ny
+            }
+        }
+    }
+}
+
+# Walks a floor, turning at walls and edges; a thrower stops now and then to throw at Basil.
+class Walker : Brain {
+    var speed: number = 0.5
+    var throw_t: number = 2
+    override func setup(me: entity, b: Body) -> void { this.throw_t = 1 + random(2) }
+    override func step(me: entity, b: Body, dt: number) -> void {
+        var ahead := me.position + vec2(b.facing * 8, 0)
+        var floor_ahead := me.position + vec2(b.facing * 8, b.half.y + 2)
+        if b.solid(ahead) or not b.solid(floor_ahead) { b.facing = -b.facing }
+        else { me.x += b.facing * this.speed }
+        me.Sprite.flip_x = b.facing < 0
+        if b.shoot != "" and b.near_basil(me, 150) {
+            this.throw_t -= dt
+            if this.throw_t <= 0 {
+                this.throw_t = 2.2
+                b.facing = sign(b.basil.x - me.x)
+                b.fire(me, b.toward_basil(me), 1.6)
+            }
+        }
+    }
+}
+
+# Glides back and forth between walls; pepper bounces off it.
+class Slider : Brain {
+    var speed: number = 0.8
+    override func setup(me: entity, b: Body) -> void { b.armored = true }
+    override func step(me: entity, b: Body, dt: number) -> void {
+        if b.solid(me.position + vec2(b.facing * 9, 0)) { b.facing = -b.facing }
+        me.x += b.facing * this.speed
+        me.Sprite.flip_x = b.facing < 0
+    }
+}
+
+# Waits in lava, then jumps up out of it and falls back.
+class Leaper : Brain {
+    var home := vec2(0, 0)
+    var wait: number = 1
+    override func setup(me: entity, b: Body) -> void {
+        this.home = me.position
+        this.wait = random(2)
+    }
+    override func step(me: entity, b: Body, dt: number) -> void {
+        if this.wait > 0 {
+            this.wait -= dt
+            b.visible = false
+            if this.wait <= 0 {
+                b.vel = vec2(0, -4.6)
+                b.visible = true
+            }
+            return
+        }
+        b.vel.y += 0.15
+        me.position = me.position + b.vel
+        me.Sprite.flip_y = b.vel.y > 0
+        if me.y >= this.home.y and b.vel.y > 0 {
+            me.position = this.home
+            this.wait = 1 + random(1.5)
+        }
+    }
+}
+
+# Floats straight through walls towards Basil, fading in and out; only hurt while seen.
+class Ghost : Brain {
+    override func step(me: entity, b: Body, dt: number) -> void {
+        this.t += dt
+        var a := (sin(this.t * 90) + 1) / 2
+        b.visible = a > 0.35
+        me.Sprite.tint = rgb(255, 255, 255, 40 + a * 200)
+        if b.near_basil(me, 200) { me.position = me.position + b.toward_basil(me) * 0.45 }
+        me.Sprite.flip_x = b.basil.x < me.x
+    }
+}
+
+# Stays put and fires at Basil when he's in sight.
+class Turret : Brain {
+    var reload: number = 1.5
+    override func step(me: entity, b: Body, dt: number) -> void {
+        this.reload -= dt
+        if this.reload <= 0 and b.near_basil(me, 170) {
+            this.reload = 1.8
+            b.fire(me, b.toward_basil(me), 1.8)
+        }
+    }
+}
+
+# Walks at Basil behind a shield; pepper from the front is turned away.
+class Knight : Walker {
+    override func setup(me: entity, b: Body) -> void {
+        b.shield = true
+        this.speed = 0.6
+    }
+    override func step(me: entity, b: Body, dt: number) -> void {
+        if b.near_basil(me, 120) and abs(b.basil.y - me.y) < 40 { b.facing = sign(b.basil.x - me.x) }
+        super.step(me, b, dt)
+    }
+}
+
+# ---- the entity ---------------------------------------------------------------------------------
+var brain: string = "crawler"
+var hp: number = 2
+var damage: number = 8
+var clockwise: bool = true
+var shoots: string = ""
+var drops: bool = true
+var b := Body()
+var mind: Brain
+var frozen_t: number = 0
+var flash_t: number = 0
+var game: entity
+
+func make_brain(kind: string) -> Brain {
+    if kind == "crawler" {
+        var c := Crawler()
+        c.clockwise = clockwise
+        return c
+    }
+    if kind == "flyer" { return Flyer() }
+    if kind == "swooper" { return Swooper() }
+    if kind == "hopper" { return Hopper() }
+    if kind == "walker" { return Walker() }
+    if kind == "slider" { return Slider() }
+    if kind == "leaper" { return Leaper() }
+    if kind == "ghost" { return Ghost() }
+    if kind == "turret" { return Turret() }
+    if kind == "knight" { return Knight() }
+    log_error("no brain called", kind)
+    return Brain()
+}
+
+func start() -> void {
+    game = find("Game")
+    b.map = child(self.parent, "Map")
+    b.basil = find("Basil")
+    b.hp = hp
+    b.shoot = shoots
+    if brain == "walker" or brain == "knight" { b.half = vec2(6, 11) }
+    mind = make_brain(brain)
+    mind.setup(self, b)
+}
+
+func frozen() -> bool { return frozen_t > 0 }
+
+# For Basil's feet: a frozen enemy is something to stand on.
+func blocks(c: vec2, s: vec2) -> bool {
+    return frozen_t > 0 and abs(c.x - self.x) < s.x / 2 + 8 and abs(c.y - self.y) < s.y / 2 + 8
+}
+
+# Is a point within r of what can be hit?
+func hit_by(p: vec2, r: number) -> bool {
+    return b.visible and abs(p.x - self.x) < b.half.x + r and abs(p.y - self.y) < b.half.y + r
+}
+
+# Hit by Basil (kind: pepper, frost, garlic, garlic_frost, rocket, popcorn). Returns whether the shot stops here.
+func hit(amount: number, kind: string, from: vec2) -> bool {
+    var freezes := kind == "frost" or kind == "garlic_frost"
+    if frozen_t > 0 {
+        if kind == "rocket" or kind == "popcorn" { die() }
+        elif freezes { frozen_t = 6 }
+        return true
+    }
+    if (b.armored or (b.shield and sign(from.x) == -b.facing)) and kind != "rocket" and kind != "popcorn" and not freezes {
+        play_sound("sfx/clank.wav", 0.4)
+        return true
+    }
+    if freezes and has_tag(self, "freezable") and b.hp > amount {
+        freeze()
+        return true
+    }
+    b.hp -= amount
+    flash_t = 0.15
+    if b.hp <= 0 {
+        if freezes and has_tag(self, "freezable") {
+            b.hp = 1
+            freeze()
+        } else {
+            die()
+        }
+    } else {
+        play_sound("sfx/hit.wav", 0.5)
+    }
+    return true
+}
+
+func freeze() -> void {
+    frozen_t = 6
+    add_tag(self, "platform")
+    play_sound("sfx/freeze.wav", 0.6)
+}
+
+func die() -> void {
+    spawn("prefabs/burst.scene", self.position)
+    play_sound("sfx/enemy_die.wav", 0.6)
+    if drops { game.drop(self.position) }
+    destroy(self)
+}
+
+func update(dt: number) -> void {
+    if game.state != "play" { return }
+    if frozen_t > 0 {
+        frozen_t -= dt
+        self.Animation.playing = false
+        var thaw := frozen_t < 1.5 and floor(frozen_t * 10) % 2 == 0
+        if thaw { self.Sprite.tint = rgb(255, 255, 255) } else { self.Sprite.tint = rgb(150, 220, 255) }
+        if frozen_t <= 0 {
+            remove_tag(self, "platform")
+            self.Animation.playing = true
+            self.Sprite.tint = rgb(255, 255, 255)
+        }
+        return
+    }
+    mind.step(self, b, dt)
+    if flash_t > 0 {
+        flash_t -= dt
+        self.Sprite.tint = rgb(255, 120, 120)
+        if flash_t <= 0 { self.Sprite.tint = rgb(255, 255, 255) }
+    }
+    if b.visible and b.basil.touches(self.position, b.half) { b.basil.hurt(damage, self.position) }
+}

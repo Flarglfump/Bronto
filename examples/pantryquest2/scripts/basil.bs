@@ -1,0 +1,358 @@
+@strict
+# Basil, Pip's apprentice: runs, jumps, fires his pepper mill, and - once he has found
+# them - rolls up in the Dough Wrap, drops popcorn, fires hot sauce rockets, and so on.
+#
+# Movement is the old consoles' kind: speeds in pixels per step (60 steps a second),
+# moving a pixel at a time and stopping at walls. Walls are the room map's solid tiles
+# (tile_box_solid) and frozen enemies (tagged "platform"). His box is 12 x 26 standing,
+# 12 x 12 rolled up, with his feet at the bottom of his sprite.
+
+const RUN: number = 1.5
+const GRAVITY: number = 0.25
+const JUMP: number = 5.25            # about 3 tiles up
+const HIGH_JUMP: number = 6.5        # with the Leaven Boots: about 5
+const CUT: number = 2.0              # letting go of jump early: rising no faster than this
+const MAX_FALL: number = 5.0
+const SHOT_GAP: int = 9              # steps between shots
+
+var game: entity
+var map: entity                      # the room's solid map (the game sets these)
+var front: entity                    # the room's front map (liquid), or nil
+var vel := vec2(0, 0)
+var sub := vec2(0, 0)                # what's left over after whole-pixel moves
+var facing: int = 1
+var grounded: bool = false
+var ball: bool = false
+var spin: bool = false
+var aim_up: bool = false
+var shot_cd: int = 0
+var hurt_t: number = 0               # knocked back: no control
+var safe_t: number = 0               # just hurt: can't be hurt again
+var platforms: list[entity] = []
+var in_liquid: bool = false
+var lava_t: number = 0
+var landed_t: number = 0
+var ball_t: number = 0
+var lifted: bool = false             # coming up a shaft: rising without holding jump
+
+func start() -> void {
+    game = find("Game")
+}
+
+# ---- his box ------------------------------------------------------------------------------
+func box_size(rolled: bool) -> vec2 {
+    if rolled { return vec2(12, 12) }
+    return vec2(12, 26)
+}
+
+# The middle of his box when his sprite is at p (his feet are at p.y + 16).
+func box_centre(p: vec2, rolled: bool) -> vec2 {
+    if rolled { return vec2(p.x, p.y + 10) }
+    return vec2(p.x, p.y + 3)
+}
+
+func feet() -> vec2 { return vec2(self.x, self.y + 16) }
+func middle() -> vec2 { return box_centre(self.position, ball) }
+
+# Does anything solid overlap his box with his sprite at p?
+func blocked(p: vec2, rolled: bool) -> bool {
+    var c := box_centre(p, rolled)
+    var s := box_size(rolled)
+    if tile_box_solid(map, c, s) { return true }
+    for e in platforms {
+        if e.alive and e.blocks(c, s) { return true }
+    }
+    return false
+}
+
+# Is a world box (centre, half size) touching his? For enemies, shots and pickups.
+func touches(c: vec2, half: vec2) -> bool {
+    var m := middle()
+    var s := box_size(ball) / 2
+    return abs(c.x - m.x) < half.x + s.x and abs(c.y - m.y) < half.y + s.y
+}
+
+# ---- moving -----------------------------------------------------------------------------------
+func move_x(dx: number) -> bool {
+    sub.x += dx
+    var steps := round(sub.x)
+    sub.x -= steps
+    var s := sign(steps)
+    for i in abs(steps) {
+        var next := self.position + vec2(s, 0)
+        if blocked(next, ball) {
+            sub.x = 0
+            return false
+        }
+        self.position = next
+    }
+    return true
+}
+
+func move_y(dy: number) -> bool {
+    sub.y += dy
+    var steps := round(sub.y)
+    sub.y -= steps
+    var s := sign(steps)
+    for i in abs(steps) {
+        var next := self.position + vec2(0, s)
+        if blocked(next, ball) {
+            sub.y = 0
+            return false
+        }
+        self.position = next
+    }
+    return true
+}
+
+func on_ground() -> bool { return blocked(self.position + vec2(0, 1), ball) }
+
+func tile_under_feet(dy: number) -> string { return tile_at(map, vec2(self.x, self.y + 16 + dy)) }
+
+func liquid_here() -> bool {
+    if front == nil { return false }
+    var t := tile_at(front, middle())
+    return t == "=" or t == "-"
+}
+
+# ---- what the game asks of him ----------------------------------------------------------------
+# Puts him somewhere (a new room), keeping his speed.
+func place(p: vec2, keep_speed: bool) -> void {
+    self.position = vec2(floor(p.x), floor(p.y))
+    sub = vec2(0, 0)
+    if not keep_speed { vel = vec2(0, 0) }
+    platforms = []
+}
+
+func face(dir: int) -> void {
+    facing = dir
+    self.Sprite.flip_x = facing < 0
+}
+
+# Hurt by something at world point `from`. Returns whether it hurt him.
+func hurt(amount: number, from: vec2) -> bool {
+    if safe_t > 0 or game.state != "play" { return false }
+    game.damage(amount)
+    safe_t = 1.1
+    hurt_t = 0.25
+    var away: number = sign(self.x - from.x)
+    if away == 0 { away = -facing }
+    vel = vec2(away * 1.6, -2.5)
+    if ball { vel.y = -2 }
+    spin = false
+    play_sound("sfx/hurt.wav")
+    rumble(0.5, 0.2)
+    return true
+}
+
+func bounce(v: number) -> void {     # popcorn under him (rolled up): up he goes
+    vel.y = -v
+    grounded = false
+    lifted = true
+}
+
+func lift(v: number) -> void {       # up through a shaft into the room above
+    vel.y = -v
+    grounded = false
+    lifted = true
+}
+
+# ---- each step ------------------------------------------------------------------------------------
+func update(dt: number) -> void {
+    if game.state != "play" {
+        animate()
+        return
+    }
+    platforms = find_tagged("platform")
+    if safe_t > 0 { safe_t -= dt }
+    if hurt_t > 0 { hurt_t -= dt }
+    if shot_cd > 0 { shot_cd -= 1 }
+    in_liquid = liquid_here()
+    var control := hurt_t <= 0
+    var left := action_down("left")
+    var right := action_down("right")
+    var dir: int = 0
+    if control and left and not right { dir = -1 }
+    if control and right and not left { dir = 1 }
+    if dir != 0 { face(dir) }
+    aim_up = control and action_down("up") and not ball
+
+    # rolling up, and standing again
+    if control and not ball and game.has("dough") and action_pressed("down") and on_ground() {
+        ball = true
+        spin = false
+        self.y += 0                                  # (the box shrinks to the bottom: his feet stay put)
+        play_sound("sfx/roll.wav")
+        ball_t = 0
+    } elif control and ball and (action_pressed("up") or action_pressed("jump")) {
+        if not blocked(self.position, false) {
+            ball = false
+            play_sound("sfx/unroll.wav")
+        }
+    }
+
+    # running
+    var speed: number = RUN
+    if in_liquid { speed = RUN * 0.6 }
+    if control { vel.x = dir * speed }
+    elif grounded { vel.x = vel.x * 0.8 }
+    if not move_x(vel.x) { vel.x = 0 }
+
+    # jumping and falling
+    var was_grounded := grounded
+    grounded = vel.y >= 0 and on_ground()
+    if grounded {
+        if not was_grounded {
+            landed_t = 0.1
+            spin = false
+        }
+        vel.y = 0
+        if control and not ball and action_pressed("jump") { jump(dir) }
+    } else {
+        var g: number = GRAVITY
+        var top: number = MAX_FALL
+        if in_liquid {
+            g = GRAVITY * 0.5
+            top = MAX_FALL * 0.5
+        }
+        vel.y = min(vel.y + g, top)
+        if control and not ball and spin and game.has("whisk") and action_pressed("jump") and vel.y > -2 { jump(dir) }
+        if vel.y >= 0 { lifted = false }
+        if vel.y < -CUT and not action_down("jump") and hurt_t <= 0 and not lifted { vel.y = -CUT }
+    }
+    if not move_y(vel.y) {
+        if vel.y < 0 { vel.y = 0.5 } else { vel.y = 0 }
+    }
+
+    # shooting
+    if control and action_pressed("fire") and shot_cd <= 0 {
+        if ball { drop_popcorn() } else { shoot(false) }
+    }
+    if control and action_pressed("rocket") and shot_cd <= 0 and not ball { shoot(true) }
+
+    hazards(dt)
+    leave_room()
+    animate()
+}
+
+func jump(dir: int) -> void {
+    var v: number = JUMP
+    if game.has("leaven") { v = HIGH_JUMP }
+    if in_liquid { v = v * 0.75 }
+    vel.y = -v
+    grounded = false
+    spin = dir != 0 and game.has("whisk")
+    play_sound("sfx/jump.wav", 0.6)
+}
+
+func muzzle(up: bool) -> vec2 {
+    if up { return vec2(self.x + facing * 3, self.y - 18) }
+    if grounded { return vec2(self.x + facing * 14, self.y + 2) }
+    return vec2(self.x + facing * 14, self.y + 1)
+}
+
+func shoot(rocket: bool) -> void {
+    var up := aim_up
+    var d := vec2(facing, 0)
+    if up { d = vec2(0, -1) }
+    if rocket {
+        if not game.use_rocket() {
+            play_sound("sfx/click.wav", 0.5)
+            shot_cd = SHOT_GAP
+            return
+        }
+        var r := spawn("prefabs/rocket.scene", muzzle(up))
+        r.launch(d)
+        shot_cd = SHOT_GAP + 4
+        play_sound("sfx/rocket.wav")
+        return
+    }
+    if len(find_tagged("pepper")) >= 3 { return }
+    var s := spawn("prefabs/shot.scene", muzzle(up))
+    s.launch(d, game.beam())
+    shot_cd = SHOT_GAP
+    spin = false
+    play_sound(game.beam_sound(), 0.7)
+}
+
+func drop_popcorn() -> void {
+    if not game.has("popcorn") or len(find_tagged("popcorn")) >= 3 { return }
+    spawn("prefabs/popcorn.scene", vec2(self.x, self.y + 10))
+    shot_cd = 10
+    play_sound("sfx/drop.wav", 0.6)
+}
+
+func hazards(dt: number) -> void {
+    var m := middle()
+    var s := box_size(ball) / 2
+    var lava := false
+    for p in [vec2(m.x - s.x + 2, m.y + s.y - 2), vec2(m.x + s.x - 2, m.y + s.y - 2), m] {
+        if tile_at(map, p) == "~" { lava = true }
+    }
+    if lava {
+        lava_t -= dt
+        if lava_t <= 0 {
+            lava_t = 0.4
+            game.damage(game.lava_damage())
+            play_sound("sfx/sizzle.wav", 0.6)
+        }
+        if vel.y > 1 { vel.y = 1 }
+    }
+    var spikes := false
+    for p in [vec2(m.x - s.x + 2, m.y + s.y - 2), vec2(m.x + s.x - 2, m.y + s.y - 2), vec2(m.x - s.x + 2, m.y - s.y + 1), vec2(m.x + s.x - 2, m.y - s.y + 1)] {
+        var t := tile_at(map, p)
+        if t == "^" or t == "v" { spikes = true }
+    }
+    if spikes { hurt(15, vec2(self.x - facing, self.y + 30)) }
+}
+
+# Gone through a door (off the room's edge)? The game takes him to the next room.
+func leave_room() -> void {
+    var size: vec2 = game.room_size()
+    var m := middle()
+    if m.x < 0 { game.leave("W", m) }
+    elif m.x > size.x { game.leave("E", m) }
+    elif m.y < 0 { game.leave("N", m) }
+    elif m.y > size.y { game.leave("S", m) }
+}
+
+# ---- how he looks ---------------------------------------------------------------------------------
+func animate() -> void {
+    if safe_t > 0 and floor(safe_t * 20) % 2 == 0 and game.state == "play" {
+        self.Sprite.tint = rgb(255, 255, 255, 90)
+    } else {
+        self.Sprite.tint = rgb(255, 255, 255)
+    }
+    if game.has("mitts") { self.Sprite.image = "art/basil_mitts.bmp" } else { self.Sprite.image = "art/basil.bmp" }
+    if game.state == "pose" {
+        play_animation(self, "22")
+        return
+    }
+    if hurt_t > 0 {
+        play_animation(self, "9")
+        return
+    }
+    if ball {
+        if vel.x != 0 { play_animation(self, "14-17", 14, true) } else { play_animation(self, "14") }
+        return
+    }
+    if not grounded {
+        if spin {
+            play_animation(self, "10-13", 20, true)
+        } elif aim_up {
+            play_animation(self, "8")
+        } elif vel.y < 0 {
+            play_animation(self, "5")
+        } else {
+            play_animation(self, "6")
+        }
+        return
+    }
+    if vel.x != 0 {
+        if aim_up { play_animation(self, "18-21", 10, true) } else { play_animation(self, "1-4", 10, true) }
+    } elif aim_up {
+        play_animation(self, "7")
+    } else {
+        play_animation(self, "0")
+    }
+}

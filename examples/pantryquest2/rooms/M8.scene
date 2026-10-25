@@ -1,0 +1,83 @@
+# Pantry Quest II - room M8, Wyrm's Furnace (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"M8\", area = \"molten\", w = 2, h = 1, music = \"music/boss.wav\", boss = \"wyrm\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 256 120
+  Tilemap
+    tileset = "art/tiles_molten.bmp"
+    tile_size = 16
+    columns = 32
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "#$###$###%###%###%###%########################################################################$####+####$###$###$###$###}###$#####$###$###$###$###%###%###%###%#%###%###%########################################################################$}##$###$###$#####$###$###$###$###$###$###%###%#$###%###%###%###%########################################################################*###$#####$###$###$###$###$###$###$#####$###$###$###%###%###%###%#####%###%###########################"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 256 120
+  Tilemap
+    tileset = "art/tiles_molten.bmp"
+    tile_size = 16
+    columns = 32
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "QPPPPPPPPPPQPPPPPPPSPPPPRPPPPPPPPLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLPN..............................HN..............................HN..............................HN..............................HN..............................HN..............................HN.............CKKI.............HN..............................DN...CKKI..............CKI.......N...............................N~~~~~~~~~~~~~~~~~~~~~~~~~......POOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOPPPRPPPPPPPPPPRPPPPQPPPPPPPSPPPP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 504 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+    frame = 2
+    flip_x = true
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"E\", index = 0, kind = \"boss\", to = \"M7\", arrive = \"W1\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Boss"
+  Transform
+    position = 264 192
+  Sprite
+    image = "art/boss_wyrm.bmp"
+    layer = 3
+    frame_size = 32 32
+  Script
+    file = "scripts/bosses/wyrm.bs"
+    vars = "home = vec2(264, 192)"
+  Tags
+    list = "enemy, boss"
+  Parent
+    entity = 0

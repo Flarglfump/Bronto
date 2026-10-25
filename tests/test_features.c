@@ -461,6 +461,24 @@ static void test_broadcast_and_globals(void) {
     teardown();
 }
 
+/* Every script's variables are set before any start() runs, so a start() can read another
+ * entity's variables whichever was made first. */
+static void test_start_sees_others(void) {
+    br_entity a;
+    setup();
+    a = scripted("a", "reader.bs", "var seen: number = 0\nfunc start() -> void { seen = find(\"b\").speed }\n");
+    scripted("b", "speedy.bs", "var speed: number = 7\n");
+    steps(1);
+    CHECK(num(a, "seen") == 7);
+    teardown();
+}
+
+/* A folder isn't a file: reading one fails cleanly (some systems open it, with a huge size). */
+static void test_read_folder(void) {
+    size_t size = 1;
+    CHECK(br_file_read_all(g_out_dir, &size) == NULL && size == 0);
+}
+
 static void test_scene_requests(void) {
     br_entity s;
     char path[64];
@@ -575,6 +593,8 @@ void suite_features(void) {
     RUN(test_script_draw);
     RUN(test_voices_music_tones);
     RUN(test_broadcast_and_globals);
+    RUN(test_start_sees_others);
+    RUN(test_read_folder);
     RUN(test_scene_requests);
     RUN(test_actions_window_input);
     RUN(test_editor_play_stack);

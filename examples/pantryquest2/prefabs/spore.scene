@@ -1,0 +1,22 @@
+# Pantry Quest II - a mould spore the Big Cheese breathes out (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Spore"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/spore.bmp"
+    layer = 4
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"flyer\", hp = 1, damage = 8, drops = false"
+  Tags
+    list = "enemy, spore, transient"

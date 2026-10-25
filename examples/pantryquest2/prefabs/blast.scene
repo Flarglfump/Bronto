@@ -1,0 +1,22 @@
+# Pantry Quest II - an effect: blast (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Blast"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/fx_blast.bmp"
+    layer = 7
+    frame_size = 16 16
+    blend = add
+  Animation
+    frames = "0-4"
+    fps = 16
+    loop = false
+    playing = true
+  Script
+    file = "scripts/fx.bs"
+  Tags
+    list = "transient"

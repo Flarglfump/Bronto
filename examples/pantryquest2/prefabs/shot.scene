@@ -1,0 +1,16 @@
+# Pantry Quest II - a peppercorn from Basil's mill (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Shot"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/shots.bmp"
+    layer = 6
+    frame_size = 8 8
+  Script
+    file = "scripts/shot.bs"
+  Tags
+    list = "pepper, transient"

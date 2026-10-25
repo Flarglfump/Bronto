@@ -1,0 +1,15 @@
+# Pantry Quest II - a hot sauce rocket (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Rocket"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/rocket.bmp"
+    layer = 6
+  Script
+    file = "scripts/rocket.bs"
+  Tags
+    list = "rocket, transient"

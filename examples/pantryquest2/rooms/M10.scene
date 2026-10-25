@@ -1,0 +1,95 @@
+# Pantry Quest II - room M10, Steam Pipe (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"M10\", area = \"molten\", w = 1, h = 3, music = \"music/molten.wav\", heat = true"
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 128 360
+  Tilemap
+    tileset = "art/tiles_molten.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 45
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "##$###$###$###$#$###$###$###%#####%################*######+################$###$#$###$###$###$#####%###%###%########+#############################$###$###$###$#$###$###%###%##########################################$###$###$#$###$###$###$#####%###%##+#######################################$###$###$###$#$###+###%###%######################################$###$###$###$#$###$###$###%#####%########################################$#####$###$###+###$#%###%###%###%######################################$+##$###$###$#$###$###%###%##########################################$###$#####$###$###$###$#%###%###%#################################+########$###$###$###$#$###%###%###%######################################$###$###$###"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 360
+  Tilemap
+    tileset = "art/tiles_molten.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 45
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "QPPPPPN..HPQPPPPPLLLLLJ..DLLLLLPN..............HN..............HN.....CKKI.....HN..............HN..............HN........CKKKKKPN..............HN..............HPKKKKKI........HN..............HN..............HN........CKKKKKQN..............HN..............HRKKKKKI........HN..............HN..............HN........CKKKKKPN..............HN..............HPKKKKKI........HN..............HN..............HN........CKKKKKPN..............HN..............HPKKKKKI........HN..............HN..............HN........CKKKKKPN..............HN..............HPKKKKKI........HN..............HN..............HN........CKKKKKPN..............HN..............HPKKKKKI........HN..............HN..............HPOOOOOM..GOOOOOPPPPQPPN..HPPPPQP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 128 8
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"N\", index = 0, kind = \"blue\", to = \"B8\", arrive = \"S0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 128 712
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"S\", index = 0, kind = \"blue\", to = \"M6\", arrive = \"N1\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Crawler"
+  Transform
+    position = 200 328
+  Sprite
+    image = "art/crawler.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"crawler\", hp = 2, damage = 8"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0

@@ -1,0 +1,17 @@
+# Pantry Quest II - a piece of the Flambe Wyrm's body (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "WyrmBody"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/boss_wyrm.bmp"
+    layer = 2
+    frame_size = 32 32
+    frame = 2
+  Script
+    file = "scripts/bosses/segment.bs"
+  Tags
+    list = "enemy, boss, transient"

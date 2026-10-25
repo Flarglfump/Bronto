@@ -1,0 +1,125 @@
+# Pantry Quest II - room V1, Bakery Ruins (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"V1\", area = \"village\", w = 2, h = 1, music = \"music/village.wav\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 256 120
+  Tilemap
+    tileset = "art/tiles_village.bmp"
+    tile_size = 16
+    columns = 32
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "000000010000000000100000000001000000000000100000000001000000000000100000000001000000000010000000000001000000000010000000000100000000000010000000000100000000001010000000000100000000001000000000@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@9999999999999999999999999999999999999999999999999999999999999999666666666666666666666666666666668888777777778888777777778888777788887777777788887777777788887777888877777777888877777777888877778888777777778888777777778888777788887777777788887777777788887777"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 256 120
+  Tilemap
+    tileset = "art/tiles_village.bmp"
+    tile_size = 16
+    columns = 32
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY..............................YY..............................YY..............................YY..............................YY..............................YY..............................YY..............................YY.......CKKKKI...CKKKKKI.......YY..............................Y.....................................GM..................GM..........HN..................HN.....OOOOOSPOOOOOOOOOOOOOOOOOOPQOOOOOPPPRPPPPPPPPPPRPPPPQPPPPPPPSPPPP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 8 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"W\", index = 0, kind = \"blue\", to = \"V0\", arrive = \"E0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 504 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+    flip_x = true
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"E\", index = 0, kind = \"blue\", to = \"V2\", arrive = \"W0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "NPC"
+  Transform
+    position = 216 192
+  Sprite
+    image = "art/mozz.bmp"
+    layer = 3
+    frame_size = 24 32
+  Animation
+    frames = "0-1"
+    fps = 2
+    loop = true
+    playing = true
+  Script
+    file = "scripts/npc.bs"
+    vars = "say = \"mozz_meet\", again = \"mozz_idle\", until = \"seals4\", who = \"mozz\""
+  Tags
+    list = "npc"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Hearth"
+  Transform
+    position = 328 192
+  Sprite
+    image = "art/hearth.bmp"
+    layer = -5
+    frame_size = 32 32
+  Animation
+    frames = "0-3"
+    fps = 8
+    loop = true
+    playing = true
+  Script
+    file = "scripts/hearth.bs"
+  Tags
+    list = "hearth"
+  Parent
+    entity = 0

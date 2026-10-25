@@ -1,0 +1,21 @@
+# Pantry Quest II - an effect: crumbs (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Crumbs"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/fx_crumbs.bmp"
+    layer = 7
+    frame_size = 16 16
+  Animation
+    frames = "0-3"
+    fps = 10
+    loop = false
+    playing = true
+  Script
+    file = "scripts/fx.bs"
+  Tags
+    list = "transient"

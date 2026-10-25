@@ -1,0 +1,145 @@
+@strict
+# DOCTOR BRINE and FRANKENFURTER. The monster - a hot dog stitched together and brought to
+# life in the doctor's vats - lumbers after Basil, lunges, and lobs mustard. Above, the
+# doctor floats in his jar and calls down lightning (bosses/doctor.bs). When the monster
+# falls, the doctor comes down himself; his jar turns pepper until hot sauce cracks it.
+
+const NAME: string = "FRANKENFURTER"
+const HP: number = 40
+var home := vec2(0, 0)
+var gate: list = []
+var game: entity
+var basil: entity
+var doctor: entity
+var state: string = "sleep"               # sleep, intro, walk, lunge, lob, down, done, dying
+var hp: number = 40
+var t: number = 0
+var facing: int = -1
+var flash_t: number = 0
+var moves: int = 0
+var right_wall: number = 480
+
+func start() -> void {
+    game = find("Game")
+    basil = find("Basil")
+    right_wall = game.room_size().x - 32
+    if game.flag("boss:brine") {
+        open_gate()
+        game.boss_beaten_again("brine", [["seal_vinegar", "seal_vinegar"]], home)
+        destroy(self)
+    }
+}
+
+func open_gate() -> void {
+    if len(gate) < 4 { return }
+    var map := child(self.parent, "Map")
+    for dy in gate[3] {
+        for dx in gate[2] { tile_put(map, gate[0] + dx, gate[1] + dy, ".") }
+    }
+}
+
+func hit_by(p: vec2, r: number) -> bool {
+    return state != "sleep" and state != "down" and state != "done" and state != "dying" and abs(p.x - self.x) < 14 + r and abs(p.y - self.y) < 24 + r
+}
+
+func hit(amount: number, kind: string, from: vec2) -> bool {
+    if state == "intro" { return true }
+    hp -= amount
+    flash_t = 0.12
+    play_sound("sfx/boss_hit.wav", 0.6)
+    game.boss_health(hp)
+    if hp <= 0 {
+        begin("down")
+        play_sound("sfx/roar.wav")
+        doctor.descend()
+    }
+    return true
+}
+
+func face_basil() -> void {
+    facing = sign(basil.x - self.x)
+    if facing == 0 { facing = 1 }
+    self.Sprite.flip_x = facing > 0
+}
+
+func begin(s: string) -> void {
+    state = s
+    t = 0
+}
+
+# The doctor is beaten too: it's over.
+func all_done() -> void {
+    begin("dying")
+}
+
+func update(dt: number) -> void {
+    if game.state != "play" and state != "intro" { return }
+    t += dt
+    if flash_t > 0 {
+        flash_t -= dt
+        self.Sprite.tint = rgb(255, 140, 140)
+    } else {
+        self.Sprite.tint = rgb(255, 255, 255)
+    }
+    if state == "sleep" {
+        self.Sprite.frame = 5
+        if basil.x < right_wall - 40 {
+            state = "intro"
+            doctor = spawn("prefabs/doctor.scene", vec2(self.x, 60), self.parent)
+            doctor.monster = self
+            game.boss_start(NAME, HP, "music/boss.wav")
+            game.talk("brine_intro")
+        }
+        return
+    }
+    if state == "intro" {
+        if game.state == "play" and game.talking == "" {
+            begin("walk")
+            play_sound("sfx/roar.wav")
+        }
+        return
+    }
+    if state == "down" or state == "done" {
+        self.Sprite.frame = 5
+        return
+    }
+    if state == "dying" {
+        if floor(t * 8) != floor((t - dt) * 8) { spawn("prefabs/burst.scene", self.position + vec2(random(-16, 16), random(-24, 24))) }
+        self.Sprite.tint = rgb(255, 255, 255, 255 * max(0, 1 - t / 2))
+        if t > 2 {
+            open_gate()
+            game.boss_beaten("brine", [["seal_vinegar", "seal_vinegar"]], vec2(self.parent.x + 256, home.y + 16), "brine_beaten")
+            destroy(self)
+        }
+        return
+    }
+    if basil.touches(self.position, vec2(14, 24)) { basil.hurt(16, self.position) }
+    if state == "walk" {
+        face_basil()
+        self.Sprite.frame = floor(t * 4) % 2
+        self.x = clamp(self.x + facing * 0.6, 32, right_wall)
+        if t > 1.6 {
+            moves += 1
+            if abs(basil.x - self.x) < 70 { begin("lunge") } else { begin("lob") }
+        }
+    } elif state == "lunge" {
+        self.Sprite.frame = 2
+        if t > 0.35 {
+            self.Sprite.frame = 3
+            if t < 0.75 { self.x = clamp(self.x + facing * 3.2, 32, right_wall) }
+        }
+        if t > 1.2 { begin("walk") }
+    } elif state == "lob" {
+        self.Sprite.frame = 4
+        if t > 0.4 and t - dt <= 0.4 {
+            for k in 3 {
+                var m := spawn("prefabs/spit.scene", self.position + vec2(facing * 12, -20))
+                m.launch(vec2(clamp((basil.x - self.x) / 60, -3.5, 3.5) + (k - 1) * 0.6, -3.5), "brine")
+                m.grav = 0.12
+                m.damage = 12
+            }
+            play_sound("sfx/pop.wav", 0.6)
+        }
+        if t > 1.0 { begin("walk") }
+    }
+}

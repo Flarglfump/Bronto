@@ -1,6 +1,7 @@
 #include "bronto/memory.h"
 #include "bronto/log.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -221,7 +222,8 @@ void *br_file_read_all(const char *path, size_t *out_size) {
     }
     f = fopen(path, "rb");
     if (!f) return NULL;
-    if (fseek(f, 0, SEEK_END) != 0 || (len = ftell(f)) < 0 || fseek(f, 0, SEEK_SET) != 0) {
+    /* (a directory opens on some systems, and then reports a size of LONG_MAX) */
+    if (fseek(f, 0, SEEK_END) != 0 || (len = ftell(f)) < 0 || len == LONG_MAX || fseek(f, 0, SEEK_SET) != 0) {
         fclose(f);
         return NULL;
     }

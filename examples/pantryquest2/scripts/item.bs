@@ -1,0 +1,30 @@
+@strict
+# An item: one of Basil's new abilities, a cake slice (more energy), a sauce packet (more
+# hot sauce), a page of the Count's diary, or one of the four seals. Each is found once:
+# the game remembers it by its id.
+
+var kind: string = "dough"
+var iid: string = ""
+var t: number = 0
+var home := vec2(0, 0)
+
+func start() -> void {
+    home = self.position
+    if find("Game").flag("item:" + iid) { destroy(self) }
+    var kinds: list[string] = ["dough", "popcorn", "sauce", "frost", "leaven", "mitts", "garlic", "whisk",
+                               "cake", "packet", "page", "seal_salt", "seal_sugar", "seal_vinegar", "seal_pepper"]
+    for i in len(kinds) {
+        if kinds[i] == kind { self.Sprite.frame = i }
+    }
+}
+
+func update(dt: number) -> void {
+    var game := find("Game")
+    t += dt
+    self.position = home + vec2(0, sin(t * 180) * 2)
+    if game.state != "play" { return }
+    if find("Basil").touches(self.position, vec2(7, 7)) {
+        game.collect(kind, iid)
+        destroy(self)
+    }
+}

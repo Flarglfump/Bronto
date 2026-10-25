@@ -1,0 +1,114 @@
+@strict
+# A door in a room's side wall. Shut, it fills the doorway (its three cells are solid);
+# a shot opens it - any shot for a blue door, hot sauce for a wax one - and it shuts again
+# once Basil is through. A guardian's doors stay shut while it fights (seal()), and the
+# castle gate opens only for all four seals. Doors in floors and ceilings (shafts) have
+# no cap and are always open.
+
+var side: string = "W"
+var index: int = 0
+var kind: string = "blue"                 # blue, wax, boss, gate, open
+var to: string = ""
+var arrive: string = ""
+var opened: bool = false
+var sealed: bool = false
+var t: number = 0                         # how far open the cap is (0 shut .. 1 open)
+var shut_t: number = 0
+var game: entity
+var map: entity
+var cell := vec2(0, 0)                    # the middle of its three cells
+
+func start() -> void {
+    game = find("Game")
+    map = child(self.parent, "Map")
+    if side == "N" or side == "S" or kind == "open" {
+        opened = true
+        t = 1
+        return
+    }
+    cell = tile_cell(map, self.position)
+    if kind == "wax" and game.flag("wax:" + game.room_id + side + index) { kind = "blue" }   # melted once: open for good
+    if game.arrived_door == side + index {    # Basil came in this way: open behind him
+        opened = true
+        t = 1
+        shut_t = 1.0
+        set_cells(".")
+    } else {
+        set_cells("Y")
+    }
+    show()
+}
+
+func set_cells(ch: string) -> void {
+    for dy in [-1, 0, 1] { tile_put(map, cell.x, cell.y + dy, ch) }
+}
+
+func show() -> void {
+    if not has(self, "Sprite") { return }
+    var closed_frame: int = 0
+    if kind == "wax" { closed_frame = 1 }
+    if kind == "boss" { closed_frame = 2 }
+    if kind == "gate" { closed_frame = 3 }
+    if sealed { closed_frame = 2 }
+    if t >= 1 { self.Sprite.frame = 5 } elif t > 0 { self.Sprite.frame = 4 } else { self.Sprite.frame = closed_frame }
+}
+
+# A shot hit the cap: does it open? (kind: pepper, frost, garlic, rocket, popcorn)
+func shot(by: string) -> bool {
+    if opened or kind == "open" { return false }
+    if sealed {
+        play_sound("sfx/clank.wav", 0.6)
+        return true
+    }
+    if kind == "wax" and by != "rocket" {
+        play_sound("sfx/clank.wav", 0.6)
+        return true
+    }
+    if kind == "gate" and game.inv.seals() < 4 {
+        play_sound("sfx/clank.wav", 0.6)
+        game.gate_message()
+        return true
+    }
+    open_up()
+    return true
+}
+
+func open_up() -> void {
+    opened = true
+    set_cells(".")
+    shut_t = 0
+    play_sound("sfx/door.wav", 0.8)
+    if kind == "wax" { game.set_flag("wax:" + game.room_id + side + index) }
+}
+
+# The guardian shuts (true) or frees (false) the room's doors.
+func seal(on: bool) -> void {
+    if side == "N" or side == "S" or kind == "open" { return }
+    sealed = on
+    if on and opened {
+        opened = false
+        set_cells("Y")
+    }
+    show()
+}
+
+func update(dt: number) -> void {
+    if side == "N" or side == "S" or kind == "open" { return }
+    if opened and t < 1 { t = min(1, t + dt * 6) }
+    if not opened and t > 0 { t = max(0, t - dt * 6) }
+    if opened and t >= 1 and game.state == "play" {
+        var basil := find("Basil")
+        var c := tile_cell_center(map, cell.x, cell.y)
+        if abs(basil.x - c.x) > 40 or abs(basil.y - c.y) > 48 {
+            shut_t -= dt
+            if shut_t <= -1.5 and not basil.touches(c, vec2(8, 24)) {
+                opened = false
+                set_cells("Y")
+                play_sound("sfx/door.wav", 0.5)
+            }
+        } else {
+            shut_t = 0
+        }
+    }
+    show()
+}

@@ -1,0 +1,142 @@
+# Pantry Quest II - room B2, Brine Hearth (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"B2\", area = \"brine\", w = 1, h = 1, music = \"music/brine.wav\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 128 120
+  Tilemap
+    tileset = "art/tiles_brine.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "#%###%###%###%##################################$###$###$###$#####$###$###%###%#%########################################$#{#$#####$###$###$###$#%###%###%###########################{##########$###$###$###$#####$###%###%###%#################"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 128 120
+  Tilemap
+    tileset = "art/tiles_brine.bmp"
+    tile_size = 16
+    columns = 16
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "QPPPPPPPPPPQPPPPPLLLLLLLLLLLLLLPN..............HN..............HN..............HN..............HN..............HN..............HN..............HJ..............H...............H...............H...............HOOOOOOM..GOOOOOQPPPRPPN..HPPPPRP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 8 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"W\", index = 0, kind = \"blue\", to = \"B1\", arrive = \"E0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 128 232
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"S\", index = 0, kind = \"blue\", to = \"B3\", arrive = \"N0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Hearth"
+  Transform
+    position = 72 192
+  Sprite
+    image = "art/hearth.bmp"
+    layer = -5
+    frame_size = 32 32
+  Animation
+    frames = "0-3"
+    fps = 8
+    loop = true
+    playing = true
+  Script
+    file = "scripts/hearth.bs"
+  Tags
+    list = "hearth"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MapTable"
+  Transform
+    position = 184 192
+  Sprite
+    image = "art/maptable.bmp"
+    layer = -5
+    frame_size = 32 32
+  Animation
+    frames = "0-1"
+    fps = 3
+    loop = true
+    playing = true
+  Script
+    file = "scripts/maptable.bs"
+    vars = "area = \"brine\""
+  Tags
+    list = "maptable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "NPC"
+  Transform
+    position = 216 192
+  Sprite
+    image = "art/mozz.bmp"
+    layer = 3
+    frame_size = 24 32
+  Animation
+    frames = "0-1"
+    fps = 2
+    loop = true
+    playing = true
+  Script
+    file = "scripts/npc.bs"
+    vars = "say = \"mozz_brine\", who = \"mozz\""
+  Tags
+    list = "npc"
+  Parent
+    entity = 0

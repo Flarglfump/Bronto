@@ -1,0 +1,47 @@
+@strict
+# Someone to talk to (Old Mozz, Chef Pip). Walking up to them the first time starts their
+# talk (if `auto`); after that, pressing up beside them says `again`. Their talk can wait
+# for a flag (`needs`) or stop once one is set (`until`).
+
+var who: string = "mozz"
+var say: string = ""                      # the talk (story.bs)
+var again: string = ""                    # what they say after that ("" = the same)
+var auto: bool = true
+var needs: string = ""
+var until: string = ""
+var draw_layer: int = 6
+var game: entity
+var basil: entity
+var near: bool = false
+var t: number = 0
+
+func start() -> void {
+    game = find("Game")
+    basil = find("Basil")
+    if until != "" and game.flag(until) { destroy(self) }
+}
+
+func update(dt: number) -> void {
+    t += dt
+    if game.state != "play" { return }
+    if needs != "" and not game.flag(needs) {
+        near = false
+        return
+    }
+    self.Sprite.flip_x = basil.x < self.x
+    near = abs(basil.x - self.x) < 40 and abs(basil.y - self.y) < 40
+    var first: bool = not game.flag("talked:" + say)
+    if near and auto and first {
+        game.set_flag("talked:" + say)
+        game.talk(say)
+    } elif near and action_pressed("up") {
+        game.set_flag("talked:" + say)
+        if again != "" and not first { game.talk(again) } else { game.talk(say) }
+    }
+}
+
+func draw() -> void {
+    if near and game.state == "play" and floor(t * 3) % 2 == 0 {
+        draw_text("^", vec2(self.x - 4, self.y - 30), "#ffffff")
+    }
+}

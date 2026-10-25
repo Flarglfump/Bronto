@@ -19,3 +19,5 @@ editor*.bmp
 editor_demo.scene
 editor_project/
 sceneplayer.bmp
+__pycache__/
+*.pyc

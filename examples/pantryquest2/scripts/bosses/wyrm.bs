@@ -1,0 +1,164 @@
+@strict
+# THE FLAMBE WYRM, a serpent of burnt caramel and flame that lives in the furnace's molten
+# cheese. It leaps out of the pool in a long arc - its body trailing behind it - spits a fan
+# of fire at the top, and dives back in, to rise again somewhere else. Only its head can be
+# hurt; its body turns everything.
+
+const NAME: string = "FLAMBE WYRM"
+const HP: number = 60
+const SEGMENTS: int = 6
+
+class Trail {                             # where the head has been, for the body to follow
+    var points: list[vec2] = []
+    var cap: int = 64
+    func add(p: vec2) -> void {
+        push(this.points, p)
+        if len(this.points) > this.cap { remove(this.points, 0) }
+    }
+    func back(steps: int) -> vec2 {
+        var i: int = len(this.points) - 1 - steps
+        if i < 0 { i = 0 }
+        return this.points[i]
+    }
+}
+
+var home := vec2(0, 0)
+var game: entity
+var basil: entity
+var state: string = "sleep"               # sleep, intro, under, leap, dying
+var hp: number = 60
+var t: number = 0
+var vel := vec2(0, 0)
+var flash_t: number = 0
+var spots: list[number] = [72, 168, 264, 360]
+var spot: int = 1
+var trail := Trail()
+var body: list[entity] = []
+var fired: bool = false
+var lava_y: number = 200
+
+func start() -> void {
+    game = find("Game")
+    basil = find("Basil")
+    if game.flag("boss:wyrm") {
+        game.boss_beaten_again("wyrm", [["seal_pepper", "seal_pepper"]], vec2(256, 120))
+        destroy(self)
+        return
+    }
+    self.Sprite.tint = rgb(255, 255, 255, 0)
+}
+
+func hit_by(p: vec2, r: number) -> bool {
+    return state == "leap" and abs(p.x - self.x) < 12 + r and abs(p.y - self.y) < 12 + r
+}
+
+func hit(amount: number, kind: string, from: vec2) -> bool {
+    hp -= amount
+    flash_t = 0.12
+    play_sound("sfx/boss_hit.wav", 0.6)
+    game.boss_health(hp)
+    if hp <= 0 {
+        state = "dying"
+        t = 0
+        stop_music(0.5)
+        play_sound("sfx/boss_die.wav")
+    }
+    return true
+}
+
+func begin(s: string) -> void {
+    state = s
+    t = 0
+}
+
+func update(dt: number) -> void {
+    if game.state != "play" and state != "intro" { return }
+    t += dt
+    if flash_t > 0 {
+        flash_t -= dt
+        if state == "leap" { self.Sprite.tint = rgb(255, 160, 160) }
+    } elif state == "leap" {
+        self.Sprite.tint = rgb(255, 255, 255)
+    }
+    if state == "sleep" {
+        if basil.x < 440 {
+            state = "intro"
+            for i in SEGMENTS {
+                var s := spawn("prefabs/wyrm_seg.scene", vec2(-100, -100), self.parent)
+                push(body, s)
+            }
+            game.boss_start(NAME, HP, "music/boss.wav")
+            game.talk("wyrm_intro")
+            play_sound("sfx/roar.wav")
+        }
+        return
+    }
+    if state == "intro" {
+        if game.state == "play" and game.talking == "" { begin("under") }
+        return
+    }
+    if state == "dying" {
+        if floor(t * 8) != floor((t - dt) * 8) {
+            spawn("prefabs/burst.scene", self.position + vec2(random(-12, 12), random(-12, 12)))
+            if len(body) > 0 {
+                var seg: entity = pop(body)
+                spawn("prefabs/burst.scene", seg.position)
+                destroy(seg)
+            }
+        }
+        self.y += 0.6
+        if t > 2.2 {
+            for seg in body { destroy(seg) }
+            game.boss_beaten("wyrm", [["seal_pepper", "seal_pepper"]], vec2(256, 120), "wyrm_beaten")
+            destroy(self)
+        }
+        return
+    }
+    if state == "under" {
+        self.Sprite.tint = rgb(255, 255, 255, 0)
+        trail.add(vec2(-100, -100))
+        place_body()
+        if t > 1.1 {
+            spot = (spot + 1 + floor(random(len(spots) - 1))) % len(spots)
+            self.position = vec2(spots[spot], lava_y + 24)
+            var target: number = basil.x
+            vel = vec2(clamp((target - self.x) / 70, -2.2, 2.2), -6.2)
+            fired = false
+            begin("leap")
+            play_sound("sfx/sizzle.wav", 0.8)
+            spawn("prefabs/blast.scene", vec2(self.x, lava_y))
+        }
+        return
+    }
+    if state == "leap" {
+        vel.y += 0.13
+        self.position = self.position + vel
+        self.rotation = angle(vel) + 90
+        self.Sprite.frame = 0
+        if not fired and vel.y > -0.5 {
+            fired = true
+            self.Sprite.frame = 1
+            var aim: vec2 = basil.middle() - self.position
+            for a in [-20, 0, 20] {
+                var f := spawn("prefabs/spit.scene", self.position)
+                f.launch(from_angle(angle(aim) + a, 2.4), "fire")
+                f.damage = 14
+            }
+            play_sound("sfx/rocket.wav", 0.6)
+        }
+        trail.add(self.position)
+        place_body()
+        if basil.touches(self.position, vec2(12, 12)) { basil.hurt(18, self.position) }
+        if vel.y > 0 and self.y > lava_y + 30 {
+            spawn("prefabs/blast.scene", vec2(self.x, lava_y))
+            begin("under")
+        }
+    }
+}
+
+func place_body() -> void {
+    for i in len(body) {
+        var seg: entity = body[i]
+        seg.position = trail.back((i + 1) * 5)
+    }
+}

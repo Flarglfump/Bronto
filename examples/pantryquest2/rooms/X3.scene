@@ -1,0 +1,206 @@
+# Pantry Quest II - room X3, Library (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"X3\", area = \"castle\", w = 2, h = 2, music = \"music/castle.wav\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 256 240
+  Tilemap
+    tileset = "art/tiles_castle.bmp"
+    tile_size = 16
+    columns = 32
+    rows = 30
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "#%########################################################################$###$###$###$###$###$#$##+$###$#]#$###$!##%###%###%#####{###%###%##################{#####################################################$###$###$###$#$###$###$#!#$###$###$###$###%####{$###%###%###%###%#########{##############################################################$########!$###$###$###$###$###*###$#$#{#$###$###$###%###%###%###%{####%###%############################################################+######]####$#!#$###$###$###$#${##$###$###$###$###$###%###{#####%###%###%###%####################################################]######!############$###$#####{###$###$###$###$###$###$##{$#$###$###$###%###%###%###%#########%##################################!####################*#######{########$###$###$###$###$#{#$#$###$###$###$###$###%###%###%#####%###%###%########################################################################$###$###$#####$###$###$###$###$###$###$###%#"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 256 240
+  Tilemap
+    tileset = "art/tiles_castle.bmp"
+    tile_size = 16
+    columns = 32
+    rows = 30
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "QPPPPPPPPPPQPPPPPPPSPPPPRPPPPPPPPLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLPN..............................HN..............................HN..............................HN..............................HN..............................HPKKKI..........................HN..............................HN..............................DN...............................N...............................N.........CKKKKKKKOOOM..........N.................DLLLKKKKKI.CKON..............................HN..............................HN..............................HN...CKKKKKKKI..................HN..............................HN..............................HN..............................HN.................CKKKKKKKKI...HN..............................HN..............................HJ..............................H....CKKKKKKKI..................H...............................H...............................HOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOPPPQPPPPPPPSPPPPRPPPPPPPPPPRPPPPQ"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 8 424
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"W\", index = 1, kind = \"blue\", to = \"X1\", arrive = \"E0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 504 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+    flip_x = true
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"E\", index = 0, kind = \"blue\", to = \"X6\", arrive = \"W1\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MapTable"
+  Transform
+    position = 248 176
+  Sprite
+    image = "art/maptable.bmp"
+    layer = -5
+    frame_size = 32 32
+  Animation
+    frames = "0-1"
+    fps = 3
+    loop = true
+    playing = true
+  Script
+    file = "scripts/maptable.bs"
+    vars = "area = \"castle\""
+  Tags
+    list = "maptable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Item"
+  Transform
+    position = 360 184
+  Sprite
+    image = "art/items.bmp"
+    layer = 3
+    frame_size = 16 16
+    frame = 10
+  Script
+    file = "scripts/item.bs"
+    vars = "kind = \"page\", iid = \"page8\""
+  Tags
+    list = "item"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Item"
+  Transform
+    position = 40 104
+  Sprite
+    image = "art/items.bmp"
+    layer = 3
+    frame_size = 16 16
+    frame = 9
+  Script
+    file = "scripts/item.bs"
+    vars = "kind = \"packet\", iid = \"packet_x3\""
+  Tags
+    list = "item"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Ghost"
+  Transform
+    position = 136 296
+  Sprite
+    image = "art/ghost.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"ghost\", hp = 4, damage = 12"
+  Tags
+    list = "enemy"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Ghost"
+  Transform
+    position = 392 104
+  Sprite
+    image = "art/ghost.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"ghost\", hp = 4, damage = 12"
+  Tags
+    list = "enemy"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Knight"
+  Transform
+    position = 328 436
+  Sprite
+    image = "art/knight.bmp"
+    layer = 2
+    frame_size = 16 24
+  Animation
+    frames = "0-3"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"knight\", hp = 8, damage = 16"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0

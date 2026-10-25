@@ -1,0 +1,40 @@
+@strict
+# Something an enemy throws or spits (a seed, brine, a fireball): it flies straight and
+# hurts Basil, and stops at walls.
+
+var vel := vec2(1, 0)
+var kind: string = "seed"
+var damage: number = 8
+var map: entity
+var basil: entity
+var life: number = 4
+var grav: number = 0                      # falling as it flies (thrown things arc)
+
+func launch(v: vec2, k: string) -> void {
+    vel = v
+    kind = k
+    map = find("Basil").map
+    basil = find("Basil")
+    var f: int = 0
+    if kind == "brine" { f = 2 }
+    if kind == "fire" {
+        f = 4
+        damage = 12
+    }
+    if kind == "bone" { f = 6 }
+    if kind == "snow" { f = 8 }
+    self.Animation.frames = f + "-" + (f + 1)
+}
+
+func update(dt: number) -> void {
+    if find("Game").state != "play" { return }
+    vel.y += grav
+    self.position = self.position + vel
+    life -= dt
+    if life <= 0 or tile_solid(map, self.position) {
+        spawn("prefabs/puff.scene", self.position)
+        destroy(self)
+        return
+    }
+    if basil.touches(self.position, vec2(3, 3)) and basil.hurt(damage, self.position) { destroy(self) }
+}

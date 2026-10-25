@@ -1,0 +1,39 @@
+@strict
+# A popcorn kernel, dropped by Basil while rolled up: it sizzles, then pops - breaking
+# cracked blocks and crumbs round it, hurting what's near, and throwing Basil up if he's
+# on top of it (that's how he climbs while rolled up).
+
+var t: number = 0.8
+var map: entity
+
+func start() -> void {
+    map = find("Basil").map
+}
+
+func update(dt: number) -> void {
+    t -= dt
+    if floor(t * 10) % 2 == 0 { self.Sprite.frame = 0 } else { self.Sprite.frame = 1 }
+    if t > 0 { return }
+    var game := find("Game")
+    var c := tile_cell(map, self.position)
+    for dy in [-1, 0, 1] {
+        for dx in [-1, 0, 1] {
+            if abs(dx) + abs(dy) > 1 { continue }
+            var ch := tile_get(map, c.x + dx, c.y + dy)
+            if ch == "x" or ch == "c" {
+                tile_put(map, c.x + dx, c.y + dy, ".")
+                game.room.broke(c.x + dx, c.y + dy, ch)
+                if ch == "x" { game.set_flag("block:" + game.room_id + ":" + (c.x + dx) + "_" + (c.y + dy)) }
+                spawn("prefabs/crumbs.scene", tile_cell_center(map, c.x + dx, c.y + dy))
+            }
+        }
+    }
+    for e in find_tagged("enemy") {
+        if e.alive and distance(e.position, self.position) < 22 { e.hit(3, "popcorn", vec2(0, -1)) }
+    }
+    var basil := find("Basil")
+    if basil.ball and abs(basil.x - self.x) < 14 and basil.y + 10 - self.y < 4 and basil.y + 10 - self.y > -20 { basil.bounce(4.6) }
+    spawn("prefabs/pop.scene", self.position)
+    play_sound("sfx/pop.wav", 0.8)
+    destroy(self)
+}

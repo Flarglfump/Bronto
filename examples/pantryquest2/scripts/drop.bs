@@ -1,0 +1,31 @@
+@strict
+# A little something left by an enemy: energy, more energy, or a hot sauce refill. It
+# blinks out after a while.
+
+var kind: string = "energy"
+var life: number = 8
+var basil: entity
+
+func start() -> void {
+    basil = find("Basil")
+    if kind == "energy_big" { self.Animation.frames = "2-3" }
+    if kind == "sauce" { self.Animation.frames = "4-5" }
+}
+
+func update(dt: number) -> void {
+    var game := find("Game")
+    if game.state != "play" { return }
+    life -= dt
+    if life < 2 and floor(life * 10) % 2 == 0 { self.Sprite.tint = rgb(255, 255, 255, 0) } else { self.Sprite.tint = rgb(255, 255, 255) }
+    if life <= 0 {
+        destroy(self)
+        return
+    }
+    if basil.touches(self.position, vec2(5, 5)) {
+        if kind == "energy" { game.inv.heal(5) }
+        if kind == "energy_big" { game.inv.heal(20) }
+        if kind == "sauce" { game.inv.rockets = min(game.inv.rockets + 2, game.inv.max_rockets) }
+        play_sound("sfx/pickup.wav", 0.5)
+        destroy(self)
+    }
+}

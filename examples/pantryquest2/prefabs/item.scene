@@ -1,0 +1,16 @@
+# Pantry Quest II - an item a guardian leaves (its kind and id are set when it is spawned) (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Item"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/items.bmp"
+    layer = 3
+    frame_size = 16 16
+  Script
+    file = "scripts/item.bs"
+  Tags
+    list = "item, transient"

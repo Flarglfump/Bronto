@@ -1,0 +1,16 @@
+# Pantry Quest II - a popcorn kernel, about to pop (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Popcorn"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/popcorn.bmp"
+    layer = 4
+    frame_size = 8 8
+  Script
+    file = "scripts/popcorn.bs"
+  Tags
+    list = "popcorn, transient"

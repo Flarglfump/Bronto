@@ -1,0 +1,124 @@
+@strict
+# DOCTOR BRINE, floating in his jar of pickling brine above his monster. He drifts back and
+# forth and, every few seconds, marks Basil's spot and calls lightning down on it. When the
+# monster falls he comes down to fight: pepper bounces off his jar until hot sauce cracks it
+# (three rockets), and then he can be hurt.
+
+var monster: entity
+var game: entity
+var basil: entity
+var state: string = "float"               # float, zap, descend, fight, dying
+var t: number = 0
+var zap_x: number = 0
+var jar: int = 3
+var hp: number = 16
+var flash_t: number = 0
+var dir: int = 1
+var draw_layer: int = 6
+var right_wall: number = 480
+
+func start() -> void {
+    game = find("Game")
+    basil = find("Basil")
+    right_wall = game.room_size().x - 32
+}
+
+func hit_by(p: vec2, r: number) -> bool {
+    return (state == "fight") and abs(p.x - self.x) < 10 + r and abs(p.y - self.y) < 14 + r
+}
+
+func hit(amount: number, kind: string, from: vec2) -> bool {
+    if jar > 0 {
+        if kind == "rocket" {
+            jar -= 1
+            play_sound("sfx/blast.wav", 0.6)
+            shake_camera(2, 0.2)
+            self.Sprite.frame = 3 - jar
+            if jar == 0 { game.say("THE JAR IS CRACKED!") }
+        } else {
+            play_sound("sfx/clank.wav", 0.5)
+        }
+        return true
+    }
+    hp -= amount
+    flash_t = 0.12
+    game.boss_health(hp)
+    play_sound("sfx/boss_hit.wav", 0.6)
+    if hp <= 0 {
+        state = "dying"
+        t = 0
+        stop_music(0.5)
+        play_sound("sfx/boss_die.wav")
+    }
+    return true
+}
+
+func descend() -> void {
+    state = "descend"
+    t = 0
+    game.boss_name = "DOCTOR BRINE"
+    game.boss_max = 16
+    game.boss_hp = 16
+}
+
+func update(dt: number) -> void {
+    if game.state != "play" { return }
+    t += dt
+    if flash_t > 0 {
+        flash_t -= dt
+        self.Sprite.tint = rgb(255, 140, 140)
+    } else {
+        self.Sprite.tint = rgb(255, 255, 255)
+    }
+    if state == "float" or state == "zap" {
+        self.x += dir * 0.8
+        if self.x < 48 or self.x > right_wall - 16 { dir = -dir }
+        self.y = 60 + sin(t * 120) * 6
+        if state == "float" and t > 2.6 {
+            state = "zap"
+            t = 0
+            zap_x = basil.x
+            play_sound("sfx/alarm.wav", 0.4)
+        }
+        if state == "zap" and t > 0.8 {
+            spawn("prefabs/bolt.scene", vec2(zap_x, 120))
+            shake_camera(2, 0.2)
+            play_sound("sfx/blast.wav", 0.7)
+            if abs(basil.x - zap_x) < 14 { basil.hurt(18, vec2(zap_x, basil.y - 20)) }
+            state = "float"
+            t = 0
+        }
+    } elif state == "descend" {
+        self.y = min(self.y + 1, 150)
+        if self.y >= 150 {
+            state = "fight"
+            t = 0
+        }
+    } elif state == "fight" {
+        var aim: vec2 = basil.middle() - self.position
+        self.position = self.position + normalize(aim) * 0.7 + vec2(0, sin(t * 200) * 0.8)
+        self.y = clamp(self.y, 80, 180)
+        if floor(t / 1.6) != floor((t - dt) / 1.6) {
+            var s := spawn("prefabs/spit.scene", self.position)
+            s.launch(normalize(aim) * 2.2, "seed")
+            s.damage = 10
+        }
+        if basil.touches(self.position, vec2(10, 14)) { basil.hurt(14, self.position) }
+    } elif state == "dying" {
+        if floor(t * 8) != floor((t - dt) * 8) { spawn("prefabs/burst.scene", self.position + vec2(random(-10, 10), random(-12, 12))) }
+        self.y += 0.5
+        if t > 1.5 {
+            monster.all_done()
+            destroy(self)
+        }
+    }
+}
+
+func draw() -> void {
+    if state == "zap" {                              # the mark where the lightning will fall
+        var c: string = "#fff070"
+        if floor(t * 12) % 2 == 0 { c = "#ff9030" }
+        draw_rect(vec2(zap_x - 8, 204), vec2(16, 4), c)
+        draw_line(vec2(zap_x, 80), vec2(zap_x, 204), rgb(255, 255, 160, 60 + floor(t * 150)))
+    }
+}

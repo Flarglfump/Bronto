@@ -1,0 +1,30 @@
+@strict
+# A hearth: an old oven still burning. Standing at it and pressing up saves the game and
+# fills Basil's energy and hot sauce.
+
+var game: entity
+var basil: entity
+var cool: number = 0
+var draw_layer: int = 6
+var t: number = 0
+
+func start() -> void {
+    game = find("Game")
+    basil = find("Basil")
+}
+
+func draw() -> void {
+    if game.state == "play" and cool <= 0 and basil.touches(self.position + vec2(0, 4), vec2(12, 12)) and floor(t * 3) % 2 == 0 {
+        draw_text("^", vec2(self.x - 4, self.y - 28), "#ffffff")
+    }
+}
+
+func update(dt: number) -> void {
+    t += dt
+    if cool > 0 { cool -= dt }
+    if game.state != "play" or cool > 0 { return }
+    if basil.touches(self.position + vec2(0, 4), vec2(12, 12)) and basil.grounded and action_pressed("up") {
+        cool = 1.5
+        game.rest_at_hearth()
+    }
+}

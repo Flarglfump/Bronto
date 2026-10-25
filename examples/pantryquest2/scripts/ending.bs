@@ -1,0 +1,239 @@
+@strict
+# The ending: dawn over Crumb Village, Basil and Chef Pip walking home, what became of
+# everyone, how the journey went (its time and the treasure found), and the cast rolling by.
+# The Game set the globals "end_time" (seconds), "end_items" ([found, all]) and "end_pages".
+
+var draw_layer: int = 60
+var state: string = "walk"                # walk, words, stats, credits, end
+var t: number = 0                         # seconds in this state
+var page: int = 0
+var shown: number = 0
+var lines: list[string] = []
+var walk_x: number = -20
+var leaving: number = -1
+var scroll: number = 0
+
+var words: list[string] = [
+    "THE CASTLE MELTED DOWN INTO THE HILL, AND THE BLIGHT WENT WITH IT.",
+    "CHEF PIP CAME HOME TO CRUMB VILLAGE, AND THE OVENS WERE LIT AGAIN.",
+    "OLD MOZZ OPENED A LITTLE SHOP BY THE WELL. HE SAYS HE IS QUITE DONE WITH CASTLES.",
+    "AND ONCE A YEAR, BASIL BAKES A ROUND LOAF AND LEAVES IT ON THE HILL, FOR A CHEESE NOBODY ELSE REMEMBERS: FROMAGE."
+]
+
+# The cast: [name, portrait frame (-1: none)], and the lines between.
+var cast: list = [
+    ["PANTRY QUEST II", -1], ["THE CASTLE OF COUNT FROMAGE", -1], ["", -1],
+    ["- CAST -", -1], ["", -1],
+    ["BASIL, AN APPRENTICE", 0], ["CHEF PIP", 2], ["OLD MOZZ, A BUTLER NO MORE", 1],
+    ["SIR STALE", 4], ["THE ABOMINABLE SUNDAE", 5], ["DOCTOR BRINE", 6], ["THE FLAMBE WYRM", 7],
+    ["COUNT FROMAGE", 3], ["", -1],
+    ["MADE IN THE BRONTO EDITOR", -1], ["WRITTEN IN BRONTOSCRIPT", -1], ["", -1],
+    ["NO CHEESE WAS FORGOTTEN", -1], ["IN THE MAKING OF THIS GAME", -1], ["", -1],
+    ["THANK YOU FOR PLAYING!", -1]
+]
+
+func start() -> void {
+    play_music("music/ending.wav", 1.0, 1.5)
+    var pages: int = global("end_pages", 0)
+    if pages >= 8 {
+        push(words, "HE KEEPS THE COUNT'S DIARY ON THE SHELF ABOVE HIS OVEN. EVERY PAGE OF IT.")
+    }
+}
+
+func wrap(text: string, width: int) -> list[string] {
+    var out: list[string] = []
+    var line: string = ""
+    var word: string = ""
+    for i in len(text) + 1 {
+        var c: string = " "
+        if i < len(text) { c = text[i] }
+        if c == " " {
+            if len(line) + len(word) + 1 > width and line != "" {
+                push(out, line)
+                line = word
+            } elif line == "" {
+                line = word
+            } else {
+                line = line + " " + word
+            }
+            word = ""
+        } else {
+            word = word + c
+        }
+    }
+    if line != "" { push(out, line) }
+    return out
+}
+
+func total() -> int {
+    var n: int = 0
+    for l in lines { n += len(l) }
+    return n
+}
+
+func next() -> bool {
+    return action_pressed("jump") or action_pressed("fire") or key_pressed("enter") or mouse_pressed(0)
+}
+
+func credits_height() -> number {
+    var h: number = 0
+    for c in cast {
+        if c[1] >= 0 { h += 38 } else { h += 16 }
+    }
+    return h
+}
+
+func set_state(s: string) -> void {
+    state = s
+    t = 0
+}
+
+func update(dt: number) -> void {
+    t += dt
+    if leaving >= 0 {
+        leaving += dt
+        if leaving > 1.2 { load_scene("title.scene") }
+        return
+    }
+    if state == "walk" {
+        walk_x = min(walk_x + dt * 40, 112)
+        if walk_x >= 112 and t > 3.5 {
+            set_state("words")
+            page = 0
+            lines = wrap(words[0], 28)
+            shown = 0
+        }
+        return
+    }
+    if state == "words" {
+        var before: int = floor(shown)
+        shown = min(shown + dt * 28, total())
+        if floor(shown) != before and floor(shown) % 3 == 0 { play_sound("sfx/text.wav", 0.25) }
+        if next() {
+            if shown < total() {
+                shown = total()
+            } else {
+                page += 1
+                if page >= len(words) {
+                    set_state("stats")
+                } else {
+                    lines = wrap(words[page], 28)
+                    shown = 0
+                }
+            }
+        }
+        return
+    }
+    if state == "stats" {
+        if t > 1.0 and next() { set_state("credits") }
+        return
+    }
+    if state == "credits" {
+        scroll += dt * 18
+        if next() { scroll += 40 }
+        if scroll > credits_height() + 260 { set_state("end") }
+        return
+    }
+    if state == "end" {
+        if t > 1.5 and (next() or action_pressed("pause")) {
+            leaving = 0
+            stop_music(1.0)
+        }
+    }
+}
+
+# ---- drawing ---------------------------------------------------------------------------------------
+func centred(s: string, y: number, colour: string) -> void {
+    var w: number = text_size(s).x
+    draw_text(s, vec2(128 - w / 2 + 1, y + 1), "#000000")
+    draw_text(s, vec2(128 - w / 2, y), colour)
+}
+
+func two(n: int) -> string {
+    if n < 10 { return "0" + n }
+    return "" + n
+}
+
+# How it went, as the old games put it: the faster and the more found, the grander the verdict.
+func verdict(secs: number, pct: int) -> string {
+    if pct >= 100 and secs < 3 * 3600 { return "A FEAST FIT FOR A KING!" }
+    if pct >= 100 { return "NOT A CRUMB LEFT BEHIND!" }
+    if secs < 2 * 3600 { return "SERVED PIPING HOT!" }
+    if pct >= 75 { return "A HEARTY MEAL." }
+    return "HOME IN TIME FOR BREAKFAST."
+}
+
+func draw_people(ground: number) -> void {
+    var walking: bool = state == "walk" and walk_x < 112
+    var bf: int = 0
+    var pf: int = 0
+    if walking {
+        bf = 1 + floor(t * 10) % 4
+        pf = floor(t * 6) % 2
+    }
+    draw_image("art/basil.bmp", vec2(walk_x + 16, ground), bf, vec2(24, 32))
+    draw_image("art/pip.bmp", vec2(walk_x - 10, ground), pf, vec2(24, 32))
+}
+
+func draw() -> void {
+    draw_image("art/title_dawn.bmp", vec2(128, 120))
+    if state == "walk" or state == "words" or state == "stats" {
+        draw_people(206)
+    }
+    if state == "walk" and t > 1.0 {
+        centred("MORNING", 40, "#ffffff")
+    }
+    if state == "words" {
+        draw_rect(vec2(0, 0), vec2(256, 80), rgb(0, 0, 0, 170))
+        var left: int = floor(shown)
+        var y: number = 12
+        for l in lines {
+            if left <= 0 { break }
+            draw_text(substr(l, 0, left), vec2(16, y), "#ffffff")
+            left -= len(l)
+            y += 12
+        }
+        if shown >= total() and floor(t * 3) % 2 == 0 { draw_text(">", vec2(238, 68), "#f8c860") }
+    }
+    if state == "stats" {
+        var secs: number = global("end_time", 0)
+        var it: list = global("end_items", [0, 1])
+        var pct: int = floor(it[0] * 100 / max(it[1], 1))
+        var m: int = floor(secs / 60)
+        draw_rect(vec2(28, 30), vec2(200, 100), "#000000")
+        draw_rect(vec2(29, 31), vec2(198, 98), "#f8e8b0", false)
+        draw_rect(vec2(31, 33), vec2(194, 94), "#806030", false)
+        centred("THE JOURNEY", 42, "#ffe070")
+        centred("TIME  " + two(floor(m / 60)) + ":" + two(m % 60), 62, "#ffffff")
+        centred("TREASURE  " + it[0] + " / " + it[1] + "  (" + pct + "%)", 78, "#ffffff")
+        centred(verdict(secs, pct), 104, "#ff9070")
+    }
+    if state == "credits" {
+        draw_rect(vec2(0, 0), vec2(256, 240), rgb(0, 0, 0, 150))
+        var y: number = 250 - scroll
+        for i in len(cast) {
+            var c: list = cast[i]
+            var h: number = 16
+            if c[1] >= 0 { h = 38 }
+            y += h
+            if y < -40 or y > 260 { continue }
+            var col: string = "#ffffff"
+            if i < 2 { col = "#ffe070" }
+            if c[1] >= 0 {
+                draw_image("art/portraits.bmp", vec2(44, y + 3), c[1], vec2(32, 32))
+                draw_text(c[0], vec2(68, y), col)
+            } else {
+                centred(c[0], y, col)
+            }
+        }
+    }
+    if state == "end" {
+        draw_people(206)
+        draw_image("art/logo.bmp", vec2(128, 60))
+        centred("THE END", 120, "#ffffff")
+        if t > 1.5 and floor(t * 2) % 2 == 0 { centred("PRESS START", 150, "#ffe070") }
+    }
+    var a: number = clamp(1 - t * 0.7, 0, 1)
+    if state == "walk" and a > 0 { draw_rect(vec2(0, 0), vec2(256, 240), rgb(0, 0, 0, 255 * a)) }
+    if leaving >= 0 { draw_rect(vec2(0, 0), vec2(256, 240), rgb(0, 0, 0, 255 * clamp(leaving, 0, 1))) }
+}

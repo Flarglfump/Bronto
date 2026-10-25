@@ -1,0 +1,41 @@
+@strict
+# A switch set into the wall behind a grate's room: only the Garlic Wave, which passes
+# through walls, can reach it. Hit, it opens its grate (the cells in `gate`: column, row,
+# width, height) for good.
+
+var gate: list = [0, 0, 1, 1]
+var sid: string = ""
+var on: bool = false
+var game: entity
+
+func start() -> void {
+    game = find("Game")
+    if game.flag("switch:" + sid) { open_gate(false) }
+}
+
+func hit_by(p: vec2, r: number) -> bool { return abs(p.x - self.x) < 7 + r and abs(p.y - self.y) < 7 + r }
+
+func hit(amount: number, kind: string, from: vec2) -> bool {
+    if on { return true }
+    if kind == "garlic" or kind == "garlic_frost" {
+        open_gate(true)
+    } else {
+        play_sound("sfx/clank.wav", 0.4)
+    }
+    return true
+}
+
+func open_gate(noisy: bool) -> void {
+    on = true
+    self.Sprite.frame = 1
+    var map := child(self.parent, "Map")
+    for dy in gate[3] {
+        for dx in gate[2] { tile_put(map, gate[0] + dx, gate[1] + dy, ".") }
+    }
+    game.set_flag("switch:" + sid)
+    if noisy {
+        play_sound("sfx/door.wav")
+        shake_camera(2, 0.3)
+        game.say("SOMEWHERE, A GRATE SLIDES OPEN")
+    }
+}

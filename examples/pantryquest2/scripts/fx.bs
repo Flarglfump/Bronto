@@ -1,0 +1,11 @@
+@strict
+# An effect (a puff, a burst, crumbs): plays its Animation once, drifting, then goes.
+
+var drift := vec2(0, 0)
+var life: number = 2
+
+func update(dt: number) -> void {
+    self.position = self.position + drift
+    life -= dt
+    if not self.Animation.playing or life <= 0 { destroy(self) }
+}

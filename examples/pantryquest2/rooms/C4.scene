@@ -1,0 +1,223 @@
+# Pantry Quest II - room C4, Crumbling Crypt (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"C4\", area = \"catacombs\", w = 3, h = 2, music = \"music/catacombs.wav\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 384 240
+  Tilemap
+    tileset = "art/tiles_catacombs.bmp"
+    tile_size = 16
+    columns = 48
+    rows = 30
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "###%##############################################################################$###$###$###$#############$###$###$###$###$###$###$###$###%#####$###$###*###$##+$###%###%###%!##%#############%###%###%###%##############################################################################$###$#####################$###$###$###$###$###$###$#####$*##$###$###$##>$###$#!#$###%###%###%###%#####$###$###%###%###%###%########################################################################################################$###$###$###$###$#########$###>###$###$###$###$###$###$###%###%#####$###$###$###$###%###%###%###%#################%###%###%##############################################################################$###$###$##########*######$###$##>$###$###$###$###$###$#####$###$###$###$###$###$###%###%###%###%#########$###%###%###%###%##################################################################################*######+######>#######$###$###$###$###$###$#####$###$###$###$###$###$###$###$###%###%###%#####$###$###$###%###%###%###%#####################%###%#######################################################>######!###############$###$*##$###$#############$###$###$###$###$###$###$###$###%#####$###$###$###$###$###%###%###%###%#############%###%###%###%##############################################################################$#########################$###$###$###$###$###$###$#$###$###$###$###$###$###$###$###%###%###%###%###"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 384 240
+  Tilemap
+    tileset = "art/tiles_catacombs.bmp"
+    tile_size = 16
+    columns = 48
+    rows = 30
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "QPPPPPPPPPPQPPPPPPPSPPN..HPPPPPPPPPRPPPPQPPPPPPPPLLLLLLLLLLLLLLLLLLLLLJ..DLLLLLLLLLLLLLLLLLLLLLPN..............................................HN..............................................HN...................CKKKKKKI...................HN..............................................HN..............................................HN..............................................HN.........CKKKKI..............CKKKKI...........HN..............................................HN..............................................HN..............................................HN.CKKKKKKI........cccccccccccc........CKKKKKKI.HN..............................................HN..............................................HN..............................................HN.............CKKKI...........CKKKI............HN..............................................HN..............................................HN.....................CKKI.....................HN..............................................HN.....CKKKI..........................CKKKI.....HN..............................................HN..............................................HLOOOOOM........................................D.HPPPPPOM........................................DLLLLLLJ.......................................................................................OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOPPQPPPPPPPSPPPPRPPPPPPPPPPRPPPPQPPPPPPPSPPPPPPPP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 384 8
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"N\", index = 1, kind = \"blue\", to = \"C1\", arrive = \"S1\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 760 424
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+    flip_x = true
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"E\", index = 1, kind = \"blue\", to = \"C5\", arrive = \"W0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 8 424
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"W\", index = 1, kind = \"blue\", to = \"C7\", arrive = \"E0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Item"
+  Transform
+    position = 392 296
+  Sprite
+    image = "art/items.bmp"
+    layer = 3
+    frame_size = 16 16
+    frame = 10
+  Script
+    file = "scripts/item.bs"
+    vars = "kind = \"page\", iid = \"page2\""
+  Tags
+    list = "item"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Crawler"
+  Transform
+    position = 200 120
+  Sprite
+    image = "art/crawler.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"crawler\", hp = 2, damage = 8"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Crawler"
+  Transform
+    position = 520 120
+  Sprite
+    image = "art/crawler.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"crawler\", hp = 2, damage = 8"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Batter"
+  Transform
+    position = 376 216
+  Sprite
+    image = "art/batter.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"swooper\", hp = 2, damage = 10"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Walker"
+  Transform
+    position = 328 436
+  Sprite
+    image = "art/walker.bmp"
+    layer = 2
+    frame_size = 16 24
+  Animation
+    frames = "0-3"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"walker\", hp = 3, damage = 10"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Gnat"
+  Transform
+    position = 648 280
+  Sprite
+    image = "art/gnat.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"flyer\", hp = 1, damage = 6"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0

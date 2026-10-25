@@ -1,0 +1,165 @@
+# Pantry Quest II - room X4, Fondue Kitchen (made by tools/make_rooms.py from tools/world.py: change it there)
+bronto_scene 1
+
+entity
+  Name
+    text = "Room"
+  Transform
+    position = 0 0
+  Script
+    file = "scripts/room.bs"
+    vars = "id = \"X4\", area = \"castle\", w = 2, h = 1, music = \"music/castle.wav\""
+  Tags
+    list = "room"
+
+entity
+  Name
+    text = "Back"
+  Transform
+    position = 256 120
+  Tilemap
+    tileset = "art/tiles_castle.bmp"
+    tile_size = 16
+    columns = 32
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = ""
+    tiles = "##$###$###$###$###%###%###%###%#%###%###%##########################################################]######!######$###$###$###$#####$###$###$###$###$###$###%###%#$###%###%###%###%##################################################!####################*$###$#####$###$###$###$###$###$###$#####$###$###$###%###%###%###%#####%###%#####################################################+##################$###$###$###$###$#####$###$###$###$###$###%###%###%#%###%###%###%##################"
+    layer = -30
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Map"
+  Transform
+    position = 256 120
+  Tilemap
+    tileset = "art/tiles_castle.bmp"
+    tile_size = 16
+    columns = 32
+    rows = 15
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
+    tiles = "QPPPPPPPPPPQPPPPPPPSPPPPRPPPPPPPPLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLPN..............................HN..............................HN..............................HN..............................HN..............................HN..............................HN....CKKI......................HJ..............................D............GOOOOOOM........................HRPPPPQN........................HPPPPRPN............OOOOOOOOOOOOPPPQPPPPOOOOOOOOOOOOPPPRPPPPPPPPPPRPPPPQPPPPPPPSPPPP"
+    layer = -10
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 8 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"W\", index = 0, kind = \"blue\", to = \"X2\", arrive = \"E0\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Door"
+  Transform
+    position = 504 184
+  Sprite
+    image = "art/door.bmp"
+    layer = 4
+    frame_size = 16 48
+    flip_x = true
+  Script
+    file = "scripts/door.bs"
+    vars = "side = \"E\", index = 0, kind = \"blue\", to = \"X6\", arrive = \"W3\""
+  Tags
+    list = "door"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Item"
+  Transform
+    position = 104 120
+  Sprite
+    image = "art/items.bmp"
+    layer = 3
+    frame_size = 16 16
+    frame = 8
+  Script
+    file = "scripts/item.bs"
+    vars = "kind = \"cake\", iid = \"cake_x4\""
+  Tags
+    list = "item"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Hearth"
+  Transform
+    position = 424 192
+  Sprite
+    image = "art/hearth.bmp"
+    layer = -5
+    frame_size = 32 32
+  Animation
+    frames = "0-3"
+    fps = 8
+    loop = true
+    playing = true
+  Script
+    file = "scripts/hearth.bs"
+  Tags
+    list = "hearth"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Knight"
+  Transform
+    position = 360 196
+  Sprite
+    image = "art/knight.bmp"
+    layer = 2
+    frame_size = 16 24
+  Animation
+    frames = "0-3"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"knight\", hp = 8, damage = 16"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "Gnat"
+  Transform
+    position = 248 88
+  Sprite
+    image = "art/gnat.bmp"
+    layer = 2
+    frame_size = 16 16
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/enemy.bs"
+    vars = "brain = \"flyer\", hp = 1, damage = 6"
+  Tags
+    list = "enemy, freezable"
+  Parent
+    entity = 0

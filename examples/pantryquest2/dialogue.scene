@@ -1,0 +1,9 @@
+# Pantry Quest II - the dialogue box, pushed over the game (scripts/dialogue.bs). The words come
+# in the global "talk".
+bronto_scene 1
+
+entity
+  Name
+    text = "Dialogue"
+  Script
+    file = "scripts/dialogue.bs"

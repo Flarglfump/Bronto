@@ -1,0 +1,109 @@
+@strict
+# The HUD, drawn by draw() on the screen (its layer is above the camera's ui_layer):
+# Basil's energy and cake-slice tanks, his hot sauce, the minimap, the name of a part of
+# the world as he comes into it, a guardian's strength, short messages, and the fade
+# between rooms.
+
+var draw_layer: int = 60
+var game: entity
+var cells: list = []                      # [x, y, area] of every map cell, for the minimap
+var colours: list = []                    # [area, colour]
+var t: number = 0
+
+func start() -> void {
+    game = find("Game")
+    var world := find("World")
+    for r in world.rooms() {
+        for j in r[4] {
+            for i in r[3] { push(cells, [r[1] + i, r[2] + j, r[5], r[0]]) }
+        }
+    }
+    for a in world.areas() { push(colours, [a[0], a[2]]) }
+}
+
+func colour_of(area: string) -> string {
+    for c in colours {
+        if c[0] == area { return c[1] }
+    }
+    return "#808080"
+}
+
+func update(dt: number) -> void { t += dt }
+
+func shadow_text(s: string, p: vec2, colour: string) -> void {
+    draw_text(s, p + vec2(1, 1), "#000000")
+    draw_text(s, p, colour)
+}
+
+func draw() -> void {
+    if game.state == "boot" { return }
+    var inv: any = game.inv
+    # energy: a box for each cake slice (filled while it holds energy), then the energy in hand
+    var tanks: int = inv.tanks
+    var full: int = floor(inv.energy / 100)
+    for i in tanks {
+        var p := vec2(8 + (i % 7) * 7, 6 + floor(i / 7) * 6)
+        if i < full { draw_rect(p, vec2(5, 4), "#f8d848") } else { draw_rect(p, vec2(5, 4), "#f8d848", false) }
+    }
+    var e: int = inv.energy % 100
+    if inv.energy > 0 and e == 0 and inv.energy >= 100 { e = 99 }
+    var en: string = "EN " + e
+    if e < 10 { en = "EN 0" + e }
+    shadow_text(en, vec2(8, 12 + floor(max(tanks - 1, 0) / 7) * 6), "#ffffff")
+    if game.has("sauce") {
+        draw_image("art/hud_icons.bmp", vec2(76, 15), 0, vec2(8, 8))
+        var r: string = "" + inv.rockets
+        if inv.rockets < 10 { r = "0" + r }
+        shadow_text(r, vec2(82, 12), "#ff8060")
+    }
+    draw_minimap(vec2(196, 6))
+    # the name of where he's come in
+    if game.banner_t > 0 {
+        var a: number = clamp(game.banner_t, 0, 1)
+        var title: string = game.area_title()
+        var size := text_size(title)
+        var x: number = 128 - size.x / 2
+        draw_rect(vec2(x - 8, 50), vec2(size.x + 16, 14), rgb(0, 0, 0, 170 * a))
+        draw_text(title, vec2(x, 53), rgb(255, 230, 150, 255 * a))
+    }
+    # a guardian's strength
+    if game.boss_max > 0 {
+        var w: number = 160
+        draw_rect(vec2(48, 222), vec2(w + 2, 7), "#000000")
+        draw_rect(vec2(49, 223), vec2(w * clamp(game.boss_hp / game.boss_max, 0, 1), 5), "#e04848")
+        shadow_text(game.boss_name, vec2(128 - text_size(game.boss_name).x / 2, 210), "#ffd0a0")
+    }
+    # a short message
+    if game.toast_t > 0 {
+        var s := text_size(game.toast)
+        draw_rect(vec2(128 - s.x / 2 - 6, 186), vec2(s.x + 12, 14), rgb(0, 0, 0, 190))
+        draw_text(game.toast, vec2(128 - s.x / 2, 189), "#ffffff")
+    }
+    if game.escape_t > 0 {
+        var secs: int = ceil(game.escape_t)
+        var m: string = floor(secs / 60) + ":" + (secs % 60)
+        if secs % 60 < 10 { m = floor(secs / 60) + ":0" + (secs % 60) }
+        shadow_text("ESCAPE " + m, vec2(96, 28), "#ff6060")
+    }
+    if game.fade > 0 { draw_rect(vec2(0, 0), vec2(256, 240), rgb(0, 0, 0, 255 * game.fade)) }
+}
+
+# The cells round Basil's, 5 across and 3 down: seen ones in their area's colour, mapped
+# ones (a map table read) dimmer, his own blinking.
+func draw_minimap(at: vec2) -> void {
+    var me: vec2 = game.cell()
+    draw_rect(at - vec2(1, 1), vec2(5 * 10 + 2, 3 * 8 + 2), rgb(0, 0, 0, 200))
+    for c in cells {
+        var dx: number = c[0] - me.x
+        var dy: number = c[1] - me.y
+        if abs(dx) > 2 or abs(dy) > 1 { continue }
+        var key: string = c[0] + "_" + c[1]
+        var seen: bool = contains(game.visited, key)
+        var mapped: bool = contains(game.maps, c[2])
+        if not seen and not mapped { continue }
+        var p := at + vec2((dx + 2) * 10, (dy + 1) * 8)
+        var col: string = colour_of(c[2])
+        if seen { draw_rect(p, vec2(9, 7), col) } else { draw_rect(p, vec2(9, 7), col, false) }
+        if dx == 0 and dy == 0 and floor(t * 4) % 2 == 0 { draw_rect(p + vec2(3, 2), vec2(3, 3), "#ffffff") }
+    }
+}

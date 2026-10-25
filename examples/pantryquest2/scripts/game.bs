@@ -1,0 +1,601 @@
+@strict
+# The Game entity: what Basil carries and has done (an Inventory and the world's flags),
+# the room he's in (bringing in the next as he goes through a door), the camera's limits,
+# the music, saving and loading, and the story's moments (dialogue, the item fanfares,
+# the guardians, the ending).
+#
+# Other scripts ask it: find("Game").has("dough"), .damage(12), .flag("boss:stale")...
+
+# ---- what Basil has: a class, so it can be saved and loaded as one thing --------------------
+class Inventory {
+    var items: list[string] = []          # abilities and treasures: "dough", "popcorn", "seal_salt"...
+    var energy: int = 99
+    var tanks: int = 0                    # cake slices: +100 each
+    var rockets: int = 0
+    var max_rockets: int = 0
+    var pages: list[string] = []          # the Count's diary pages found
+    var frost_on: bool = true             # Frost Sugar in the pepper (it can be left out, in the pause menu)
+
+    func has(name: string) -> bool { return contains(this.items, name) }
+    func give(name: string) -> void {
+        if not contains(this.items, name) { push(this.items, name) }
+    }
+    func max_energy() -> int { return 99 + this.tanks * 100 }
+    func seals() -> int {
+        var n: int = 0
+        for s in ["seal_salt", "seal_sugar", "seal_vinegar", "seal_pepper"] {
+            if this.has(s) { n += 1 }
+        }
+        return n
+    }
+    func heal(amount: int) -> void { this.energy = min(this.energy + amount, this.max_energy()) }
+    func to_list() -> list { return [this.items, this.energy, this.tanks, this.rockets, this.max_rockets, this.pages, this.frost_on] }
+    static func from_list(l: list) -> Inventory {
+        var inv := Inventory()
+        inv.items = l[0]
+        inv.energy = l[1]
+        inv.tanks = l[2]
+        inv.rockets = l[3]
+        inv.max_rockets = l[4]
+        inv.pages = l[5]
+        inv.frost_on = l[6]
+        return inv
+    }
+}
+
+# ---- settings for testing in the editor: set them in Script › vars ----------------------------
+var start_room: string = "V0"
+var start_door: string = ""               # "" = at start_pos
+var start_pos := vec2(72, 192)
+var start_items: list[string] = []        # e.g. ["dough", "popcorn"]
+
+# ---- the state ---------------------------------------------------------------------------------
+var inv := Inventory()
+var flags: list[string] = []              # "item:c_dough", "boss:stale", "door:...": what has been done
+var visited: list[string] = []            # the map cells seen ("x_y")
+var maps: list[string] = []               # the areas whose map table has been read
+var state: string = "boot"                # boot, play, fade_out, fade_in, pose, dead, ending
+var room: entity
+var room_id: string = ""
+var room_info: list = []
+var rooms_data: list = []
+var basil: entity
+var cam: entity
+var fade: number = 1                      # 0 clear .. 1 black
+var next_room: string = ""
+var next_door: string = ""
+var next_speed := vec2(0, 0)
+var arrived_door: string = ""             # the door Basil came in by (it starts open)
+var area: string = ""
+var banner_t: number = 0
+var play_time: number = 0
+var slot: string = "slot1"
+var save_room: string = "V0"              # where a continue starts
+var heat_t: number = 0
+var dead_t: number = 0
+var boss_name: string = ""                # a guardian fighting: its name and strength, for the HUD
+var boss_hp: number = 0
+var boss_max: number = 0
+var toast: string = ""                    # a short message at the bottom of the screen
+var toast_t: number = 0
+var escape_t: number = 0                  # the castle is falling: seconds left
+var talking: string = ""                  # the talk on screen (the dialogue scene is pushed over this one)
+var after_talk: list = []                 # what to do when it's done: ["give", kind], ["boss_reward", ...]
+var pending_talks: list = []              # talks waiting their turn
+var story: entity
+
+func start() -> void {
+    bind_keys()
+    basil = find("Basil")
+    cam = find("Camera")
+    story = find("Story")
+    rooms_data = find("World").rooms()
+    slot = global("slot", "slot1")
+    if global("load", false) and load_game() {
+        enter(save_room, "", vec2(0, 0), true)
+    } else {
+        for it in start_items { inv.give(it) }
+        if inv.has("sauce") and inv.max_rockets == 0 { inv.max_rockets = 5 }
+        inv.rockets = inv.max_rockets
+        enter(start_room, start_door, start_pos, false)
+    }
+}
+
+# The controls, as actions any script can ask for (action_down("jump")).
+func bind_keys() -> void {
+    for a in ["left", "right", "up", "down", "jump", "fire", "rocket", "pause", "map"] { unbind(a) }   # (bound afresh)
+    bind("left", "left", "a", "pad:left", "pad:left_x-")
+    bind("right", "right", "d", "pad:right", "pad:left_x+")
+    bind("up", "up", "w", "pad:up", "pad:left_y-")
+    bind("down", "down", "s", "pad:down", "pad:left_y+")
+    bind("jump", "z", "k", "space", "pad:a")
+    bind("fire", "x", "j", "pad:x")
+    bind("rocket", "c", "l", "pad:b", "pad:rb")
+    bind("pause", "enter", "escape", "pad:start")
+    bind("map", "m", "tab", "pad:back")
+}
+
+# ---- asking about the world -----------------------------------------------------------------
+func info(id: string) -> list {
+    for r in rooms_data {
+        if r[0] == id { return r }
+    }
+    return []
+}
+func room_size() -> vec2 { return vec2(room_info[3] * 256, room_info[4] * 240) }
+# The map cell Basil is in.
+func cell() -> vec2 {
+    var m: vec2 = basil.middle()
+    return vec2(room_info[1] + clamp(floor(m.x / 256), 0, room_info[3] - 1), room_info[2] + clamp(floor(m.y / 240), 0, room_info[4] - 1))
+}
+func area_title() -> string {
+    for a in find("World").areas() {
+        if a[0] == area { return a[1] }
+    }
+    return ""
+}
+func say(text: string) -> void {
+    toast = text
+    toast_t = 2.5
+}
+func gate_message() -> void {
+    say("THE GATE NEEDS FOUR SEALS (" + inv.seals() + "/4)")
+}
+# Something beaten leaves a little energy, or hot sauce if Basil is short of it.
+func drop(at: vec2) -> void {
+    var r := random()
+    if r < 0.45 { return }
+    var kind: string = "energy"
+    if inv.has("sauce") and inv.rockets < inv.max_rockets and r > 0.75 { kind = "sauce" }
+    elif r > 0.92 { kind = "energy_big" }
+    var d := spawn("prefabs/drop.scene", at)
+    d.kind = kind
+}
+func has(name: string) -> bool { return inv.has(name) }
+func flag(name: string) -> bool { return contains(flags, name) }
+func set_flag(name: string) -> void {
+    if not contains(flags, name) { push(flags, name) }
+}
+func use_rocket() -> bool {
+    if not inv.has("sauce") or inv.rockets <= 0 { return false }
+    inv.rockets -= 1
+    return true
+}
+func beam() -> string {
+    if inv.has("garlic") and inv.has("frost") and inv.frost_on { return "garlic_frost" }
+    if inv.has("garlic") { return "garlic" }
+    if inv.has("frost") and inv.frost_on { return "frost" }
+    return "pepper"
+}
+func beam_sound() -> string {
+    if inv.has("garlic") { return "sfx/garlic.wav" }
+    if inv.has("frost") and inv.frost_on { return "sfx/frost.wav" }
+    return "sfx/pepper.wav"
+}
+func lava_damage() -> int {
+    if inv.has("mitts") { return 6 }
+    return 14
+}
+
+# ---- rooms --------------------------------------------------------------------------------------
+# Brings in a room: Basil arrives by a door ("W0", "N1"...) or at a spot.
+func enter(id: string, door: string, at: vec2, keep_speed: bool) -> void {
+    var data := info(id)
+    if len(data) == 0 {
+        log_error("there's no room called", id)
+        return
+    }
+    if room != nil { destroy(room) }
+    for e in find_tagged("transient") { destroy(e) }   # shots, sparks, spit... (every prefab is tagged so)
+    room_id = id
+    room_info = data
+    room = spawn("rooms/" + id + ".scene", vec2(0, 0))
+    arrived_door = door
+    var map := child(room, "Map")
+    basil.map = map
+    basil.front = child(room, "Front")
+    var size := room_size()
+    var spot := at
+    if door != "" { spot = door_spot(door, size) }
+    basil.place(spot, keep_speed)
+    if door != "" {
+        var side := substr(door, 0, 1)
+        if side == "W" { basil.face(1) }
+        if side == "E" { basil.face(-1) }
+    }
+    cam.Camera.limit_min = vec2(0, 0)
+    cam.Camera.limit_max = size
+    snap_camera()
+    see_cells()
+    if data[5] != area {
+        area = data[5]
+        banner_t = 3
+    }
+    play_music(room.music, 0.8, 1.0)
+}
+
+# Where Basil stands coming in by a door.
+func door_spot(door: string, size: vec2) -> vec2 {
+    var side := substr(door, 0, 1)
+    var index: int = floor(num(substr(door, 1)))
+    if side == "W" { return vec2(26, (index * 15 + 13) * 16 - 16) }
+    if side == "E" { return vec2(size.x - 26, (index * 15 + 13) * 16 - 16) }
+    if side == "N" { return vec2(index * 256 + 128, 10) }
+    return vec2(index * 256 + 128, size.y - 30)
+}
+
+# Basil went off the room's edge at `p` (the middle of his box): through which door?
+func leave(side: string, p: vec2) -> void {
+    if state != "play" { return }
+    var index: int = 0
+    if side == "W" or side == "E" { index = floor(p.y / 240) } else { index = floor(p.x / 256) }
+    var me: string = side + index
+    var other := neighbour(side, index)
+    if len(other) == 0 {
+        log_warning("no room through", room_id, me)
+        return
+    }
+    next_room = other[0]
+    next_door = other[1]
+    next_speed = basil.vel
+    if side == "W" or side == "E" {
+        state = "fade_out"
+    } else {
+        go_through()                                   # shafts: straight on, no fade
+    }
+}
+
+# The room on the other side of a door, and the door you come in by: [id, "E0"].
+func neighbour(side: string, index: int) -> list {
+    var cx: int = room_info[1]
+    var cy: int = room_info[2]
+    var w: int = room_info[3]
+    var h: int = room_info[4]
+    var target := vec2(0, 0)
+    var arrive: string = ""
+    if side == "W" { target = vec2(cx - 1, cy + index) }
+    if side == "E" { target = vec2(cx + w, cy + index) }
+    if side == "N" { target = vec2(cx + index, cy - 1) }
+    if side == "S" { target = vec2(cx + index, cy + h) }
+    for r in rooms_data {
+        if target.x >= r[1] and target.x < r[1] + r[3] and target.y >= r[2] and target.y < r[2] + r[4] {
+            if side == "W" { arrive = "E" + floor(target.y - r[2]) }
+            if side == "E" { arrive = "W" + floor(target.y - r[2]) }
+            if side == "N" { arrive = "S" + floor(target.x - r[1]) }
+            if side == "S" { arrive = "N" + floor(target.x - r[1]) }
+            return [r[0], arrive]
+        }
+    }
+    return []
+}
+
+func go_through() -> void {
+    var side := substr(next_door, 0, 1)
+    enter(next_room, next_door, vec2(0, 0), true)
+    if side == "S" { basil.lift(max(-next_speed.y, 4.5)) }   # coming up a shaft: a lift over the edge
+}
+
+func see_cells() -> void {
+    var c := cell()
+    var key: string = c.x + "_" + c.y
+    if not contains(visited, key) { push(visited, key) }
+}
+
+# ---- Basil's energy ----------------------------------------------------------------------------
+func damage(amount: number) -> void {
+    var a: int = round(amount)
+    if inv.has("mitts") { a = round(amount / 2) }
+    inv.energy -= a
+    if inv.energy <= 0 {
+        inv.energy = 0
+        die()
+    }
+}
+
+func die() -> void {
+    if state == "dead" { return }
+    state = "dead"
+    dead_t = 0
+    stop_music(0.5)
+    play_sound("sfx/die.wav")
+}
+
+# ---- each step -----------------------------------------------------------------------------------
+func update(dt: number) -> void {
+    if state == "boot" {
+        state = "fade_in"
+    }
+    if state == "fade_in" {
+        fade -= dt * 3
+        if fade <= 0 {
+            fade = 0
+            state = "play"
+        }
+    } elif state == "fade_out" {
+        fade += dt * 4
+        if fade >= 1 {
+            fade = 1
+            go_through()
+            state = "fade_in"
+        }
+    } elif state == "play" {
+        play_time += dt
+        see_cells()
+        if escape_t > 0 {
+            escape_t -= dt
+            if floor(escape_t * 2) != floor((escape_t + dt) * 2) { shake_camera(1.5, 0.4) }
+            if room_info[5] == "castle" and random() < 0.02 { debris() }
+            if escape_t <= 0 {
+                escape_t = 0
+                die()
+            }
+            if room_id == "V4" {
+                finish()
+                return
+            }
+        }
+        if action_pressed("pause") or action_pressed("map") {
+            pause()
+            return
+        }
+        if room.heat and not inv.has("mitts") {
+            heat_t -= dt
+            if heat_t <= 0 {
+                heat_t = 0.25
+                damage(2)
+            }
+        }
+    } elif state == "dead" {
+        dead_t += dt
+        fade = min(1, dead_t / 1.5)
+        if dead_t > 2.5 { respawn() }
+    }
+    if banner_t > 0 { banner_t -= dt }
+    if toast_t > 0 { toast_t -= dt }
+}
+
+func respawn() -> void {
+    inv.energy = inv.max_energy()
+    inv.rockets = inv.max_rockets
+    state = "fade_in"
+    basil.safe_t = 0
+    if flag("escape") {                                 # caught in the castle: from the throne room again
+        escape_t = 180
+        play_music("music/escape.wav", 1.0, 0)
+        enter("X7", "", vec2(256, 192), false)
+        return
+    }
+    enter(save_room, "", hearth_spot(save_room), false)
+}
+
+# A bit of the melting castle falls.
+func debris() -> void {
+    var size := room_size()
+    var x: number = clamp(basil.x + random(-120, 120), 24, size.x - 24)
+    var d := spawn("prefabs/spit.scene", vec2(x, cam.y - 110))
+    d.launch(vec2(0, 2.5), "snow")
+    d.damage = 10
+}
+
+func hearth_spot(id: string) -> vec2 {
+    for t in find("World").things() {
+        if t[0] == id and t[1] == "hearth" { return vec2(t[2] * 16 + 8, t[3] * 16) }
+    }
+    return start_pos
+}
+
+# ---- talking: the dialogue scene is pushed over this one, so everything here waits ---------------
+func talk(id: string) -> void { talk_pages(id, story.talk(id)) }
+
+func talk_pages(id: string, pages: list) -> void {
+    if talking != "" {
+        push(pending_talks, [id, pages])
+        return
+    }
+    talking = id
+    set_global("talk", pages)
+    set_global("talk_id", id)
+    set_volume("music", volume("music") * 0.5)
+    push_scene("dialogue.scene", true, false)
+}
+
+# The scene on top was popped: a talk ended, or the pause menu closed.
+func on_resume() -> void {
+    if talking != "" {
+        var id: string = talking
+        talking = ""
+        set_volume("music", global("music_volume", 0.8))
+        talk_done(id)
+        if len(pending_talks) > 0 {
+            var next: list = remove(pending_talks, 0)
+            talk_pages(next[0], next[1])
+        }
+        return
+    }
+    var action: string = global("pause_action", "")
+    set_global("pause_action", "")
+    inv.frost_on = global("frost_on", inv.frost_on)
+    if action == "quit" {
+        load_scene("title.scene")
+    }
+}
+
+func talk_done(id: string) -> void {
+    if state == "pose" { state = "play" }
+    if id == "pip_rescue" { start_escape() }
+    if id == "count_beaten" { set_flag("count_gone") }
+    if len(after_talk) > 0 {
+        var todo: list = after_talk
+        after_talk = []
+        if todo[0] == "flag" { set_flag(todo[1]) }
+    }
+    broadcast("talk_finished", id)
+}
+
+# ---- things found -------------------------------------------------------------------------------
+func collect(kind: string, iid: string) -> void {
+    set_flag("item:" + iid)
+    var small := false
+    if kind == "cake" {
+        inv.tanks += 1
+        inv.energy = inv.max_energy()
+    } elif kind == "packet" {
+        inv.max_rockets += 5
+        inv.rockets += 5
+        small = true
+    } elif kind == "page" {
+        push(inv.pages, iid)
+    } else {
+        inv.give(kind)
+        if inv.seals() == 4 { set_flag("seals4") }
+        if kind == "sauce" {
+            inv.max_rockets += 10
+            inv.rockets = inv.max_rockets
+        }
+    }
+    if small { play_sound("sfx/small_item.wav") } else { play_sound("sfx/item.wav") }
+    state = "pose"
+    var text: string = story.item_text(kind, "C")
+    if kind == "page" { text = "\"" + story.page_text(iid) + "\"" }
+    talk_pages("item:" + kind, [["", -1, "You found the " + story.item_name(kind) + "!|" + text]])
+}
+
+func rest_at_hearth() -> void {
+    inv.energy = inv.max_energy()
+    inv.rockets = inv.max_rockets
+    save_room = room_id
+    play_sound("sfx/save.wav")
+    if save_game() { talk("hearth") } else { talk("hearth_nosave") }
+}
+
+func read_map(which: string) -> void {
+    if not contains(maps, which) { push(maps, which) }
+    play_sound("sfx/map.wav")
+    var title: string = ""
+    for a in find("World").areas() {
+        if a[0] == which { title = a[1] }
+    }
+    talk_pages("map", [["", -1, "Basil copies the map of " + title + " from the old table."]])
+}
+
+# The pause menu (a scene of its own, pushed over this one): it reads what to show from globals.
+func pause() -> void {
+    set_global("pause_inv", inv.to_list())
+    set_global("pause_visited", visited)
+    set_global("pause_maps", maps)
+    set_global("pause_cell", cell())
+    set_global("pause_room", room_id)
+    set_global("pause_time", play_time)
+    set_global("pause_marks", marks())
+    set_global("frost_on", inv.frost_on)
+    play_sound("sfx/select.wav", 0.5)
+    push_scene("pause.scene", false, false)
+}
+
+# What the map shows: where the hearths and map tables are (those seen), and the items not taken yet in mapped areas.
+func marks() -> list {
+    var out: list = []
+    for t in find("World").things() {
+        var r := info(t[0])
+        if len(r) == 0 { continue }
+        var cell: string = (r[1] + floor(t[2] / 16)) + "_" + (r[2] + floor(t[3] / 15))
+        var seen := contains(visited, cell)
+        if t[1] == "item" and not flag("item:" + t[4]) and (contains(maps, r[5]) or seen) { push(out, [cell, "item"]) }
+        if (t[1] == "hearth" or t[1] == "maptable") and seen { push(out, [cell, t[1]]) }
+    }
+    return out
+}
+
+# ---- the guardians ------------------------------------------------------------------------------
+# A guardian wakes: the room's doors shut, its name and strength go on the HUD, the music changes.
+func boss_start(display: string, hp: number, music: string) -> void {
+    boss_name = display
+    boss_hp = hp
+    boss_max = hp
+    broadcast("seal", true)
+    play_music(music, 0.9, 0.5)
+}
+
+func boss_health(hp: number) -> void { boss_hp = max(0, hp) }
+
+# Beaten: it's remembered, the doors open, and its seal (and anything else) appears.
+func boss_beaten(id: string, rewards: list, at: vec2, words: string) -> void {
+    set_flag("boss:" + id)
+    boss_max = 0
+    broadcast("seal", false)
+    play_music(room_music(), 0.8, 2.0)
+    for i in len(rewards) {
+        var r: list = rewards[i]
+        if not flag("item:" + r[1]) {
+            var it := spawn("prefabs/item.scene", at + vec2((i - (len(rewards) - 1) / 2) * 32, 0), room)
+            it.kind = r[0]
+            it.iid = r[1]
+        }
+    }
+    if words != "" { talk(words) }
+}
+
+# Coming back to a beaten guardian's room: whatever it left that wasn't taken is still there.
+func boss_beaten_again(id: string, rewards: list, at: vec2) -> void {
+    for i in len(rewards) {
+        var r: list = rewards[i]
+        if not flag("item:" + r[1]) {
+            var it := spawn("prefabs/item.scene", at + vec2((i - (len(rewards) - 1) / 2) * 32, 8), room)
+            it.kind = r[0]
+            it.iid = r[1]
+        }
+    }
+}
+
+func room_music() -> string {
+    var a: string = room_info[5]
+    return "music/" + a + ".wav"
+}
+
+# ---- the escape and the ending -----------------------------------------------------------------
+func start_escape() -> void {
+    escape_t = 180
+    save_room = "X7"
+    set_flag("escape")
+    play_music("music/escape.wav", 1.0, 0)
+    play_sound("sfx/alarm.wav")
+}
+
+func finish() -> void {
+    state = "ending"
+    var total: int = len(find("World").things())
+    var found: int = 0
+    var items: int = 0
+    for t in find("World").things() {
+        if t[1] == "item" {
+            items += 1
+            if flag("item:" + t[4]) { found += 1 }
+        }
+    }
+    set_global("end_time", play_time)
+    set_global("end_items", [found, items])
+    set_global("end_pages", len(inv.pages))
+    set_flag("won")
+    save_game()
+    stop_music(1.0)
+    load_scene("ending.scene")
+}
+
+# ---- saving ---------------------------------------------------------------------------------------
+func save_game() -> bool {
+    return save_data(slot, [1, inv.to_list(), flags, visited, maps, save_room, play_time])
+}
+
+func load_game() -> bool {
+    var s: any = load_data(slot)
+    if s == nil { return false }
+    var l: list = s
+    if len(l) < 7 or l[0] != 1 { return false }
+    inv = Inventory.from_list(l[1])
+    flags = l[2]
+    visited = l[3]
+    maps = l[4]
+    save_room = l[5]
+    play_time = l[6]
+    return true
+}

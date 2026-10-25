@@ -1,0 +1,78 @@
+@strict
+# A peppercorn from Basil's mill: it flies a short way and stops at walls (breaking crumb
+# blocks). With Frost Sugar it freezes what it hits; with the Garlic Wave it goes through
+# walls and hits harder.
+
+var dir := vec2(1, 0)
+var kind: string = "pepper"               # pepper, frost, garlic, garlic_frost
+var travelled: number = 0
+var range: number = 88
+var speed: number = 5
+var map: entity
+
+func launch(d: vec2, k: string) -> void {
+    dir = d
+    kind = k
+    map = find("Basil").map
+    if kind == "garlic" or kind == "garlic_frost" { range = 132 }
+    var f: int = 0
+    if kind == "frost" { f = 1 }
+    if kind == "garlic" { f = 2 }
+    if kind == "garlic_frost" { f = 3 }
+    if dir.y != 0 { f += 4 }
+    self.Sprite.frame = f
+}
+
+func passes_walls() -> bool { return kind == "garlic" or kind == "garlic_frost" }
+
+func damage() -> number {
+    if passes_walls() { return 2 }
+    return 1
+}
+
+func update(dt: number) -> void {
+    for i in 2 {                                     # two half-moves a step, so nothing thin is skipped
+        self.position = self.position + dir * (speed / 2)
+        travelled += speed / 2
+        if hit_something() {
+            destroy(self)
+            return
+        }
+    }
+    if travelled >= range { destroy(self) }
+}
+
+func hit_something() -> bool {
+    var p := self.position
+    var t := tile_at(map, p)
+    if t == "Y" {                                    # a door's cap
+        for d in find_tagged("door") {
+            if distance(d.position, p) < 30 and d.shot(kind) {
+                puff()
+                return true
+            }
+        }
+    }
+    if t == "c" {                                    # crumbs: they break
+        var cell := tile_cell(map, p)
+        tile_put(map, cell.x, cell.y, ".")
+        find("Game").room.broke(cell.x, cell.y, "c")
+        spawn("prefabs/crumbs.scene", tile_cell_center(map, cell.x, cell.y))
+        play_sound("sfx/crumble.wav", 0.5)
+        return true
+    }
+    for e in find_tagged("enemy") {
+        if e.alive and e.hit_by(p, 3) {
+            if e.hit(damage(), kind, dir) { return true }
+        }
+    }
+    if tile_solid(map, p) and not passes_walls() {
+        puff()
+        return true
+    }
+    return false
+}
+
+func puff() -> void {
+    spawn("prefabs/puff.scene", self.position)
+}

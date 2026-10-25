@@ -1,0 +1,386 @@
+@strict
+# The pause menu: a scene pushed over the game (which waits underneath, unseen). Four
+# pages - MAP, ITEMS, DIARY and SYSTEM - turned with left and right (or LB / RB, or the
+# mouse on the tabs). What to show comes in globals the Game sets before pushing it
+# ("pause_inv", "pause_visited", ...); what to do after - quitting, Frost Sugar on or off -
+# goes back the same way. PAUSE (or MAP, or jump on the tabs) closes it.
+
+var draw_layer: int = 70
+var tab: int = 0
+var tabs: list[string] = ["MAP", "ITEMS", "DIARY", "SYSTEM"]
+var inv: list = []
+var items: list[string] = []
+var visited: list[string] = []
+var maps: list[string] = []
+var marks: list = []
+var here := vec2(0, 0)
+var rooms: list = []
+var areas: list = []
+var room_id: string = ""
+var story: entity
+var sel: int = 0
+var reading: int = -1                     # the diary page open (-1: the list)
+var t: number = 0
+var closing: bool = false
+var options: list[string] = []
+var confirm_quit: bool = false
+
+func start() -> void {
+    story = find("Story")
+    inv = global("pause_inv", [[], 99, 0, 0, 0, [], true])
+    items = inv[0]
+    visited = global("pause_visited", [])
+    maps = global("pause_maps", [])
+    marks = global("pause_marks", [])
+    here = global("pause_cell", vec2(0, 0))
+    room_id = global("pause_room", "")
+    rooms = find("World").rooms()
+    areas = find("World").areas()
+    if action_down("map") { tab = 0 }
+}
+
+func area_colour(a: string) -> string {
+    for x in areas {
+        if x[0] == a { return x[2] }
+    }
+    return "#808080"
+}
+
+func update(dt: number) -> void {
+    t += dt
+    if closing { return }
+    if t < 0.15 { return }                     # (the press that opened it isn't a press in here)
+    var turn: int = 0
+    if action_pressed("left") and reading < 0 and not (tab == 3) { turn = -1 }
+    if action_pressed("right") and reading < 0 and not (tab == 3) { turn = 1 }
+    if button_pressed("lb") { turn = -1 }
+    if button_pressed("rb") { turn = 1 }
+    if mouse_pressed(0) {
+        var m := mouse_position()
+        if m.y < 24 {
+            var i: int = floor((m.x - 8) / 60)
+            if i >= 0 and i < 4 and i != tab {
+                tab = i
+                sel = 0
+                reading = -1
+                play_sound("sfx/blip.wav", 0.5)
+            }
+        }
+    }
+    if turn != 0 {
+        tab = (tab + turn + 4) % 4
+        sel = 0
+        reading = -1
+        confirm_quit = false
+        play_sound("sfx/blip.wav", 0.5)
+    }
+    if action_pressed("pause") or action_pressed("map") {
+        close()
+        return
+    }
+    if tab == 1 { items_input() }
+    if tab == 2 { diary_input() }
+    if tab == 3 { system_input() }
+}
+
+func close() -> void {
+    closing = true
+    play_sound("sfx/back.wav", 0.5)
+    pop_scene()
+}
+
+func move_sel(n: int, cols: int) -> void {
+    var before: int = sel
+    if action_pressed("left") { sel -= 1 }
+    if action_pressed("right") { sel += 1 }
+    if action_pressed("up") { sel -= cols }
+    if action_pressed("down") { sel += cols }
+    sel = clamp(sel, 0, n - 1)
+    if sel != before { play_sound("sfx/blip.wav", 0.4) }
+}
+
+func items_input() -> void {
+    var before: int = sel
+    if action_pressed("up") { sel -= 4 }
+    if action_pressed("down") { sel += 4 }
+    sel = clamp(sel, 0, 11)
+    if sel != before { play_sound("sfx/blip.wav", 0.4) }
+}
+
+func diary_input() -> void {
+    var found: list = inv[5]
+    if reading >= 0 {
+        if action_pressed("jump") or action_pressed("fire") or action_pressed("rocket") {
+            reading = -1
+            play_sound("sfx/back.wav", 0.4)
+        }
+        return
+    }
+    if len(found) == 0 { return }
+    var before: int = sel
+    if action_pressed("up") { sel -= 1 }
+    if action_pressed("down") { sel += 1 }
+    sel = clamp(sel, 0, 7)
+    if sel != before { play_sound("sfx/blip.wav", 0.4) }
+    if action_pressed("jump") or action_pressed("fire") {
+        if contains(found, "page" + (sel + 1)) {
+            reading = sel
+            play_sound("sfx/select.wav", 0.5)
+        }
+    }
+}
+
+func system_options() -> list[string] {
+    var out: list[string] = []
+    if contains(items, "frost") { push(out, "frost") }
+    push(out, "music")
+    push(out, "sound")
+    push(out, "fullscreen")
+    push(out, "resume")
+    push(out, "quit")
+    return out
+}
+
+func system_input() -> void {
+    options = system_options()
+    var before: int = sel
+    if action_pressed("up") { sel -= 1 }
+    if action_pressed("down") { sel += 1 }
+    sel = clamp(sel, 0, len(options) - 1)
+    if sel != before {
+        play_sound("sfx/blip.wav", 0.4)
+        confirm_quit = false
+    }
+    var o: string = options[sel]
+    var lr: int = 0
+    if action_pressed("left") { lr = -1 }
+    if action_pressed("right") { lr = 1 }
+    var ok := action_pressed("jump") or action_pressed("fire")
+    if o == "frost" and (ok or lr != 0) {
+        set_global("frost_on", not global("frost_on", true))
+        play_sound("sfx/select.wav", 0.5)
+    }
+    if o == "music" and lr != 0 {
+        var v: number = clamp(global("music_volume", 0.8) + lr * 0.1, 0, 1)
+        set_global("music_volume", v)
+        set_volume("music", v)
+        play_sound("sfx/blip.wav", 0.5)
+        save_settings()
+    }
+    if o == "sound" and lr != 0 {
+        var v: number = clamp(volume("sfx") + lr * 0.1, 0, 1)
+        set_volume("sfx", v)
+        set_global("sound_volume", v)
+        play_sound("sfx/blip.wav", 0.8)
+        save_settings()
+    }
+    if o == "fullscreen" and (ok or lr != 0) {
+        set_fullscreen(not fullscreen())
+        play_sound("sfx/select.wav", 0.5)
+        save_settings()
+    }
+    if o == "resume" and ok { close() }
+    if o == "quit" and ok {
+        if confirm_quit {
+            set_global("pause_action", "quit")
+            close()
+        } else {
+            confirm_quit = true
+            play_sound("sfx/select.wav", 0.5)
+        }
+    }
+}
+
+# The volumes and fullscreen are kept in their own save, shared by every journey (title.bs reads it).
+func save_settings() -> void {
+    save_data("settings", [global("music_volume", 0.8), volume("sfx"), fullscreen()])
+}
+
+# ---- drawing ----------------------------------------------------------------------------------
+func draw() -> void {
+    draw_rect(vec2(0, 0), vec2(256, 240), "#100818")
+    for i in 4 {
+        var x: number = 8 + i * 60
+        var col: string = "#403050"
+        if i == tab { col = "#a06838" }
+        draw_rect(vec2(x, 6), vec2(56, 14), col)
+        var w: number = text_size(tabs[i]).x
+        draw_text(tabs[i], vec2(x + 28 - w / 2, 9), "#ffffff")
+    }
+    draw_rect(vec2(4, 22), vec2(248, 1), "#a06838")
+    if tab == 0 { draw_map() }
+    if tab == 1 { draw_items() }
+    if tab == 2 { draw_diary() }
+    if tab == 3 { draw_system() }
+    draw_text("LEFT/RIGHT: PAGES   PAUSE: BACK", vec2(4, 230), "#706080")
+}
+
+func draw_map() -> void {
+    var cw: number = 7
+    var ch: number = 6
+    var ox: number = 12
+    var oy: number = 40
+    var name: string = ""
+    var aname: string = ""
+    for r in rooms {
+        for j in r[4] {
+            for i in r[3] {
+                var key: string = (r[1] + i) + "_" + (r[2] + j)
+                var seen := contains(visited, key)
+                var mapped := contains(maps, r[5])
+                if not seen and not mapped { continue }
+                var p := vec2(ox + (r[1] + i) * cw, oy + (r[2] + j) * ch)
+                var col: string = area_colour(r[5])
+                if seen { draw_rect(p, vec2(cw - 1, ch - 1), col) } else { draw_rect(p, vec2(cw - 1, ch - 1), col, false) }
+            }
+        }
+        if r[0] == room_id {
+            name = r[6]
+            for a in areas {
+                if a[0] == r[5] { aname = a[1] }
+            }
+        }
+    }
+    for m in marks {
+        var parts: list = split_key(m[0])
+        var p := vec2(ox + parts[0] * cw + 2, oy + parts[1] * ch + 1)
+        if m[1] == "item" { draw_rect(p, vec2(2, 2), "#ffffff") }
+        if m[1] == "hearth" { draw_rect(p, vec2(3, 3), "#ff9030") }
+        if m[1] == "maptable" { draw_rect(p, vec2(3, 3), "#60c0ff") }
+    }
+    if floor(t * 4) % 2 == 0 {
+        draw_rect(vec2(ox + here.x * cw + 1, oy + here.y * ch + 1), vec2(cw - 3, ch - 3), "#ffffff")
+    }
+    draw_text(aname, vec2(12, 28), "#f8c860")
+    draw_text(name, vec2(12, 168), "#ffffff")
+    var secs: int = floor(global("pause_time", 0))
+    var tm: string = floor(secs / 3600) + ":" + two(floor(secs / 60) % 60) + ":" + two(secs % 60)
+    draw_text("TIME " + tm, vec2(12, 184), "#a090b0")
+    draw_rect(vec2(12, 200), vec2(4, 4), "#ff9030")
+    draw_text("HEARTH", vec2(20, 198), "#a090b0")
+    draw_rect(vec2(80, 200), vec2(4, 4), "#60c0ff")
+    draw_text("MAP", vec2(88, 198), "#a090b0")
+    draw_rect(vec2(124, 201), vec2(2, 2), "#ffffff")
+    draw_text("ITEM", vec2(130, 198), "#a090b0")
+}
+
+func two(n: int) -> string {
+    if n < 10 { return "0" + n }
+    return "" + n
+}
+
+func split_key(k: string) -> list {
+    var i: int = 0
+    while i < len(k) and k[i] != "_" { i += 1 }
+    return [num(substr(k, 0, i)), num(substr(k, i + 1))]
+}
+
+func draw_items() -> void {
+    var kinds: list[string] = ["dough", "popcorn", "sauce", "frost", "leaven", "mitts", "garlic", "whisk",
+                               "seal_salt", "seal_sugar", "seal_vinegar", "seal_pepper"]
+    for i in 12 {
+        var k: string = kinds[i]
+        var p := vec2(40 + (i % 4) * 48, 44 + floor(i / 4) * 34)
+        var frame: int = i
+        if i >= 8 { frame = 11 + (i - 8) }
+        var col: string = "#302038"
+        if i == sel { col = "#a06838" }
+        draw_rect(p - vec2(14, 14), vec2(28, 28), col)
+        if contains(items, k) { draw_image("art/items.bmp", p, frame, vec2(16, 16)) } else { draw_text("?", p - vec2(3, 4), "#605070") }
+    }
+    var k: string = kinds[sel]
+    if contains(items, k) {
+        draw_text(story.item_name(k), vec2(12, 150), "#f8c860")
+        var lines: list[string] = wrap(story.item_text(k, "C"), 29)
+        for i in len(lines) { draw_text(lines[i], vec2(12, 164 + i * 10), "#ffffff") }
+    } else {
+        draw_text("NOT FOUND YET", vec2(12, 150), "#605070")
+    }
+    var pages: list = inv[5]
+    draw_text("ENERGY " + inv[1] + "/" + (99 + inv[2] * 100) + "   SAUCE " + inv[3] + "/" + inv[4] + "   PAGES " + len(pages) + "/8", vec2(8, 214), "#a090b0")
+}
+
+func draw_diary() -> void {
+    var found: list = inv[5]
+    if reading >= 0 {
+        draw_text("THE COUNT'S DIARY - PAGE " + (reading + 1), vec2(12, 34), "#f8c860")
+        draw_rect(vec2(10, 48), vec2(236, 150), "#e8d8a8")
+        var lines: list[string] = wrap(story.page_text("page" + (reading + 1)), 27)
+        for i in len(lines) { draw_text(lines[i], vec2(18, 56 + i * 11), "#402818") }
+        draw_text("JUMP: BACK", vec2(12, 206), "#a090b0")
+        return
+    }
+    draw_text("THE COUNT'S DIARY", vec2(12, 34), "#f8c860")
+    for i in 8 {
+        var y: number = 52 + i * 16
+        var col: string = "#605070"
+        var label: string = "PAGE " + (i + 1) + "  - - - - -"
+        if contains(found, "page" + (i + 1)) {
+            col = "#ffffff"
+            label = "PAGE " + (i + 1)
+        }
+        if i == sel { draw_rect(vec2(10, y - 3), vec2(150, 14), "#503040") }
+        draw_text(label, vec2(16, y), col)
+    }
+    if len(found) == 0 { draw_text("NO PAGES FOUND YET", vec2(16, 190), "#a090b0") } else { draw_text("JUMP: READ", vec2(16, 190), "#a090b0") }
+}
+
+func draw_system() -> void {
+    options = system_options()
+    for i in len(options) {
+        var o: string = options[i]
+        var y: number = 48 + i * 20
+        var label: string = ""
+        if o == "frost" {
+            label = "FROST SUGAR: OFF"
+            if global("frost_on", true) { label = "FROST SUGAR: ON" }
+        }
+        if o == "music" { label = "MUSIC  " + bar(global("music_volume", 0.8)) }
+        if o == "sound" { label = "SOUND  " + bar(volume("sfx")) }
+        if o == "fullscreen" {
+            label = "FULLSCREEN: OFF"
+            if fullscreen() { label = "FULLSCREEN: ON" }
+        }
+        if o == "resume" { label = "RESUME" }
+        if o == "quit" {
+            label = "QUIT TO TITLE"
+            if confirm_quit and i == sel { label = "SURE? UNSAVED PROGRESS IS LOST" }
+        }
+        if i == sel { draw_rect(vec2(10, y - 4), vec2(236, 16), "#503040") }
+        draw_text(label, vec2(18, y), "#ffffff")
+    }
+    draw_text("SAVE AT A HEARTH (UP, STANDING AT ONE)", vec2(8, 200), "#a090b0")
+}
+
+func bar(v: number) -> string {
+    var s: string = ""
+    for i in 10 {
+        if i < round(v * 10) { s = s + "#" } else { s = s + "-" }
+    }
+    return s
+}
+
+func wrap(text: string, width: int) -> list[string] {
+    var out: list[string] = []
+    var line: string = ""
+    var word: string = ""
+    for i in len(text) + 1 {
+        var c: string = " "
+        if i < len(text) { c = text[i] }
+        if c == " " {
+            if len(line) + len(word) + 1 > width and line != "" {
+                push(out, line)
+                line = word
+            } elif line == "" {
+                line = word
+            } else {
+                line = line + " " + word
+            }
+            word = ""
+        } else {
+            word = word + c
+        }
+    }
+    if line != "" { push(out, line) }
+    return out
+}

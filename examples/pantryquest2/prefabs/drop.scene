@@ -1,0 +1,21 @@
+# Pantry Quest II - a little energy or hot sauce left by an enemy (made by tools/make_prefabs.py)
+bronto_scene 1
+
+entity
+  Name
+    text = "Drop"
+  Transform
+    position = 0 0
+  Sprite
+    image = "art/drops.bmp"
+    layer = 3
+    frame_size = 8 8
+  Animation
+    frames = "0-1"
+    fps = 6
+    loop = true
+    playing = true
+  Script
+    file = "scripts/drop.bs"
+  Tags
+    list = "drop, transient"
