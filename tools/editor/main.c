@@ -286,6 +286,7 @@ static bool editor_enter(br_scene *s) {
     ed_prefs_load(ed);
     ed_doc_init(&ed->doc);
     ed->doc.world.context = ed->engine;              /* Sound components play while playing */
+    ed->doc.context = ed->engine;                    /* ... and in scenes pushed over it (push_scene) */
     {   /* the project: the scene's (see br_assets_find_root), or the folder the editor started in */
         char root[ED_PATH_MAX] = "";
         if (g_open_path && !br_fs_is_dir(g_open_path)) br_assets_find_root(g_open_path, root, sizeof(root));
@@ -334,20 +335,46 @@ static void editor_update(br_scene *s, float dt) {
     ed_console_poll(ed);
     shortcuts(ed);
     update_title(ed);
-    if (ed->doc.playing) {                          /* what the game's scripts asked for */
+    if (ed->doc.playing) {                          /* what the game's scripts asked for, in each scene on the stack */
         char next[ED_PATH_MAX], full[ED_PATH_MAX * 2];
-        if (br_script_quit_request(&ed->doc.world)) {
-            ed_cmd_play(ed);
-            ed_status(ed, "The game called quit(): stopped playing");
-        } else if (br_script_scene_request(&ed->doc.world, next, sizeof(next))) {
-            snprintf(full, sizeof(full), "%s%s", br_assets_root(), next);
-            if (ed_doc_switch_scene(&ed->doc, full)) ed_status(ed, "load_scene(\"%s\") - Stop goes back to the scene you were editing", next);
-            else ed_status(ed, "load_scene(\"%s\"): %s", next, ed->doc.error);
+        int i;
+        bool transparent, below;
+        for (i = ed_doc_stack_depth(&ed->doc) - 1; i >= 0 && ed->doc.playing; --i) {
+            br_world *w = ed_doc_stack_world(&ed->doc, i);
+            if (!w) continue;
+            if (br_script_quit_request(w)) {
+                ed_cmd_play(ed);
+                ed_status(ed, "The game called quit(): stopped playing");
+                break;
+            }
+            if (br_script_scene_request(w, next, sizeof(next))) {
+                snprintf(full, sizeof(full), "%s%s", br_assets_root(), next);
+                if (ed_doc_switch_scene(&ed->doc, full)) ed_status(ed, "load_scene(\"%s\") - Stop goes back to the scene you were editing", next);
+                else ed_status(ed, "load_scene(\"%s\"): %s", next, ed->doc.error);
+                break;
+            }
+            if (br_script_pop_request(w)) {
+                if (ed_doc_pop_scene(&ed->doc)) ed_status(ed, "pop_scene()");
+                break;
+            }
+            if (br_script_push_request(w, next, sizeof(next), &transparent, &below)) {
+                if (ed_doc_push_scene(&ed->doc, next, transparent, below)) ed_status(ed, "push_scene(\"%s\") - Stop goes back to the scene you were editing", next);
+                else ed_status(ed, "push_scene(\"%s\"): %s", next, ed->doc.error);
+                break;
+            }
         }
     }
-    if (ed->doc.playing && br_script_error_count(&ed->doc.world) != ed->script_errors_seen) {   /* a script broke */
-        ed->script_errors_seen = br_script_error_count(&ed->doc.world);
-        ed_status(ed, "Script error: %s", br_script_last_error(&ed->doc.world));
+    if (ed->doc.playing) {                          /* a script broke, in any scene on the stack */
+        uint32_t errors = 0;
+        int i;
+        const char *last = "";
+        for (i = 0; i < ed_doc_stack_depth(&ed->doc); ++i) {
+            br_world *w = ed_doc_stack_world(&ed->doc, i);
+            errors += br_script_error_count(w);
+            if (br_script_error_count(w)) last = br_script_last_error(w);
+        }
+        if (errors > ed->script_errors_seen) ed_status(ed, "Script error: %s", last);
+        ed->script_errors_seen = errors;
     }
 }
 

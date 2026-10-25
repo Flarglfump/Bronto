@@ -10,6 +10,7 @@
 #include "bronto/script.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,6 +26,7 @@ static const br_field k_transform_fields[] = {
 };
 static const br_transform k_transform_default = { { 0, 0 }, 0, { 1, 1 } };
 
+static const char *const k_blend_modes[] = { "alpha", "none", "add", "multiply" };   /* br_blend_mode order */
 static const char *const k_shape_kinds[] = { "rect", "ellipse", "triangle" };
 static const br_field k_shape_fields[] = {
     BR_FIELD_ENUM_OF(br_shape, kind, k_shape_kinds),
@@ -32,15 +34,21 @@ static const br_field k_shape_fields[] = {
     BR_FIELD(br_shape, color, BR_FIELD_COLOR, 0, 0),
     BR_FIELD(br_shape, outline, BR_FIELD_COLOR, 0, 0),
     BR_FIELD(br_shape, layer, BR_FIELD_INT, -100, 100),
+    BR_FIELD_ENUM_OF(br_shape, blend, k_blend_modes),
 };
-static const br_shape k_shape_default = { BR_SHAPE_RECT, { 16, 16 }, { 74, 163, 255, 255 }, { 0, 0, 0, 0 }, 0 };
+static const br_shape k_shape_default = { BR_SHAPE_RECT, { 16, 16 }, { 74, 163, 255, 255 }, { 0, 0, 0, 0 }, 0, BR_BLEND_ALPHA };
 
 static const br_field k_sprite_fields[] = {
     BR_FIELD(br_sprite, image, BR_FIELD_STRING, 0, 0),
     BR_FIELD(br_sprite, tint, BR_FIELD_COLOR, 0, 0),
     BR_FIELD(br_sprite, layer, BR_FIELD_INT, -100, 100),
+    BR_FIELD(br_sprite, frame_size, BR_FIELD_VEC2, 0, 4096),
+    BR_FIELD(br_sprite, frame, BR_FIELD_INT, 0, 4095),
+    BR_FIELD(br_sprite, flip_x, BR_FIELD_BOOL, 0, 0),
+    BR_FIELD(br_sprite, flip_y, BR_FIELD_BOOL, 0, 0),
+    BR_FIELD_ENUM_OF(br_sprite, blend, k_blend_modes),
 };
-static const br_sprite k_sprite_default = { "", { 255, 255, 255, 255 }, 0 };
+static const br_sprite k_sprite_default = { "", { 255, 255, 255, 255 }, 0, { 0, 0 }, 0, false, false, BR_BLEND_ALPHA };
 
 static const br_field k_label_fields[] = {
     BR_FIELD(br_label, text, BR_FIELD_STRING, 0, 0),
@@ -89,6 +97,31 @@ static const br_tilemap k_tilemap_default = { "", 16, 16, 11, "", "", "", -10, {
 static const br_field k_tags_fields[] = { BR_FIELD(br_tags, list, BR_FIELD_STRING, 0, 0) };
 static const br_tags k_tags_default = { "" };
 
+static const br_field k_animation_fields[] = {
+    BR_FIELD(br_animation, frames, BR_FIELD_STRING, 0, 0),
+    BR_FIELD(br_animation, fps, BR_FIELD_FLOAT, 0, 120),
+    BR_FIELD(br_animation, loop, BR_FIELD_BOOL, 0, 0),
+    BR_FIELD(br_animation, playing, BR_FIELD_BOOL, 0, 0),
+};
+static const br_animation k_animation_default = { "0-3", 8, true, true, 0, "" };
+
+static const br_field k_camera_fields[] = {
+    BR_FIELD(br_camera, current, BR_FIELD_BOOL, 0, 0),
+    BR_FIELD(br_camera, zoom, BR_FIELD_FLOAT, 0.05f, 32),
+    BR_FIELD(br_camera, follow, BR_FIELD_ENTITY, 0, 0),
+    BR_FIELD(br_camera, follow_offset, BR_FIELD_VEC2, 0, 0),
+    BR_FIELD(br_camera, deadzone, BR_FIELD_VEC2, 0, 4096),
+    BR_FIELD(br_camera, smoothing, BR_FIELD_FLOAT, 0, 5),
+    BR_FIELD(br_camera, limit, BR_FIELD_BOOL, 0, 0),
+    BR_FIELD(br_camera, limit_min, BR_FIELD_VEC2, 0, 0),
+    BR_FIELD(br_camera, limit_max, BR_FIELD_VEC2, 0, 0),
+    BR_FIELD(br_camera, ui_layer, BR_FIELD_INT, -100, 101),
+    BR_FIELD(br_camera, pixel_snap, BR_FIELD_BOOL, 0, 0),
+};
+static const br_camera k_camera_default = {
+    true, 1, BR_ENTITY_NULL, { 0, 0 }, { 0, 0 }, 0, false, { 0, 0 }, { 320, 180 }, 50, true, 0, 0, 0, { 0, 0 }, 0, false
+};
+
 #define DESC(name, T, fields, def) { name, sizeof(T), fields, (int)BR_ARRAY_COUNT(fields), def }
 static const br_component_desc k_descs[] = {
     DESC("Name", br_name, k_name_fields, &k_name_default),
@@ -101,10 +134,12 @@ static const br_component_desc k_descs[] = {
     DESC("Sound", br_sound_src, k_sound_fields, &k_sound_default),
     DESC("Tilemap", br_tilemap, k_tilemap_fields, &k_tilemap_default),
     DESC("Tags", br_tags, k_tags_fields, &k_tags_default),
+    DESC("Animation", br_animation, k_animation_fields, &k_animation_default),
+    DESC("Camera", br_camera, k_camera_fields, &k_camera_default),
 };
 static const br_component_desc *const k_desc_list[] = {
     &k_descs[0], &k_descs[1], &k_descs[2], &k_descs[3], &k_descs[4], &k_descs[5], &k_descs[6], &k_descs[7],
-    &k_descs[8], &k_descs[9],
+    &k_descs[8], &k_descs[9], &k_descs[10], &k_descs[11],
 };
 
 const br_component_desc *const *br_builtin_descs(int *count) {
@@ -123,7 +158,9 @@ bool br_builtin_ids_of(const br_world *w, br_builtin_ids *ids) {
     ids->sound = br_component_find(w, "Sound");
     ids->tilemap = br_component_find(w, "Tilemap");
     ids->tags = br_component_find(w, "Tags");
-    return ids->tags != BR_COMPONENT_INVALID && ids->transform != BR_COMPONENT_INVALID && ids->shape != BR_COMPONENT_INVALID &&
+    ids->animation = br_component_find(w, "Animation");
+    ids->camera = br_component_find(w, "Camera");
+    return ids->tags != BR_COMPONENT_INVALID && ids->animation != BR_COMPONENT_INVALID && ids->camera != BR_COMPONENT_INVALID && ids->transform != BR_COMPONENT_INVALID && ids->shape != BR_COMPONENT_INVALID &&
            ids->sprite != BR_COMPONENT_INVALID && ids->label != BR_COMPONENT_INVALID &&
            ids->motion != BR_COMPONENT_INVALID && ids->bounds != BR_COMPONENT_INVALID &&
            ids->name != BR_COMPONENT_INVALID && ids->sound != BR_COMPONENT_INVALID &&
@@ -375,6 +412,7 @@ static br_vec2 local_half_extent(const br_world *w, const br_builtin_ids *id, br
     if (sp) {
         const br_image *img = br_asset_image(sp->image);
         float iw = img ? (float)img->width : 16.0f, ih = img ? (float)img->height : 16.0f;
+        if (img && sp->frame_size.x >= 1 && sp->frame_size.y >= 1) { iw = sp->frame_size.x; ih = sp->frame_size.y; }
         h.x = BR_MAX(h.x, iw / 2);
         h.y = BR_MAX(h.y, ih / 2);
     }
@@ -430,7 +468,8 @@ bool br_builtin_hit(const br_world *w, br_entity e, br_vec2 p) {
 
 /* ---- drawing ------------------------------------------------------------------ */
 
-typedef struct draw_item { br_entity e; int layer; int what; uint32_t depth; } draw_item;   /* parents under their children */   /* what: 0 shape, 1 sprite, 2 label, 3 tilemap */
+/* what: 0 shape, 1 sprite, 2 label, 3 tilemap, 4 a script's draw(); parents under their children */
+typedef struct draw_item { br_entity e; int layer; int what; uint32_t depth; } draw_item;
 
 static draw_item *g_items;
 static uint32_t g_item_cap;
@@ -448,6 +487,8 @@ static void draw_polygon(br_renderer *r, const br_vec2 *p, int n, br_color fill,
     if (fill.a) for (i = 1; i + 1 < n; ++i) br_fill_triangle(r, p[0], p[i], p[i + 1], fill);
     if (outline.a) for (i = 0; i < n; ++i) br_draw_line(r, p[i], p[(i + 1) % n], outline);
 }
+
+static br_blend_mode blend_of(int b) { return b >= BR_BLEND_ALPHA && b <= BR_BLEND_MULTIPLY ? (br_blend_mode)b : BR_BLEND_ALPHA; }
 
 static void draw_shape(br_renderer *r, const br_transform *t, const br_shape *s) {
     br_vec2 pts[32];
@@ -469,14 +510,32 @@ static void draw_shape(br_renderer *r, const br_transform *t, const br_shape *s)
         pts[n++] = to_world(t, br_v2(hx, hy));
         pts[n++] = to_world(t, br_v2(-hx, hy));
     }
+    br_set_blend(r, blend_of(s->blend));
     draw_polygon(r, pts, n, s->color, s->outline);
+    br_set_blend(r, BR_BLEND_ALPHA);
+}
+
+/* The part of a sprite's image it shows: the whole image, or its frame. */
+static br_recti sprite_source(const br_image *img, const br_sprite *s) {
+    int fw = (int)s->frame_size.x, fh = (int)s->frame_size.y, per_row, frame;
+    if (fw < 1 || fh < 1 || fw > img->width || fh > img->height) return br_recti_make(0, 0, img->width, img->height);
+    per_row = img->width / fw;
+    frame = s->frame < 0 ? 0 : s->frame;
+    if (frame >= per_row * (img->height / fh)) frame = per_row * (img->height / fh) - 1;   /* past the last: the last */
+    return br_recti_make((frame % per_row) * fw, (frame / per_row) * fh, fw, fh);
 }
 
 static void draw_sprite(br_renderer *r, const br_transform *t, const br_sprite *s) {
     const br_image *img = br_asset_image(s->image);
     if (img) {
-        br_draw_sprite(r, img, NULL, t->position, br_v2((float)img->width / 2, (float)img->height / 2),
-                       t->scale, t->rotation * (BR_PI / 180.0f), s->tint);
+        br_recti src = sprite_source(img, s);
+        br_vec2 scale = t->scale;
+        if (s->flip_x) scale.x = -scale.x;
+        if (s->flip_y) scale.y = -scale.y;
+        br_set_blend(r, blend_of(s->blend));
+        br_draw_sprite(r, img, &src, t->position, br_v2((float)src.w / 2, (float)src.h / 2),
+                       scale, t->rotation * (BR_PI / 180.0f), s->tint);
+        br_set_blend(r, BR_BLEND_ALPHA);
     } else {                      /* missing image: a magenta box with a cross */
         br_vec2 p[4];
         p[0] = to_world(t, br_v2(-8, -8)); p[1] = to_world(t, br_v2(8, -8));
@@ -487,17 +546,47 @@ static void draw_sprite(br_renderer *r, const br_transform *t, const br_sprite *
     }
 }
 
+/* Which cells of an unrotated map can show inside the renderer's clip (the
+ * others are skipped): columns c0..c1 and rows r0..r1. False: draw them all. */
+static bool visible_cells(const br_renderer *r, const br_transform *t, const br_tilemap *m, int *c0, int *c1, int *r0, int *r1) {
+    br_vec2 a, b, lo, hi;
+    float ts = (float)m->tile_size, left, top;
+    if (t->rotation != 0 || br_absf(r->view.b) > 1e-6f || br_absf(r->view.c) > 1e-6f) return false;
+    if (br_absf(t->scale.x) < 1e-6f || br_absf(t->scale.y) < 1e-6f) return false;
+    a = br_screen_to_world(r, br_v2((float)r->clip.x, (float)r->clip.y));
+    b = br_screen_to_world(r, br_v2((float)(r->clip.x + r->clip.w), (float)(r->clip.y + r->clip.h)));
+    lo = br_v2((BR_MIN(a.x, b.x) - t->position.x) / t->scale.x, (BR_MIN(a.y, b.y) - t->position.y) / t->scale.y);
+    hi = br_v2((BR_MAX(a.x, b.x) - t->position.x) / t->scale.x, (BR_MAX(a.y, b.y) - t->position.y) / t->scale.y);
+    if (lo.x > hi.x) { float k = lo.x; lo.x = hi.x; hi.x = k; }
+    if (lo.y > hi.y) { float k = lo.y; lo.y = hi.y; hi.y = k; }
+    left = -(float)m->columns * ts / 2;
+    top = -(float)m->rows * ts / 2;
+    *c0 = (int)floorf((lo.x - left) / ts) - 1;
+    *c1 = (int)floorf((hi.x - left) / ts) + 1;
+    *r0 = (int)floorf((lo.y - top) / ts) - 1;
+    *r1 = (int)floorf((hi.y - top) / ts) + 1;
+    return true;
+}
+
 static void draw_tilemap(br_renderer *r, const br_transform *t, const br_tilemap *m) {
     const br_image *img = br_asset_image(m->tileset);
-    int ts = m->tile_size, per_row, x, y;
+    int ts = m->tile_size, per_row, x, y, c0 = 0, c1, r0 = 0, r1;
     size_t count;
     float left, top;
     if (!img || ts <= 0 || (per_row = img->width / ts) <= 0) return;
     count = strlen(m->tiles);
     left = -(float)(m->columns * ts) / 2;
     top = -(float)(m->rows * ts) / 2;
-    for (y = 0; y < m->rows; ++y) {
-        for (x = 0; x < m->columns; ++x) {
+    c1 = m->columns - 1;
+    r1 = m->rows - 1;
+    if (visible_cells(r, t, m, &c0, &c1, &r0, &r1)) {
+        if (c0 < 0) c0 = 0;
+        if (r0 < 0) r0 = 0;
+        if (c1 > m->columns - 1) c1 = m->columns - 1;
+        if (r1 > m->rows - 1) r1 = m->rows - 1;
+    }
+    for (y = r0; y <= r1; ++y) {
+        for (x = c0; x <= c1; ++x) {
             size_t at = (size_t)y * (size_t)m->columns + (size_t)x;
             const char *found;
             int index;
@@ -567,6 +656,66 @@ bool br_tilemap_solid(const br_world *w, br_entity map, br_vec2 point) {
     return c && strchr(m->solid, c) != NULL;
 }
 
+bool br_tilemap_solid_box(const br_world *w, br_entity map, br_vec2 center, br_vec2 size) {
+    const br_tilemap *m = tilemap_of(w, map);
+    br_transform t;
+    float ts, left, top, x0, y0, x1, y1, sx, sy;
+    int c0, c1, r0, r1, cx, cy;
+    size_t len;
+    if (!m || m->tile_size <= 0 || !m->solid[0]) return false;
+    t = br_world_transform(w, map);
+    if (t.rotation != 0 || br_absf(t.scale.x) < 1e-6f || br_absf(t.scale.y) < 1e-6f) {   /* a turned map: the corners and the middle */
+        float hx = size.x / 2, hy = size.y / 2;
+        return br_tilemap_solid(w, map, center) || br_tilemap_solid(w, map, br_v2(center.x - hx, center.y - hy)) ||
+               br_tilemap_solid(w, map, br_v2(center.x + hx, center.y - hy)) || br_tilemap_solid(w, map, br_v2(center.x - hx, center.y + hy)) ||
+               br_tilemap_solid(w, map, br_v2(center.x + hx, center.y + hy));
+    }
+    ts = (float)m->tile_size;
+    sx = t.scale.x; sy = t.scale.y;
+    left = -(float)m->columns * ts / 2;
+    top = -(float)m->rows * ts / 2;
+    x0 = (center.x - size.x / 2 - t.position.x) / sx; x1 = (center.x + size.x / 2 - t.position.x) / sx;
+    y0 = (center.y - size.y / 2 - t.position.y) / sy; y1 = (center.y + size.y / 2 - t.position.y) / sy;
+    if (x0 > x1) { float k = x0; x0 = x1; x1 = k; }
+    if (y0 > y1) { float k = y0; y0 = y1; y1 = k; }
+    c0 = (int)floorf((x0 - left) / ts);
+    c1 = (int)ceilf((x1 - left) / ts) - 1;                  /* an edge on a cell's edge doesn't reach into it */
+    r0 = (int)floorf((y0 - top) / ts);
+    r1 = (int)ceilf((y1 - top) / ts) - 1;
+    if (c0 < 0) c0 = 0;
+    if (r0 < 0) r0 = 0;
+    if (c1 > m->columns - 1) c1 = m->columns - 1;
+    if (r1 > m->rows - 1) r1 = m->rows - 1;
+    len = strlen(m->tiles);
+    for (cy = r0; cy <= r1; ++cy)
+        for (cx = c0; cx <= c1; ++cx) {
+            size_t at = (size_t)cy * (size_t)m->columns + (size_t)cx;
+            if (at < len && m->tiles[at] && strchr(m->solid, m->tiles[at])) return true;
+        }
+    return false;
+}
+
+char br_tilemap_cell(const br_world *w, br_entity map, int col, int row) {
+    const br_tilemap *m = tilemap_of(w, map);
+    size_t at;
+    if (!m || col < 0 || row < 0 || col >= m->columns || row >= m->rows) return 0;
+    at = (size_t)row * (size_t)m->columns + (size_t)col;
+    return at < strlen(m->tiles) ? m->tiles[at] : 0;
+}
+
+bool br_tilemap_set_cell(br_world *w, br_entity map, int col, int row, char c) {
+    br_tilemap *m = tilemap_of(w, map);
+    size_t at, len;
+    if (!m || !c || col < 0 || row < 0 || col >= m->columns || row >= m->rows) return false;
+    at = (size_t)row * (size_t)m->columns + (size_t)col;
+    if (at >= BR_TILEMAP_MAX) return false;
+    len = strlen(m->tiles);
+    while (len < at) m->tiles[len++] = ' ';
+    m->tiles[at] = c;
+    if (at == len) m->tiles[at + 1] = 0;
+    return true;
+}
+
 bool br_tilemap_cell_center(const br_world *w, br_entity map, int col, int row, br_vec2 *out) {
     const br_tilemap *m = tilemap_of(w, map);
     br_transform t;
@@ -584,21 +733,43 @@ static void draw_label(br_renderer *r, const br_transform *t, const br_label *l)
     br_draw_text(r, l->text, t->position.x - m.x / 2, t->position.y - m.y / 2, size, l->color);
 }
 
-void br_builtin_draw(const br_world *w, br_renderer *r) {
+static bool use_camera(br_renderer *r, const br_camera2d *cam, bool *began, const br_camera2d *saved, bool had) {
+    if (cam) { br_begin_camera(r, cam); *began = true; }
+    else if (*began) {                          /* back to whatever space the caller had */
+        if (had) br_begin_camera(r, saved); else br_end_camera(r);
+        *began = false;
+    }
+    return true;
+}
+
+void br_builtin_draw_layers(const br_world *w, br_renderer *r, const br_camera2d *world_cam,
+                            const br_camera2d *screen_cam, int ui_layer) {
     br_builtin_ids id;
     uint32_t n = 0, i, k;
-    br_component kinds[4];
+    br_component kinds[5];
+    br_component script = br_component_find(w, "Script");
+    bool had = r->camera_active, began = false;
+    br_camera2d saved = r->camera;
+    int space = -1;                               /* 0: the world's, 1: the screen's */
     if (!br_builtin_ids_of(w, &id)) return;
     kinds[0] = id.shape;
     kinds[1] = id.sprite;
     kinds[2] = id.label;
     kinds[3] = id.tilemap;
-    for (k = 0; k < 4; ++k) {                     /* everything visible that has a Transform */
-        const br_component_pool *p = &w->pools[kinds[k]];
+    kinds[4] = script;
+    for (k = 0; k < 5; ++k) {                     /* everything visible that has a Transform */
+        const br_component_pool *p;
+        if (kinds[k] == BR_COMPONENT_INVALID) continue;
+        p = &w->pools[kinds[k]];
         for (i = 0; i < p->count; ++i) {
             br_entity e = p->entities[i];
             const void *data = p->data + (size_t)i * p->stride;
-            if (!br_has(w, e, id.transform)) continue;
+            int layer = 0;
+            if (k == 4) { if (!br_script_draw_layer(w, e, &layer)) continue; }   /* a script with draw() */
+            else if (!br_has(w, e, id.transform)) continue;
+            else layer = k == 0 ? ((const br_shape *)data)->layer
+                       : k == 1 ? ((const br_sprite *)data)->layer
+                       : k == 2 ? ((const br_label *)data)->layer : ((const br_tilemap *)data)->layer;
             if (n == g_item_cap) {
                 uint32_t cap = g_item_cap ? g_item_cap * 2 : 256;
                 draw_item *grown = (draw_item *)br_realloc(g_items, cap * sizeof(draw_item));
@@ -609,25 +780,238 @@ void br_builtin_draw(const br_world *w, br_renderer *r) {
             g_items[n].e = e;
             g_items[n].what = (int)k;
             g_items[n].depth = br_depth(w, e);
-            g_items[n].layer = k == 0 ? ((const br_shape *)data)->layer
-                             : k == 1 ? ((const br_sprite *)data)->layer
-                             : k == 2 ? ((const br_label *)data)->layer : ((const br_tilemap *)data)->layer;
+            g_items[n].layer = layer;
             ++n;
         }
     }
     qsort(g_items, n, sizeof(draw_item), compare_items);
     for (i = 0; i < n; ++i) {
         const draw_item *it = &g_items[i];
-        br_transform wt = br_world_transform(w, it->e);   /* children follow their parents */
-        const br_transform *t = &wt;
-        if (it->what == 0) draw_shape(r, t, (const br_shape *)br_get(w, it->e, id.shape));
-        else if (it->what == 1) draw_sprite(r, t, (const br_sprite *)br_get(w, it->e, id.sprite));
-        else if (it->what == 2) draw_label(r, t, (const br_label *)br_get(w, it->e, id.label));
-        else draw_tilemap(r, t, (const br_tilemap *)br_get(w, it->e, id.tilemap));
+        int want = it->layer >= ui_layer ? 1 : 0;
+        if (want != space) {                       /* the world's layers, then the screen's */
+            space = want;
+            use_camera(r, want ? screen_cam : world_cam, &began, &saved, had);
+        }
+        if (it->what == 4) { br_script_draw((br_world *)w, it->e, r); continue; }
+        {
+            br_transform wt = br_world_transform(w, it->e);   /* children follow their parents */
+            const br_transform *t = &wt;
+            if (it->what == 0) draw_shape(r, t, (const br_shape *)br_get(w, it->e, id.shape));
+            else if (it->what == 1) draw_sprite(r, t, (const br_sprite *)br_get(w, it->e, id.sprite));
+            else if (it->what == 2) draw_label(r, t, (const br_label *)br_get(w, it->e, id.label));
+            else draw_tilemap(r, t, (const br_tilemap *)br_get(w, it->e, id.tilemap));
+        }
+    }
+    use_camera(r, NULL, &began, &saved, had);
+}
+
+void br_builtin_draw(const br_world *w, br_renderer *r) {
+    br_builtin_draw_layers(w, r, NULL, NULL, 1 << 30);
+}
+
+/* ---- animation ------------------------------------------------------------------ */
+
+int br_animation_parse(const char *frames, int *out, int max) {
+    const char *p = frames;
+    int count = 0;
+    for (;;) {
+        long a, b, step;
+        char *end;
+        while (*p == ' ' || *p == ',' || *p == '\t') ++p;
+        if (!*p) return count;
+        if (*p < '0' || *p > '9') return -1;
+        a = strtol(p, &end, 10);
+        p = end;
+        while (*p == ' ') ++p;
+        b = a;
+        if (*p == '-') {
+            ++p;
+            while (*p == ' ') ++p;
+            if (*p < '0' || *p > '9') return -1;
+            b = strtol(p, &end, 10);
+            p = end;
+        }
+        if (a > 4095 || b > 4095) return -1;
+        step = b >= a ? 1 : -1;
+        for (;; a += step) {
+            if (out && count < max) out[count] = (int)a;
+            if (++count > 4096) return -1;
+            if (a == b) break;
+        }
+        while (*p == ' ') ++p;
+        if (*p && *p != ',') return -1;
     }
 }
 
+void br_animation_step(br_world *w, float dt) {
+    br_builtin_ids id;
+    br_component with[2];
+    br_query q;
+    int frames[256];
+    if (!br_builtin_ids_of(w, &id)) return;
+    with[0] = id.animation;
+    with[1] = id.sprite;
+    q = br_query_make(w, with, 2);
+    while (br_query_next(&q)) {
+        br_animation *a = BR_QUERY_GET(&q, 0, br_animation);
+        br_sprite *sp = BR_QUERY_GET(&q, 1, br_sprite);
+        int n = br_animation_parse(a->frames, frames, 256), at;
+        if (n > 256) n = 256;
+        if (strcmp(a->started, a->frames) != 0) {      /* a new list: from its first frame */
+            snprintf(a->started, sizeof(a->started), "%s", a->frames);
+            a->time = 0;
+            if (n > 0) sp->frame = frames[0];
+        }
+        if (n <= 0 || !a->playing) continue;
+        if (a->fps > 0) a->time += dt;
+        at = a->fps > 0 ? (int)floorf(a->time * a->fps + 1e-4f) : 0;
+        if (at >= n) {
+            if (a->loop) { at %= n; a->time = fmodf(a->time, (float)n / a->fps); }
+            else { at = n - 1; a->playing = false; }
+        }
+        sp->frame = frames[at];
+    }
+}
+
+static void animation_added(br_world *w, br_entity e, void *data, void *user) {
+    br_animation *a = (br_animation *)data;
+    BR_UNUSED(w); BR_UNUSED(e); BR_UNUSED(user);
+    a->time = 0;
+    a->started[0] = 0;
+}
+
+/* ---- cameras ---------------------------------------------------------------------- */
+
+br_entity br_camera_current(const br_world *w) {
+    br_builtin_ids id;
+    const br_component_pool *p;
+    uint32_t i;
+    if (!br_builtin_ids_of(w, &id)) return BR_ENTITY_NULL;
+    p = &w->pools[id.camera];
+    for (i = 0; i < p->count; ++i) {
+        const br_camera *c = (const br_camera *)(p->data + (size_t)i * p->stride);
+        if (c->current && br_has(w, p->entities[i], id.transform)) return p->entities[i];
+    }
+    return BR_ENTITY_NULL;
+}
+
+/* Keeps a centre inside the limits for a view of half-size h (an area smaller than the view: its middle). */
+static float limit_axis(float c, float h, float lo, float hi) {
+    if (hi - lo <= 2 * h) return (lo + hi) / 2;
+    if (c - h < lo) return lo + h;
+    if (c + h > hi) return hi - h;
+    return c;
+}
+
+static float cam_zoom(const br_camera *c) { return c->zoom > 0.01f ? c->zoom : 1; }
+
+bool br_camera_view(const br_world *w, int width, int height, br_camera2d *out, int *ui_layer) {
+    br_entity e = br_camera_current(w);
+    br_builtin_ids id;
+    const br_camera *c;
+    br_transform t;
+    br_vec2 target;
+    float z;
+    *out = br_camera2d_make(br_v2((float)width / 2, (float)height / 2), br_v2((float)width / 2, (float)height / 2));
+    *ui_layer = 1 << 30;
+    if (e == BR_ENTITY_NULL || !br_builtin_ids_of(w, &id)) return false;
+    c = (const br_camera *)br_get(w, e, id.camera);
+    t = br_world_transform(w, e);
+    z = cam_zoom(c);
+    target = br_v2_add(t.position, c->shake_offset);
+    if (c->pixel_snap) {                                  /* whole screen pixels */
+        target.x = floorf(target.x * z + 0.5f) / z;
+        target.y = floorf(target.y * z + 0.5f) / z;
+    }
+    out->target = target;
+    out->zoom = z;
+    out->rotation = t.rotation * (BR_PI / 180.0f);
+    *ui_layer = c->ui_layer;
+    return true;
+}
+
+static int g_view_w = 320, g_view_h = 180;              /* the screen size cameras last drew for */
+
+/* Where a camera wants to be, from where it is. */
+static br_vec2 camera_goal(const br_world *w, const br_builtin_ids *id, br_entity e, const br_camera *c, br_vec2 pos) {
+    float z = cam_zoom(c), hw = (float)g_view_w / 2 / z, hh = (float)g_view_h / 2 / z;
+    br_vec2 goal = pos;
+    if (c->follow != BR_ENTITY_NULL && br_entity_alive(w, c->follow) && br_has(w, c->follow, id->transform)) {
+        br_vec2 aim = br_v2_add(br_world_transform(w, c->follow).position, c->follow_offset);
+        float dx = aim.x - pos.x, dy = aim.y - pos.y;
+        if (dx > c->deadzone.x) goal.x = aim.x - c->deadzone.x; else if (dx < -c->deadzone.x) goal.x = aim.x + c->deadzone.x;
+        if (dy > c->deadzone.y) goal.y = aim.y - c->deadzone.y; else if (dy < -c->deadzone.y) goal.y = aim.y + c->deadzone.y;
+    }
+    BR_UNUSED(e);
+    if (c->limit) {
+        goal.x = limit_axis(goal.x, hw, BR_MIN(c->limit_min.x, c->limit_max.x), BR_MAX(c->limit_min.x, c->limit_max.x));
+        goal.y = limit_axis(goal.y, hh, BR_MIN(c->limit_min.y, c->limit_max.y), BR_MAX(c->limit_min.y, c->limit_max.y));
+    }
+    return goal;
+}
+
+static void camera_move(br_world *w, float dt, bool snap) {
+    br_builtin_ids id;
+    br_component_pool *p;
+    uint32_t i;
+    if (!br_builtin_ids_of(w, &id)) return;
+    if (w->context) { g_view_w = ((br_engine *)w->context)->framebuffer.width; g_view_h = ((br_engine *)w->context)->framebuffer.height; }
+    p = &w->pools[id.camera];
+    for (i = 0; i < p->count; ++i) {
+        br_entity e = p->entities[i];
+        br_camera *c = (br_camera *)(p->data + (size_t)i * p->stride);
+        br_transform wt;
+        br_vec2 goal, pos;
+        if (!br_has(w, e, id.transform)) continue;
+        wt = br_world_transform(w, e);
+        goal = camera_goal(w, &id, e, c, wt.position);
+        pos = goal;
+        if (!snap && c->placed && c->smoothing > 0 && dt > 0) {
+            float k = 1 - expf(-dt * 3.0f / c->smoothing);       /* about 95% of the way in `smoothing` seconds */
+            pos = br_v2_add(wt.position, br_v2_scale(br_v2_sub(goal, wt.position), k));
+        }
+        c->placed = true;
+        if (pos.x != wt.position.x || pos.y != wt.position.y) br_set_world_position(w, e, pos);
+        if (c->shake_left > 0 && dt > 0) {                         /* shaking: a new offset each step, fading */
+            float f;
+            c->shake_left -= dt;
+            f = c->shake_time > 0 ? BR_MAX(c->shake_left, 0) / c->shake_time : 0;
+            c->shake_seed = c->shake_seed * 1664525u + 1013904223u;
+            c->shake_offset.x = (((float)((c->shake_seed >> 8) & 0xFFFF) / 65535.0f) * 2 - 1) * c->shake * f;
+            c->shake_seed = c->shake_seed * 1664525u + 1013904223u;
+            c->shake_offset.y = (((float)((c->shake_seed >> 8) & 0xFFFF) / 65535.0f) * 2 - 1) * c->shake * f;
+            if (c->shake_left <= 0) c->shake_offset = br_v2(0, 0);
+        }
+    }
+}
+
+void br_camera_step(br_world *w, float dt) { camera_move(w, dt, false); }
+void br_camera_snap(br_world *w) { camera_move(w, 0, true); }
+
+void br_camera_shake(br_world *w, float strength, float seconds) {
+    br_builtin_ids id;
+    br_entity e = br_camera_current(w);
+    br_camera *c;
+    if (e == BR_ENTITY_NULL || !br_builtin_ids_of(w, &id)) return;
+    c = (br_camera *)br_get(w, e, id.camera);
+    if (strength <= 0 || seconds <= 0) { c->shake_left = 0; c->shake_offset = br_v2(0, 0); return; }
+    if (c->shake_left > 0 && c->shake * (c->shake_left / BR_MAX(c->shake_time, 1e-3f)) > strength) return;   /* a bigger one is going */
+    c->shake = strength;
+    c->shake_time = c->shake_left = seconds;
+    if (!c->shake_seed) c->shake_seed = 0x9E3779B9u ^ (uint32_t)e;
+}
+
+static void camera_added(br_world *w, br_entity e, void *data, void *user) {
+    br_camera *c = (br_camera *)data;
+    BR_UNUSED(w); BR_UNUSED(e); BR_UNUSED(user);
+    c->shake = c->shake_time = c->shake_left = 0;
+    c->shake_offset = br_v2(0, 0);
+    c->shake_seed = 0;
+    c->placed = false;
+}
+
 void br_builtin_release(void) {
+    br_script_release();
     br_free(g_items);
     g_items = NULL;
     g_item_cap = 0;
@@ -646,10 +1030,21 @@ static void sys_audio(br_world *w, float dt, void *user) {
     audio_step(w);
 }
 
+static void sys_animation(br_world *w, float dt, void *user) { BR_UNUSED(user); br_animation_step(w, dt); }
+static void sys_camera(br_world *w, float dt, void *user) { BR_UNUSED(user); br_camera_step(w, dt); }
+
 static void sys_draw(br_world *w, float dt, void *user) {
+    br_engine *e = (br_engine *)w->context;
+    br_camera2d cam;
+    int ui_layer;
     BR_UNUSED(dt);
     BR_UNUSED(user);
-    if (w->context) br_builtin_draw(w, &((br_engine *)w->context)->renderer);
+    if (!e) return;
+    g_view_w = e->framebuffer.width;
+    g_view_h = e->framebuffer.height;
+    if (br_camera_view(w, e->framebuffer.width, e->framebuffer.height, &cam, &ui_layer))
+        br_builtin_draw_layers(w, &e->renderer, &cam, NULL, ui_layer);     /* the world through the camera, the HUD on the screen */
+    else br_builtin_draw(w, &e->renderer);
 }
 
 void br_builtin_register(br_world *w, br_builtin_ids *ids) {
@@ -657,7 +1052,11 @@ void br_builtin_register(br_world *w, br_builtin_ids *ids) {
     for (i = 0; i < (int)BR_ARRAY_COUNT(k_descs); ++i) br_component_register_desc(w, &k_descs[i]);
     br_system_add(w, "builtin_motion", BR_PHASE_FIXED_UPDATE, sys_motion, NULL, 0);
     br_system_add(w, "builtin_audio", BR_PHASE_FIXED_UPDATE, sys_audio, NULL, 0);
+    br_system_add(w, "builtin_animation", BR_PHASE_FIXED_UPDATE, sys_animation, NULL, 25);
+    br_system_add(w, "builtin_camera", BR_PHASE_FIXED_UPDATE, sys_camera, NULL, 40);
     br_component_set_hooks(w, br_component_find(w, "Sound"), sound_added, sound_removed, NULL);
+    br_component_set_hooks(w, br_component_find(w, "Animation"), animation_added, NULL, NULL);
+    br_component_set_hooks(w, br_component_find(w, "Camera"), camera_added, NULL, NULL);
     br_hierarchy_register(w);
     br_physics_register(w);
     br_script_register(w);

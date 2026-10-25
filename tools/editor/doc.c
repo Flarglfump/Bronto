@@ -93,6 +93,7 @@ static void forget_history(ed_doc *d) {
 }
 
 void ed_doc_destroy(ed_doc *d) {
+    ed_doc_clear_overlays(d);
     forget_history(d);
     set_text(&d->state, NULL);
     set_text(&d->saved, NULL);
@@ -516,15 +517,19 @@ bool ed_doc_redo(ed_doc *d) {
 
 void ed_doc_play(ed_doc *d) {
     if (d->playing) return;
+    br_script_reset_session();                       /* no globals or music left from the last run */
     ed_doc_checkpoint(d);
     set_text(&d->play_snapshot, snapshot(d));
     d->play_selected = ed_doc_index(d, d->selected);
     br_script_reload(&d->world);                     /* pick up scripts edited since the last run */
     d->playing = d->play_snapshot != NULL;
+    if (d->playing) br_camera_snap(&d->world);       /* cameras start where they look */
 }
 
 void ed_doc_stop(ed_doc *d) {
     if (!d->playing) return;
+    ed_doc_clear_overlays(d);
+    br_script_reset_session();
     restore(d, d->play_snapshot, d->play_selected);
     set_text(&d->play_snapshot, NULL);
     d->playing = false;
@@ -536,11 +541,71 @@ bool ed_doc_switch_scene(ed_doc *d, const char *path) {
     bool ok;
     if (!d->playing) return false;                    /* (Stop still goes back to the edited scene) */
     if (!(text = (char *)br_file_read_all(path, &size))) { snprintf(d->error, sizeof(d->error), "can't read '%s'", path); return false; }
+    ed_doc_clear_overlays(d);
     ok = restore(d, text, -1);
     br_free(text);
+    if (ok) br_camera_snap(&d->world);
     return ok;
 }
 
+/* ---- the scene stack while playing ------------------------------------------------------- */
+
+int ed_doc_stack_depth(const ed_doc *d) { return 1 + d->overlay_count; }
+
+br_world *ed_doc_stack_world(ed_doc *d, int index) {
+    if (index <= 0) return &d->world;
+    return index <= d->overlay_count ? &d->overlays[index - 1]->world : NULL;
+}
+
+br_world *ed_doc_top_world(ed_doc *d) { return ed_doc_stack_world(d, d->overlay_count); }
+
+bool ed_doc_push_scene(ed_doc *d, const char *path, bool transparent, bool update_below) {
+    char full[ED_PATH_MAX * 2], err[200];
+    ed_overlay *o;
+    if (!d->playing) return false;
+    if (d->overlay_count == ED_OVERLAYS_MAX) { snprintf(d->error, sizeof(d->error), "no room for more than %d scenes on the stack", ED_OVERLAYS_MAX); return false; }
+    if (!(o = (ed_overlay *)br_alloc(sizeof(ed_overlay)))) { snprintf(d->error, sizeof(d->error), "out of memory"); return false; }
+    memset(o, 0, sizeof(*o));
+    br_world_init(&o->world);
+    br_builtin_register(&o->world, NULL);
+    o->world.context = d->context;
+    snprintf(o->path, sizeof(o->path), "%s", path);
+    o->transparent = transparent;
+    o->update_below = update_below;
+    snprintf(full, sizeof(full), "%s%s", br_assets_root(), path);
+    if (br_world_load_file(&o->world, full, NULL, 0, err, sizeof(err)) < 0) {
+        snprintf(d->error, sizeof(d->error), "%s", err);
+        br_world_destroy(&o->world);
+        br_free(o);
+        return false;
+    }
+    br_camera_snap(&o->world);
+    br_script_notify(ed_doc_top_world(d), "on_pause");
+    d->overlays[d->overlay_count++] = o;
+    return true;
+}
+
+static void free_overlay(ed_overlay *o) {
+    br_world_destroy(&o->world);
+    br_free(o);
+}
+
+bool ed_doc_pop_scene(ed_doc *d) {
+    if (!d->overlay_count) return false;
+    free_overlay(d->overlays[--d->overlay_count]);
+    br_script_notify(ed_doc_top_world(d), "on_resume");
+    return true;
+}
+
+void ed_doc_clear_overlays(ed_doc *d) {
+    while (d->overlay_count) free_overlay(d->overlays[--d->overlay_count]);
+}
+
 void ed_doc_step(ed_doc *d, float dt) {
-    if (d->playing) br_world_run_phase(&d->world, BR_PHASE_FIXED_UPDATE, dt);
+    int top, i;
+    if (!d->playing) return;
+    top = d->overlay_count;                           /* the top scene, and those under it it lets run */
+    i = top;
+    while (i > 0 && d->overlays[i - 1]->update_below) --i;
+    for (; i <= top; ++i) br_world_run_phase(ed_doc_stack_world(d, i), BR_PHASE_FIXED_UPDATE, dt);
 }

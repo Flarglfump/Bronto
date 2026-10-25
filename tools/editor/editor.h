@@ -32,6 +32,14 @@
 
 /* ======================= doc.c: the document ======================= */
 
+/* While playing, scenes a script pushed over the edited one (push_scene). */
+#define ED_OVERLAYS_MAX 8
+typedef struct ed_overlay {
+    br_world world;
+    char path[ED_PATH_MAX];      /* relative to the project */
+    bool transparent, update_below;
+} ed_overlay;
+
 typedef struct ed_doc {
     br_world world;
     br_builtin_ids ids;
@@ -53,6 +61,9 @@ typedef struct ed_doc {
     bool playing;
     char *play_snapshot;         /* restored by Stop */
     int play_selected;
+    ed_overlay *overlays[ED_OVERLAYS_MAX];   /* scenes pushed while playing, bottom first */
+    int overlay_count;
+    void *context;               /* the engine, for the overlays' worlds (world.context) */
 } ed_doc;
 
 void ed_doc_init(ed_doc *d);
@@ -106,6 +117,18 @@ void ed_doc_play(ed_doc *d);                      /* remember the scene, start t
 void ed_doc_stop(ed_doc *d);                      /* back to exactly what was remembered */
 void ed_doc_step(ed_doc *d, float dt);            /* one fixed update while playing */
 bool ed_doc_switch_scene(ed_doc *d, const char *path);   /* while playing: a script's load_scene() */
+/* While playing, the scene stack a game has (push_scene / pop_scene): scenes on
+ * top of the edited one, each its own world, loaded from `path` (relative to the
+ * project). Stop and load_scene take them all away. The top world is the one
+ * that runs (and the ones under it, while each above lets them: update_below);
+ * the viewport draws from the lowest one still showing (transparent). */
+bool ed_doc_push_scene(ed_doc *d, const char *path, bool transparent, bool update_below);
+bool ed_doc_pop_scene(ed_doc *d);
+void ed_doc_clear_overlays(ed_doc *d);
+br_world *ed_doc_top_world(ed_doc *d);           /* the top of the stack (the edited scene's world when none) */
+/* Each world on the stack, bottom (the edited scene, index 0) to top. */
+br_world *ed_doc_stack_world(ed_doc *d, int index);
+int ed_doc_stack_depth(const ed_doc *d);         /* 1 + overlays */
 
 /* ======================= console.c: the console's lines ======================= */
 
@@ -166,6 +189,13 @@ typedef struct ed_view {
     br_mouse_button pan_button;  /* what started the pan: a right click without a drag opens the menu */
     br_vec2 press_at;
     bool pan_moved;
+    /* While playing a scene with a Camera, the view shows what the game shows:
+     * the world through the game's camera (inside the game-screen frame), the
+     * camera's ui layers on the frame itself. ed_view_to_screen / to_world then
+     * go through the game's camera too, so picking and handles follow it. */
+    bool use_game_camera;
+    br_camera2d game_camera;
+    int game_ui_layer;
 } ed_view;
 
 /* What the asset browser makes of a file. */

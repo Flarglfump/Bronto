@@ -66,6 +66,7 @@ int main(int argc, char **argv) {
     printf("[snake]\n");  suite_snake();
     printf("[towerdefense]\n"); suite_towerdefense();
     printf("[editor]\n"); suite_editor_doc();
+    printf("[features]\n"); suite_features();
 
     printf("\n%d tests, %d checks, %d failed test(s), %d leak(s)\n", g_tests, g_checks,
            g_failed_tests, g_leaky_tests);

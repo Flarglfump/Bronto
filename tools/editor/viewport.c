@@ -32,12 +32,35 @@ void ed_view_init(ed_view *v) {
 
 static br_vec2 view_mid(const ed_view *v) { return br_v2(v->rect.x + v->rect.w / 2, v->rect.y + v->rect.h / 2); }
 
-br_vec2 ed_view_to_screen(const ed_view *v, br_vec2 w) {
+/* The editor's own view: game-screen coordinates <-> the editor's pixels. */
+static br_vec2 frame_to_screen(const ed_view *v, br_vec2 w) {
     return br_v2_add(view_mid(v), br_v2_scale(br_v2_sub(w, v->center), v->zoom));
+}
+static br_vec2 screen_to_frame(const ed_view *v, br_vec2 s) {
+    return br_v2_add(v->center, br_v2_scale(br_v2_sub(s, view_mid(v)), 1.0f / v->zoom));
+}
+
+/* The game's camera: world <-> game-screen coordinates. */
+static br_vec2 game_to_frame(const ed_view *v, br_vec2 w) {
+    br_renderer r;
+    memset(&r, 0, sizeof(r));
+    br_begin_camera(&r, &v->game_camera);
+    return br_world_to_screen(&r, w);
+}
+static br_vec2 frame_to_game(const ed_view *v, br_vec2 s) {
+    br_renderer r;
+    memset(&r, 0, sizeof(r));
+    br_begin_camera(&r, &v->game_camera);
+    return br_screen_to_world(&r, s);
+}
+
+br_vec2 ed_view_to_screen(const ed_view *v, br_vec2 w) {
+    return frame_to_screen(v, v->use_game_camera ? game_to_frame(v, w) : w);
 }
 
 br_vec2 ed_view_to_world(const ed_view *v, br_vec2 s) {
-    return br_v2_add(v->center, br_v2_scale(br_v2_sub(s, view_mid(v)), 1.0f / v->zoom));
+    br_vec2 f = screen_to_frame(v, s);
+    return v->use_game_camera ? frame_to_game(v, f) : f;
 }
 
 static bool in_rect(br_rect r, br_vec2 p) { return p.x >= r.x && p.y >= r.y && p.x < r.x + r.w && p.y < r.y + r.h; }
@@ -187,13 +210,45 @@ static void draw_overlays(editor *ed) {
     br_renderer *r = &ed->engine->renderer;
     const ed_doc *d = &ed->doc;
     uint32_t i;
-    br_vec2 a = ed_view_to_screen(v, br_v2(0, 0)), b = ed_view_to_screen(v, v->game_size);
+    br_vec2 a = frame_to_screen(v, br_v2(0, 0)), b = frame_to_screen(v, v->game_size);
     char text[64];
 
     /* the game's screen */
     br_draw_rect(r, br_rect_make(floorf(a.x), floorf(a.y), floorf(b.x - a.x), floorf(b.y - a.y)), br_rgba(255, 255, 255, 110));
-    snprintf(text, sizeof(text), "game %dx%d", (int)v->game_size.x, (int)v->game_size.y);
+    snprintf(text, sizeof(text), v->use_game_camera ? "game %dx%d (through its camera)" : "game %dx%d", (int)v->game_size.x, (int)v->game_size.y);
     br_draw_text(r, text, floorf(a.x), floorf(a.y) - 10, 1, br_rgba(255, 255, 255, 110));
+
+    /* cameras: what each one shows (blue; the current one brighter) and its limits (orange) */
+    if (!v->use_game_camera) {
+        for (i = 0; i < d->count; ++i) {
+            br_entity e = d->order[i];
+            const br_camera *cam = (const br_camera *)br_get(&d->world, e, d->ids.camera);
+            br_vec2 c[4], p;
+            float hw, hh, z, ang, cs, sn;
+            int k;
+            bool current;
+            if (!cam || !br_has(&d->world, e, d->ids.transform)) continue;
+            current = br_camera_current(&d->world) == e;
+            z = cam->zoom > 0.01f ? cam->zoom : 1;
+            hw = v->game_size.x / 2 / z;
+            hh = v->game_size.y / 2 / z;
+            p = br_world_transform(&d->world, e).position;
+            ang = br_world_transform(&d->world, e).rotation * (BR_PI / 180.0f);
+            cs = cosf(ang); sn = sinf(ang);
+            c[0] = br_v2(-hw, -hh); c[1] = br_v2(hw, -hh); c[2] = br_v2(hw, hh); c[3] = br_v2(-hw, hh);
+            for (k = 0; k < 4; ++k) c[k] = ed_view_to_screen(v, br_v2(p.x + c[k].x * cs + c[k].y * sn, p.y - c[k].x * sn + c[k].y * cs));
+            outline(r, c, current ? br_rgba(110, 190, 255, 220) : br_rgba(110, 190, 255, 90));
+            {
+                char label[64];
+                ed_doc_name(d, e, label, sizeof(label));
+                br_draw_text(r, label, c[0].x + 2, c[0].y + 2, 1, current ? br_rgba(110, 190, 255, 220) : br_rgba(110, 190, 255, 90));
+            }
+            if (cam->limit) {
+                br_vec2 lo = ed_view_to_screen(v, cam->limit_min), hi = ed_view_to_screen(v, cam->limit_max);
+                br_draw_rect(r, br_rect_make(BR_MIN(lo.x, hi.x), BR_MIN(lo.y, hi.y), br_absf(hi.x - lo.x), br_absf(hi.y - lo.y)), br_rgba(255, 170, 60, 160));
+            }
+        }
+    }
 
     /* entities with nothing to draw still get a marker you can grab */
     for (i = 0; i < d->count; ++i) {
@@ -263,13 +318,43 @@ void ed_view_frame(editor *ed, br_rect rect) {
 
     br_set_clip(r, clip);
     br_fill_rect(r, rect, br_rgb(22, 25, 30));
-    if (v->grid) draw_grid(ed);
     cam = br_camera2d_make(v->center, view_mid(v));
     cam.zoom = v->zoom;
-    br_begin_camera(r, &cam);
-    br_builtin_draw(&ed->doc.world, r);                       /* exactly what a game draws */
-    if (ed->show_colliders) br_physics_debug_draw(&ed->doc.world, r, br_rgba(90, 255, 140, 200), br_rgba(255, 220, 80, 200));
-    br_end_camera(r);
+    /* Playing with a Camera: the world as the game's camera shows it, its HUD on the screen frame. */
+    v->use_game_camera = ed->doc.playing &&
+        br_camera_view(&ed->doc.world, (int)v->game_size.x, (int)v->game_size.y, &v->game_camera, &v->game_ui_layer);
+    if (v->grid) draw_grid(ed);
+    {
+        int depth = ed_doc_stack_depth(&ed->doc), first = depth - 1, i;
+        while (first > 0 && ed->doc.overlays[first - 1]->transparent) --first;     /* the lowest scene still showing */
+        for (i = first; i < depth; ++i) {
+            br_world *w = ed_doc_stack_world(&ed->doc, i);
+            br_camera2d game, world_cam;
+            int ui_layer;
+            if (ed->doc.playing && br_camera_view(w, (int)v->game_size.x, (int)v->game_size.y, &game, &ui_layer)) {
+                /* editor(game(p)): the game's camera, then the editor's view of the game's screen */
+                world_cam = cam;
+                world_cam.zoom = cam.zoom * game.zoom;
+                world_cam.rotation = game.rotation;
+                {
+                    br_vec2 d0 = br_v2_scale(br_v2_sub(game.offset, cam.target), 1.0f / game.zoom);
+                    float cs = cosf(game.rotation), sn = sinf(game.rotation);
+                    world_cam.target = br_v2_sub(game.target, br_v2(d0.x * cs + d0.y * sn, -d0.x * sn + d0.y * cs));
+                }
+                br_builtin_draw_layers(w, r, &world_cam, &cam, ui_layer);
+                if (ed->show_colliders && i == 0) {
+                    br_begin_camera(r, &world_cam);
+                    br_physics_debug_draw(w, r, br_rgba(90, 255, 140, 200), br_rgba(255, 220, 80, 200));
+                    br_end_camera(r);
+                }
+            } else {
+                br_begin_camera(r, &cam);
+                br_builtin_draw(w, r);                         /* exactly what a game draws */
+                if (ed->show_colliders && i == 0) br_physics_debug_draw(w, r, br_rgba(90, 255, 140, 200), br_rgba(255, 220, 80, 200));
+                br_end_camera(r);
+            }
+        }
+    }
     draw_overlays(ed);
     accept_drops(ed);
     br_reset_clip(r);

@@ -58,7 +58,7 @@ test('completion at the top level offers the missing callbacks', () => {
 
 test('hover: builtins, file functions, vars, properties, components', () => {
     let p = at('raycast(');
-    assert.match(lang.hover(player, p.line, p.character + 2), /raycast\(from: vec2, to: vec2, \[ignore: entity \| nil\]\) -> any/);
+    assert.match(lang.hover(player, p.line, p.character + 2), /raycast\(from: vec2, to: vec2, \[ignore: entity \| nil\], \[mask: number\]\) -> any/);
     p = at('grounded = on_ground()', 12);
     assert.match(lang.hover(player, p.line, p.character + 2), /func on_ground\(\)[\s\S]*short ray/);
     p = at('var speed');

@@ -57,6 +57,7 @@ void suite_input(void);
 void suite_ecs(void);
 void suite_scene(void);
 void suite_render(void);
+void suite_features(void);
 void suite_audio(void);
 void suite_engine(void);
 void suite_window(void);

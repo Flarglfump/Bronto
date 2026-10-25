@@ -58,6 +58,9 @@ The engine calls these functions when a script defines them:
 | `on_collision_end(other)` | they stopped touching |
 | `on_trigger(other)` | `other` entered a trigger collider (either this entity's or `other`'s) |
 | `on_trigger_exit(other)` | ... and left it |
+| `draw()` | when the scene is drawn: see [Drawing](#drawing) |
+| `on_pause()` | another scene was pushed over this one (`push_scene`) |
+| `on_resume()` | this scene is the top one again (the one over it was popped) |
 
 Every callback can declare fewer parameters than the engine passes.
 
@@ -210,13 +213,20 @@ if key_pressed("space") or button_pressed("a") { jump() }
 - `has(e, "Shape")`, `add(e, "Motion")` (returns the component) and `remove_component(e, "Motion")`.
 - `send(e, "function", args...)` calls a function on another entity's script if it has one,
   and quietly does nothing if not.
-- `play_sound("sfx/jump.wav"[, volume])` plays on the `sfx` bus. A Sound component's
+- `play_sound("sfx/jump.wav"[, volume[, pitch[, pan]]])` plays on the `sfx` bus and
+  returns the voice (see [Sounds and music](#sounds-and-music)). A Sound component's
   `bus` field (`sfx`, `music`, `ui` or `ambient`) says where it plays.
   `set_volume("music", 0.5)` and `volume("music")` set and read a bus's volume (0 to 1,
   up to 2), or the whole mix's with `"master"`: for a game's volume settings.
-- `load_scene("levels/2.scene")` ends this scene and starts that one (after this step).
-  `quit()` ends the game. In the editor's Play, load_scene shows the other scene until Stop,
-  and quit stops playing.
+- `load_scene("levels/2.scene")` ends this scene (and any pushed over it) and starts that
+  one (after this step). `quit()` ends the game. In the editor's Play, load_scene shows the
+  other scene until Stop, and quit stops playing. To put a scene *on top* of this one, see
+  [Scenes on a stack](#scenes-on-a-stack-and-globals).
+- `broadcast("boss_beaten", 3)` calls `boss_beaten(3)` in every script of the scene that
+  has that function, and returns how many did: a message to whoever cares, without
+  finding them. (`send(e, ...)` is the same for one entity.) C code hears it on the
+  engine's message bus as the type `"script.boss_beaten"`, with the number arguments as
+  its payload (up to six `double`s), once it has registered that type.
 
 **Saved data** (kept between runs of the game, in its own folder for saved data: see
 [Saved data](../README.md#saved-data)):
@@ -274,12 +284,179 @@ func explode() {                               # hurts every enemy nearby
 **Text:** `substr(text, start[, count])` returns part of a string; a negative start counts
 from the end. `text[i]` is one character.
 
+- `tile_cell(map, point)` gives the column and row (a vec2) of the cell under a world point;
+  `tile_get(map, column, row)` and `tile_put(map, column, row, "#")` read and change a cell by
+  its column and row, and `tile_cell_center(map, column, row)` gives its middle.
+- `tile_box_solid(map, centre, size)` tells whether a box (its world centre and full size)
+  overlaps any solid cell; edges that only touch don't count. It is the quick way to move
+  something through a level by script: try the move, and take it back if the box hits.
+
+```
+func move_x(dx: number) -> void {            # one pixel at a time, stopping at walls
+    for i in abs(dx) {
+        var next := self.position + vec2(sign(dx), 0)
+        if tile_box_solid(map, next, vec2(10, 14)) { return }
+        self.position = next
+    }
+}
+```
+
 **Physics:**
 - `apply_force(e, force[, point])` pushes over the next step. `apply_impulse(e, impulse[, point])`
   changes the velocity now.
-- `raycast(from, to[, ignore])` returns `[entity, point, normal]` for the first solid collider
-  on the line, or nil.
-- `entity_at(point)` returns the collider at a point, or nil.
+- `raycast(from, to[, ignore[, mask]])` returns `[entity, point, normal]` for the first solid
+  collider on the line, or nil. `mask` picks the collision layers to look at (bits: `1 + 4`
+  is layers 0 and 2; -1, the default, is every layer).
+- `entity_at(point[, mask])` returns the collider at a point, or nil.
+- `gravity()` and `set_gravity(vec2(0, 900))`: the PhysicsWorld's gravity (set_gravity adds
+  a PhysicsWorld to this entity if the scene has none).
+
+## Sprite sheets, animation and cameras
+
+These are components (edit them in the inspector, or from scripts as `self.Sprite.frame`),
+with a few functions to help.
+
+**Sprite sheets.** A Sprite's `frame_size` (say `16 16`) makes its image a sheet of frames
+that size, numbered from 0 left to right, then top to bottom; `frame` is the one shown.
+`flip_x` and `flip_y` mirror it, and `blend` draws it as `alpha` (the default), `add`
+(glows), `multiply` (shadows) or `none`. Shapes have `blend` too.
+
+**Animation.** An Animation component plays a list of its Sprite's frames: `frames` like
+`"0-3"`, `"4,5,6,5"` or `"7-4"` (backwards), `fps` frames a second, round and round if
+`loop`, else once - after which `playing` turns false and the last frame stays. Setting
+`frames` to a new list starts it from its first frame.
+- `play_animation(e, "4-7"[, fps[, loop]])` does that (adding an Animation if it has none)
+  unless those frames are already playing, so it can be called every step:
+  `if moving { play_animation(self, "1-4", 10) } else { play_animation(self, "0") }`.
+
+**Cameras.** A Camera on an entity makes the game show the world around that entity's
+Transform: its position at the middle of the screen, `zoom`ed, turned with its rotation.
+The first Camera with `current` set is the one used; with none, the screen shows the world
+from (0, 0) as it always has.
+- `follow`: an entity to keep in view (with `follow_offset`), `deadzone`: how far (each way)
+  that entity can move from the middle before the camera moves, `smoothing`: 0 to keep up
+  at once, or about how many seconds it takes to catch up.
+- `limit` with `limit_min` and `limit_max`: the camera never shows anything outside that
+  box (world coordinates), so it stops at a room's edges. A room smaller than the screen
+  is centred.
+- `ui_layer` (50 at first): drawing layers from this one up are drawn on the screen
+  itself, not in the world, so a HUD stays put while the world scrolls. Place HUD entities
+  in screen pixels, (0, 0) at the top left, as you would without a camera.
+- `pixel_snap` draws from whole pixels so pixel art doesn't shimmer.
+- `camera()` returns the current camera entity (or nil): `camera().Camera.limit_max = vec2(512, 240)`.
+- `snap_camera()` puts it straight where it is heading (after moving the player to a new
+  room). `shake_camera(4, 0.3)` shakes it by up to 4 pixels, fading out over 0.3 seconds.
+- `screen_to_world(mouse_position())` and `world_to_screen(p)` convert through it.
+
+In the editor, each camera shows what it sees as a blue frame (and its limits in orange).
+While playing, the view follows the game's camera inside the game-screen frame.
+
+## Drawing
+
+A script can draw for itself: give it a `draw()` function. It runs whenever the scene is
+drawn, among the sprites, in the layer named by the script's `draw_layer` variable (0 if
+it has none), and in the same place: in the world, or on the screen for layers from the
+camera's `ui_layer` up.
+
+```
+var draw_layer: int = 60                     # above the HUD's sprites, on the screen
+
+func draw() -> void {
+    draw_rect(vec2(8, 8), vec2(52, 6), rgb(40, 20, 20))           # a health bar
+    draw_rect(vec2(9, 9), vec2(hp * 5, 4), "#e04040")
+    draw_text("HP", vec2(64, 7), rgb(255, 255, 255))
+    for p in path { draw_circle(p, 2, rgb(255, 220, 80)) }
+}
+```
+
+- `draw_rect(position, size, colour[, filled])` from its top-left corner (filled false: the
+  outline), `draw_line(from, to, colour)`, `draw_circle(centre, radius, colour[, filled])`.
+- `draw_text(text, position, colour[, size])` in the built-in 8x8 font, from its top-left.
+  `text_size(text[, size])` says how much room it takes (this one works anywhere).
+- `draw_image(path, centre[, frame[, frame_size[, flip_x]]])` an image, or one frame of a
+  sheet.
+- Colours are strings (`"#e04040"`, `rgb(224, 64, 64)`) or lists (`[224, 64, 64]`).
+
+These work only while `draw()` runs. Use `draw()` only for drawing: a replay that skips
+ahead doesn't draw the frames it skips, so anything `draw()` changed would differ
+(`random()` inside it has numbers of its own, for that reason).
+
+## Sounds and music
+
+`play_sound(path[, volume[, pitch[, pan]]])` returns a **voice**: a number for the sound
+while it plays (0 if every voice was busy). `pitch` is the playback rate (2 is an octave
+up, 0.5 an octave down); `pan` goes from -1 (left) to 1 (right).
+- `stop_sound(voice)`, `pause_sound(voice, true)`, `sound_playing(voice)`,
+  `set_sound_volume(voice, v)`, `set_sound_pitch(voice, p)`, `set_sound_pan(voice, p)`.
+- `stop_sounds()` stops everything (`stop_sounds("sfx")`: one bus).
+- `sound_length(path)`: a file's length in seconds.
+- `play_tone(wave, frequency, seconds[, volume])` plays a tone made on the spot, for
+  blips with no file: `wave` is `"sine"`, `"square"`, `"triangle"`, `"saw"` or `"noise"`.
+
+**Music.** `play_music("music/castle.wav"[, volume[, fade]])` loops a track on the music
+bus, fading in over `fade` seconds while the one before fades out; asking for the track
+that is already playing only changes its volume, so every room can ask for its own. The
+music keeps playing through `load_scene()` and `push_scene()`. `stop_music([fade])` stops
+it, and `music()` names what is playing (`""` for nothing).
+
+## Scenes on a stack, and globals
+
+`load_scene()` replaces the game's scene. `push_scene("menus/pause.scene")` puts a scene
+*on top* of it instead - a pause menu, a map, a dialogue box - and `pop_scene()` takes the
+top one off again, so the game underneath carries on just as it was left.
+- `push_scene(path[, transparent[, update_below]])`: `transparent` (true unless you say
+  otherwise) keeps drawing the scenes underneath; `update_below` keeps them running too
+  (false: they wait, frozen).
+- When a scene is covered, its scripts' `on_pause()` runs; when it is the top one again,
+  `on_resume()` does.
+- Each scene has its own entities: `find()` and the rest look only in the script's own
+  scene. To pass things between scenes, use globals.
+
+**Globals** are values kept while the game runs, whatever scene is showing:
+`set_global("coins", 12)`, `global("coins", 0)` (the second value is the default),
+`has_global(name)` and `delete_global(name)`. They take what `save_data()` takes: numbers,
+strings, true/false, nil, vec2s and lists of these. (They last until the game ends; use
+saved data for what must outlive it. In the editor, Play starts with none.)
+
+## The window
+
+`set_fullscreen(true)` / `fullscreen()`, `set_window_title(text)`, `show_cursor(false)`,
+and `screen_size()` (the game's screen in game pixels).
+
+## Actions
+
+Instead of asking for keys and buttons by name everywhere, a game can name its actions
+once and bind inputs to them:
+
+```
+func start() -> void {
+    bind("jump", "space", "z", "pad:a")
+    bind("left", "left", "a", "pad:left", "pad:left_x-")
+    bind("right", "right", "d", "pad:right", "pad:left_x+")
+}
+func update(dt: number) -> void {
+    self.velocity.x = action_axis("left", "right") * 90
+    if action_pressed("jump") { jump() }
+}
+```
+
+- `bind(action, input, ...)` adds up to six inputs: a key's name, `"mouse:0"` (1 right,
+  2 middle), `"pad:a"` (any button `button_down()` names), or `"pad:left_x-"` /
+  `"pad:right_y+"` / `"pad:lt+"` (a stick or trigger pushed that way past half way).
+  `unbind(action)` takes them all off. Actions are kept for the whole game.
+- `action_down(name)`, `action_pressed(name)` (once per press, like `key_pressed()`),
+  `action_released(name)`, and `action_axis(negative, positive)`: -1, 0 or 1.
+
+**More input:** `mouse_released(button)`, `mouse_wheel()` (how far the wheel turned since
+the last frame), `text_typed()` (the characters typed since the last frame, for name
+entry) and `touches()` (where each finger is, leaving out those on the on-screen
+controls).
+
+## Odds and ends
+
+`random_seed(n)` (the same seed gives the same numbers from then on), `clipboard()` and
+`set_clipboard(text)`, `fps()`, `frame_count()`, `log_warning(...)` and `log_error(...)`
+(like `print()`, as a warning or an error), `open_url(url)` and `image_size(path)`.
 
 ## Structs and classes
 

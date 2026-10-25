@@ -33,38 +33,63 @@ static char g_scene[BR_PATH_MAX];              /* the scene to show, relative to
 static bool g_failed;
 static char g_main_scene[BR_PATH_MAX];         /* the first scene (a replay going back starts here again) */
 
+/* Each scene on the stack is a project scene file: its path is the scene's data.
+ * load_scene() replaces the whole stack; push_scene() puts one on top (transparent:
+ * the ones under it still show; update_below: they keep running), pop_scene()
+ * takes the top one off. */
+static char g_pending[BR_PATH_MAX];            /* the scene file the next scene to enter loads */
+
 static bool game_enter(br_scene *s) {
     char path[BR_PATH_MAX * 2], err[256];
     int n;
+    snprintf((char *)s->data, BR_PATH_MAX, "%s", g_pending);
     br_builtin_register(&s->world, NULL);
-    snprintf(path, sizeof(path), "%s%s", br_assets_root(), g_scene);
+    snprintf(path, sizeof(path), "%s%s", br_assets_root(), g_pending);
     n = br_world_load_file(&s->world, path, NULL, 0, err, sizeof(err));
     if (n < 0) {
-        BR_ERROR("can't load the scene %s: %s", g_scene, err);
+        BR_ERROR("can't load the scene %s: %s", g_pending, err);
         g_failed = true;
         return false;
     }
-    BR_INFO("playing %s (%d entities)", g_scene, n);
+    br_camera_snap(&s->world);                           /* cameras start where they look */
+    BR_INFO("playing %s (%d entities)", g_pending, n);
     return true;
 }
 
-static const br_scene_desc *game_desc(void);
+static void game_pause(br_scene *s) { br_script_notify(&s->world, "on_pause"); }
+static void game_resume(br_scene *s) { br_script_notify(&s->world, "on_resume"); }
+
+static const br_scene_desc *game_desc(bool transparent, bool update_below);
 
 /* After each step: what the scripts asked for. */
 static void game_update(br_scene *s, float dt) {
     char next[BR_PATH_MAX];
+    bool transparent = true, below = false;
     BR_UNUSED(dt);
     if (br_script_quit_request(&s->world)) br_engine_quit(s->engine);
     if (br_script_scene_request(&s->world, next, sizeof(next))) {
+        snprintf(g_pending, sizeof(g_pending), "%s", next);
         snprintf(g_scene, sizeof(g_scene), "%s", next);
-        br_scene_switch(&s->engine->scenes, game_desc());   /* a fresh world, at a safe point */
+        br_scene_clear(&s->engine->scenes);              /* a fresh stack, at a safe point */
+        br_scene_push(&s->engine->scenes, game_desc(false, false));
+        return;
+    }
+    if (br_script_pop_request(&s->world) && br_scenes_depth(&s->engine->scenes) > 1) br_scene_pop(&s->engine->scenes);
+    if (br_script_push_request(&s->world, next, sizeof(next), &transparent, &below)) {
+        snprintf(g_pending, sizeof(g_pending), "%s", next);
+        br_scene_push(&s->engine->scenes, game_desc(transparent, below));
     }
 }
 
-static const br_scene_desc k_game = {
-    "game", 0, false, false, game_enter, NULL, NULL, NULL, NULL, game_update, NULL, NULL
+static const br_scene_desc k_game[4] = {
+    { "game", BR_PATH_MAX, false, false, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL },
+    { "game (transparent)", BR_PATH_MAX, true, false, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL },
+    { "game (updates below)", BR_PATH_MAX, false, true, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL },
+    { "game (transparent, updates below)", BR_PATH_MAX, true, true, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL },
 };
-static const br_scene_desc *game_desc(void) { return &k_game; }
+static const br_scene_desc *game_desc(bool transparent, bool update_below) {
+    return &k_game[(transparent ? 1 : 0) + (update_below ? 2 : 0)];
+}
 
 static bool on_init(br_engine *e) {
     if (g_project.icon[0]) {                             /* the project's icon, for the window and taskbar */
@@ -78,6 +103,8 @@ static bool on_init(br_engine *e) {
 static void replay_restart(br_engine *e) {
     BR_UNUSED(e);
     snprintf(g_scene, sizeof(g_scene), "%s", g_main_scene);
+    snprintf(g_pending, sizeof(g_pending), "%s", g_main_scene);
+    br_script_reset_session();                           /* the globals and music of the run before */
     g_failed = false;
 }
 
@@ -158,7 +185,8 @@ int main(int argc, char **argv) {
     cfg.width = g_project.width;
     cfg.height = g_project.height;
     cfg.window_scale = g_project.window_scale;
-    cfg.initial_scene = &k_game;
+    cfg.initial_scene = game_desc(false, false);
+    snprintf(g_pending, sizeof(g_pending), "%s", g_scene);
     cfg.on_init = on_init;
     cfg.touch_controls = replay ? NULL : g_project.touch_controls;   /* (a replay is keys only) */
     cfg.touch_mouse = touch && !replay;                               /* --touch: try them with the mouse */

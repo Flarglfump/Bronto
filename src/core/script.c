@@ -401,9 +401,9 @@ typedef struct sc_class {
 
 typedef struct sc_chunk { struct sc_chunk *next; size_t used, size; } sc_chunk;
 
-enum { CB_START, CB_UPDATE, CB_COLLISION, CB_COLLISION_END, CB_TRIGGER, CB_TRIGGER_EXIT, CB_COUNT };
+enum { CB_START, CB_UPDATE, CB_COLLISION, CB_COLLISION_END, CB_TRIGGER, CB_TRIGGER_EXIT, CB_DRAW, CB_PAUSE, CB_RESUME, CB_COUNT };
 static const char *const k_callbacks[CB_COUNT] = {
-    "start", "update", "on_collision", "on_collision_end", "on_trigger", "on_trigger_exit"
+    "start", "update", "on_collision", "on_collision_end", "on_trigger", "on_trigger_exit", "draw", "on_pause", "on_resume"
 };
 
 typedef struct sc_program {
@@ -1949,7 +1949,7 @@ static void sc_check_stmt(sc_parser *P, sc_node *n) {
 }
 
 /* What the engine passes to each callback. */
-static const char *const k_callback_sig[CB_COUNT] = { "", "n", "evn", "e", "e", "e" };
+static const char *const k_callback_sig[CB_COUNT] = { "", "n", "evn", "e", "e", "e", "", "", "" };
 
 /* A function's body: its parameters' (and this's) types, then its statements. */
 static void sc_check_func(sc_parser *P, sc_func *f) {
@@ -2137,7 +2137,13 @@ struct sc_runtime {
     uint32_t error_count;
     char scene_request[BR_PATH_MAX];  /* load_scene(), for the game to act on */
     bool quit_request;                /* quit() */
+    char push_request[BR_PATH_MAX];   /* push_scene() */
+    bool push_transparent, push_update_below;
+    bool pop_request;                 /* pop_scene() */
     br_rng rng;
+    br_rng draw_rng;                  /* random() inside draw(), which may not run every frame */
+    br_renderer *draw_r;              /* while a draw() runs: what draw_rect() and the rest draw on */
+    uint64_t text_frame, wheel_frame; /* the engine frame whose typed text / wheel a script last took */
     int busy;                       /* calls in progress: no collecting */
 };
 
@@ -3101,7 +3107,7 @@ static sc_value bi_lerp(ARGS) {
     return sc_num(NUM(0, "lerp()") + (NUM(1, "lerp()") - a[0].as.n) * t);
 }
 static sc_value bi_random(ARGS) {
-    double u = (double)br_rng_float(&vm->rt->rng);
+    double u = (double)br_rng_float(vm->rt->draw_r ? &vm->rt->draw_rng : &vm->rt->rng);
     if (n == 0) return sc_num(u);
     if (n == 1) return sc_num(u * NUM(0, "random()"));
     return sc_num(NUM(0, "random()") + u * (NUM(1, "random()") - a[0].as.n));
@@ -3644,9 +3650,10 @@ static sc_value bi_apply_impulse(ARGS) {
 static sc_value bi_raycast(ARGS) {
     br_vec2 from = sc_need_vec(vm, &a[0], line, "raycast()"), to = sc_need_vec(vm, &a[1], line, "raycast()");
     br_entity ignore = n > 2 && a[2].t == V_ENT ? a[2].as.e : BR_ENTITY_NULL;
+    int mask = n > 3 && a[3].t != V_NIL ? (int)NUM(3, "raycast() mask") : -1;
     br_raycast_hit hit;
     sc_value list;
-    if (!br_physics_raycast(vm->rt->w, from, to, -1, ignore, &hit)) return sc_nil();
+    if (!br_physics_raycast(vm->rt->w, from, to, mask, ignore, &hit)) return sc_nil();
     list = sc_new_list(vm, line);                         /* [entity, point, normal] */
     sc_list_push(vm, list.as.l, sc_ent(hit.entity), line);
     sc_list_push(vm, list.as.l, sc_vec(hit.point.x, hit.point.y), line);
@@ -3654,8 +3661,8 @@ static sc_value bi_raycast(ARGS) {
     return list;
 }
 static sc_value bi_entity_at(ARGS) {
-    br_entity e = br_physics_point(vm->rt->w, sc_need_vec(vm, &a[0], line, "entity_at()"), -1);
-    BR_UNUSED(n);
+    br_entity e = br_physics_point(vm->rt->w, sc_need_vec(vm, &a[0], line, "entity_at()"),
+                                   n > 1 && a[1].t != V_NIL ? (int)NUM(1, "entity_at() mask") : -1);
     return e == BR_ENTITY_NULL ? sc_nil() : sc_ent(e);
 }
 /* Tilemaps: the map entity and a world point. */
@@ -3701,16 +3708,21 @@ static sc_value bi_substr(ARGS) {
     return sc_string(vm, t + (size_t)start, (size_t)count);
 }
 
+/* play_sound(path[, volume[, pitch[, pan]]]): on the sfx bus; returns the voice (0 if none was free). */
 static sc_value bi_play_sound(ARGS) {
     br_engine *e = sc_engine(vm);
     const br_sound *s;
     br_play_params pp;
-    if (!e) return sc_nil();
+    if (!e) return sc_num(0);
     if (!(s = br_asset_sound(sc_need_str(vm, &a[0], line, "play_sound()")))) sc_fail(vm, line, "play_sound(): can't load %s", a[0].as.s->chars);
     pp = br_play_defaults();
-    if (n > 1) pp.volume = (float)NUM(1, "play_sound() volume");
-    br_play(&e->mixer, s, &pp);
-    return sc_nil();
+    if (n > 1 && a[1].t != V_NIL) pp.volume = (float)NUM(1, "play_sound() volume");
+    if (n > 2 && a[2].t != V_NIL) pp.pitch = (float)NUM(2, "play_sound() pitch");
+    if (n > 3 && a[3].t != V_NIL) pp.pan = (float)NUM(3, "play_sound() pan");
+    if (pp.pitch < 0.05f) pp.pitch = 0.05f;
+    if (pp.pitch > 8) pp.pitch = 8;
+    pp.pan = pp.pan < -1 ? -1 : pp.pan > 1 ? 1 : pp.pan;
+    return sc_num((double)br_play(&e->mixer, s, &pp));
 }
 /* set_volume("music", 0.5) / volume("music"): the mixer's buses ("sfx",
  * "music", "ui", "ambient") and "master", 0 (silent) to 1 (full; up to 2). */
@@ -3981,6 +3993,651 @@ static sc_value bi_data_names(ARGS) {
     return out;
 }
 
+/* ---- drawing from draw() ----
+ * draw_rect(), draw_text() and the rest draw straight onto the scene, in the
+ * layer of the script's draw_layer, in the same space as the entities around
+ * them (the world, or the screen for layers from the camera's ui_layer up).
+ * They work only while draw() runs. */
+static br_renderer *sc_draw_target(sc_vm *vm, int line, const char *what) {
+    if (!vm->rt->draw_r) sc_fail(vm, line, "%s only works inside draw()", what);
+    return vm->rt->draw_r;
+}
+static br_color sc_need_color(sc_vm *vm, const sc_value *v, int line, const char *what) {
+    static const br_field f = { "colour", BR_FIELD_COLOR, 0, sizeof(br_color), 0, 0, NULL, 0 };
+    br_color c = br_rgba(255, 255, 255, 255);
+    if (v->t != V_STR && v->t != V_LIST) sc_fail(vm, line, "%s needs a colour (\"#rrggbb\", rgb() or [r, g, b]), not %s", what, sc_type_name(v));
+    sc_field_set(vm, &f, &c, v, line);
+    return c;
+}
+static sc_value bi_draw_rect(ARGS) {
+    br_renderer *r = sc_draw_target(vm, line, "draw_rect()");
+    br_vec2 p = sc_need_vec(vm, &a[0], line, "draw_rect() position"), size = sc_need_vec(vm, &a[1], line, "draw_rect() size");
+    br_color c = sc_need_color(vm, &a[2], line, "draw_rect()");
+    br_rect rect = br_rect_make(p.x, p.y, size.x, size.y);
+    if (n > 3 && !sc_truthy(&a[3])) br_draw_rect(r, rect, c); else br_fill_rect(r, rect, c);
+    return sc_nil();
+}
+static sc_value bi_draw_line(ARGS) {
+    br_renderer *r = sc_draw_target(vm, line, "draw_line()");
+    BR_UNUSED(n);
+    br_draw_line(r, sc_need_vec(vm, &a[0], line, "draw_line()"), sc_need_vec(vm, &a[1], line, "draw_line()"), sc_need_color(vm, &a[2], line, "draw_line()"));
+    return sc_nil();
+}
+static sc_value bi_draw_circle(ARGS) {
+    br_renderer *r = sc_draw_target(vm, line, "draw_circle()");
+    br_vec2 c = sc_need_vec(vm, &a[0], line, "draw_circle() centre");
+    float radius = (float)NUM(1, "draw_circle() radius");
+    br_color col = sc_need_color(vm, &a[2], line, "draw_circle()");
+    if (n > 3 && !sc_truthy(&a[3])) br_draw_circle(r, c, radius, col); else br_fill_circle(r, c, radius, col);
+    return sc_nil();
+}
+static sc_value bi_draw_text(ARGS) {
+    br_renderer *r = sc_draw_target(vm, line, "draw_text()");
+    sc_value text = sc_to_string(vm, &a[0]);
+    br_vec2 p = sc_need_vec(vm, &a[1], line, "draw_text() position");
+    br_color c = sc_need_color(vm, &a[2], line, "draw_text()");
+    float scale = n > 3 && a[3].t != V_NIL ? (float)NUM(3, "draw_text() size") : 1;
+    br_draw_text(r, text.as.s->chars, p.x, p.y, scale, c);
+    return sc_nil();
+}
+/* draw_image(path, centre[, frame[, frame_size[, flip_x]]]) */
+static sc_value bi_draw_image(ARGS) {
+    br_renderer *r = sc_draw_target(vm, line, "draw_image()");
+    const char *path = sc_need_str(vm, &a[0], line, "draw_image()");
+    br_vec2 at = sc_need_vec(vm, &a[1], line, "draw_image() position"), fs = br_v2(0, 0);
+    const br_image *img = br_asset_image(path);
+    int frame = n > 2 && a[2].t != V_NIL ? (int)NUM(2, "draw_image() frame") : 0;
+    bool flip = n > 4 && sc_truthy(&a[4]);
+    br_recti src;
+    if (!img) sc_fail(vm, line, "draw_image(): can't load %s", path);
+    if (n > 3 && a[3].t != V_NIL) fs = sc_need_vec(vm, &a[3], line, "draw_image() frame_size");
+    src = br_recti_make(0, 0, img->width, img->height);
+    if (fs.x >= 1 && fs.y >= 1 && fs.x <= img->width && fs.y <= img->height) {
+        int per_row = img->width / (int)fs.x, total = per_row * (img->height / (int)fs.y);
+        if (frame < 0) frame = 0;
+        if (frame >= total) frame = total - 1;
+        src = br_recti_make((frame % per_row) * (int)fs.x, (frame / per_row) * (int)fs.y, (int)fs.x, (int)fs.y);
+    }
+    br_draw_sprite(r, img, &src, at, br_v2((float)src.w / 2, (float)src.h / 2), br_v2(flip ? -1.0f : 1.0f, 1), 0, BR_WHITE);
+    return sc_nil();
+}
+/* text_size(text[, size]): how much room draw_text() (or a Label) needs. Works anywhere. */
+static sc_value bi_text_size(ARGS) {
+    sc_value text = sc_to_string(vm, &a[0]);
+    br_vec2 m = br_measure_text(text.as.s->chars, n > 1 && a[1].t != V_NIL ? (float)NUM(1, "text_size() size") : 1);
+    return sc_vec(m.x, m.y);
+}
+
+/* ---- cameras (the Camera component: components.h) ---- */
+static sc_value bi_camera(ARGS) {
+    br_entity e = br_camera_current(vm->rt->w);
+    UNUSED_ARGS;
+    return e == BR_ENTITY_NULL ? sc_nil() : sc_ent(e);
+}
+static sc_value bi_shake_camera(ARGS) {
+    BR_UNUSED(n);
+    br_camera_shake(vm->rt->w, (float)NUM(0, "shake_camera() strength"), (float)NUM(1, "shake_camera() seconds"));
+    return sc_nil();
+}
+static sc_value bi_snap_camera(ARGS) { UNUSED_ARGS; br_camera_snap(vm->rt->w); return sc_nil(); }
+static void sc_view(sc_vm *vm, br_camera2d *cam) {
+    br_engine *e = sc_engine(vm);
+    int ui;
+    br_camera_view(vm->rt->w, e ? e->framebuffer.width : 320, e ? e->framebuffer.height : 180, cam, &ui);
+}
+static sc_value bi_screen_to_world(ARGS) {
+    br_camera2d cam;
+    br_renderer r;
+    br_vec2 p = sc_need_vec(vm, &a[0], line, "screen_to_world()");
+    BR_UNUSED(n);
+    sc_view(vm, &cam);
+    memset(&r, 0, sizeof(r));
+    br_begin_camera(&r, &cam);
+    p = br_screen_to_world(&r, p);
+    return sc_vec(p.x, p.y);
+}
+static sc_value bi_world_to_screen(ARGS) {
+    br_camera2d cam;
+    br_renderer r;
+    br_vec2 p = sc_need_vec(vm, &a[0], line, "world_to_screen()");
+    BR_UNUSED(n);
+    sc_view(vm, &cam);
+    memset(&r, 0, sizeof(r));
+    br_begin_camera(&r, &cam);
+    p = br_world_to_screen(&r, p);
+    return sc_vec(p.x, p.y);
+}
+
+/* play_animation(e, frames[, fps[, loop]]): its Animation plays these frames (from the first, unless they're playing already). */
+static sc_value bi_play_animation(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "play_animation()");
+    const char *frames = sc_need_str(vm, &a[1], line, "play_animation() frames");
+    br_animation *an;
+    if (br_animation_parse(frames, NULL, 0) <= 0) sc_fail(vm, line, "play_animation(): \"%s\" isn't a list of frames (like \"0-3\" or \"4,5,6\")", frames);
+    if (strlen(frames) >= BR_ANIM_FRAMES_MAX) sc_fail(vm, line, "play_animation(): the list of frames is too long");
+    if (!(an = (br_animation *)br_get(vm->rt->w, e, vm->rt->ids.animation)))
+        an = (br_animation *)br_add(vm->rt->w, e, vm->rt->ids.animation, NULL);
+    if (!an) sc_fail(vm, line, "out of memory");
+    if (n > 2 && a[2].t != V_NIL) an->fps = (float)NUM(2, "play_animation() fps");
+    if (n > 3 && a[3].t != V_NIL) an->loop = sc_truthy(&a[3]);
+    if (strcmp(an->frames, frames) != 0 || !an->playing) {
+        snprintf(an->frames, sizeof(an->frames), "%s", frames);
+        an->started[0] = 0;                                 /* from its first frame, at the next step */
+        an->playing = true;
+        {   /* and show that frame now */
+            int first;
+            br_sprite *sp = (br_sprite *)br_get(vm->rt->w, e, vm->rt->ids.sprite);
+            if (sp && br_animation_parse(frames, &first, 1) > 0) sp->frame = first;
+        }
+    }
+    return sc_nil();
+}
+
+/* ---- sounds: voices, music and tones ---- */
+static br_mixer *sc_mixer(sc_vm *vm) { br_engine *e = sc_engine(vm); return e ? &e->mixer : NULL; }
+static br_voice sc_voice(sc_vm *vm, const sc_value *v, int line, const char *what) {
+    double d = sc_need_num(vm, v, line, what);
+    return d > 0 ? (br_voice)d : 0;
+}
+static sc_value bi_stop_sound(ARGS) { br_mixer *m = sc_mixer(vm); br_voice v = sc_voice(vm, &a[0], line, "stop_sound()"); BR_UNUSED(n); if (m && v) br_voice_stop(m, v); return sc_nil(); }
+static sc_value bi_sound_playing(ARGS) { br_mixer *m = sc_mixer(vm); br_voice v = sc_voice(vm, &a[0], line, "sound_playing()"); BR_UNUSED(n); return sc_bool(m && v && br_voice_playing(m, v)); }
+static sc_value bi_set_sound_volume(ARGS) { br_mixer *m = sc_mixer(vm); br_voice v = sc_voice(vm, &a[0], line, "set_sound_volume()"); float x = (float)NUM(1, "set_sound_volume()"); BR_UNUSED(n); if (m && v) br_voice_set_volume(m, v, x < 0 ? 0 : x); return sc_nil(); }
+static sc_value bi_set_sound_pitch(ARGS) { br_mixer *m = sc_mixer(vm); br_voice v = sc_voice(vm, &a[0], line, "set_sound_pitch()"); float x = (float)NUM(1, "set_sound_pitch()"); BR_UNUSED(n); if (m && v) br_voice_set_pitch(m, v, x < 0.05f ? 0.05f : x > 8 ? 8 : x); return sc_nil(); }
+static sc_value bi_set_sound_pan(ARGS) { br_mixer *m = sc_mixer(vm); br_voice v = sc_voice(vm, &a[0], line, "set_sound_pan()"); float x = (float)NUM(1, "set_sound_pan()"); BR_UNUSED(n); if (m && v) br_voice_set_pan(m, v, x < -1 ? -1 : x > 1 ? 1 : x); return sc_nil(); }
+static sc_value bi_pause_sound(ARGS) { br_mixer *m = sc_mixer(vm); br_voice v = sc_voice(vm, &a[0], line, "pause_sound()"); BR_UNUSED(n); if (m && v) br_voice_set_paused(m, v, sc_truthy(&a[1])); return sc_nil(); }
+/* stop_sounds([bus]): every sound playing (or every one on a bus), music included. */
+static sc_value bi_stop_sounds(ARGS) {
+    br_mixer *m = sc_mixer(vm);
+    int bus = n > 0 && a[0].t != V_NIL ? sc_bus_named(vm, &a[0], line, "stop_sounds()") : -1, i;
+    if (!m) return sc_nil();
+    for (i = 0; i < BR_AUDIO_MAX_VOICES; ++i) {
+        br_voice_state *vs = &m->voices[i];
+        if (vs->active && (bus < 0 || vs->params.bus == bus)) vs->stopping = true;
+    }
+    return sc_nil();
+}
+static sc_value bi_sound_length(ARGS) {
+    const br_sound *s = br_asset_sound(sc_need_str(vm, &a[0], line, "sound_length()"));
+    BR_UNUSED(n);
+    if (!s) sc_fail(vm, line, "sound_length(): can't load %s", a[0].as.s->chars);
+    return sc_num(br_sound_duration(s));
+}
+
+/* The music: one track at a time on the music bus, kept playing across scenes, faded in and out. */
+static struct {
+    char path[BR_PATH_MAX];
+    br_mixer *mixer;
+    br_voice voice, old;              /* the track, and the one fading out under it */
+    float volume;                     /* the track's own volume (the bus's is on top) */
+    double fade_start, fade_len;      /* engine time */
+    float old_volume;
+    double old_start, old_len;
+} g_music;
+
+static void sc_music_tick(double now) {
+    br_mixer *m = g_music.mixer;
+    if (!m) return;
+    if (g_music.voice) {
+        float k = g_music.fade_len > 0 ? (float)((now - g_music.fade_start) / g_music.fade_len) : 1;
+        if (!br_voice_playing(m, g_music.voice)) { g_music.voice = 0; g_music.path[0] = 0; }
+        else br_voice_set_volume(m, g_music.voice, g_music.volume * (k < 0 ? 0 : k > 1 ? 1 : k));
+    }
+    if (g_music.old) {
+        float k = g_music.old_len > 0 ? (float)((now - g_music.old_start) / g_music.old_len) : 1;
+        if (k >= 1 || !br_voice_playing(m, g_music.old)) { br_voice_stop(m, g_music.old); g_music.old = 0; }
+        else br_voice_set_volume(m, g_music.old, g_music.old_volume * (1 - k));
+    }
+}
+static void sc_music_out(double now, double fade) {
+    if (!g_music.voice || !g_music.mixer) { g_music.voice = 0; g_music.path[0] = 0; return; }
+    if (g_music.old) br_voice_stop(g_music.mixer, g_music.old);
+    if (fade <= 0) { br_voice_stop(g_music.mixer, g_music.voice); g_music.old = 0; }
+    else {
+        const br_voice_state *vs = &g_music.mixer->voices[(g_music.voice & 0xFFu) % BR_AUDIO_MAX_VOICES];
+        g_music.old = g_music.voice;
+        g_music.old_volume = vs->params.volume;
+        g_music.old_start = now;
+        g_music.old_len = fade;
+    }
+    g_music.voice = 0;
+    g_music.path[0] = 0;
+}
+/* play_music(path[, volume[, fade]]): loops it on the music bus, fading in over `fade`
+ * seconds while any other track fades out. The same track again only changes its volume. */
+static sc_value bi_play_music(ARGS) {
+    br_engine *e = sc_engine(vm);
+    const char *path = sc_need_str(vm, &a[0], line, "play_music()");
+    float volume = n > 1 && a[1].t != V_NIL ? (float)NUM(1, "play_music() volume") : 1;
+    double fade = n > 2 && a[2].t != V_NIL ? NUM(2, "play_music() fade") : 0;
+    const br_sound *s;
+    br_play_params pp;
+    if (!e) return sc_nil();
+    if (!(s = br_asset_sound(path))) sc_fail(vm, line, "play_music(): can't load %s", path);
+    if (g_music.mixer != &e->mixer) { memset(&g_music, 0, sizeof(g_music)); g_music.mixer = &e->mixer; }
+    sc_music_tick(e->time);
+    if (g_music.voice && strcmp(g_music.path, path) == 0) { g_music.volume = volume < 0 ? 0 : volume; return sc_nil(); }
+    sc_music_out(e->time, fade);
+    pp = br_play_defaults();
+    pp.loop = true;
+    pp.bus = BR_BUS_MUSIC;
+    pp.volume = fade > 0 ? 0 : volume;
+    g_music.voice = br_play(&e->mixer, s, &pp);
+    snprintf(g_music.path, sizeof(g_music.path), "%s", g_music.voice ? path : "");
+    g_music.volume = volume < 0 ? 0 : volume;
+    g_music.fade_start = e->time;
+    g_music.fade_len = fade;
+    return sc_nil();
+}
+static sc_value bi_stop_music(ARGS) {
+    br_engine *e = sc_engine(vm);
+    if (e && g_music.mixer == &e->mixer) sc_music_out(e->time, n > 0 && a[0].t != V_NIL ? NUM(0, "stop_music() fade") : 0);
+    BR_UNUSED(line);
+    return sc_nil();
+}
+static sc_value bi_music(ARGS) { UNUSED_ARGS; return sc_string(vm, g_music.path, strlen(g_music.path)); }
+const char *br_script_music(void) { return g_music.path; }
+
+/* play_tone(wave, frequency, seconds[, volume]): a tone made on the spot ("sine", "square",
+ * "triangle", "saw" or "noise") on the sfx bus, for blips with no sound file. Returns the voice. */
+#define SC_TONES 48
+static struct { br_sound sound; int wave; float freq, secs, vol; uint32_t used; br_mixer *mixer; } g_tones[SC_TONES];
+static uint32_t g_tone_clock;
+static sc_value bi_play_tone(ARGS) {
+    static const char *const waves[] = { "sine", "square", "triangle", "saw", "noise" };
+    br_mixer *m = sc_mixer(vm);
+    const char *wave = sc_need_str(vm, &a[0], line, "play_tone() wave");
+    float f = (float)NUM(1, "play_tone() frequency"), secs = (float)NUM(2, "play_tone() seconds");
+    float vol = n > 3 && a[3].t != V_NIL ? (float)NUM(3, "play_tone() volume") : 0.5f;
+    int w = -1, i, slot = -1;
+    for (i = 0; i < 5; ++i) if (sc_strieq(wave, waves[i])) w = i;
+    if (w < 0) sc_fail(vm, line, "play_tone(): there is no wave called \"%s\" (sine, square, triangle, saw, noise)", wave);
+    if (f < 10 || f > 20000) sc_fail(vm, line, "play_tone(): %g Hz is outside 10 to 20000", (double)f);
+    if (secs <= 0 || secs > 10) sc_fail(vm, line, "play_tone(): a tone lasts more than 0 and up to 10 seconds");
+    vol = vol < 0 ? 0 : vol > 1 ? 1 : vol;
+    if (!m) return sc_num(0);
+    for (i = 0; i < SC_TONES; ++i)
+        if (g_tones[i].sound.samples && g_tones[i].wave == w && g_tones[i].freq == f && g_tones[i].secs == secs && g_tones[i].vol == vol) { slot = i; break; }
+    if (slot < 0) {                                   /* make it, in a free slot or the one used longest ago */
+        uint32_t oldest = 0xFFFFFFFFu;
+        for (i = 0; i < SC_TONES; ++i) {
+            if (!g_tones[i].sound.samples) { slot = i; break; }
+            if (g_tones[i].used < oldest) { oldest = g_tones[i].used; slot = i; }
+        }
+        if (g_tones[slot].sound.samples) {
+            if (g_tones[slot].mixer) br_mixer_stop_sound(g_tones[slot].mixer, &g_tones[slot].sound);
+            br_sound_destroy(&g_tones[slot].sound);
+        }
+        if (!br_sound_generate(&g_tones[slot].sound, (br_waveform)w, f, secs, vol, m->sample_rate)) { memset(&g_tones[slot], 0, sizeof(g_tones[0])); return sc_num(0); }
+        g_tones[slot].wave = w; g_tones[slot].freq = f; g_tones[slot].secs = secs; g_tones[slot].vol = vol;
+    }
+    g_tones[slot].used = ++g_tone_clock;
+    g_tones[slot].mixer = m;
+    return sc_num((double)br_play(m, &g_tones[slot].sound, NULL));
+}
+
+/* ---- messages: broadcast(fn, args...) calls fn in every script of the scene that has it ---- */
+static sc_value bi_broadcast(ARGS) {
+    sc_runtime *rt = vm->rt;
+    const char *fn_name = sc_need_str(vm, &a[0], line, "broadcast()");
+    br_entity *targets;
+    int count = 0, i, called = 0;
+    br_engine *e = sc_engine(vm);
+    if (!rt->instance_count) return sc_num(0);
+    if (!(targets = (br_entity *)br_alloc(sizeof(br_entity) * (size_t)rt->instance_count))) sc_fail(vm, line, "out of memory");
+    for (i = 0; i < rt->instance_count; ++i) targets[count++] = rt->instances[i]->e;    /* (calls may add or remove scripts) */
+    for (i = 0; i < count; ++i) {
+        sc_instance *t = sc_instance_of(rt, targets[i]);
+        int fn;
+        if (!t || !t->prog || t->failed || !t->ready || (fn = sc_find_func(t->prog, fn_name)) < 0) continue;
+        sc_call_func(vm, t, fn, a + 1, n - 1, line);
+        ++called;
+    }
+    br_free(targets);
+    if (e) {                                          /* and on the engine's message bus, as "script.<fn>", for C code */
+        char type[80];
+        double nums[6];
+        int k, m = 0;
+        snprintf(type, sizeof(type), "script.%s", fn_name);
+        memset(nums, 0, sizeof(nums));
+        for (k = 1; k < n && m < 6; ++k) if (a[k].t == V_NUM) nums[m++] = a[k].as.n;
+        if (br_events_find_type(&e->events, type)) br_events_post_data(&e->events, br_events_find_type(&e->events, type), nums, sizeof(nums));
+    }
+    return sc_num(called);
+}
+
+/* ---- scenes on a stack, and values that outlive them ---- */
+static sc_value bi_push_scene(ARGS) {
+    sc_runtime *rt = vm->rt;
+    snprintf(rt->push_request, sizeof(rt->push_request), "%s", sc_need_str(vm, &a[0], line, "push_scene()"));
+    rt->push_transparent = n > 1 && a[1].t != V_NIL ? sc_truthy(&a[1]) : true;
+    rt->push_update_below = n > 2 && sc_truthy(&a[2]);
+    return sc_nil();
+}
+static sc_value bi_pop_scene(ARGS) { UNUSED_ARGS; vm->rt->pop_request = true; return sc_nil(); }
+
+#define SC_GLOBALS_MAX 256
+static struct { char name[64]; char *text; } g_globals[SC_GLOBALS_MAX];
+static int g_global_count;
+static int sc_global_slot(const char *name) {
+    int i;
+    for (i = 0; i < g_global_count; ++i) if (strcmp(g_globals[i].name, name) == 0) return i;
+    return -1;
+}
+static const char *sc_global_name(sc_vm *vm, const sc_value *v, int line, const char *what) {
+    const char *name = sc_need_str(vm, v, line, what);
+    if (!name[0] || strlen(name) > 63) sc_fail(vm, line, "%s: a global's name is 1 to 63 characters", what);
+    return name;
+}
+/* set_global(name, value): kept while the game runs (load_scene and push_scene don't lose it);
+ * the same values save_data() takes. */
+static sc_value bi_set_global(ARGS) {
+    const char *name = sc_global_name(vm, &a[0], line, "set_global()"), *why;
+    sc_text t;
+    int slot = sc_global_slot(name);
+    BR_UNUSED(n);
+    memset(&t, 0, sizeof(t));
+    if ((why = sc_write_value(&t, &a[1], 0)) != NULL) { br_free(t.p); sc_fail(vm, line, "set_global(): can't keep %s", why); }
+    if (t.failed) { br_free(t.p); sc_fail(vm, line, "out of memory"); }
+    if (slot < 0) {
+        if (g_global_count == SC_GLOBALS_MAX) { br_free(t.p); sc_fail(vm, line, "set_global(): no room for more than %d globals", SC_GLOBALS_MAX); }
+        slot = g_global_count++;
+        snprintf(g_globals[slot].name, sizeof(g_globals[slot].name), "%s", name);
+    } else {
+        br_free(g_globals[slot].text);
+    }
+    g_globals[slot].text = t.p;
+    return sc_nil();
+}
+static sc_value bi_global(ARGS) {
+    int slot = sc_global_slot(sc_global_name(vm, &a[0], line, "global()"));
+    sc_lexer L;
+    sc_token t;
+    sc_value v;
+    if (slot < 0) return n > 1 ? a[1] : sc_nil();
+    L.p = g_globals[slot].text;
+    L.line = 1;
+    L.depth = 0;
+    t = sc_next(&L);
+    if (!sc_read_value(vm->rt, &L, t, &v, 0)) sc_fail(vm, line, "out of memory");
+    return v;
+}
+static sc_value bi_has_global(ARGS) { BR_UNUSED(n); return sc_bool(sc_global_slot(sc_global_name(vm, &a[0], line, "has_global()")) >= 0); }
+static sc_value bi_delete_global(ARGS) {
+    int slot = sc_global_slot(sc_global_name(vm, &a[0], line, "delete_global()"));
+    BR_UNUSED(n);
+    if (slot < 0) return sc_bool(false);
+    br_free(g_globals[slot].text);
+    g_globals[slot] = g_globals[--g_global_count];
+    return sc_bool(true);
+}
+
+void br_script_reset_session(void) {
+    int i;
+    for (i = 0; i < g_global_count; ++i) br_free(g_globals[i].text);
+    g_global_count = 0;
+    if (g_music.mixer) {
+        if (g_music.voice) br_voice_stop(g_music.mixer, g_music.voice);
+        if (g_music.old) br_voice_stop(g_music.mixer, g_music.old);
+    }
+    memset(&g_music, 0, sizeof(g_music));
+    for (i = 0; i < SC_TONES; ++i)
+        if (g_tones[i].sound.samples && g_tones[i].mixer) br_mixer_stop_sound(g_tones[i].mixer, &g_tones[i].sound);
+}
+void br_script_release(void) {
+    int i;
+    br_script_reset_session();
+    for (i = 0; i < SC_TONES; ++i) if (g_tones[i].sound.samples) br_sound_destroy(&g_tones[i].sound);
+    memset(g_tones, 0, sizeof(g_tones));
+}
+
+/* ---- the window ---- */
+static sc_value bi_set_fullscreen(ARGS) { br_engine *e = sc_engine(vm); BR_UNUSED(n); BR_UNUSED(line); if (e) br_window_set_fullscreen(e, sc_truthy(&a[0])); return sc_nil(); }
+static sc_value bi_fullscreen(ARGS) { br_engine *e = sc_engine(vm); UNUSED_ARGS; return sc_bool(e && br_window_is_fullscreen(e)); }
+static sc_value bi_set_window_title(ARGS) { br_engine *e = sc_engine(vm); const char *t = sc_need_str(vm, &a[0], line, "set_window_title()"); BR_UNUSED(n); if (e) br_window_set_title(e, t); return sc_nil(); }
+static sc_value bi_show_cursor(ARGS) { br_engine *e = sc_engine(vm); BR_UNUSED(n); BR_UNUSED(line); if (e) br_window_set_cursor_visible(e, sc_truthy(&a[0])); return sc_nil(); }
+static sc_value bi_screen_size(ARGS) { br_engine *e = sc_engine(vm); UNUSED_ARGS; return e ? sc_vec(e->framebuffer.width, e->framebuffer.height) : sc_vec(320, 180); }
+
+/* ---- more input: the wheel, typed text, touches, actions ---- */
+static sc_value bi_mouse_released(ARGS) {
+    br_engine *e = sc_engine(vm);
+    int b = n ? (int)NUM(0, "mouse_released()") : 0;
+    if (b < 0 || b >= BR_MOUSE_BUTTON_COUNT) sc_fail(vm, line, "mouse buttons are 0 (left), 1 (right) and 2 (middle)");
+    return sc_bool(e && br_mouse_released(&e->input, (br_mouse_button)b));
+}
+/* mouse_wheel(): how far the wheel turned since the last frame (+y: towards the player), once a frame. */
+static sc_value bi_mouse_wheel(ARGS) {
+    br_engine *e = sc_engine(vm);
+    UNUSED_ARGS;
+    if (!e || vm->rt->wheel_frame == e->frame + 1) return sc_vec(0, 0);
+    vm->rt->wheel_frame = e->frame + 1;
+    return sc_vec(e->input.wheel_x, e->input.wheel_y);
+}
+/* text_typed(): the characters typed since the last frame (once a frame), for name entry and the like. */
+static sc_value bi_text_typed(ARGS) {
+    br_engine *e = sc_engine(vm);
+    char buf[BR_TEXT_INPUT_MAX * 4 + 1];
+    size_t len = 0;
+    int i;
+    UNUSED_ARGS;
+    if (!e || vm->rt->text_frame == e->frame + 1) return sc_string(vm, "", 0);
+    vm->rt->text_frame = e->frame + 1;
+    for (i = 0; i < e->input.text_count; ++i) {             /* as UTF-8 */
+        uint32_t c = e->input.text[i];
+        if (c < 0x80) buf[len++] = (char)c;
+        else if (c < 0x800) { buf[len++] = (char)(0xC0 | (c >> 6)); buf[len++] = (char)(0x80 | (c & 0x3F)); }
+        else if (c < 0x10000) { buf[len++] = (char)(0xE0 | (c >> 12)); buf[len++] = (char)(0x80 | ((c >> 6) & 0x3F)); buf[len++] = (char)(0x80 | (c & 0x3F)); }
+        else { buf[len++] = (char)(0xF0 | (c >> 18)); buf[len++] = (char)(0x80 | ((c >> 12) & 0x3F)); buf[len++] = (char)(0x80 | ((c >> 6) & 0x3F)); buf[len++] = (char)(0x80 | (c & 0x3F)); }
+    }
+    return sc_string(vm, buf, len);
+}
+/* touches(): where each finger on the screen is (game pixels), leaving out those on the on-screen controls. */
+static sc_value bi_touches(ARGS) {
+    br_engine *e = sc_engine(vm);
+    sc_value list = sc_new_list(vm, line);
+    int i;
+    BR_UNUSED(a); BR_UNUSED(n);
+    if (e) for (i = 0; i < e->input.touch_count; ++i)
+        if (!e->input.touches[i].claimed) sc_list_push(vm, list.as.l, sc_vec(e->input.touches[i].x, e->input.touches[i].y), line);
+    return list;
+}
+/* Actions: names bound to inputs, shared by every scene (input.h). An input is a key's name ("space"),
+ * "mouse:0" (a mouse button), "pad:a" (a gamepad button, as button_down() names them), or "pad:left_x-" /
+ * "pad:left_y+" (a stick or trigger pushed that way past the dead zone). */
+static void sc_bind_one(sc_vm *vm, br_input *in, br_action act, const char *what, int line) {
+    if (strncmp(what, "mouse:", 6) == 0) {
+        int b = atoi(what + 6);
+        if (b < 0 || b >= BR_MOUSE_BUTTON_COUNT || !isdigit((unsigned char)what[6])) sc_fail(vm, line, "bind(): \"%s\": mouse buttons are mouse:0, mouse:1 and mouse:2", what);
+        br_input_bind(in, act, BR_BIND_MOUSE_BUTTON, b, -1);
+    } else if (strncmp(what, "pad:", 4) == 0) {
+        static const struct { const char *name; int axis; } axes[] = {
+            { "left_x", BR_PAD_AXIS_LEFT_X }, { "left_y", BR_PAD_AXIS_LEFT_Y }, { "right_x", BR_PAD_AXIS_RIGHT_X },
+            { "right_y", BR_PAD_AXIS_RIGHT_Y }, { "lt", BR_PAD_AXIS_LEFT_TRIGGER }, { "rt", BR_PAD_AXIS_RIGHT_TRIGGER },
+        };
+        char name[32];
+        size_t len = strlen(what + 4), i;
+        snprintf(name, sizeof(name), "%s", what + 4);
+        if (len > 1 && (name[len - 1] == '+' || name[len - 1] == '-')) {
+            bool neg = name[len - 1] == '-';
+            name[len - 1] = 0;
+            for (i = 0; i < BR_ARRAY_COUNT(axes); ++i)
+                if (sc_strieq(name, axes[i].name)) { br_input_bind(in, act, neg ? BR_BIND_PAD_AXIS_NEG : BR_BIND_PAD_AXIS_POS, axes[i].axis, -1); return; }
+            sc_fail(vm, line, "bind(): there is no axis called \"%s\" (left_x left_y right_x right_y lt rt, then + or -)", name);
+        } else {
+            int b = sc_pad_button_named(name);
+            if (b < 0 || b >= BR_PAD_BUTTON_COUNT) {
+                if (b == SC_PAD_LT || b == SC_PAD_RT) { br_input_bind(in, act, BR_BIND_PAD_AXIS_POS, b == SC_PAD_LT ? BR_PAD_AXIS_LEFT_TRIGGER : BR_PAD_AXIS_RIGHT_TRIGGER, -1); return; }
+                sc_fail(vm, line, "bind(): there is no gamepad button called \"%s\"", name);
+            }
+            br_input_bind(in, act, BR_BIND_PAD_BUTTON, b, -1);
+        }
+    } else {
+        br_key k = sc_key_named(what);
+        if (k == BR_KEY_UNKNOWN) sc_fail(vm, line, "bind(): there is no key called \"%s\" (or write mouse:0, pad:a, pad:left_x-)", what);
+        br_input_bind(in, act, BR_BIND_KEY, (int)k, -1);
+    }
+}
+static br_action sc_action(sc_vm *vm, const sc_value *v, int line, const char *what, bool create) {
+    br_engine *e = sc_engine(vm);
+    const char *name = sc_need_str(vm, v, line, what);
+    br_action act;
+    if (!name[0] || strlen(name) >= BR_ACTION_NAME_MAX) sc_fail(vm, line, "%s: an action's name is 1 to %d characters", what, BR_ACTION_NAME_MAX - 1);
+    if (!e) return -1;
+    act = create ? br_input_action(&e->input, name) : br_input_find_action(&e->input, name);
+    if (create && act < 0) sc_fail(vm, line, "%s: no room for more actions", what);
+    return act;
+}
+/* bind(action, input, ...): adds inputs to an action (up to 6). */
+static sc_value bi_bind(ARGS) {
+    br_engine *e = sc_engine(vm);
+    br_action act = sc_action(vm, &a[0], line, "bind()", true);
+    int i;
+    if (!e) return sc_nil();
+    for (i = 1; i < n; ++i) {
+        if (e->input.actions[act].binding_count >= BR_MAX_ACTION_BINDINGS) sc_fail(vm, line, "bind(): an action takes up to %d inputs", BR_MAX_ACTION_BINDINGS);
+        sc_bind_one(vm, &e->input, act, sc_need_str(vm, &a[i], line, "bind() input"), line);
+    }
+    return sc_nil();
+}
+static sc_value bi_unbind(ARGS) { br_engine *e = sc_engine(vm); br_action act = sc_action(vm, &a[0], line, "unbind()", false); BR_UNUSED(n); if (e && act >= 0) br_input_clear_bindings(&e->input, act); return sc_nil(); }
+/* which: 0 down, 1 pressed this step, 2 released this step - built on the keys' and buttons' own
+ * states, so a press is seen in exactly one step (as key_pressed() is). */
+static bool sc_action_state(sc_vm *vm, const sc_value *v, int line, int which, const char *what) {
+    br_engine *e = sc_engine(vm);
+    br_action act = sc_action(vm, v, line, what, false);
+    const br_action_def *d;
+    int i, p;
+    bool any_down = false, any_edge = false;
+    if (!e || act < 0) return false;
+    d = &e->input.actions[act];
+    for (i = 0; i < d->binding_count; ++i) {
+        const br_binding *b = &d->bindings[i];
+        bool down = false, pressed = false, released = false;
+        switch (b->kind) {
+        case BR_BIND_KEY: down = br_key_down(&e->input, (br_key)b->code); pressed = br_key_pressed(&e->input, (br_key)b->code); released = br_key_released(&e->input, (br_key)b->code); break;
+        case BR_BIND_MOUSE_BUTTON: down = br_mouse_down(&e->input, (br_mouse_button)b->code); pressed = br_mouse_pressed(&e->input, (br_mouse_button)b->code); released = br_mouse_released(&e->input, (br_mouse_button)b->code); break;
+        case BR_BIND_PAD_BUTTON:
+            for (p = 0; p < BR_MAX_GAMEPADS; ++p) {
+                if (b->pad >= 0 && b->pad != p) continue;
+                down |= e->input.pads[p].buttons[b->code]; pressed |= e->input.pads[p].pressed[b->code]; released |= e->input.pads[p].released[b->code];
+            }
+            break;
+        case BR_BIND_PAD_AXIS_POS: case BR_BIND_PAD_AXIS_NEG:
+            for (p = 0; p < BR_MAX_GAMEPADS; ++p) {
+                float x;
+                if (b->pad >= 0 && b->pad != p) continue;
+                x = br_pad_axis(&e->input, p, (br_gamepad_axis)b->code);
+                down |= b->kind == BR_BIND_PAD_AXIS_POS ? x > 0.5f : x < -0.5f;
+            }
+            pressed = down && !d->prev_down;              /* (a stick has no edges of its own) */
+            released = !down && d->prev_down;
+            break;
+        default: break;
+        }
+        any_down |= down;
+        any_edge |= which == 1 ? pressed : released;
+    }
+    if (which == 0) return any_down;
+    if (which == 1) return any_edge && any_down;
+    return any_edge && !any_down;
+}
+static sc_value bi_action_down(ARGS) { BR_UNUSED(n); return sc_bool(sc_action_state(vm, &a[0], line, 0, "action_down()")); }
+static sc_value bi_action_pressed(ARGS) { BR_UNUSED(n); return sc_bool(sc_action_state(vm, &a[0], line, 1, "action_pressed()")); }
+static sc_value bi_action_released(ARGS) { BR_UNUSED(n); return sc_bool(sc_action_state(vm, &a[0], line, 2, "action_released()")); }
+/* action_axis(negative, positive): -1, 0 or 1 from two actions (left and right, say). */
+static sc_value bi_action_axis(ARGS) {
+    BR_UNUSED(n);
+    return sc_num((sc_action_state(vm, &a[1], line, 0, "action_axis()") ? 1 : 0) - (sc_action_state(vm, &a[0], line, 0, "action_axis()") ? 1 : 0));
+}
+
+/* ---- physics: gravity ---- */
+static sc_value bi_gravity(ARGS) { br_vec2 g = br_physics_gravity(vm->rt->w); UNUSED_ARGS; return sc_vec(g.x, g.y); }
+/* set_gravity(v): the PhysicsWorld's gravity (one is added to this entity if the scene has none). */
+static sc_value bi_set_gravity(ARGS) {
+    br_world *w = vm->rt->w;
+    br_component pw = br_component_find(w, "PhysicsWorld");
+    br_vec2 g = sc_need_vec(vm, &a[0], line, "set_gravity()");
+    br_physics_world *d = NULL;
+    BR_UNUSED(n);
+    if (pw == BR_COMPONENT_INVALID) sc_fail(vm, line, "set_gravity(): there's no physics in this scene");
+    if (w->pools[pw].count) d = (br_physics_world *)w->pools[pw].data;
+    else if (vm->inst) d = (br_physics_world *)br_add(w, vm->inst->e, pw, NULL);
+    if (d) d->gravity = g;
+    return sc_nil();
+}
+
+/* ---- tilemaps by column and row ---- */
+static sc_value bi_tile_cell(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "tile_cell()");
+    int col, row;
+    BR_UNUSED(n);
+    if (!br_has(vm->rt->w, e, vm->rt->ids.tilemap)) sc_fail(vm, line, "tile_cell(): the entity has no Tilemap");
+    br_tilemap_get(vm->rt->w, e, sc_need_vec(vm, &a[1], line, "tile_cell() point"), &col, &row);
+    return sc_vec(col, row);
+}
+static sc_value bi_tile_get(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "tile_get()");
+    char c = br_tilemap_cell(vm->rt->w, e, (int)floor(NUM(1, "tile_get() column")), (int)floor(NUM(2, "tile_get() row")));
+    BR_UNUSED(n);
+    return sc_string(vm, &c, c ? 1 : 0);
+}
+static sc_value bi_tile_put(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "tile_put()");
+    const char *t = sc_need_str(vm, &a[3], line, "tile_put()");
+    BR_UNUSED(n);
+    if (strlen(t) != 1) sc_fail(vm, line, "tile_put() wants one character, not \"%s\"", t);
+    return sc_bool(br_tilemap_set_cell(vm->rt->w, e, (int)floor(NUM(1, "tile_put() column")), (int)floor(NUM(2, "tile_put() row")), t[0]));
+}
+static sc_value bi_tile_cell_center(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "tile_cell_center()");
+    br_vec2 c;
+    BR_UNUSED(n);
+    if (!br_tilemap_cell_center(vm->rt->w, e, (int)floor(NUM(1, "tile_cell_center() column")), (int)floor(NUM(2, "tile_cell_center() row")), &c))
+        sc_fail(vm, line, "tile_cell_center(): the entity has no Tilemap");
+    return sc_vec(c.x, c.y);
+}
+static sc_value bi_tile_box_solid(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "tile_box_solid()");
+    BR_UNUSED(n);
+    return sc_bool(br_tilemap_solid_box(vm->rt->w, e, sc_need_vec(vm, &a[1], line, "tile_box_solid() centre"), sc_need_vec(vm, &a[2], line, "tile_box_solid() size")));
+}
+
+/* ---- odds and ends ---- */
+static sc_value bi_random_seed(ARGS) { BR_UNUSED(n); br_rng_seed(&vm->rt->rng, (uint64_t)(int64_t)floor(NUM(0, "random_seed()"))); return sc_nil(); }
+static sc_value bi_clipboard(ARGS) {
+    br_engine *e = sc_engine(vm);
+    char *text;
+    sc_value v;
+    UNUSED_ARGS;
+    if (!e || !(text = br_clipboard_get(e))) return sc_string(vm, "", 0);
+    v = sc_string(vm, text, strlen(text));
+    br_free(text);
+    return v;
+}
+static sc_value bi_set_clipboard(ARGS) { br_engine *e = sc_engine(vm); const char *t = sc_need_str(vm, &a[0], line, "set_clipboard()"); BR_UNUSED(n); return sc_bool(e && br_clipboard_set(e, t)); }
+static sc_value bi_fps(ARGS) { br_engine *e = sc_engine(vm); UNUSED_ARGS; return sc_num(e ? e->fps : 0); }
+static sc_value bi_frame_count(ARGS) { br_engine *e = sc_engine(vm); UNUSED_ARGS; return sc_num(e ? (double)e->frame : 0); }
+static sc_value bi_log(sc_vm *vm, sc_value *a, int n, int warn) {
+    char buf[1024];
+    int i;
+    buf[0] = 0;
+    for (i = 0; i < n; ++i) {
+        if (i) strncat(buf, " ", sizeof(buf) - strlen(buf) - 1);
+        sc_append(vm, buf, sizeof(buf), &a[i], 0);
+    }
+    if (warn) BR_WARN("[%s] %s", vm->inst && vm->inst->prog ? vm->inst->prog->name : "script", buf);
+    else BR_ERROR("[%s] %s", vm->inst && vm->inst->prog ? vm->inst->prog->name : "script", buf);
+    return sc_nil();
+}
+static sc_value bi_log_warning(ARGS) { BR_UNUSED(line); return bi_log(vm, a, n, 1); }
+static sc_value bi_log_error(ARGS) { BR_UNUSED(line); return bi_log(vm, a, n, 0); }
+static sc_value bi_open_url(ARGS) { br_engine *e = sc_engine(vm); const char *u = sc_need_str(vm, &a[0], line, "open_url()"); BR_UNUSED(n); return sc_bool(e && br_open_path(e, u)); }
+static sc_value bi_image_size(ARGS) {
+    const br_image *img = br_asset_image(sc_need_str(vm, &a[0], line, "image_size()"));
+    BR_UNUSED(n);
+    if (!img) sc_fail(vm, line, "image_size(): can't load %s", a[0].as.s->chars);
+    return sc_vec(img->width, img->height);
+}
+
 /* Signatures (for the type checker): a letter per parameter, '*' repeats the
  * last for the rest, then '>' and the result. n number, i int, s string,
  * b bool, v vec2, l list, e entity, a anything, x number or vec2, t list or
@@ -4018,8 +4675,8 @@ static const sc_builtin k_builtin_table[] = {
     { "has", 2, 2, bi_has, "es>b" }, { "add", 2, 2, bi_add, "es>c" },
     { "remove_component", 2, 2, bi_remove_component, "es>-" },
     { "apply_force", 2, 3, bi_apply_force, "evv>-" }, { "apply_impulse", 2, 3, bi_apply_impulse, "evv>-" },
-    { "raycast", 2, 3, bi_raycast, "vvq>a" }, { "entity_at", 1, 1, bi_entity_at, "v>e" },
-    { "play_sound", 1, 2, bi_play_sound, "sn>-" }, { "send", 2, 16, bi_send, "esa*>a" },
+    { "raycast", 2, 4, bi_raycast, "vvqn>a" }, { "entity_at", 1, 2, bi_entity_at, "vn>e" },
+    { "play_sound", 1, 4, bi_play_sound, "snnn>n" }, { "send", 2, 16, bi_send, "esa*>a" },
     { "load_scene", 1, 1, bi_load_scene, "s>-" }, { "quit", 0, 0, bi_quit, ">-" },
     { "tile_at", 2, 2, bi_tile_at, "ev>s" }, { "set_tile", 3, 3, bi_set_tile, "evs>b" },
     { "tile_solid", 2, 2, bi_tile_solid, "ev>b" }, { "tile_center", 2, 2, bi_tile_center, "ev>v" },
@@ -4029,6 +4686,47 @@ static const sc_builtin k_builtin_table[] = {
     { "data_names", 0, 0, bi_data_names, ">W" },
     { "last_key", 0, 0, bi_last_key, ">s" }, { "set_volume", 2, 2, bi_set_volume, "sn>-" },
     { "volume", 1, 1, bi_volume, "s>n" },
+    /* drawing, in draw() */
+    { "draw_rect", 3, 4, bi_draw_rect, "vvab>-" }, { "draw_line", 3, 3, bi_draw_line, "vva>-" },
+    { "draw_circle", 3, 4, bi_draw_circle, "vnab>-" }, { "draw_text", 3, 4, bi_draw_text, "avan>-" },
+    { "draw_image", 2, 5, bi_draw_image, "svnvb>-" }, { "text_size", 1, 2, bi_text_size, "an>v" },
+    /* cameras and animation */
+    { "camera", 0, 0, bi_camera, ">e" }, { "shake_camera", 2, 2, bi_shake_camera, "nn>-" },
+    { "snap_camera", 0, 0, bi_snap_camera, ">-" }, { "screen_to_world", 1, 1, bi_screen_to_world, "v>v" },
+    { "world_to_screen", 1, 1, bi_world_to_screen, "v>v" }, { "play_animation", 2, 4, bi_play_animation, "esnb>-" },
+    /* sounds */
+    { "stop_sound", 1, 1, bi_stop_sound, "n>-" }, { "sound_playing", 1, 1, bi_sound_playing, "n>b" },
+    { "set_sound_volume", 2, 2, bi_set_sound_volume, "nn>-" }, { "set_sound_pitch", 2, 2, bi_set_sound_pitch, "nn>-" },
+    { "set_sound_pan", 2, 2, bi_set_sound_pan, "nn>-" }, { "pause_sound", 2, 2, bi_pause_sound, "nb>-" },
+    { "stop_sounds", 0, 1, bi_stop_sounds, "s>-" }, { "sound_length", 1, 1, bi_sound_length, "s>n" },
+    { "play_music", 1, 3, bi_play_music, "snn>-" }, { "stop_music", 0, 1, bi_stop_music, "n>-" },
+    { "music", 0, 0, bi_music, ">s" }, { "play_tone", 3, 4, bi_play_tone, "snnn>n" },
+    /* messages, scenes and globals */
+    { "broadcast", 1, 16, bi_broadcast, "sa*>i" },
+    { "push_scene", 1, 3, bi_push_scene, "sbb>-" }, { "pop_scene", 0, 0, bi_pop_scene, ">-" },
+    { "set_global", 2, 2, bi_set_global, "sa>-" }, { "global", 1, 2, bi_global, "sa>a" },
+    { "has_global", 1, 1, bi_has_global, "s>b" }, { "delete_global", 1, 1, bi_delete_global, "s>b" },
+    /* the window */
+    { "set_fullscreen", 1, 1, bi_set_fullscreen, "b>-" }, { "fullscreen", 0, 0, bi_fullscreen, ">b" },
+    { "set_window_title", 1, 1, bi_set_window_title, "s>-" }, { "show_cursor", 1, 1, bi_show_cursor, "b>-" },
+    { "screen_size", 0, 0, bi_screen_size, ">v" },
+    /* more input */
+    { "mouse_released", 0, 1, bi_mouse_released, "n>b" }, { "mouse_wheel", 0, 0, bi_mouse_wheel, ">v" },
+    { "text_typed", 0, 0, bi_text_typed, ">s" }, { "touches", 0, 0, bi_touches, ">l" },
+    { "bind", 2, 7, bi_bind, "sssssss>-" }, { "unbind", 1, 1, bi_unbind, "s>-" },
+    { "action_down", 1, 1, bi_action_down, "s>b" }, { "action_pressed", 1, 1, bi_action_pressed, "s>b" },
+    { "action_released", 1, 1, bi_action_released, "s>b" }, { "action_axis", 2, 2, bi_action_axis, "ss>i" },
+    /* physics and tilemaps */
+    { "gravity", 0, 0, bi_gravity, ">v" }, { "set_gravity", 1, 1, bi_set_gravity, "v>-" },
+    { "tile_cell", 2, 2, bi_tile_cell, "ev>v" }, { "tile_get", 3, 3, bi_tile_get, "enn>s" },
+    { "tile_put", 4, 4, bi_tile_put, "enns>b" }, { "tile_cell_center", 3, 3, bi_tile_cell_center, "enn>v" },
+    { "tile_box_solid", 3, 3, bi_tile_box_solid, "evv>b" },
+    /* odds and ends */
+    { "random_seed", 1, 1, bi_random_seed, "n>-" }, { "clipboard", 0, 0, bi_clipboard, ">s" },
+    { "set_clipboard", 1, 1, bi_set_clipboard, "s>b" }, { "fps", 0, 0, bi_fps, ">n" },
+    { "frame_count", 0, 0, bi_frame_count, ">i" }, { "log_warning", 0, 16, bi_log_warning, "a*>-" },
+    { "log_error", 0, 16, bi_log_error, "a*>-" }, { "open_url", 1, 1, bi_open_url, "s>b" },
+    { "image_size", 1, 1, bi_image_size, "s>v" },
 };
 
 static int sc_find_builtin(const char *name) {
@@ -4104,6 +4802,7 @@ static sc_runtime *sc_runtime_of(br_world *w) {
     rt->body_id = br_component_find(w, "RigidBody");
     rt->collider_id = br_component_find(w, "Collider");
     br_rng_seed(&rt->rng, 0x5C21u);
+    br_rng_seed(&rt->draw_rng, 0xD2A3u);
     if (!br_world_attach(w, &k_runtime_key, rt, sc_runtime_destroy)) { br_free(rt); return NULL; }
     return rt;
 }
@@ -4359,6 +5058,7 @@ void br_script_step(br_world *w, float dt) {
     uint32_t i, count;
     sc_value arg;
     if (!w->context || !(rt = sc_runtime_of(w)) || rt->script_id == BR_COMPONENT_INVALID) return;
+    if (g_music.mixer == &((br_engine *)w->context)->mixer) sc_music_tick(((br_engine *)w->context)->time);   /* fades */
     count = w->pools[rt->script_id].count;              /* scripts spawned now start next step */
     arg = sc_num(dt);
     for (i = 0; i < count && i < w->pools[rt->script_id].count; ++i) {
@@ -4510,6 +5210,61 @@ bool br_script_scene_request(br_world *w, char *path, size_t size) {
     snprintf(path, size, "%s", rt->scene_request);
     rt->scene_request[0] = 0;
     return true;
+}
+
+bool br_script_push_request(br_world *w, char *path, size_t size, bool *transparent, bool *update_below) {
+    sc_runtime *rt = (sc_runtime *)br_world_attached(w, &k_runtime_key);
+    if (!rt || !rt->push_request[0]) return false;
+    snprintf(path, size, "%s", rt->push_request);
+    if (transparent) *transparent = rt->push_transparent;
+    if (update_below) *update_below = rt->push_update_below;
+    rt->push_request[0] = 0;
+    return true;
+}
+
+bool br_script_pop_request(br_world *w) {
+    sc_runtime *rt = (sc_runtime *)br_world_attached(w, &k_runtime_key);
+    bool p = rt && rt->pop_request;
+    if (rt) rt->pop_request = false;
+    return p;
+}
+
+int br_script_notify(br_world *w, const char *function) {
+    sc_runtime *rt = (sc_runtime *)br_world_attached(w, &k_runtime_key);
+    br_entity *targets;
+    int count = 0, i, called = 0;
+    if (!rt || !rt->instance_count || !(targets = (br_entity *)br_alloc(sizeof(br_entity) * (size_t)rt->instance_count))) return 0;
+    for (i = 0; i < rt->instance_count; ++i) targets[count++] = rt->instances[i]->e;
+    for (i = 0; i < count; ++i) {
+        sc_instance *inst = sc_instance_of(rt, targets[i]);
+        int fn;
+        if (!inst || !inst->prog || inst->failed || !inst->started || (fn = sc_find_func(inst->prog, function)) < 0) continue;
+        sc_run(rt, inst, fn, NULL, 0, NULL);
+        ++called;
+    }
+    br_free(targets);
+    sc_collect(rt);
+    return called;
+}
+
+bool br_script_draw_layer(const br_world *w, br_entity e, int *layer) {
+    sc_runtime *rt = (sc_runtime *)br_world_attached(w, &k_runtime_key);
+    sc_instance *inst = rt ? sc_instance_of(rt, e) : NULL;
+    int g;
+    if (!inst || !inst->prog || !inst->started || inst->failed || inst->prog->callbacks[CB_DRAW] < 0) return false;
+    *layer = 0;
+    if ((g = sc_find_global(inst->prog, "draw_layer")) >= 0 && inst->globals[g].t == V_NUM) *layer = (int)floor(inst->globals[g].as.n);
+    return true;
+}
+
+void br_script_draw(br_world *w, br_entity e, br_renderer *r) {
+    sc_runtime *rt = (sc_runtime *)br_world_attached(w, &k_runtime_key);
+    sc_instance *inst = rt ? sc_instance_of(rt, e) : NULL;
+    if (!inst || !inst->prog || !inst->started || inst->failed || rt->draw_r) return;
+    rt->draw_r = r;
+    sc_callback(rt, inst, CB_DRAW, NULL, 0);
+    rt->draw_r = NULL;
+    br_set_blend(r, BR_BLEND_ALPHA);
 }
 
 bool br_script_quit_request(br_world *w) {

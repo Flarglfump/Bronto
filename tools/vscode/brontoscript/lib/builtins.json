@@ -974,48 +974,56 @@
   },
   {
    "name": "raycast",
-   "signature": "raycast(from, to, ignore)",
-   "doc": "The first solid collider on the line: [entity, point, normal], or nil.",
+   "signature": "raycast(from, to, ignore, mask = -1)",
+   "doc": "The first solid collider on the line: [entity, point, normal], or nil. mask: the collision layers to look at (bits; -1 all).",
    "params": [
     "from",
     "to",
-    "ignore"
+    "ignore",
+    "mask"
    ],
    "min": 2,
    "param_types": [
     "vec2",
     "vec2",
-    "entity | nil"
+    "entity | nil",
+    "number"
    ],
    "returns": "any"
   },
   {
    "name": "entity_at",
-   "signature": "entity_at(point)",
-   "doc": "The collider under a point, or nil.",
+   "signature": "entity_at(point, mask = -1)",
+   "doc": "The collider at a world point, or nil. mask: the collision layers to look at (bits; -1 all).",
    "params": [
-    "point"
+    "point",
+    "mask"
    ],
    "min": 1,
    "param_types": [
-    "vec2"
+    "vec2",
+    "number"
    ],
    "returns": "entity"
   },
   {
    "name": "play_sound",
-   "signature": "play_sound(path, volume = 1)",
-   "doc": "Plays a WAV file from the project.",
+   "signature": "play_sound(path, volume = 1, pitch = 1, pan = 0)",
+   "doc": "Plays a WAV file from the project on the sfx bus. pitch is the playback rate (2 = an octave up), pan -1 (left) to 1 (right). Returns the voice, for stop_sound() and the rest (0 if none was free).",
    "params": [
     "path",
-    "volume"
+    "volume",
+    "pitch",
+    "pan"
    ],
    "min": 1,
    "param_types": [
     "string",
+    "number",
+    "number",
     "number"
    ],
-   "returns": "void"
+   "returns": "number"
   },
   {
    "name": "send",
@@ -1236,6 +1244,862 @@
     "string"
    ],
    "returns": "number"
+  },
+  {
+   "name": "draw_rect",
+   "signature": "draw_rect(position, size, colour, filled = true)",
+   "doc": "Inside draw(): a rectangle, from its top-left corner. filled false draws its outline.",
+   "params": [
+    "position",
+    "size",
+    "colour",
+    "filled"
+   ],
+   "min": 3,
+   "param_types": [
+    "vec2",
+    "vec2",
+    "any",
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "draw_line",
+   "signature": "draw_line(from, to, colour)",
+   "doc": "Inside draw(): a line.",
+   "params": [
+    "from",
+    "to",
+    "colour"
+   ],
+   "min": 3,
+   "param_types": [
+    "vec2",
+    "vec2",
+    "any"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "draw_circle",
+   "signature": "draw_circle(centre, radius, colour, filled = true)",
+   "doc": "Inside draw(): a circle (filled false: its outline).",
+   "params": [
+    "centre",
+    "radius",
+    "colour",
+    "filled"
+   ],
+   "min": 3,
+   "param_types": [
+    "vec2",
+    "number",
+    "any",
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "draw_text",
+   "signature": "draw_text(text, position, colour, size = 1)",
+   "doc": "Inside draw(): text in the built-in 8x8 font, from its top-left corner.",
+   "params": [
+    "text",
+    "position",
+    "colour",
+    "size"
+   ],
+   "min": 3,
+   "param_types": [
+    "any",
+    "vec2",
+    "any",
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "draw_image",
+   "signature": "draw_image(path, centre, frame = 0, frame_size = vec2(0, 0), flip_x = false)",
+   "doc": "Inside draw(): an image (or one frame of a sprite sheet), centred on a point.",
+   "params": [
+    "path",
+    "centre",
+    "frame",
+    "frame_size",
+    "flip_x"
+   ],
+   "min": 2,
+   "param_types": [
+    "string",
+    "vec2",
+    "number",
+    "vec2",
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "text_size",
+   "signature": "text_size(text, size = 1)",
+   "doc": "How much room text takes (width, height) in the built-in font, as draw_text() and Labels draw it.",
+   "params": [
+    "text",
+    "size"
+   ],
+   "min": 1,
+   "param_types": [
+    "any",
+    "number"
+   ],
+   "returns": "vec2"
+  },
+  {
+   "name": "camera",
+   "signature": "camera()",
+   "doc": "The Camera the game draws with (the first that is current), or nil.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "entity"
+  },
+  {
+   "name": "shake_camera",
+   "signature": "shake_camera(strength, seconds)",
+   "doc": "Shakes the current camera by up to `strength` pixels, fading over `seconds`.",
+   "params": [
+    "strength",
+    "seconds"
+   ],
+   "min": 2,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "snap_camera",
+   "signature": "snap_camera()",
+   "doc": "Puts the current camera straight where it is heading (no smoothing): after moving to a new room, say.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "void"
+  },
+  {
+   "name": "screen_to_world",
+   "signature": "screen_to_world(point)",
+   "doc": "A point on the screen (game pixels) as a point in the world, through the current camera.",
+   "params": [
+    "point"
+   ],
+   "min": 1,
+   "param_types": [
+    "vec2"
+   ],
+   "returns": "vec2"
+  },
+  {
+   "name": "world_to_screen",
+   "signature": "world_to_screen(point)",
+   "doc": "A point in the world as a point on the screen (game pixels), through the current camera.",
+   "params": [
+    "point"
+   ],
+   "min": 1,
+   "param_types": [
+    "vec2"
+   ],
+   "returns": "vec2"
+  },
+  {
+   "name": "play_animation",
+   "signature": "play_animation(entity, frames, fps, loop)",
+   "doc": "Plays frames of its Sprite sheet (\"0-3\", \"4,5,6\") with an Animation component (added if needed), from the first frame unless they are playing already.",
+   "params": [
+    "entity",
+    "frames",
+    "fps",
+    "loop"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string",
+    "number",
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "stop_sound",
+   "signature": "stop_sound(voice)",
+   "doc": "Stops a sound play_sound() started (fading out over a few milliseconds).",
+   "params": [
+    "voice"
+   ],
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "sound_playing",
+   "signature": "sound_playing(voice)",
+   "doc": "Is that sound still playing?",
+   "params": [
+    "voice"
+   ],
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "set_sound_volume",
+   "signature": "set_sound_volume(voice, volume)",
+   "doc": "Changes a playing sound's volume.",
+   "params": [
+    "voice",
+    "volume"
+   ],
+   "min": 2,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "set_sound_pitch",
+   "signature": "set_sound_pitch(voice, pitch)",
+   "doc": "Changes a playing sound's pitch (its playback rate: 2 is an octave up).",
+   "params": [
+    "voice",
+    "pitch"
+   ],
+   "min": 2,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "set_sound_pan",
+   "signature": "set_sound_pan(voice, pan)",
+   "doc": "Moves a playing sound from left (-1) to right (1).",
+   "params": [
+    "voice",
+    "pan"
+   ],
+   "min": 2,
+   "param_types": [
+    "number",
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "pause_sound",
+   "signature": "pause_sound(voice, paused)",
+   "doc": "Pauses a playing sound (true) or carries it on (false).",
+   "params": [
+    "voice",
+    "paused"
+   ],
+   "min": 2,
+   "param_types": [
+    "number",
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "stop_sounds",
+   "signature": "stop_sounds(bus)",
+   "doc": "Stops every sound playing, or every one on a bus (\"sfx\", \"music\", \"ui\", \"ambient\").",
+   "params": [
+    "bus"
+   ],
+   "min": 0,
+   "param_types": [
+    "string"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "sound_length",
+   "signature": "sound_length(path)",
+   "doc": "How long a sound file is, in seconds.",
+   "params": [
+    "path"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "number"
+  },
+  {
+   "name": "play_music",
+   "signature": "play_music(path, volume = 1, fade = 0)",
+   "doc": "Loops a track on the music bus, fading in over `fade` seconds while the one before fades out. It keeps playing through load_scene(). The same track again only changes its volume.",
+   "params": [
+    "path",
+    "volume",
+    "fade"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "number",
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "stop_music",
+   "signature": "stop_music(fade = 0)",
+   "doc": "Stops the music play_music() started, fading out over `fade` seconds.",
+   "params": [
+    "fade"
+   ],
+   "min": 0,
+   "param_types": [
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "music",
+   "signature": "music()",
+   "doc": "The track play_music() is playing (\"\" for none).",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "string"
+  },
+  {
+   "name": "play_tone",
+   "signature": "play_tone(wave, frequency, seconds, volume = 0.5)",
+   "doc": "Plays a tone made on the spot - \"sine\", \"square\", \"triangle\", \"saw\" or \"noise\" - for blips with no sound file. Returns the voice.",
+   "params": [
+    "wave",
+    "frequency",
+    "seconds",
+    "volume"
+   ],
+   "min": 3,
+   "param_types": [
+    "string",
+    "number",
+    "number",
+    "number"
+   ],
+   "returns": "number"
+  },
+  {
+   "name": "broadcast",
+   "signature": "broadcast(function, args...)",
+   "doc": "Calls the function in every script of the scene that has it, and returns how many did. (C code hears it on the message bus as \"script.<function>\".)",
+   "params": [
+    "function",
+    "args"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "any"
+   ],
+   "returns": "int"
+  },
+  {
+   "name": "push_scene",
+   "signature": "push_scene(path, transparent = true, update_below = false)",
+   "doc": "Puts a scene on top of this one (a pause menu, a map). transparent: this one still shows under it; update_below: this one keeps running.",
+   "params": [
+    "path",
+    "transparent",
+    "update_below"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "bool",
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "pop_scene",
+   "signature": "pop_scene()",
+   "doc": "Takes the top scene off the stack (after this step); the one under it carries on, and its scripts' on_resume() runs.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "void"
+  },
+  {
+   "name": "set_global",
+   "signature": "set_global(name, value)",
+   "doc": "Keeps a value while the game runs, across load_scene() and push_scene(): a number, string, true/false, nil, vec2 or list of these.",
+   "params": [
+    "name",
+    "value"
+   ],
+   "min": 2,
+   "param_types": [
+    "string",
+    "any"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "global",
+   "signature": "global(name, default = nil)",
+   "doc": "A value set_global() kept, or the default.",
+   "params": [
+    "name",
+    "default"
+   ],
+   "min": 1,
+   "param_types": [
+    "string",
+    "any"
+   ],
+   "returns": "any"
+  },
+  {
+   "name": "has_global",
+   "signature": "has_global(name)",
+   "doc": "Did set_global() keep a value by that name?",
+   "params": [
+    "name"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "delete_global",
+   "signature": "delete_global(name)",
+   "doc": "Forgets a global (true if there was one).",
+   "params": [
+    "name"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "set_fullscreen",
+   "signature": "set_fullscreen(on)",
+   "doc": "Fills the screen with the game (true) or goes back to a window.",
+   "params": [
+    "on"
+   ],
+   "min": 1,
+   "param_types": [
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "fullscreen",
+   "signature": "fullscreen()",
+   "doc": "Is the game filling the screen?",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "bool"
+  },
+  {
+   "name": "set_window_title",
+   "signature": "set_window_title(text)",
+   "doc": "The window's title (the page's, on the web).",
+   "params": [
+    "text"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "show_cursor",
+   "signature": "show_cursor(on)",
+   "doc": "Shows or hides the mouse pointer over the game.",
+   "params": [
+    "on"
+   ],
+   "min": 1,
+   "param_types": [
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "screen_size",
+   "signature": "screen_size()",
+   "doc": "The game's screen, in game pixels (its width and height).",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "vec2"
+  },
+  {
+   "name": "mouse_released",
+   "signature": "mouse_released(button = 0)",
+   "doc": "Was the mouse button let go this step? 0 left, 1 right, 2 middle.",
+   "params": [
+    "button"
+   ],
+   "min": 0,
+   "param_types": [
+    "number"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "mouse_wheel",
+   "signature": "mouse_wheel()",
+   "doc": "How far the wheel turned since the last frame (+y towards the player), once a frame.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "vec2"
+  },
+  {
+   "name": "text_typed",
+   "signature": "text_typed()",
+   "doc": "The characters typed since the last frame (once a frame): for entering names.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "string"
+  },
+  {
+   "name": "touches",
+   "signature": "touches()",
+   "doc": "Where each finger on the screen is (game pixels), leaving out those on the on-screen controls.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "list"
+  },
+  {
+   "name": "bind",
+   "signature": "bind(action, input, ...)",
+   "doc": "Adds inputs to a named action (up to 6): a key's name (\"space\"), \"mouse:0\", \"pad:a\", or \"pad:left_x-\" (a stick pushed that way).",
+   "params": [
+    "action",
+    "input",
+    "input2",
+    "input3",
+    "input4",
+    "input5",
+    "input6"
+   ],
+   "min": 2,
+   "param_types": [
+    "string",
+    "string",
+    "string",
+    "string",
+    "string",
+    "string",
+    "string"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "unbind",
+   "signature": "unbind(action)",
+   "doc": "Takes every input off an action.",
+   "params": [
+    "action"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "action_down",
+   "signature": "action_down(action)",
+   "doc": "Is any of the action's inputs held?",
+   "params": [
+    "action"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "action_pressed",
+   "signature": "action_pressed(action)",
+   "doc": "Did one of the action's inputs go down this step? (Once per press, like key_pressed().)",
+   "params": [
+    "action"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "action_released",
+   "signature": "action_released(action)",
+   "doc": "Was the action let go this step?",
+   "params": [
+    "action"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "action_axis",
+   "signature": "action_axis(negative, positive)",
+   "doc": "-1, 0 or 1 from two actions (left and right, say).",
+   "params": [
+    "negative",
+    "positive"
+   ],
+   "min": 2,
+   "param_types": [
+    "string",
+    "string"
+   ],
+   "returns": "int"
+  },
+  {
+   "name": "gravity",
+   "signature": "gravity()",
+   "doc": "The physics gravity in effect (pixels / second^2).",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "vec2"
+  },
+  {
+   "name": "set_gravity",
+   "signature": "set_gravity(gravity)",
+   "doc": "Sets the PhysicsWorld's gravity (adding one to this entity if the scene has none).",
+   "params": [
+    "gravity"
+   ],
+   "min": 1,
+   "param_types": [
+    "vec2"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "tile_cell",
+   "signature": "tile_cell(map, point)",
+   "doc": "The column and row of the cell under a world point (outside the map too).",
+   "params": [
+    "map",
+    "point"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "vec2"
+   ],
+   "returns": "vec2"
+  },
+  {
+   "name": "tile_get",
+   "signature": "tile_get(map, column, row)",
+   "doc": "The character in a cell, or \"\" outside the map.",
+   "params": [
+    "map",
+    "column",
+    "row"
+   ],
+   "min": 3,
+   "param_types": [
+    "entity",
+    "number",
+    "number"
+   ],
+   "returns": "string"
+  },
+  {
+   "name": "tile_put",
+   "signature": "tile_put(map, column, row, tile)",
+   "doc": "Changes a cell (false outside the map).",
+   "params": [
+    "map",
+    "column",
+    "row",
+    "tile"
+   ],
+   "min": 4,
+   "param_types": [
+    "entity",
+    "number",
+    "number",
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "tile_cell_center",
+   "signature": "tile_cell_center(map, column, row)",
+   "doc": "The world position of the middle of a cell.",
+   "params": [
+    "map",
+    "column",
+    "row"
+   ],
+   "min": 3,
+   "param_types": [
+    "entity",
+    "number",
+    "number"
+   ],
+   "returns": "vec2"
+  },
+  {
+   "name": "tile_box_solid",
+   "signature": "tile_box_solid(map, centre, size)",
+   "doc": "Does a box (world centre, full size) overlap any of the map's solid cells? Edges only touching don't count: for walls and floors in scripted movement.",
+   "params": [
+    "map",
+    "centre",
+    "size"
+   ],
+   "min": 3,
+   "param_types": [
+    "entity",
+    "vec2",
+    "vec2"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "random_seed",
+   "signature": "random_seed(n)",
+   "doc": "Starts random() from a seed: the same seed gives the same numbers.",
+   "params": [
+    "n"
+   ],
+   "min": 1,
+   "param_types": [
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "clipboard",
+   "signature": "clipboard()",
+   "doc": "The text on the clipboard.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "string"
+  },
+  {
+   "name": "set_clipboard",
+   "signature": "set_clipboard(text)",
+   "doc": "Puts text on the clipboard.",
+   "params": [
+    "text"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "fps",
+   "signature": "fps()",
+   "doc": "Frames drawn per second, lately.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "number"
+  },
+  {
+   "name": "frame_count",
+   "signature": "frame_count()",
+   "doc": "How many frames the game has run.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "int"
+  },
+  {
+   "name": "log_warning",
+   "signature": "log_warning(value, ...)",
+   "doc": "Writes a warning to the log (and the editor's console).",
+   "params": [
+    "value"
+   ],
+   "min": 0,
+   "param_types": [
+    "any"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "log_error",
+   "signature": "log_error(value, ...)",
+   "doc": "Writes an error to the log (and the editor's console).",
+   "params": [
+    "value"
+   ],
+   "min": 0,
+   "param_types": [
+    "any"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "open_url",
+   "signature": "open_url(url)",
+   "doc": "Opens a web address in the browser (or a file in its program).",
+   "params": [
+    "url"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "image_size",
+   "signature": "image_size(path)",
+   "doc": "An image file's width and height.",
+   "params": [
+    "path"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "vec2"
   }
  ],
  "properties": [
@@ -1333,12 +2197,18 @@
    "size",
    "color",
    "outline",
-   "layer"
+   "layer",
+   "blend"
   ],
   "Sprite": [
    "image",
    "tint",
-   "layer"
+   "layer",
+   "frame_size",
+   "frame",
+   "flip_x",
+   "flip_y",
+   "blend"
   ],
   "Label": [
    "text",
@@ -1407,6 +2277,25 @@
   ],
   "Tags": [
    "list"
+  ],
+  "Animation": [
+   "frames",
+   "fps",
+   "loop",
+   "playing"
+  ],
+  "Camera": [
+   "current",
+   "zoom",
+   "follow",
+   "follow_offset",
+   "deadzone",
+   "smoothing",
+   "limit",
+   "limit_min",
+   "limit_max",
+   "ui_layer",
+   "pixel_snap"
   ]
  },
  "callbacks": [
@@ -1445,6 +2334,24 @@
    "signature": "on_trigger_exit(other: entity) -> void",
    "doc": "other left the trigger.",
    "snippet": "func on_trigger_exit(other: entity) -> void {\n\t$0\n}"
+  },
+  {
+   "name": "draw",
+   "signature": "draw() -> void",
+   "doc": "Runs when the scene is drawn: draw_rect(), draw_text() and the rest draw then, in the layer the script's `draw_layer` var names (0 without one). Only draw here: it doesn't run on every frame of a fast-forwarded replay.",
+   "snippet": "func draw() -> void {\n\t$0\n}"
+  },
+  {
+   "name": "on_pause",
+   "signature": "on_pause() -> void",
+   "doc": "Another scene was pushed over this one (push_scene).",
+   "snippet": "func on_pause() -> void {\n\t$0\n}"
+  },
+  {
+   "name": "on_resume",
+   "signature": "on_resume() -> void",
+   "doc": "This scene is the top one again (the one over it was popped).",
+   "snippet": "func on_resume() -> void {\n\t$0\n}"
   }
  ],
  "keywords": {
@@ -1687,7 +2594,16 @@
     "Script",
     "Parent",
     "Tilemap",
-    "Tags"
+    "Tags",
+    "Animation",
+    "Camera"
+   ],
+   "waves": [
+    "sine",
+    "square",
+    "triangle",
+    "saw",
+    "noise"
    ]
   },
   "args": {
@@ -1737,6 +2653,21 @@
     "0": ".scene"
    },
    "load_scene": {
+    "0": ".scene"
+   },
+   "play_music": {
+    "0": ".wav"
+   },
+   "play_tone": {
+    "0": "waves"
+   },
+   "stop_sounds": {
+    "0": "buses"
+   },
+   "sound_length": {
+    "0": ".wav"
+   },
+   "push_scene": {
     "0": ".scene"
    }
   }

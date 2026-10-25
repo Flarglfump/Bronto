@@ -39,7 +39,10 @@
  *
  * Callbacks the engine calls when a script defines them: start(),
  * update(dt) every fixed step, on_collision(other, normal, speed),
- * on_collision_end(other), on_trigger(other), on_trigger_exit(other).
+ * on_collision_end(other), on_trigger(other), on_trigger_exit(other),
+ * draw() when the scene is drawn (in the layer named by the script's
+ * `draw_layer` variable), and on_pause() / on_resume() when another scene
+ * is pushed over this one and when it is the top scene again.
  *
  * The "builtin_scripts" system runs before physics in the fixed update,
  * and "builtin_script_events" after it, delivering the contacts.
@@ -54,6 +57,7 @@
 #define BRONTO_SCRIPT_H
 
 #include "ecs.h"
+#include "render.h"
 
 typedef struct br_script {
     char file[96];
@@ -113,6 +117,32 @@ void br_script_set_strict(bool strict);
  * request is returned once. */
 bool br_script_scene_request(br_world *w, char *path, size_t size);
 bool br_script_quit_request(br_world *w);
+/* push_scene(path, transparent, update_below) and pop_scene(): for the game
+ * (bronto_player, the editor's Play) to act on, like load_scene. */
+bool br_script_push_request(br_world *w, char *path, size_t size, bool *transparent, bool *update_below);
+bool br_script_pop_request(br_world *w);
+/* Calls a function with no arguments (such as "on_pause" or "on_resume") in
+ * every script of the world that has it. Returns how many did. */
+int br_script_notify(br_world *w, const char *function);
+
+/* ---- drawing from scripts --------------------------------------------------
+ * A script with a draw() function is drawn among the scene's sprites, in the
+ * layer its `draw_layer` variable gives (0 without one). br_builtin_draw asks
+ * these for each Script; draw() runs with `r` as the target of draw_rect(),
+ * draw_text() and the rest. */
+bool br_script_draw_layer(const br_world *w, br_entity e, int *layer);
+void br_script_draw(br_world *w, br_entity e, br_renderer *r);
+
+/* ---- state that outlives a scene -------------------------------------------
+ * set_global() / global() in scripts keep values (as text) while the game
+ * runs, across load_scene and push_scene. play_music() keeps playing too.
+ * br_script_reset_session() forgets the globals and stops the music and the
+ * tones play_tone() made (the editor does this when Play starts and stops);
+ * br_script_release() also frees them (the engine's shutdown does this). */
+void br_script_reset_session(void);
+void br_script_release(void);
+/* The music play_music() is playing ("" for none). */
+const char *br_script_music(void);
 bool br_script_strict(void);
 
 /* The most recent script error ("player.bs:12: unknown function 'jmup'"),

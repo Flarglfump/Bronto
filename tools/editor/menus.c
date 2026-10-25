@@ -270,6 +270,24 @@ static void view_menu(editor *ed) {
         if (e != BR_ENTITY_NULL) snprintf(((br_label *)br_add(&d->world, e, d->ids.label, NULL))->text, sizeof(((br_label *)0)->text), "Text");
         ed_status(ed, "Added a label");
     }
+    if (item(ed, "New Camera Here", NULL, edit)) {      /* the game shows what it sees (components.h) */
+        br_entity e = new_entity_at(ed, "Camera", at, false);
+        if (e != BR_ENTITY_NULL) {
+            br_camera *c = (br_camera *)br_add(&d->world, e, d->ids.camera, NULL);
+            c->limit_max = ed->view.game_size;                  /* limits a screen's worth, to start with */
+            c->current = br_camera_current(&d->world) == e;     /* the first is the one used */
+        }
+        ed_status(ed, "Added a camera: set Camera.follow to the player, and its limits to the level");
+    }
+    if (item(ed, "New Animated Sprite Here", NULL, edit)) {
+        br_entity e = new_entity_at(ed, "Sprite", at, false);
+        if (e != BR_ENTITY_NULL) {
+            br_sprite *sp = (br_sprite *)br_add(&d->world, e, d->ids.sprite, NULL);
+            sp->frame_size = br_v2(16, 16);
+            br_add(&d->world, e, d->ids.animation, NULL);
+        }
+        ed_status(ed, "Added an animated sprite: drop a sprite sheet on Sprite.image, set frame_size and Animation.frames");
+    }
     if (item(ed, "Paste Here", "Ctrl+V", edit && ed->clipboard)) ed_cmd_paste(ed, &at, BR_ENTITY_NULL);
     sep(ed);
     if (item(ed, "Frame Selection", "F", br_entity_alive(&d->world, d->selected))) ed_cmd_frame(ed);
