@@ -482,7 +482,7 @@ networking and golden-image tests practical. Two rules keep it that way:
 
 ## Roadmap
 
-1. PNG decoder, sprite sheets and animation (tilemaps are in)
+1. PNG decoder (tilemaps, sprite sheets, Animation and Camera are in)
 2. Joints, one-way platforms and continuous collision for fast bodies; a script debugger
 3. Editor: multi-select, copy/paste between scenes, nested prefabs that update, game-specific components
 4. Web: a smaller page (compressing the pack)
