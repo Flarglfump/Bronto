@@ -165,9 +165,29 @@ numbered 0 to 3; without a pad number, these look at every pad.
 - `last_button()` gives the name of a button pressed this step (`""` if none), as
   `button_down()` takes it, for letting players choose their own buttons.
 - `rumble(strength, seconds[, pad])` shakes the pad (0 to 1; 0 stops it).
-- `last_input()` says what the player touched last: `"keyboard"`, `"mouse"` or
-  `"gamepad"` (`""` before anything). It carries over from scene to scene, so a prompt can
-  name the right button straight away.
+- `last_input()` says what the player touched last: `"keyboard"`, `"mouse"`,
+  `"gamepad"` or `"touch"` (`""` before anything). It carries over from scene to scene, so a
+  prompt can name the right button straight away.
+
+**Touch screens:** for playing on a phone or tablet (a game built for the web), list the
+on-screen controls in the project's settings: `touch_controls = stick, a, b, start` in
+`project.bronto` (**Build > Project Settings > Touch controls** in the editor). They show
+up when the screen is first touched, and they are a gamepad as far as scripts can tell: the
+stick is `stick()`, the A button `button_pressed("a")`, and so on, so a game that can be
+played with a gamepad needs nothing more. Each control can press a key instead, with a
+label of its own: `stick=arrows, a=space:JUMP`. The controls sit in the black bars around
+the game where there is room (on a screen taller than wide, the game moves to the top and
+they go below it); a tap that misses them is the left mouse button. While they are in use,
+`last_input()` is `"touch"`; a key or a real gamepad hides them again.
+- `touch_controls_shown()`: are they on screen?
+- `show_touch_controls(on)`: hide them for now (`false`: a cutscene, a menu taken with
+  taps), or show them again.
+- `set_touch_controls(list)`: different controls from now on (`""` removes them).
+- The controls: `stick` (the left stick), the buttons by their names above (`a b x y`,
+  `lb rb lt rt`, `back start`, `up down left right` as a d-pad); after `=` a key
+  (`space`, `z`, `enter`; for the stick `arrows` or `wasd`), after `:` a label of up to six
+  characters. `bronto_player --touch <project>` tries them on a desktop, with the mouse as a
+  finger.
 
 Every press is seen once: `key_pressed()`, `button_pressed()` and the rest are true in
 exactly one step of `update()`, even when the game runs two steps in one frame (or none).

@@ -9,7 +9,7 @@ and the math and render APIs are designed so that 3D can be added later.
 
 Status (v0.1):
 - **Done:** the core systems; native windows, sound output and gamepads on Windows,
-  macOS and Linux; web builds (WebAssembly, with no Emscripten); two sample games, Snake
+  macOS and Linux; web builds (WebAssembly, with no Emscripten), playable on phones and tablets with on-screen touch controls; two sample games, Snake
   and Pop Defense; a visual scene editor; and recording and replaying runs frame for
   frame, with a bot that plays Pantry Quest through.
 - **Next:** see the roadmap below.
@@ -297,7 +297,7 @@ br_save_exists("slot1.sav");  br_save_delete("slot1.sav");  br_save_list(&files)
 | Windows | Win32 + GDI, per-monitor DPI aware | waveOut (winmm, loaded at run time) | XInput, with rumble | Links user32 + gdi32 | Compiles and links against mingw-w64 headers |
 | macOS | Cocoa from plain C through the Objective-C runtime, presented with Core Animation | Core Audio (AudioQueue) | GameController framework (Xbox, PlayStation, Switch Pro, MFi); no rumble yet | `-framework Cocoa -framework QuartzCore -framework AudioToolbox -framework GameController` | Compiles and links for arm64 and x86_64 against the macOS 14.5 SDK; constants, key codes and GameController selectors checked against the SDK |
 | Any | Headless | Captured in memory | Simulated (`br_headless_set_gamepad`) | Built in | Unit tests and CI |
-| Web | `<canvas>` (WebAssembly, built with plain clang, with Bronto's own small C library) | WebAudio | Gamepad API, with rumble where the browser has it | `make web` / `build.bat web`: clang `--target=wasm32` and wasm-ld; no Emscripten ([docs/web.md](docs/web.md)) | The whole test suite runs as WebAssembly in Node; the C library's output is compared with glibc's; the examples give picture- and sample-identical results to the desktop builds; the pages are played in Chromium with keyboard, mouse and gamepad |
+| Web | `<canvas>` (WebAssembly, built with plain clang, with Bronto's own small C library) | WebAudio | Gamepad API, with rumble where the browser has it; on phones and tablets, on-screen touch controls that act as a gamepad | `make web` / `build.bat web`: clang `--target=wasm32` and wasm-ld; no Emscripten ([docs/web.md](docs/web.md)) | The whole test suite runs as WebAssembly in Node; the C library's output is compared with glibc's; the examples give picture- and sample-identical results to the desktop builds; the pages are played in Chromium with keyboard, mouse and gamepad, and on emulated phones and tablets with touch |
 
 On Windows, games built as above are console-subsystem programs, so log output shows up
 in a console window. Link with `-mwindows` (or `/SUBSYSTEM:WINDOWS`) to hide it.
@@ -368,11 +368,12 @@ docs/replay.md       recording and replaying runs, and the Pantry Quest bot
 | Memory | `memory.h` | Tracked heap (`br_alloc`, leak stats, pluggable allocator), linear arena, fixed-size pool, file helpers |
 | Math | `bmath.h` | vec2/3/4, column-major mat4 (ortho, perspective, look-at, inverse), quaternions, rects, deterministic RNG |
 | Events | `event.h` | FIFO queue plus pub/sub bus. Handlers run by priority and can consume an event to stop it. Custom message types are registered at runtime and carry up to 48 bytes of payload |
-| Input | `input.h` | Keyboard, mouse, text and 4 gamepads, built purely from events. Pressed/released edges are frame-accurate. Named actions bind to keys, buttons and stick directions. Gamepad snapshot diffing is shared by all backends; rumble goes through `br_gamepad_rumble`. Fixed-step code sees each press exactly once (however many fixed steps a frame runs), and `last_device` says whether a key, the mouse or a gamepad was touched last. With Steam Input on Linux, Valve's own controllers are left to Steam's virtual pad, so presses aren't counted twice |
+| Input | `input.h` | Keyboard, mouse, text and 4 gamepads, built purely from events. Pressed/released edges are frame-accurate. Named actions bind to keys, buttons and stick directions. Gamepad snapshot diffing is shared by all backends; rumble goes through `br_gamepad_rumble`. Fixed-step code sees each press exactly once (however many fixed steps a frame runs), and `last_device` says whether a key, the mouse, a gamepad or the touch screen was used last. Multi-touch events, with the touches down kept for each frame. With Steam Input on Linux, Valve's own controllers are left to Steam's virtual pad, so presses aren't counted twice |
 | ECS | `ecs.h` | Sparse-set storage with generation-checked entity handles. Components are registered at runtime. Queries take include and exclude lists. Supports deferred destruction, add/remove hooks, and systems ordered within 4 phases |
 | Scenes | `scene.h` | Scene stack where each scene has its own ECS world. `transparent` and `update_below` flags handle overlays and modals. Push/pop/switch requests are deferred to a safe point |
 | Render | `render.h` | Software rasterizer: shapes, triangles (including per-vertex colour; rasterised in fixed point so shared edges have no cracks or double pixels), affine sprites, 4 blend modes, 2D camera, 8x8 font, BMP/TGA |
 | Audio | `audio.h` | 32-voice mixer with volume, pan, pitch, looping, ramps, buses and resampling; WAV loader; tone generator; lock-free ring for audio threads |
+| Touch controls | `touch.h` | On-screen controls for phones and tablets: a stick and buttons, laid out in the bars around the game (or below it, held upright), drawn over the window at its own resolution. They act as a virtual gamepad (or press keys), show when the screen is touched, and pass other taps on as the mouse. `touch_controls` in a project's settings |
 | Window | `window.h` | Viewport and scale modes, mouse mapping, window state and control, the app icon (`br_window_set_icon`: window, taskbar and Dock), and the system clipboard (`br_clipboard_set` / `br_clipboard_get`: Win32 `CF_UNICODETEXT`, macOS `NSPasteboard`, X11 `CLIPBOARD` selection; a private one in headless and web builds) |
 | Platform | `platform.h` | Table of function pointers that each OS backend implements |
 | Scene files | `serialize.h` | Saves and loads worlds as readable text. Every *described* component (a list of its fields with names and types, `ecs.h`) is saved field by field. Loading skips unknown components and fields with a warning, and is all-or-nothing on errors |
@@ -479,5 +480,5 @@ networking and golden-image tests practical. Two rules keep it that way:
 1. PNG decoder, sprite sheets and animation (tilemaps are in)
 2. Joints, one-way platforms and continuous collision for fast bodies; a script debugger
 3. Editor: multi-select, copy/paste between scenes, nested prefabs that update, game-specific components
-4. Web: touch controls beyond the mouse, and a smaller page (compressing the pack)
+4. Web: a smaller page (compressing the pack)
 5. 3D path: depth buffer and perspective-correct triangles on the existing mat4/quat math

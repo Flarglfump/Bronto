@@ -120,7 +120,13 @@ function fakeBrowser() {
         removeEventListener: (type, fn) => { const l = listeners[name + ':' + type] || []; const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1); },
     });
     const frames = [];
-    const ctx2d = () => ({ putImageData: (img) => frames.push(img), drawImage() {}, fillRect() {}, set fillStyle(v) {}, set imageSmoothingEnabled(v) {} });
+    const drawn = [];                                     /* (shapes and text drawn over the frame: the touch controls) */
+    const ctx2d = () => ({
+        putImageData: (img) => frames.push(img), drawImage() {}, fillRect() {}, set fillStyle(v) {}, set imageSmoothingEnabled(v) {},
+        save() {}, restore() {}, beginPath() {}, moveTo() {}, arcTo() {}, closePath() {}, fill() {}, stroke() {},
+        arc: (x, y, r) => drawn.push({ arc: [x, y, r] }), fillText: (text, x, y) => drawn.push({ text, x, y }),
+        set strokeStyle(v) {}, set lineWidth(v) {}, set font(v) {}, set textAlign(v) {}, set textBaseline(v) {},
+    });
     const canvas = Object.assign(target('canvas'), {
         width: 0, height: 0, style: {},
         getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }),
@@ -136,7 +142,7 @@ function fakeBrowser() {
     global.document = doc;
     global.window = win;
     const fire = (name, type, event) => (listeners[name + ':' + type] || []).forEach((fn) => fn(Object.assign({ preventDefault() {} }, event)));
-    return { canvas, doc, win, frames, fire, listeners };
+    return { canvas, doc, win, frames, fire, listeners, drawn };
 }
 
 test('in a browser, a game starts, draws, takes keys and ends', async () => {
@@ -173,6 +179,43 @@ test('in a browser, a game starts, draws, takes keys and ends', async () => {
         await step(3);
         assert.strictEqual(await game.exited, 0);
         assert.ok(!b.listeners['window:keydown'] || b.listeners['window:keydown'].length === 0, 'it stops listening');
+    } finally {
+        delete global.document; delete global.window; delete global.ImageData;
+    }
+});
+
+test('on a touch screen, the controls appear, and fingers work them', async () => {
+    const b = fakeBrowser();
+    const queue = [];
+    const html = fs.readFileSync(path.join(web, 'pantryquest', 'index.html'), 'utf8');
+    try {
+        const game = await Bronto.start({
+            wasm: pagePayload(html, 'bronto-wasm'), canvas: b.canvas,
+            files: [{ path: 'game.brpak', data: pagePayload(html, 'bronto-pack') }],
+            requestFrame: (f) => queue.push(f), print: () => {},
+        });
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const step = async (n) => { for (let i = 0; i < n && queue.length; i++) { await sleep(18); queue.shift()(); } };
+        const finger = (type, id, x, y) => b.fire('canvas', type, { pointerType: 'touch', pointerId: id, clientX: x, clientY: y, button: 0 });
+        assert.strictEqual(b.canvas.style.touchAction, 'none', 'the page doesn\'t scroll or zoom under a finger');
+        await step(5);
+        assert.strictEqual(b.drawn.length, 0, 'no controls before the screen is touched');
+        finger('pointerdown', 11, 320, 20);
+        finger('pointerup', 11, 320, 20);
+        await step(3);
+        const labels = b.drawn.filter((d) => d.text).map((d) => d.text);
+        for (const l of ['A', 'B', 'X', 'Y', 'LB', 'RB', 'BACK', 'START']) assert.ok(labels.includes(l), 'the ' + l + ' button is drawn');
+        assert.ok(b.drawn.some((d) => d.arc), 'circles are drawn');
+        const a = b.drawn.filter((d) => d.text === 'A').pop();
+        assert.ok(a.x > 640 * 2 * 0.75 && a.y > 360 * 2 * 0.6, 'A is at the bottom right (in canvas pixels)');
+        finger('pointerdown', 12, a.x / 2, a.y / 2);         /* (the stand-in canvas is 640 x 360 points, 2 pixels each) */
+        await step(2);
+        finger('pointerup', 12, a.x / 2, a.y / 2);
+        b.fire('canvas', 'pointercancel', { pointerType: 'touch', pointerId: 13, clientX: 0, clientY: 0 });   /* (an unknown finger: nothing) */
+        await step(2);
+        game.stop();
+        await step(3);
+        assert.strictEqual(await game.exited, 0);
     } finally {
         delete global.document; delete global.window; delete global.ImageData;
     }

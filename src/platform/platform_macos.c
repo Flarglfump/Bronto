@@ -766,7 +766,8 @@ static const br_platform k_macos = {
     mac_set_fullscreen, mac_set_cursor_visible, mac_set_icon, mac_pick_folder, mac_open_path, mac_launch,
     mac_clipboard_set, mac_clipboard_get,
     mac_set_gamepad_rumble,
-    NULL
+    NULL,
+    NULL                                          /* present_overlay: the engine draws into the framebuffer */
 };
 
 const br_platform *br_platform_native(void) { return &k_macos; }

@@ -7,7 +7,8 @@
 # Gamepads: the left stick and the d-pad always move (and choose in menus), A
 # is always OK and B always back in menus. Whichever Pip was last played with
 # - keys or a gamepad - is what the menus' hints name (the engine keeps track:
-# last_input()).
+# last_input()). On a touch screen the on-screen controls are a gamepad too
+# (project.bronto's touch_controls), with the same buttons: A, B, the stick...
 
 var actions: list[string] = ["up", "down", "left", "right", "spoon", "item", "pantry", "pause", "quicksave", "map", "item_next", "item_prev"]
 var names: list[string] = ["UP", "DOWN", "LEFT", "RIGHT", "SPOON", "ITEM (B)", "POCKET PANTRY", "PAUSE", "QUICK SAVE", "MAP",
@@ -138,7 +139,7 @@ func nav(dir: string) -> bool {
 # The other page (the Pocket Pantry's tabs): Tab, or a shoulder button.
 func page() -> bool { return key_pressed("tab") or button_pressed("lb") or button_pressed("rb") }
 
-func pad_now() -> bool { return last_input() == "gamepad" }
+func pad_now() -> bool { return last_input() == "gamepad" or last_input() == "touch" }   # (the touch controls are a pad's buttons)
 
 # What the menus' hints call a control - the keys' or the gamepad's, whichever was used last.
 func label_of(action: string) -> string {

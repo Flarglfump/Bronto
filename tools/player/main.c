@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
     const char *arg = NULL, *shot = NULL, *replay = NULL;
     char save_name[160];
     int segment = 1;
-    bool headless = false, frames_given = false;
+    bool headless = false, frames_given = false, touch = false;
     long frames = 120;
     int i, rc = 0;
     for (i = 1; i < argc; ++i) {
@@ -138,6 +138,7 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) shot = argv[++i];
         else if (strcmp(argv[i], "--replay") == 0 && i + 1 < argc) replay = argv[++i];
         else if (strcmp(argv[i], "--segment") == 0 && i + 1 < argc) segment = atoi(argv[++i]);
+        else if (strcmp(argv[i], "--touch") == 0) touch = true;
         else if (argv[i][0] == '-' && argv[i][1] == 'p' && strncmp(argv[i], "-psn_", 5) == 0) { /* macOS Finder's process id: ignore */ }
         else arg = argv[i];
     }
@@ -145,7 +146,7 @@ int main(int argc, char **argv) {
     if (!find_game(arg)) {
         fprintf(stderr,
                 "bronto_player: no game to play.\n"
-                "  bronto_player <project folder> | <file.scene> | <game.brpak> [--headless [--frames N] [--screenshot f.bmp]]\n"
+                "  bronto_player <project folder> | <file.scene> | <game.brpak> [--touch] [--headless [--frames N] [--screenshot f.bmp]]\n"
                 "  bronto_player <game> --replay run.brec [--segment N] [--headless]\n"
                 "Games built by the editor (Build menu) have their project packed in and need no arguments.\n");
         return 1;
@@ -159,6 +160,8 @@ int main(int argc, char **argv) {
     cfg.window_scale = g_project.window_scale;
     cfg.initial_scene = &k_game;
     cfg.on_init = on_init;
+    cfg.touch_controls = replay ? NULL : g_project.touch_controls;   /* (a replay is keys only) */
+    cfg.touch_mouse = touch && !replay;                               /* --touch: try them with the mouse */
     if (headless) { cfg.platform = br_platform_headless(); cfg.audio_sample_rate = 0; }
     if (replay) {
         /* Its own saved data, starting empty, as the recorded run's did. */

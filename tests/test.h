@@ -63,6 +63,7 @@ void suite_window(void);
 void suite_snake(void);
 void suite_audio_ring(void);
 void suite_gamepad(void);
+void suite_touch(void);
 void suite_towerdefense(void);
 void suite_serialize(void);
 void suite_components(void);

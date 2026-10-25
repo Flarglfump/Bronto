@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
     printf("[memory]\n"); suite_memory(); suite_fs();
     printf("[math]\n");   suite_math();
     printf("[events]\n"); suite_events();
-    printf("[input]\n");  suite_input(); suite_gamepad();
+    printf("[input]\n");  suite_input(); suite_gamepad(); suite_touch();
     printf("[ecs]\n");    suite_ecs(); suite_serialize(); suite_components();
     printf("[hierarchy]\n"); suite_hierarchy();
     printf("[physics]\n"); suite_physics();

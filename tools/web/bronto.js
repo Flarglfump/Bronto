@@ -213,6 +213,41 @@ async function start(opts) {
             ctx.drawImage(off, vx, vy, vw, vh);
             if (opts.onFrame) opts.onFrame();
         },
+        /* The on-screen touch controls, over the frame just drawn: br_overlay_item[n] (platform.h), 40 bytes each. */
+        overlay(p, n) {
+            if (!ctx) return;
+            const dv = new DataView(memory.buffer), rgba = (v) => `rgba(${v >>> 24},${(v >>> 16) & 255},${(v >>> 8) & 255},${(v & 255) / 255})`;
+            ctx.save();
+            for (let i = 0; i < n; ++i) {
+                const a = p + 40 * i, kind = dv.getInt32(a, true), x = dv.getFloat32(a + 4, true), y = dv.getFloat32(a + 8, true);
+                const w = dv.getFloat32(a + 12, true), h = dv.getFloat32(a + 16, true);
+                const fill = dv.getUint32(a + 20, true), line = dv.getUint32(a + 24, true), lw = dv.getFloat32(a + 28, true);
+                if (kind === 3) {                                    /* text */
+                    let text = '';
+                    for (let k = 0; k < 8; ++k) { const c = dv.getUint8(a + 32 + k); if (!c) break; text += String.fromCharCode(c); }
+                    ctx.font = `bold ${Math.max(1, Math.round(h))}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = rgba(fill);
+                    ctx.fillText(text, x, y + h * 0.04);
+                    continue;
+                }
+                ctx.beginPath();
+                if (kind === 1) ctx.arc(x, y, w / 2, 0, Math.PI * 2);
+                else {                                               /* a pill: a rectangle with round ends */
+                    const r = Math.min(w, h) / 2, l = x - w / 2, t = y - h / 2;
+                    ctx.moveTo(l + r, t);
+                    ctx.arcTo(l + w, t, l + w, t + h, r);
+                    ctx.arcTo(l + w, t + h, l, t + h, r);
+                    ctx.arcTo(l, t + h, l, t, r);
+                    ctx.arcTo(l, t, l + w, t, r);
+                    ctx.closePath();
+                }
+                if (fill & 255) { ctx.fillStyle = rgba(fill); ctx.fill(); }
+                if (line & 255) { ctx.strokeStyle = rgba(line); ctx.lineWidth = lw; ctx.stroke(); }
+            }
+            ctx.restore();
+        },
         set_title(p) { if (doc && opts.setTitle !== false) doc.title = cstr(p); },
         set_size(w, h) { sizeWanted = [w, h]; if (opts.onSize) opts.onSize(w, h); },
         set_fullscreen(on) {
@@ -392,23 +427,49 @@ async function start(opts) {
         });
         on(win, 'focus', () => call(exports.bronto_web_focus, 1));
         const BUTTONS = [0, 2, 1, 3, 4];               /* DOM button -> br_mouse_button */
-        on(canvas, 'pointermove', (e) => { const [x, y] = canvasPoint(e); call(exports.bronto_web_mouse_move, x, y); });
+        /* Fingers (and pens) are touches: the engine's on-screen controls take
+         * them, or turn them into the mouse. The page mustn't scroll or zoom. */
+        const fingers = new Set();
+        const isTouch = (e) => e.pointerType === 'touch' || e.pointerType === 'pen';
+        canvas.style.touchAction = 'none';
+        canvas.style.webkitUserSelect = canvas.style.userSelect = 'none';
+        canvas.style.webkitTouchCallout = 'none';
+        const touchEnd = (e) => {
+            if (!fingers.delete(e.pointerId)) return;
+            const [x, y] = canvasPoint(e);
+            call(exports.bronto_web_touch, 2, e.pointerId, x, y);
+            e.preventDefault();
+        };
+        on(canvas, 'pointermove', (e) => {
+            const [x, y] = canvasPoint(e);
+            if (isTouch(e)) { if (fingers.has(e.pointerId)) call(exports.bronto_web_touch, 1, e.pointerId, x, y); e.preventDefault(); return; }
+            call(exports.bronto_web_mouse_move, x, y);
+        });
         on(canvas, 'pointerdown', (e) => {
             resumeAudio();
             canvas.focus && canvas.focus();
             if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } }
             const [x, y] = canvasPoint(e);
-            call(exports.bronto_web_mouse_move, x, y);
-            if (BUTTONS[e.button] !== undefined) call(exports.bronto_web_mouse_button, BUTTONS[e.button], 1, x, y);
+            if (isTouch(e)) {
+                fingers.add(e.pointerId);
+                call(exports.bronto_web_touch, 0, e.pointerId, x, y);
+            } else {
+                call(exports.bronto_web_mouse_move, x, y);
+                if (BUTTONS[e.button] !== undefined) call(exports.bronto_web_mouse_button, BUTTONS[e.button], 1, x, y);
+            }
             e.preventDefault();
         });
         on(canvas, 'pointerup', (e) => {
+            if (isTouch(e)) { touchEnd(e); return; }
             const [x, y] = canvasPoint(e);
             if (BUTTONS[e.button] !== undefined) call(exports.bronto_web_mouse_button, BUTTONS[e.button], 0, x, y);
             e.preventDefault();
         });
-        on(canvas, 'pointerenter', () => call(exports.bronto_web_mouse_inside, 1));
-        on(canvas, 'pointerleave', () => call(exports.bronto_web_mouse_inside, 0));
+        on(canvas, 'pointercancel', (e) => { if (isTouch(e)) touchEnd(e); });
+        on(canvas, 'touchstart', (e) => e.preventDefault(), { passive: false });    /* (no double-tap zoom, no long-press menu) */
+        on(canvas, 'touchmove', (e) => e.preventDefault(), { passive: false });
+        on(canvas, 'pointerenter', (e) => { if (!isTouch(e)) call(exports.bronto_web_mouse_inside, 1); });
+        on(canvas, 'pointerleave', (e) => { if (!isTouch(e)) call(exports.bronto_web_mouse_inside, 0); });
         on(canvas, 'contextmenu', (e) => e.preventDefault());
         on(canvas, 'wheel', (e) => {
             const scale = e.deltaMode === 0 ? 1 / 100 : e.deltaMode === 1 ? 1 / 3 : 1;

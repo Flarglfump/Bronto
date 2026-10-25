@@ -42,6 +42,18 @@ typedef struct br_platform_config {
 
 typedef bool (*br_frame_fn)(void *user);   /* return false to stop the loop */
 
+/* Shapes drawn over the whole window, game and black bars alike, after the
+ * frame is presented: the on-screen touch controls (touch.h). Window pixels. */
+typedef enum br_overlay_kind { BR_OVERLAY_CIRCLE = 1, BR_OVERLAY_PILL, BR_OVERLAY_TEXT } br_overlay_kind;
+typedef struct br_overlay_item {
+    int32_t kind;
+    float x, y;               /* the centre */
+    float w, h;               /* circle: w = diameter; pill: its size; text: h = its height */
+    uint32_t fill, line;      /* 0xRRGGBBAA; alpha 0 = none */
+    float line_width;
+    char text[8];
+} br_overlay_item;
+
 typedef struct br_platform {
     const char *name;
     bool   (*init)(const br_platform_config *cfg);
@@ -98,6 +110,11 @@ typedef struct br_platform {
      * return itself (the web: main() ends, the browser calls for frames).
      * NULL means the engine runs a plain while-loop. */
     void   (*run_loop)(br_frame_fn frame, void *user);
+
+    /* Optional: draw `items` over the window just presented (crisp, at the
+     * window's resolution, in the bars around the game too). NULL: the engine
+     * draws them into the framebuffer instead, over the game. */
+    void   (*present_overlay)(const br_overlay_item *items, int count);
 } br_platform;
 
 const br_platform *br_platform_headless(void);

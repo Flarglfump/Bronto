@@ -654,7 +654,7 @@
   {
    "name": "last_input",
    "signature": "last_input()",
-   "doc": "What the player touched last: \"keyboard\", \"mouse\" or \"gamepad\" (\"\" before anything), kept from scene to scene: for showing a key's name or a button's in prompts.",
+   "doc": "What the player touched last: \"keyboard\", \"mouse\", \"gamepad\" or \"touch\" (the touch screen and its on-screen controls; \"\" before anything), kept from scene to scene: for showing a key's name or a button's in prompts.",
    "params": [],
    "min": 0,
    "param_types": [],
@@ -676,6 +676,41 @@
     "number"
    ],
    "returns": "bool"
+  },
+  {
+   "name": "touch_controls_shown",
+   "signature": "touch_controls_shown()",
+   "doc": "Whether the on-screen touch controls are showing (they appear once the screen is touched; the project's touch_controls setting lists them).",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "bool"
+  },
+  {
+   "name": "show_touch_controls",
+   "signature": "show_touch_controls(on)",
+   "doc": "Hides the on-screen touch controls for now (false: a cutscene, a menu taken with taps), or shows them again (true).",
+   "params": [
+    "on"
+   ],
+   "min": 1,
+   "param_types": [
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "set_touch_controls",
+   "signature": "set_touch_controls(list)",
+   "doc": "Changes the on-screen touch controls: \"stick, a, b, start\", or with keys and labels \"stick=arrows, a=space:JUMP\" (\"\" removes them).",
+   "params": [
+    "list"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "void"
   },
   {
    "name": "time",

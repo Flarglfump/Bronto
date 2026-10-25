@@ -44,6 +44,7 @@
 #include "core/script.c"
 #include "core/audio.c"
 #include "core/window.c"
+#include "core/touch.c"
 #include "core/engine.c"
 #include "core/replay.c"
 #include "platform/platform_headless.c"

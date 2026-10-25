@@ -773,7 +773,8 @@ static const br_platform k_win32 = {
     w32_set_fullscreen, w32_set_cursor_visible, w32_set_icon, w32_pick_folder, w32_open_path, w32_launch,
     w32_clipboard_set, w32_clipboard_get,
     w32_set_gamepad_rumble,
-    NULL
+    NULL,
+    NULL                                          /* present_overlay: the engine draws into the framebuffer */
 };
 
 const br_platform *br_platform_native(void) { return &k_win32; }

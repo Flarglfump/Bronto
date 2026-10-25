@@ -912,7 +912,8 @@ static const br_platform k_x11 = {
     x11_set_fullscreen, x11_set_cursor_visible, x11_set_icon, du_pick_folder, du_open_path, du_launch,
     x11_clipboard_set, x11_clipboard_get,
     x11_set_gamepad_rumble,
-    NULL
+    NULL,
+    NULL                                          /* present_overlay: the engine draws into the framebuffer */
 };
 
 const br_platform *br_platform_native(void) { return &k_x11; }

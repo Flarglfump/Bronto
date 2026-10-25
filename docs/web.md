@@ -94,7 +94,7 @@ Makefile's `$(WEB)/%.wasm` rule shows the flags. Then make its page with
 |---|---|
 | Picture | The framebuffer is drawn into a `<canvas>` that fills the page (or the frame it's embedded in), with the window's scale modes and HiDPI as on the desktop. |
 | Keyboard, mouse, wheel | As on the desktop, with the same key codes. The browser keeps a few of its own shortcuts (F5, F11, F12, Ctrl+R, Ctrl+W...). |
-| Touch | Touches arrive as the left mouse button. |
+| Touch | Real multi-touch (`BR_EVENT_TOUCH_*`). A project's `touch_controls` (see below) puts an on-screen stick and buttons in the bars around the game; a touch that misses them is the left mouse button. The page doesn't scroll, zoom or pop up menus under a finger. |
 | Gamepads | Through the browser's Gamepad API, in the usual Xbox-style layout, with rumble where the browser supports it. |
 | Sound | WebAudio. Browsers only start sound after a click or key press, which is why the page opens with a **Play** button. |
 | Saved files | Saved data (`save.h`, and `save_data` in scripts) and any other files the game writes are kept in the browser's local storage for that page, and are there on the next visit. Saved data lives in `/saves/<game>`. The game's own files come from its pack and are read-only. |
@@ -107,6 +107,41 @@ Makefile's `$(WEB)/%.wasm` rule shows the flags. Then make its page with
 Runs are as deterministic as on the desktop. `make web-test` plays the examples headless
 as WebAssembly and checks that every picture and every sound sample matches the desktop
 build exactly.
+
+## Phones and tablets
+
+A game made in the editor can be played on a phone or tablet, in its browser, with
+on-screen controls. List them in **Build > Project Settings > Touch controls**
+(`touch_controls` in `project.bronto`):
+
+```
+touch_controls = stick, a, b, x, y, lb, rb, back, start
+```
+
+- **They are a gamepad.** The stick is the left stick and the buttons are the gamepad's
+  buttons, so whatever a game does with a gamepad, it does with these: scripts read
+  them with `stick()` and `button_pressed("a")`. For a game that only reads the keyboard,
+  each control can press a key instead, with its own label: `stick=arrows, a=space:JUMP`.
+- **They appear when the screen is first touched** (that touch is also a click), and
+  go again when a key or a real gamepad is used. While they are in use, `last_input()`
+  is `"touch"`, so prompts can name their buttons.
+- **They go where there is room.** Held sideways, the stick is at the bottom left, A B X Y
+  are a diamond at the bottom right and the shoulder and menu buttons are at the top
+  corners, all in the black bars beside the game (on a tablet, where the bars are narrow,
+  the game shrinks a little, to 60% at most). Held upright, the game moves to the top and
+  the controls go below it. They are drawn over the whole page at the screen's own
+  resolution, so they stay sharp however small the game's pixels are.
+- **Fingers:** any number at once (the stick and a button together); a finger can slide
+  from one button onto the next. A touch that misses every control is the left mouse
+  button, so menus that take clicks take taps.
+- **The page** goes fullscreen when **Play** is tapped on a touch screen (where the browser
+  allows: Android does; an iPhone's Safari keeps its bars), keeps clear of the notch, and
+  doesn't scroll, zoom or select text. Added to the home screen, it opens as an app.
+- **Scripts** can hide them for a moment (`show_touch_controls(false)`) or change them
+  (`set_touch_controls("stick, a")`); see [scripting.md](scripting.md).
+- **On a desktop**, `bronto_player --touch <project>` shows them with the mouse as a
+  finger, for trying a layout. In C, the controls are `engine->touch` (`touch.h`), set up
+  with `br_engine_config.touch_controls`.
 
 ## How it fits together
 

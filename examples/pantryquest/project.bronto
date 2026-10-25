@@ -8,5 +8,7 @@ window_scale = 3
 icon = art/icon.bmp
 # every script must declare its types (as if each began with @strict)
 strict_typing = true
+# on a phone or tablet (the web build): an on-screen stick and buttons, which work as a gamepad
+touch_controls = stick, a, b, x, y, lb, rb, back, start
 # the tools that make the art, sounds and rooms, and the Steam library art, aren't part of the game
 exclude = tools, SteamData

@@ -3412,8 +3412,25 @@ static sc_value bi_last_button(ARGS) {
             if (sc_pad_button_on(&e->input, p, b, 1)) return sc_string(vm, k_pad_button_names[b], strlen(k_pad_button_names[b]));
     return sc_string(vm, "", 0);
 }
-/* last_input(): what the player touched last - "keyboard", "mouse" or "gamepad" ("" before anything) -
+/* last_input(): what the player touched last - "keyboard", "mouse", "gamepad" or "touch" ("" before anything) -
  * kept across scenes: for showing a key's name or a button's. */
+/* The on-screen touch controls (touch.h): are they showing; hide or show them; change them. */
+static sc_value bi_touch_controls_shown(ARGS) { br_engine *e = sc_engine(vm); UNUSED_ARGS; return sc_bool(e && br_touch_ui_visible(&e->touch)); }
+static sc_value bi_show_touch_controls(ARGS) {
+    br_engine *e = sc_engine(vm);
+    BR_UNUSED(n); BR_UNUSED(line);
+    if (e) br_touch_ui_hide(&e->touch, !sc_truthy(&a[0]));
+    return sc_nil();
+}
+static sc_value bi_set_touch_controls(ARGS) {
+    br_engine *e = sc_engine(vm);
+    char why[200];
+    BR_UNUSED(n);
+    if (e && !br_touch_ui_configure(&e->touch, sc_need_str(vm, &a[0], line, "set_touch_controls()"), why, sizeof(why)))
+        sc_fail(vm, line, "set_touch_controls(): %s", why);
+    return sc_nil();
+}
+
 static sc_value bi_last_input(ARGS) {
     br_engine *e = sc_engine(vm);
     const char *name;
@@ -3991,6 +4008,8 @@ static const sc_builtin k_builtin_table[] = {
     { "stick", 0, 2, bi_stick, "sn>v" }, { "gamepad_connected", 0, 1, bi_gamepad_connected, "n>b" },
     { "gamepad_count", 0, 0, bi_gamepad_count, ">n" }, { "gamepad_name", 0, 1, bi_gamepad_name, "n>s" },
     { "last_button", 0, 0, bi_last_button, ">s" }, { "last_input", 0, 0, bi_last_input, ">s" }, { "rumble", 2, 3, bi_rumble, "nnn>b" },
+    { "touch_controls_shown", 0, 0, bi_touch_controls_shown, ">b" }, { "show_touch_controls", 1, 1, bi_show_touch_controls, "b>-" },
+    { "set_touch_controls", 1, 1, bi_set_touch_controls, "s>-" },
     { "find", 1, 1, bi_find, "s>e" }, { "find_all", 1, 1, bi_find_all, "s>L" }, { "destroy", 1, 1, bi_destroy, "e>-" },
     { "find_tagged", 1, 16, bi_find_tagged, "ss*>L" }, { "first_tagged", 1, 16, bi_first_tagged, "ss*>e" },
     { "has_tag", 2, 2, bi_has_tag, "es>b" }, { "add_tag", 2, 2, bi_add_tag, "es>-" },

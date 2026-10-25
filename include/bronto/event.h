@@ -50,6 +50,9 @@ typedef enum br_event_type {
     BR_EVENT_WINDOW_SCALE_CHANGED,   /* HiDPI factor changed (moved monitors) */
     BR_EVENT_MOUSE_ENTER,
     BR_EVENT_MOUSE_LEAVE,
+    BR_EVENT_TOUCH_DOWN,             /* a finger touched the screen (u.touch) */
+    BR_EVENT_TOUCH_MOVE,
+    BR_EVENT_TOUCH_UP,               /* ... and lifted (or the touch was cancelled) */
 
     BR_EVENT_BUILTIN_COUNT,
     BR_EVENT_USER = 1024         /* first runtime-registered type */
@@ -65,8 +68,13 @@ typedef struct br_text_event         { uint32_t codepoint; } br_text_event;
 /* Mouse positions: platforms report window pixels; before dispatch the
  * engine maps x/y (and dx/dy) into framebuffer pixels using the current
  * viewport, keeping the raw window position in wx/wy. */
-typedef struct br_mouse_move_event   { float x, y, dx, dy, wx, wy; } br_mouse_move_event;
-typedef struct br_mouse_button_event { br_mouse_button button; float x, y; int clicks; float wx, wy; } br_mouse_button_event;
+typedef struct br_mouse_move_event   { float x, y, dx, dy, wx, wy; bool touch; } br_mouse_move_event;
+typedef struct br_mouse_button_event { br_mouse_button button; float x, y; int clicks; float wx, wy; bool touch; } br_mouse_button_event;
+/* Touches: `id` follows one finger from DOWN to UP. Like the mouse, x/y are
+ * mapped into the framebuffer before dispatch (wx/wy: window pixels).
+ * `claimed`: the on-screen touch controls took it (touch.h); a touch they
+ * didn't take also arrives as the left mouse button (with `touch` set). */
+typedef struct br_touch_event        { int id; float x, y, wx, wy; bool claimed; } br_touch_event;
 typedef struct br_mouse_wheel_event  { float dx, dy; } br_mouse_wheel_event;
 typedef struct br_resize_event       { int width, height; } br_resize_event; /* window pixels */
 typedef struct br_window_event       { int x, y, width, height; float scale; bool fullscreen; } br_window_event;
@@ -82,6 +90,7 @@ typedef struct br_event {
         br_mouse_move_event mouse_move;
         br_mouse_button_event mouse_button;
         br_mouse_wheel_event wheel;
+        br_touch_event touch;
         br_resize_event resize;
         br_window_event window;
         br_gamepad_event gamepad;
@@ -153,6 +162,7 @@ br_event br_event_make(uint32_t type);
 br_event br_event_key(uint32_t type, br_key key, uint32_t mods, bool repeat);
 br_event br_event_mouse_button(uint32_t type, br_mouse_button b, float x, float y);
 br_event br_event_mouse_move(float x, float y, float dx, float dy);
+br_event br_event_touch(uint32_t type, int id, float x, float y);   /* window pixels */
 
 /* Typed payload access: BR_EVENT_DATA(e, my_struct)->field */
 #define BR_EVENT_DATA(e, T) ((const T *)(const void *)(e)->u.user.data)

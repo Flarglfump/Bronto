@@ -6,14 +6,16 @@
 
 #define BR_DISPATCH_SAFETY_LIMIT 65536u
 
-static const char *k_builtin_names[BR_EVENT_BUILTIN_COUNT] = {
+static const char *k_builtin_names[] = {
     "none", "quit", "window_resized", "window_focus_gained", "window_focus_lost",
     "key_down", "key_up", "text_input", "mouse_move", "mouse_button_down",
     "mouse_button_up", "mouse_wheel", "gamepad_connected", "gamepad_disconnected",
     "gamepad_button_down", "gamepad_button_up", "gamepad_axis", "scene_changed",
     "window_close_requested", "window_minimized", "window_maximized", "window_restored",
-    "window_moved", "window_fullscreen", "window_scale_changed", "mouse_enter", "mouse_leave"
+    "window_moved", "window_fullscreen", "window_scale_changed", "mouse_enter", "mouse_leave",
+    "touch_down", "touch_move", "touch_up"
 };
+typedef char k_builtin_names_complete[BR_ARRAY_COUNT(k_builtin_names) == BR_EVENT_BUILTIN_COUNT ? 1 : -1];   /* a name for every type */
 
 static size_t next_pow2(size_t v) {
     size_t p = 16;
@@ -234,6 +236,14 @@ br_event br_event_mouse_button(uint32_t type, br_mouse_button b, float x, float 
     e.u.mouse_button.clicks = 1;
     e.u.mouse_button.wx = x;
     e.u.mouse_button.wy = y;
+    return e;
+}
+
+br_event br_event_touch(uint32_t type, int id, float x, float y) {
+    br_event e = br_event_make(type);
+    e.u.touch.id = id;
+    e.u.touch.x = e.u.touch.wx = x;
+    e.u.touch.y = e.u.touch.wy = y;
     return e;
 }
 

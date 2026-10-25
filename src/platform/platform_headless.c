@@ -203,7 +203,8 @@ static const br_platform k_headless = {
     hl_set_fullscreen, hl_set_cursor_visible, hl_set_icon, hl_pick_folder, hl_open_path, hl_launch,
     NULL, NULL,                                   /* clipboard: the engine keeps a private one */
     hl_set_gamepad_rumble,
-    NULL
+    NULL,
+    NULL                                          /* present_overlay: the engine draws into the framebuffer */
 };
 
 const br_platform *br_platform_headless(void) { return &k_headless; }

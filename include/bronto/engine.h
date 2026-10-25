@@ -31,6 +31,7 @@
 #include "audio.h"
 #include "platform.h"
 #include "window.h"
+#include "touch.h"
 #include "bmath.h"
 
 typedef struct br_engine br_engine;
@@ -63,6 +64,12 @@ typedef struct br_engine_config {
     bool quit_when_no_scenes;     /* default true */
     const br_platform *platform;  /* NULL = native, falling back to headless */
     const br_scene_desc *initial_scene;
+    /* On-screen touch controls (touch.h): a list such as "stick, a, b, start"
+     * (NULL or "": none). They show when the screen is touched. touch_mouse:
+     * the left mouse button acts as a finger, for trying them on a desktop
+     * (and they show from the start). */
+    const char *touch_controls;
+    bool touch_mouse;
     void *user;
     /* Optional hooks */
     bool (*on_init)(br_engine *e);
@@ -80,6 +87,7 @@ struct br_engine {
     br_mixer mixer;
     br_scene_manager scenes;
     br_window_state window;
+    br_touch_ui touch;                 /* the on-screen touch controls */
     char *clipboard;                 /* the private clipboard, where the platform has none */
     br_arena frame_arena;          /* reset at the start of every frame */
     br_rng rng;

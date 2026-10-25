@@ -128,8 +128,13 @@ typedef struct br_gamepad_state {
  * the mouse (a button, the wheel, or a real move), or a gamepad (a button, or
  * a stick or trigger pushed past half way). For showing the right prompts. */
 typedef enum br_input_device {
-    BR_DEVICE_NONE = 0, BR_DEVICE_KEYBOARD, BR_DEVICE_MOUSE, BR_DEVICE_GAMEPAD
+    BR_DEVICE_NONE = 0, BR_DEVICE_KEYBOARD, BR_DEVICE_MOUSE, BR_DEVICE_GAMEPAD,
+    BR_DEVICE_TOUCH            /* a touch screen, or the on-screen controls (touch.h) */
 } br_input_device;
+
+/* A finger on the screen, in framebuffer pixels. */
+#define BR_MAX_TOUCHES 10
+typedef struct br_touch_point { int id; float x, y; bool claimed; } br_touch_point;
 
 typedef struct br_input {
     bool keys[BR_KEY_COUNT];
@@ -155,6 +160,9 @@ typedef struct br_input {
     int action_count;
 
     br_input_device last_device;      /* kept across frames (and scenes) */
+    br_touch_point touches[BR_MAX_TOUCHES];   /* the fingers down now */
+    int touch_count;
+    int touch_pad;                    /* the on-screen controls' gamepad slot + 1 (0: none): its input counts as touch */
 } br_input;
 
 /* A frame's edges - what was pressed / released this frame - on their own. The
@@ -178,7 +186,7 @@ void br_input_edges_get(const br_input *in, br_input_edges *out);
 void br_input_edges_set(br_input *in, const br_input_edges *edges);
 void br_input_edges_add(br_input_edges *to, const br_input_edges *from);   /* to |= from */
 void br_input_edges_clear(br_input *in);
-const char *br_input_device_name(br_input_device d);   /* "keyboard", "mouse", "gamepad", "" */
+const char *br_input_device_name(br_input_device d);   /* "keyboard", "mouse", "gamepad", "touch", "" */
 
 struct br_event;
 

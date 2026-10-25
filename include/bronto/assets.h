@@ -62,6 +62,7 @@ typedef struct br_project {
     char icon[256];                /* an image for the window and taskbar ("" = the default) */
     char build_dir[256];           /* where Build puts games, in the project (default builds) */
     char exclude[256];             /* left out of built games: names in the project, comma-separated ("tools, notes.txt") */
+    char touch_controls[160];      /* on-screen controls for touch screens ("stick, a, b, start"; "" = none; touch.h) */
 } br_project;
 
 void br_project_defaults(br_project *p, const char *name);

@@ -19,6 +19,7 @@
 #include "web/bw.h"
 #include "bronto/memory.h"
 
+#include <stddef.h>
 #include <string.h>
 
 /* ---- imported from bronto.js ---- */
@@ -40,6 +41,7 @@ BW_IMPORT(audio_submit)   void   bw_js_audio_submit(const int16_t *interleaved, 
 BW_IMPORT(poll_gamepads)  void   bw_js_poll_gamepads(void);          /* calls bronto_web_gamepad for each */
 BW_IMPORT(rumble)         int    bw_js_rumble(int pad, double low, double high);
 BW_IMPORT(run_loop)       void   bw_js_run_loop(void);               /* starts calling bronto_web_frame */
+BW_IMPORT(overlay)        void   bw_js_overlay(const void *items, int count);   /* br_overlay_item[count], over the canvas */
 
 static struct {
     bool open;
@@ -107,6 +109,11 @@ static void web_present(const br_image *fb, br_recti vp) {
     bw_js_present(fb->pixels, fb->width, fb->height, vp.x, vp.y, vp.w, vp.h);
 }
 
+/* (bronto.js reads the items by these offsets) */
+typedef char bw_overlay_layout[(sizeof(br_overlay_item) == 40 && offsetof(br_overlay_item, fill) == 20 &&
+                                offsetof(br_overlay_item, text) == 32) ? 1 : -1];
+static void web_present_overlay(const br_overlay_item *items, int count) { bw_js_overlay(items, count); }
+
 static void web_sleep(double seconds) { if (seconds > 0) W.wake = web_time() + seconds; }
 
 static uint32_t web_audio_wanted(void) {
@@ -171,7 +178,8 @@ static const br_platform k_web = {
     web_pick_folder, web_open_path, web_launch,
     web_clipboard_set, web_clipboard_get,
     web_rumble,
-    web_run_loop
+    web_run_loop,
+    web_present_overlay
 };
 
 const br_platform *br_platform_native(void) { return &k_web; }
@@ -183,6 +191,7 @@ BW_EXPORT(bronto_web_text) void bronto_web_text(uint32_t codepoint);
 BW_EXPORT(bronto_web_mouse_move) void bronto_web_mouse_move(float x, float y);
 BW_EXPORT(bronto_web_mouse_button) void bronto_web_mouse_button(int button, int down, float x, float y);
 BW_EXPORT(bronto_web_wheel) void bronto_web_wheel(float dx, float dy);
+BW_EXPORT(bronto_web_touch) void bronto_web_touch(int phase, int id, float x, float y);
 BW_EXPORT(bronto_web_mouse_inside) void bronto_web_mouse_inside(int inside);
 BW_EXPORT(bronto_web_resized) void bronto_web_resized(void);
 BW_EXPORT(bronto_web_scale_changed) void bronto_web_scale_changed(void);
@@ -230,6 +239,12 @@ void bronto_web_mouse_button(int button, int down, float x, float y) {
     br_event e;
     if (button < 0 || button >= BR_MOUSE_BUTTON_COUNT) return;
     e = br_event_mouse_button(down ? BR_EVENT_MOUSE_BUTTON_DOWN : BR_EVENT_MOUSE_BUTTON_UP, (br_mouse_button)button, x, y);
+    web_queue(&e);
+}
+
+/* A finger: phase 0 down, 1 moved, 2 up (or cancelled). */
+void bronto_web_touch(int phase, int id, float x, float y) {
+    br_event e = br_event_touch(phase == 0 ? BR_EVENT_TOUCH_DOWN : phase == 1 ? BR_EVENT_TOUCH_MOVE : BR_EVENT_TOUCH_UP, id, x, y);
     web_queue(&e);
 }
 

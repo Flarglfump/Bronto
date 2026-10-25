@@ -66,6 +66,8 @@ void br_engine_sync_window(br_engine *e) {
         resize_framebuffer(e, fw, fh);
     }
     w->viewport = br_viewport_compute(e->framebuffer.width, e->framebuffer.height, ww, wh, w->scale_mode);
+    br_touch_ui_place_viewport(&e->touch, ww, wh, w->scale, &w->viewport);   /* (tall screens: the game at the top) */
+    br_touch_ui_layout(&e->touch, ww, wh, w->scale, w->viewport.rect);
 }
 
 /* Platforms report mouse positions in window pixels; map them into the
@@ -92,6 +94,10 @@ static void map_mouse_events(br_engine *e) {
             p = br_viewport_to_framebuffer(vp, br_v2(ev->u.mouse_button.x, ev->u.mouse_button.y));
             ev->u.mouse_button.x = p.x;
             ev->u.mouse_button.y = p.y;
+        } else if (ev->type == BR_EVENT_TOUCH_DOWN || ev->type == BR_EVENT_TOUCH_MOVE || ev->type == BR_EVENT_TOUCH_UP) {
+            br_vec2 p = br_viewport_to_framebuffer(vp, br_v2(ev->u.touch.wx, ev->u.touch.wy));
+            ev->u.touch.x = p.x;
+            ev->u.touch.y = p.y;
         }
     }
 }
@@ -202,6 +208,15 @@ bool br_engine_init(br_engine *e, const br_engine_config *cfg) {
         return false;
     }
     br_input_init(&e->input);
+    br_touch_ui_init(&e->touch);
+    if (e->config.touch_controls && e->config.touch_controls[0]) {
+        char why[160];
+        if (!br_touch_ui_configure(&e->touch, e->config.touch_controls, why, sizeof(why))) BR_WARN("touch controls: %s", why);
+    }
+    if (e->config.touch_mouse) {
+        e->touch.mouse_as_touch = true;
+        e->touch.shown = true;
+    }
     br_renderer_init(&e->renderer, &e->framebuffer);
     br_mixer_init(&e->mixer, e->config.audio_sample_rate ? e->config.audio_sample_rate : 44100);
     br_assets_set_mixer(&e->mixer);
@@ -301,6 +316,8 @@ bool br_engine_frame(br_engine *e) {
     if (dt > 0) e->fps = e->fps * 0.9 + (1.0 / dt) * 0.1;
     br_arena_reset(&e->frame_arena);
     br_engine_sync_window(e);
+    br_touch_ui_process(&e->touch, &e->events, &e->input);   /* touches on the controls work them; the rest are the mouse */
+    br_engine_sync_window(e);                                 /* (they may have just appeared, and moved the game) */
     map_mouse_events(e);
 
     /* 3. dispatch events: window/input -> scenes -> engine */
@@ -348,8 +365,13 @@ bool br_engine_frame(br_engine *e) {
             br_set_blend(&e->renderer, BR_BLEND_ALPHA);
             if (e->config.auto_clear) br_clear(&e->renderer, e->config.clear_color);
             br_scenes_render(&e->scenes);
-            if (e->window.viewport.rect.w > 0 && e->window.viewport.rect.h > 0)
+            if (!e->platform->present_overlay) br_touch_ui_draw(&e->touch, &e->renderer, &e->window.viewport);
+            if (e->window.viewport.rect.w > 0 && e->window.viewport.rect.h > 0) {
+                const br_overlay_item *items;
+                int n = br_touch_ui_overlay(&e->touch, &items);
                 e->platform->present(&e->framebuffer, e->window.viewport.rect);
+                if (n && e->platform->present_overlay) e->platform->present_overlay(items, n);
+            }
         }
         e->time += dt;
     } else if (!e->suspended) {

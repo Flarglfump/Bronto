@@ -182,6 +182,7 @@ bool br_project_parse(const char *text, br_project *p) {
             else if (strcmp(key, "icon") == 0) snprintf(p->icon, sizeof(p->icon), "%s", v);
             else if (strcmp(key, "build_dir") == 0) snprintf(p->build_dir, sizeof(p->build_dir), "%s", v[0] ? v : "builds");
             else if (strcmp(key, "exclude") == 0) snprintf(p->exclude, sizeof(p->exclude), "%s", v);
+            else if (strcmp(key, "touch_controls") == 0) snprintf(p->touch_controls, sizeof(p->touch_controls), "%s", v);
         }
     }
     return header;
@@ -227,9 +228,9 @@ bool br_project_save(const char *folder, const br_project *p) {
         "# Asset paths in this project's scenes are relative to this folder.\n"
         "# Project settings (the editor's Build > Project Settings):\n"
         "name = %s\nmain_scene = %s\nwidth = %d\nheight = %d\nwindow_scale = %d\nstrict_typing = %s\nicon = %s\nbuild_dir = %s\n"
-        "exclude = %s\n",
+        "exclude = %s\n%s%s%s",
         p->name, p->main_scene, p->width, p->height, p->window_scale, p->strict_typing ? "true" : "false", p->icon, p->build_dir,
-        p->exclude);
+        p->exclude, p->touch_controls[0] ? "touch_controls = " : "", p->touch_controls, p->touch_controls[0] ? "\n" : "");
     br_path_join(path, sizeof(path), folder ? folder : "", BR_PROJECT_FILE);
     return n > 0 && (size_t)n < sizeof(text) && br_file_write_all(path, text, (size_t)n);
 }

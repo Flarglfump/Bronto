@@ -9,16 +9,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#000000">
 <meta name="generator" content="Bronto">
 <title>{{TITLE}}</title>
 <link rel="icon" href="{{ICON}}">
 <style>
   :root { color-scheme: dark; --bg: #0b0d10; --card: #171b21; --text: #eef1f4; --dim: #9aa4b1; --accent: #5cc46e; --accent-text: #08130b; --bad: #ff8a80; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
-               font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  #screen { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: #000;
-            outline: none; touch-action: none; -webkit-user-select: none; user-select: none; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden; overscroll-behavior: none;
+               font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+  body.playing { background: #000; }
+  /* (clear of a phone's notch and rounded corners: the game and its touch controls stay where fingers reach) */
+  #screen { position: fixed; top: env(safe-area-inset-top, 0px); right: env(safe-area-inset-right, 0px);
+            bottom: env(safe-area-inset-bottom, 0px); left: env(safe-area-inset-left, 0px);
+            width: calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+            height: calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); display: block; background: #000;
+            outline: none; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   #card { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(8, 10, 12, .78); }
   #card[hidden] { display: none; }
   .box { width: min(360px, 100%); background: var(--card); border-radius: 14px; padding: 28px 24px 24px; text-align: center;
@@ -69,6 +78,7 @@
     var canvas = document.getElementById('screen'), card = document.getElementById('card');
     var play = document.getElementById('play'), status = document.getElementById('status'), log = document.getElementById('log');
     var errors = [];
+    var touchScreen = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : ('ontouchstart' in window);
 
     function say(text, bad) { status.textContent = text; status.className = bad ? 'bad' : ''; }
     function payload(id) {
@@ -88,6 +98,8 @@
         log.textContent = '';
         errors = [];
         try { if (AC) audioContext = new AC(); } catch (e) { audioContext = null; }   /* made on the click, so it may play */
+        if (touchScreen && document.documentElement.requestFullscreen && !document.fullscreenElement)   /* phones and tablets: the whole screen */
+            document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
         try {
             var pack = payload('bronto-pack'), replay = payload('bronto-replay'), args = ARGS.slice();
             var files = pack ? [{ path: 'game.brpak', data: pack }] : [];
@@ -111,8 +123,10 @@
                 },
             });
             card.hidden = true;
+            document.body.classList.add('playing');
             canvas.focus();
             var code = await game.exited;
+            document.body.classList.remove('playing');
             card.hidden = false;
             play.hidden = false;
             play.textContent = 'Play again';

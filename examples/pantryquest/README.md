@@ -151,6 +151,15 @@ the keys when opened with the keys. Any controller works, in the same Xbox-style
 game to Steam as a non-Steam game and play it from there, so that Steam passes its controls
 on as a gamepad.
 
+**On a phone or tablet** (the web build, `make pantryquest TARGET=web`), touching the
+screen brings up on-screen controls: a stick at the bottom left, A B X Y at the bottom right,
+LB and RB at the top corners, and BACK and START beside them - the gamepad's buttons, doing
+the same things (`touch_controls` in `project.bronto` lists them). Held sideways, they sit
+either side of the game; held upright, the game moves to the top and they go below it. The
+hints name these buttons while they are being used, and a tap on a menu option chooses it,
+as a click does. Tapping **Play** on the page also makes the game fill the screen (where the
+browser allows it).
+
 **The title** offers PLAY, SETTINGS and QUIT. PLAY shows three files: an empty one starts
 a new game (saved straight away), one with a game in it carries on from where it was
 saved - the screen Pip was on, outside the cave he was in, or the door of the cellar -

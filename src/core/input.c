@@ -42,6 +42,7 @@ void br_input_reset(br_input *in) {
         memset(in->pads[i].axes, 0, sizeof(in->pads[i].axes));
     }
     in->mods = 0;
+    in->touch_count = 0;
 }
 
 static bool valid_key(int k) { return k > 0 && k < BR_KEY_COUNT; }
@@ -75,14 +76,15 @@ void br_input_handle_event(br_input *in, const br_event *e) {
         in->mouse_dy += e->u.mouse_move.y - in->mouse_y;
         in->mouse_x = e->u.mouse_move.x;
         in->mouse_y = e->u.mouse_move.y;
-        if (fabsf(e->u.mouse_move.dx) + fabsf(e->u.mouse_move.dy) >= 3) in->last_device = BR_DEVICE_MOUSE;   /* (not a nudge) */
+        if (fabsf(e->u.mouse_move.dx) + fabsf(e->u.mouse_move.dy) >= 3)            /* (not a nudge) */
+            in->last_device = e->u.mouse_move.touch ? BR_DEVICE_TOUCH : BR_DEVICE_MOUSE;
         break;
     case BR_EVENT_MOUSE_BUTTON_DOWN: {
         int b = (int)e->u.mouse_button.button;
         if (b < 0 || b >= BR_MOUSE_BUTTON_COUNT) break;
         if (!in->mouse[b]) in->mouse_pressed[b] = true;
         in->mouse[b] = true;
-        in->last_device = BR_DEVICE_MOUSE;
+        in->last_device = e->u.mouse_button.touch ? BR_DEVICE_TOUCH : BR_DEVICE_MOUSE;
         in->mouse_x = e->u.mouse_button.x;
         in->mouse_y = e->u.mouse_button.y;
         break;
@@ -101,6 +103,27 @@ void br_input_handle_event(br_input *in, const br_event *e) {
         in->wheel_y += e->u.wheel.dy;
         in->last_device = BR_DEVICE_MOUSE;
         break;
+    case BR_EVENT_TOUCH_DOWN:
+    case BR_EVENT_TOUCH_MOVE: {
+        int i;
+        for (i = 0; i < in->touch_count && in->touches[i].id != e->u.touch.id; ++i) {}
+        if (i == in->touch_count) {
+            if (e->type == BR_EVENT_TOUCH_MOVE || i == BR_MAX_TOUCHES) break;   /* (a move without a down: ignored) */
+            in->touch_count++;
+        }
+        in->touches[i].id = e->u.touch.id;
+        in->touches[i].x = e->u.touch.x;
+        in->touches[i].y = e->u.touch.y;
+        in->touches[i].claimed = e->u.touch.claimed;
+        in->last_device = BR_DEVICE_TOUCH;
+        break;
+    }
+    case BR_EVENT_TOUCH_UP: {
+        int i;
+        for (i = 0; i < in->touch_count; ++i)
+            if (in->touches[i].id == e->u.touch.id) { in->touches[i] = in->touches[--in->touch_count]; break; }
+        break;
+    }
     case BR_EVENT_GAMEPAD_CONNECTED:
         if (valid_pad(e->u.gamepad.pad)) {
             br_gamepad_state *p = &in->pads[e->u.gamepad.pad];
@@ -131,7 +154,7 @@ void br_input_handle_event(br_input *in, const br_event *e) {
         if (down && !p->buttons[b]) p->pressed[b] = true;
         if (!down && p->buttons[b]) p->released[b] = true;
         p->buttons[b] = down;
-        if (down) in->last_device = BR_DEVICE_GAMEPAD;
+        if (down) in->last_device = pad + 1 == in->touch_pad ? BR_DEVICE_TOUCH : BR_DEVICE_GAMEPAD;
         break;
     }
     case BR_EVENT_GAMEPAD_AXIS: {
@@ -139,7 +162,8 @@ void br_input_handle_event(br_input *in, const br_event *e) {
         if (!valid_pad(pad) || a < 0 || a >= BR_PAD_AXIS_COUNT) break;
         in->pads[pad].connected = true;
         in->pads[pad].axes[a] = e->u.gamepad.value;
-        if (fabsf(e->u.gamepad.value) >= 0.5f) in->last_device = BR_DEVICE_GAMEPAD;   /* (pushed, not drifting) */
+        if (fabsf(e->u.gamepad.value) >= 0.5f)                                        /* (pushed, not drifting) */
+            in->last_device = pad + 1 == in->touch_pad ? BR_DEVICE_TOUCH : BR_DEVICE_GAMEPAD;
         break;
     }
     case BR_EVENT_WINDOW_FOCUS_LOST:
@@ -218,6 +242,7 @@ const char *br_input_device_name(br_input_device d) {
     case BR_DEVICE_KEYBOARD: return "keyboard";
     case BR_DEVICE_MOUSE: return "mouse";
     case BR_DEVICE_GAMEPAD: return "gamepad";
+    case BR_DEVICE_TOUCH: return "touch";
     default: return "";
     }
 }

@@ -28,6 +28,7 @@
 #include "ui.h"
 #include "audio.h"
 #include "window.h"
+#include "touch.h"
 #include "platform.h"
 #include "engine.h"
 #include "replay.h"

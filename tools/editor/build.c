@@ -409,6 +409,8 @@ void ed_project_dialog(editor *ed, br_rect screen) {
     br_ui_text_field(ui, "Icon", p->icon, sizeof(p->icon));
     br_ui_text_field(ui, "Builds folder", p->build_dir, sizeof(p->build_dir));
     br_ui_text_field(ui, "Leave out", p->exclude, sizeof(p->exclude));
+    br_ui_text_field(ui, "Touch controls", p->touch_controls, sizeof(p->touch_controls));
+    br_ui_label_colored(ui, "For phones: stick, a, b, x, y, lb, rb, back, start ...", ui->style.text_dim);
     br_ui_spacing(ui, 8);
     br_ui_columns(ui, 2);
     if (br_ui_button(ui, "Save##project")) {
