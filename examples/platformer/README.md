@@ -13,4 +13,6 @@ and press Play. A game plays it the same way: register the built-in components, 
 `main.scene` and let the engine's systems run (see "Using scenes in a game" in
 tools/editor/README.md).
 
-Arrows (or A/D) run; space (or up/W) jumps.
+Arrows (or A/D) run; space (or up/W) jumps. On a phone or tablet (the web build), touching the
+screen brings up ◀ ▶ and JUMP buttons, which press those keys (`touch_controls` in
+`project.bronto`), and the help in the corner names them.

@@ -20,3 +20,9 @@ func show() {
         self.Label.text = "Coins: " + coins + " / " + total
     }
 }
+
+# On a touch screen, the help in the corner names the on-screen buttons instead of the keys.
+func update(dt) {
+    var help = find("Help")
+    if help != nil and last_input() == "touch" { help.Label.text = "< > and JUMP" }
+}

@@ -28,6 +28,10 @@ costs lives equal to the layers left inside it. Survive round 30 to win.
 | Pause | `P`, or `Esc` when nothing is selected | `Start` |
 | Mute music / fullscreen | `M` / `F11` | |
 
+On a phone or tablet (the web build), a tap is a click, and touching the screen brings up two
+on-screen buttons: `CANCEL` (the right click: cancel / deselect) and `PAUSE`
+(`cfg.touch_controls` in `main.c`).
+
 The cursor moves with the left stick or the d-pad. The `AUTO` button starts each round
 as soon as the previous one is cleared.
 

@@ -11,7 +11,9 @@ build/examples/snake --headless          # no window: writes screenshots and a W
 ```
 
 Controls: arrows / WASD / d-pad / left stick to move, P / Esc / Start to pause,
-Enter / A to start, M to mute the music, F11 or Alt+Enter for fullscreen.
+Enter / A to start, M to mute the music, F11 or Alt+Enter for fullscreen. On a phone or
+tablet (the web build), touching the screen brings up an on-screen d-pad, A, MUSIC, START and
+MENU (`cfg.touch_controls` in `main.c`; they are a gamepad's buttons, so nothing else changes).
 
 ## How the code is organised
 

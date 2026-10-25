@@ -27,7 +27,9 @@ static const char *const tc_k_names[TOUCH_BUTTON_KINDS] = {
     "a", "b", "x", "y", "lb", "rb", "back", "start", "guide", "ls", "rs", "up", "right", "down", "left", "lt", "rt"
 };
 static const char *const tc_k_labels[TOUCH_BUTTON_KINDS] = {
-    "A", "B", "X", "Y", "LB", "RB", "BACK", "START", "HOME", "LS", "RS", "^", ">", "v", "<", "LT", "RT"
+    "A", "B", "X", "Y", "LB", "RB", "BACK", "START", "HOME", "LS", "RS",
+    "\xe2\x96\xb2", "\xe2\x96\xb6", "\xe2\x96\xbc", "\xe2\x97\x80",                     /* (the d-pad: UTF-8 arrows) */
+    "LT", "RT"
 };
 
 void br_touch_ui_init(br_touch_ui *t) {
@@ -160,7 +162,7 @@ static void tc_metrics(float W, float H, float *m, float *R, float *b, float *d)
 }
 
 void br_touch_ui_place_viewport(const br_touch_ui *t, int win_w, int win_h, float scale, br_viewport *vp) {
-    float s = scale > 0 ? scale : 1, m, R, b, d, side;
+    float s = scale > 0 ? scale : 1, side;
     if (!br_touch_ui_visible(t) || vp->rect.w <= 0 || vp->rect.h <= 0) return;
     if (tc_tall(win_w, win_h)) {
         vp->rect.y = (int)(12 * s);                              /* the game at the top, the controls below it */
@@ -168,12 +170,26 @@ void br_touch_ui_place_viewport(const br_touch_ui *t, int win_w, int win_h, floa
         if (vp->rect.y < 0) vp->rect.y = 0;
         return;
     }
-    tc_metrics((float)win_w / s, (float)win_h / s, &m, &R, &b, &d);   /* wide: room beside the game for them */
-    side = (m + (2.2f * R > 2 * d + 2 * b ? 2.2f * R : 2 * d + 2 * b) + 6) * s;
+    {                                                            /* wide: room beside the game for the controls it has */
+        br_touch_ui trial = *t;                                  /* (where they go doesn't depend on the game when it's wide) */
+        float left = 0, right = 0;
+        int i;
+        br_touch_ui_layout(&trial, win_w, win_h, s, vp->rect);
+        for (i = 0; i < trial.count; ++i) {
+            const br_touch_control *c = &trial.controls[i];
+            if (c->w <= 0) continue;
+            if (c->x < (float)win_w / 2) { if (c->x + c->w / 2 > left) left = c->x + c->w / 2; }
+            else if ((float)win_w - (c->x - c->w / 2) > right) right = (float)win_w - (c->x - c->w / 2);
+        }
+        side = (left > right ? left : right) + 6 * s;
+    }
     if ((float)(win_w - vp->rect.w) / 2 < side) {                /* (a tablet: the game gives up some room, down to 60%) */
         float w = (float)win_w - 2 * side, min_w = (float)vp->rect.w * 0.6f, k;
         if (w < min_w) w = min_w;
         k = w / (float)vp->rect.w;
+        if (vp->scale_x == floorf(vp->scale_x) && vp->scale_x >= 2)   /* whole pixels (BR_SCALE_INTEGER): stay whole */
+            k = floorf(vp->scale_x * k) / vp->scale_x;
+        if (k >= 1) return;
         vp->scale_x *= k;
         vp->scale_y *= k;
         vp->rect.w = (int)((float)vp->rect.w * k + 0.5f);
@@ -226,7 +242,7 @@ void br_touch_ui_layout(br_touch_ui *t, int win_w, int win_h, float scale, br_re
     sy = bottom - R * 1.1f;
     tc_place(tc_find_button(t, BR_TOUCH_STICK), sx, sy, 2 * R, 2 * R, true, s);
     {                                                            /* the d-pad: there too (above the stick if both) */
-        float px = sx, py = has_stick ? sy - R * 1.1f - b * 2.8f : sy, k = b * 1.55f;
+        float px = sx, py = has_stick ? sy - R * 1.1f - b * 2.8f : sy, k = b * 1.8f;
         tc_place(tc_find_button(t, BR_PAD_DPAD_UP), px, py - k, k, k, false, s);
         tc_place(tc_find_button(t, BR_PAD_DPAD_DOWN), px, py + k, k, k, false, s);
         tc_place(tc_find_button(t, BR_PAD_DPAD_LEFT), px - k, py, k, k, false, s);
@@ -518,7 +534,13 @@ static void tc_build_items(br_touch_ui *t) {
                 it->fill = tc_with_alpha(col, c->down ? 0xb0 : 0x48);
                 it->line = tc_with_alpha(col, 0xd0);
             }
-            if (c->label[0] && (it = tc_item(t, BR_OVERLAY_TEXT, c->x, c->y, c->w, (c->round ? c->w * 0.42f : c->h * 0.56f) * (strlen(c->label) > 2 && c->round ? 0.7f : 1))) != NULL) {
+            float size = c->round ? c->w * 0.42f : c->h * 0.56f, fit;
+            int chars = 0;
+            const char *ch;
+            for (ch = c->label; *ch; ++ch) chars += ((unsigned char)*ch & 0xc0) != 0x80;   /* (characters, not UTF-8 bytes) */
+            fit = chars ? c->w * (c->round ? 0.78f : 0.84f) / (0.66f * (float)chars) : size;   /* long labels: small enough to fit */
+            if (fit < size) size = fit;
+            if (c->label[0] && (it = tc_item(t, BR_OVERLAY_TEXT, c->x, c->y, c->w, size)) != NULL) {
                 it->fill = c->down ? 0xffffffffu : 0xffffffe0u;
                 snprintf(it->text, sizeof(it->text), "%s", c->label);
             }
@@ -554,6 +576,16 @@ void br_touch_ui_draw(const br_touch_ui *t, br_renderer *r, const br_viewport *v
             break;
         }
         case BR_OVERLAY_TEXT:
+            if ((unsigned char)it->text[0] == 0xe2) {             /* a d-pad arrow (UTF-8 isn't in the 8x8 font): a triangle */
+                float k = h * 0.45f;
+                unsigned char a = (unsigned char)it->text[2];
+                br_vec2 p0 = br_v2(c.x, c.y - k), p1 = br_v2(c.x + k, c.y + k * 0.8f), p2 = br_v2(c.x - k, c.y + k * 0.8f);   /* up */
+                if (a == 0xb6) { p0 = br_v2(c.x + k, c.y); p1 = br_v2(c.x - k * 0.8f, c.y + k); p2 = br_v2(c.x - k * 0.8f, c.y - k); }
+                else if (a == 0xbc) { p0 = br_v2(c.x, c.y + k); p1 = br_v2(c.x - k, c.y - k * 0.8f); p2 = br_v2(c.x + k, c.y - k * 0.8f); }
+                else if (a == 0x80) { p0 = br_v2(c.x - k, c.y); p1 = br_v2(c.x + k * 0.8f, c.y - k); p2 = br_v2(c.x + k * 0.8f, c.y + k); }
+                br_fill_triangle(r, p0, p1, p2, br_hex(it->fill));
+                break;
+            }
             br_draw_text(r, it->text, c.x - (float)strlen(it->text) * 4 + 0.5f, c.y - 3.5f, 1, br_hex(it->fill));
             break;
         default: break;

@@ -198,7 +198,7 @@ static void draw_info(br_renderer *r, const ui_state *u, ui_widget hover) {
         snprintf(text, sizeof(text), "%s", def->desc);
     } else if (u->placing >= 0) {
         title = td_tower_info((td_tower_type)u->placing)->name;
-        snprintf(text, sizeof(text), "Click the grass to build. Right click cancels.");
+        snprintf(text, sizeof(text), "%s", u->touch ? "Tap the grass to build. B cancels." : "Click the grass to build. Right click cancels.");
     } else if (u->selected >= 0 && (hover == UI_UPGRADE || hover == UI_UPGRADE + 1)) {
         const td_tower *t = &u->game->towers[u->selected];
         int path = hover - UI_UPGRADE, tier = t->tier[path];
@@ -209,7 +209,7 @@ static void draw_info(br_renderer *r, const ui_state *u, ui_widget hover) {
         else if (s->attack == TD_ATK_PULSE && s->freeze > 0) snprintf(text, sizeof(text), "Range %d. Freezes %.1fs.", (int)s->range, (double)s->freeze);
         else snprintf(text, sizeof(text), "Range %d. Pops %d per shot.", (int)s->range, s->pierce);
     } else {
-        snprintf(text, sizeof(text), "Pick a tower to build, then click the grass.");
+        snprintf(text, sizeof(text), "%s", u->touch ? "Pick a tower to build, then tap the grass." : "Pick a tower to build, then click the grass.");
     }
     if (title) { br_draw_text(r, title, PX + 6, y, 1, br_rgb(120, 200, 255)); y += 12; }
     wrap(text, 19, wrapped, sizeof(wrapped));

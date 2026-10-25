@@ -223,8 +223,9 @@ async function start(opts) {
                 const w = dv.getFloat32(a + 12, true), h = dv.getFloat32(a + 16, true);
                 const fill = dv.getUint32(a + 20, true), line = dv.getUint32(a + 24, true), lw = dv.getFloat32(a + 28, true);
                 if (kind === 3) {                                    /* text */
-                    let text = '';
-                    for (let k = 0; k < 8; ++k) { const c = dv.getUint8(a + 32 + k); if (!c) break; text += String.fromCharCode(c); }
+                    let end = a + 32;
+                    while (end < a + 40 && dv.getUint8(end)) ++end;
+                    const text = utf8in.decode(u8().subarray(a + 32, end));   /* (UTF-8: the d-pad's arrows) */
                     ctx.font = `bold ${Math.max(1, Math.round(h))}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';

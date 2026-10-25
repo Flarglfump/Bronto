@@ -2,3 +2,5 @@ bronto_project 1
 # Asset paths in this project's scenes are relative to this folder.
 name = Platformer
 main_scene = main.scene
+# on a phone or tablet (the web build): left and right, and jump - they press the keys player.bs reads
+touch_controls = left=left, right=right, a=space:JUMP

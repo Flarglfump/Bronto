@@ -54,6 +54,7 @@ typedef struct play_data {
     float message_time;
     br_vec2 cursor;
     bool pad_cursor;            /* last moved with a gamepad: draw our own cursor */
+    bool touch;                 /* played on a touch screen: the hints say tap, and B */
     float time;
 } play_data;
 
@@ -98,6 +99,7 @@ static ui_state make_ui(const play_data *d) {
     u.message_time = d->message_time;
     u.cursor = d->cursor;
     u.time = d->time;
+    u.touch = d->touch;
     return u;
 }
 
@@ -160,6 +162,7 @@ static void play_input(br_scene *s, float dt) {
     bool go = br_key_pressed(in, BR_KEY_SPACE), target = br_key_pressed(in, BR_KEY_TAB);
     int shop_step = 0;
 
+    d->touch = in->last_device == BR_DEVICE_TOUCH;
     if (in->mouse_dx != 0 || in->mouse_dy != 0) { d->cursor = br_v2(in->mouse_x, in->mouse_y); d->pad_cursor = false; }
     for (pad = 0; pad < BR_MAX_GAMEPADS; ++pad) {
         float x, y;
@@ -370,7 +373,9 @@ static void end_render(br_scene *s) {
         snprintf(buf, sizeof(buf), "Lives left  %d", G.lives);
         view_draw_text_centered(r, buf, cx, 174, 1, br_rgb(200, 210, 225));
     }
-    if (s->time > 1.0) view_draw_text_centered(r, "ENTER  play again      Q  title", cx, 210, 1, br_rgb(190, 200, 215));
+    if (s->time > 1.0)
+        view_draw_text_centered(r, s->engine->input.last_device == BR_DEVICE_TOUCH ? "TAP  play again" : "ENTER  play again      Q  title",
+                                cx, 210, 1, br_rgb(190, 200, 215));
 }
 
 /* update_below: effects keep playing under the overlay (the rules have stopped) */
@@ -436,7 +441,7 @@ static void title_render(br_scene *s) {
     view_draw_balloon(r, TD_BLUE, false, br_v2(cx + 100, 50 + sinf(t * 2.0f + 1) * 4), 2.0f);
     view_draw_balloon(r, TD_RAINBOW, false, br_v2(cx + 172, 92 + sinf(t * 2.6f + 2) * 4), 1.5f);
     view_draw_balloon(r, TD_GREEN, false, br_v2(cx - 172, 92 + sinf(t * 1.8f + 3) * 4), 1.5f);
-    if (((int)(t * 2.0f)) & 1) view_draw_text_centered(r, "CLICK OR PRESS ENTER", cx, 160, 2, BR_WHITE);
+    if (((int)(t * 2.0f)) & 1) view_draw_text_centered(r, "CLICK, TAP OR PRESS ENTER", cx, 160, 2, BR_WHITE);
     for (i = 0; i < (int)BR_ARRAY_COUNT(help); ++i)
         view_draw_text_centered(r, help[i], cx, 204 + (float)i * 13, 1, br_rgb(205, 215, 230));
     view_draw_text_centered(r, "30 rounds on Meadow Lanes", cx, 312, 1, br_rgb(150, 170, 200));
@@ -542,6 +547,8 @@ int main(int argc, char **argv) {
     cfg.scale_mode = BR_SCALE_FIT;
     cfg.clear_color = br_rgb(12, 16, 24);
     cfg.initial_scene = &k_title;
+    /* On a phone or tablet: taps are clicks; B cancels (the right button's job) and START pauses (touch.h) */
+    cfg.touch_controls = "b:CANCEL, start:PAUSE";
     cfg.on_init = on_init;
     cfg.on_shutdown = on_shutdown;
     if (G.headless) cfg.platform = br_platform_headless();

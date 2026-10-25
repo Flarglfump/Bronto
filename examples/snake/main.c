@@ -233,7 +233,9 @@ static void game_over_render(br_scene *s) {
     snprintf(buf, sizeof(buf), "SCORE %d", G.last_score);
     view_draw_text_centered(r, buf, 92, 2, BR_WHITE);
     if (G.new_best && ((int)(s->time * 4) & 1)) view_draw_text_centered(r, "NEW BEST!", 114, 1, BR_YELLOW);
-    if (s->time > 0.6) view_draw_text_centered(r, "ENTER  play again      Q / ESC  menu", 140, 1, br_rgb(190, 190, 190));
+    if (s->time > 0.6)                        /* (on a touch screen: the on-screen buttons) */
+        view_draw_text_centered(r, s->engine->input.last_device == BR_DEVICE_TOUCH ? "A  play again      MENU  menu" : "ENTER  play again      Q / ESC  menu",
+                                140, 1, br_rgb(190, 190, 190));
 }
 
 /* update_below = true: particles keep flying under the overlay */
@@ -279,9 +281,15 @@ static void title_render(br_scene *s) {
     br_fill_rect(r, br_rect_make(0, 0, FB_W, HUD_H), br_rgb(18, 24, 22));
     br_draw_text(r, "BRONTO ENGINE SAMPLE", 6, 6, 1, br_rgb(120, 160, 130));
     view_draw_text_centered(r, "SNAKE", 38 + sinf(t * 2.0f) * 2.0f, 5, br_rgb(150, 240, 100));
-    if (((int)(t * 2.0f)) & 1) view_draw_text_centered(r, "PRESS ENTER", 96, 2, BR_WHITE);
-    view_draw_text_centered(r, "ARROWS / WASD / D-PAD  move", 128, 1, br_rgb(180, 200, 180));
-    view_draw_text_centered(r, "P pause   M music   F11 fullscreen", 140, 1, br_rgb(180, 200, 180));
+    if (s->engine->input.last_device == BR_DEVICE_TOUCH) {     /* played on a touch screen */
+        if (((int)(t * 2.0f)) & 1) view_draw_text_centered(r, "TAP OR PRESS A", 96, 2, BR_WHITE);
+        view_draw_text_centered(r, "THE ARROWS  move", 128, 1, br_rgb(180, 200, 180));
+        view_draw_text_centered(r, "START pause   MUSIC on / off", 140, 1, br_rgb(180, 200, 180));
+    } else {
+        if (((int)(t * 2.0f)) & 1) view_draw_text_centered(r, "PRESS ENTER", 96, 2, BR_WHITE);
+        view_draw_text_centered(r, "ARROWS / WASD / D-PAD  move", 128, 1, br_rgb(180, 200, 180));
+        view_draw_text_centered(r, "P pause   M music   F11 fullscreen", 140, 1, br_rgb(180, 200, 180));
+    }
     snprintf(buf, sizeof(buf), "BEST %d", G.best);
     view_draw_text_centered(r, buf, 160, 1, BR_YELLOW);
 }
@@ -407,6 +415,8 @@ int main(int argc, char **argv) {
     cfg.scale_mode = BR_SCALE_INTEGER;        /* crisp, evenly sized pixels */
     cfg.clear_color = br_rgb(10, 14, 12);
     cfg.initial_scene = &k_title;
+    /* On a phone or tablet (the web build): an on-screen d-pad and buttons, which are a gamepad's (touch.h) */
+    cfg.touch_controls = "up, down, left, right, a, y=m:MUSIC, start, back:MENU";
     cfg.on_init = on_init;
     cfg.on_shutdown = on_shutdown;
     if (G.headless) cfg.platform = br_platform_headless();

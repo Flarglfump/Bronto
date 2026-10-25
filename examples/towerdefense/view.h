@@ -55,6 +55,7 @@ typedef struct ui_state {
     float message_time;
     br_vec2 cursor;
     float time;
+    bool touch;             /* a touch screen: "tap", and the on-screen B cancels */
 } ui_state;
 
 ui_widget view_ui_hit(const ui_state *u, br_vec2 p);
