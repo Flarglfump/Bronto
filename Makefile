@@ -381,3 +381,11 @@ replay-check: $(PLAYER)
 replay-web: $(WEB_PLAYER) $(WEB_RUNTIME) $(WEB_TOOL)
 	$(WEB_TOOL) examples/pantryquest --runtime $(WEB) --replay $(PLAYTHROUGH) -o $(WEB)/pantryquest-replay/index.html
 .PHONY: pantrybot playthrough replay replay-check replay-web
+
+# botrunner: runs a game headless for a bot in another program (stdin/stdout) and records
+# the run; Pantry Quest II's bot (examples/pantryquest2/tools/bot) drives it.
+BOTRUNNER := $(BUILD)/botrunner
+$(BOTRUNNER): tools/botrunner/main.c $(LIB)
+	$(CC) $(CFLAGS) tools/botrunner/main.c $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
+botrunner: $(BOTRUNNER)
+.PHONY: botrunner

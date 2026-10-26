@@ -201,7 +201,7 @@ def build():
     r.enemy('gnat', 8, 17).enemy('crawler', 3, 35)
 
     r = R('C4', 'catacombs', 4, 6, 3, 2, name='Crumbling Crypt')
-    r.door('N', 1).door('E', 1).door('W', 1)
+    r.door('N', 1).door('E', 1).door('W', 1, 'open')  # (no cap: at the end of a crawlspace, a shot can't reach it)
     r.plat(20, 4, 8)                             # under the opening from the Ossuary
     r.plat(10, 8, 6).plat(30, 8, 6)
     r.solid(2, 12, 8, 1).solid(38, 12, 8, 1)

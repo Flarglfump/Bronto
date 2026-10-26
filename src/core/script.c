@@ -5171,6 +5171,15 @@ bool br_script_get_number(br_world *w, br_entity e, const char *var, double *out
     return true;
 }
 
+bool br_script_get_vec2(br_world *w, br_entity e, const char *var, double *x, double *y) {
+    sc_instance *inst = sc_running(w, e);
+    int g = inst ? sc_find_global(inst->prog, var) : -1;
+    if (g < 0 || inst->globals[g].t != V_VEC) return false;
+    *x = inst->globals[g].as.v.x;
+    *y = inst->globals[g].as.v.y;
+    return true;
+}
+
 bool br_script_set_number(br_world *w, br_entity e, const char *var, double value) {
     sc_instance *inst = sc_running(w, e);
     int g = inst ? sc_find_global(inst->prog, var) : -1;

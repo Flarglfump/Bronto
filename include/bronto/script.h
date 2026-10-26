@@ -98,6 +98,8 @@ bool br_script_call(br_world *w, br_entity e, const char *function, const double
 bool br_script_get_number(br_world *w, br_entity e, const char *var, double *out);
 bool br_script_set_number(br_world *w, br_entity e, const char *var, double value);
 bool br_script_get_string(br_world *w, br_entity e, const char *var, char *out, size_t size);
+/* A vec2 variable, at full precision (false if it isn't one). */
+bool br_script_get_vec2(br_world *w, br_entity e, const char *var, double *x, double *y);
 /* An entity variable (false if it isn't one, or the entity is gone). */
 bool br_script_get_entity(br_world *w, br_entity e, const char *var, br_entity *out);
 

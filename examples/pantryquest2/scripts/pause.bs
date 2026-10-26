@@ -89,7 +89,10 @@ func update(dt: number) -> void {
     }
     if button_pressed("lb") { turn = -1 }
     if button_pressed("rb") { turn = 1 }
-    if turn != 0 { set_tab((tab + turn + 4) % 4) }
+    if turn != 0 {                                      # (the press that turns the page does nothing on the new one:
+        set_tab((tab + turn + 4) % 4)                  #  LEFT onto SYSTEM mustn't also change its first setting)
+        return
+    }
     if clicked {
         for i in 4 {
             if inside(m, vec2(8 + i * 60, 6), vec2(56, 14)) {

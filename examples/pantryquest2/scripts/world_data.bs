@@ -19,7 +19,7 @@ func rooms() -> list {
         ["C8", 9, 6, 4, 1, "catacombs", "Bone Corridor", ["W0", "E0"], false],
         ["C9", 13, 6, 2, 1, "catacombs", "Sir Stale's Hall", ["W0:boss", "E0"], true],
         ["C10", 15, 5, 1, 3, "catacombs", "East Stair", ["W1", "N0"], false],
-        ["C4", 4, 6, 3, 2, "catacombs", "Crumbling Crypt", ["N1", "E1", "W1"], false],
+        ["C4", 4, 6, 3, 2, "catacombs", "Crumbling Crypt", ["N1", "E1", "W1:open"], false],
         ["C5", 7, 7, 1, 1, "catacombs", "Rye Hearth", ["W0", "E0"], false],
         ["C11", 8, 7, 3, 1, "catacombs", "Sunken Chapel", ["W0", "N0", "E0:wax"], false],
         ["C7", 3, 7, 1, 3, "catacombs", "Deep Stair", ["E0", "S0"], false],

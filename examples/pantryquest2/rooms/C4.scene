@@ -82,13 +82,9 @@ entity
     text = "Door"
   Transform
     position = 8 424
-  Sprite
-    image = "art/door.bmp"
-    layer = 4
-    frame_size = 16 48
   Script
     file = "scripts/door.bs"
-    vars = "side = \"W\", index = 1, kind = \"blue\", to = \"C7\", arrive = \"E0\""
+    vars = "side = \"W\", index = 1, kind = \"open\", to = \"C7\", arrive = \"E0\""
   Tags
     list = "door"
   Parent
