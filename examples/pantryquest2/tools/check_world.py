@@ -5,12 +5,15 @@ have by then, and follows the order of the game - the items each newly reachable
 holds, the guardians he can beat - until the Count's throne is reached, or nothing more
 can be. It reports anything that can't be reached, and rooms whose doors don't lead on.
 
-    python3 examples/pantryquest2/tools/check_world.py [--verbose]
+    python3 examples/pantryquest2/tools/check_world.py [--verbose] [--exact]
+
+Jumps are played 8 pixels lower than they really reach, so nothing needs a perfect jump
+(--exact plays them at full height).
 
 The movement is tried from every place Basil can stand: walking, falling, jumps of a
 few kinds (straight up, running, turning late, short hops), rolling up, popcorn bounces,
 Frost Sugar steps (the spots marked in world.py) and the Whisk Spin. It is close to the
-game but a little cautious, so anything it says can be reached, can.
+game but cautious, so anything it says can be reached, can, with room to spare.
 """
 import sys
 import os
@@ -20,7 +23,33 @@ sys.path.insert(0, HERE)
 import world                                             # noqa: E402
 from roomkit import SW, SH                               # noqa: E402
 
-RUN, GRAVITY, JUMP, HIGH_JUMP, CUT, MAX_FALL = 1.5, 0.25, 5.25, 6.5, 2.0, 5.0
+RUN, GRAVITY, JUMP, HIGH_JUMP, CUT, MAX_FALL = 1.5, 0.25, 5.4, 7.0, 2.0, 5.0
+
+
+def apex(v):
+    """How high a jump at speed v rises, in pixels (the game moves first, then slows by GRAVITY)."""
+    h, x = 0.0, v
+    while x > 0:
+        h += x
+        x -= GRAVITY
+    return h
+
+
+def with_margin(v, px):
+    """The jump speed whose apex is px lower: the checker plays with these, so that every jump
+    it needs leaves a player some room to spare (a 3-tile ledge for a 3.6-tile jump, say)."""
+    lo, hi = 0.0, v
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        if apex(mid) < apex(v) - px:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+MARGIN = 0 if '--exact' in sys.argv else 8                # pixels of height every needed jump must spare
+JUMP_C, HIGH_JUMP_C = with_margin(JUMP, MARGIN), with_margin(HIGH_JUMP, MARGIN)
 STAND = (12, 26)          # box size; its bottom is the feet
 BALL = (12, 12)
 SOLID = set('#cxruhgY')   # (the room's own letters before autotiling)
@@ -177,7 +206,7 @@ def simulate(g, x, y, ball, plan, ab, vy0=None, frames=150):
                 return end_land(b)
             b.vy = 0
             if press and not b.ball and not jumped:
-                v = HIGH_JUMP if 'leaven' in ab else JUMP
+                v = HIGH_JUMP_C if 'leaven' in ab else JUMP_C
                 if liquid:
                     v *= 0.75
                 b.vy = -v

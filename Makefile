@@ -198,6 +198,7 @@ pantryquest2-check: $(BSCHECK)
 	$(BSCHECK) --strict --project $(PQ2) $(wildcard $(PQ2)/scripts/*.bs) $(wildcard $(PQ2)/scripts/bosses/*.bs)
 	python3 $(PQ2)/tools/check_scenes.py
 	python3 $(PQ2)/tools/check_world.py
+	python3 $(PQ2)/tools/check_softlocks.py
 .PHONY: pantryquest2 pantryquest2-assets pantryquest2-check
 
 # The VS Code extension for .bs scripts: package it, and test it with node.

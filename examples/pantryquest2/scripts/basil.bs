@@ -9,8 +9,8 @@
 
 const RUN: number = 1.5
 const GRAVITY: number = 0.25
-const JUMP: number = 5.25            # about 3 tiles up
-const HIGH_JUMP: number = 6.5        # with the Leaven Boots: about 5
+const JUMP: number = 5.4             # about 3.8 tiles up (a 3-tile ledge with room to spare)
+const HIGH_JUMP: number = 7.0        # with the Leaven Boots: about 6.3 (5-tile ledges, easily)
 const CUT: number = 2.0              # letting go of jump early: rising no faster than this
 const MAX_FALL: number = 5.0
 const SHOT_GAP: int = 9              # steps between shots

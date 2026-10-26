@@ -153,9 +153,15 @@ Everything in `art/`, `sfx/`, `music/`, `rooms/` and `prefabs/` is made by Pytho
 - `check_world.py` plays the world through on paper. It models Basil's jumps, rolls and
   bounces with the same numbers the game uses, picks up items as he reaches them, and beats
   each guardian once he has what it needs. It checks that every room, item and guardian can
-  be reached from the start. `make pantryquest2-check` runs it after `bscheck` and
-  `check_scenes.py`, which makes sure the hand-written scenes' references between entities
-  (the camera following Basil) still point where they should.
+  be reached from the start. It plays every jump 8 pixels lower than it really goes, so
+  nothing the game needs is a pixel-perfect jump (`--exact` plays them at full height).
+- `check_softlocks.py` makes sure Basil can't get stuck. At each stage of the game, from
+  every spot he can reach, he must be able to get back to the start, perhaps by picking up
+  what's there to find; otherwise the spot is reported. A guardian's room or a hazard
+  counts as a way out, since a game over sends him back to a hearth.
+- `check_scenes.py` makes sure the hand-written scenes' references between entities
+  still point where they should (the camera following Basil).
+- `make pantryquest2-check` runs `bscheck` and all three.
 
 To try a part of the game in the editor, set the Game entity's Script vars in `main.scene`:
 `start_room`, `start_pos` (or `start_door`, like `"W0"`) and `start_items`

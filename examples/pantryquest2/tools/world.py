@@ -171,9 +171,9 @@ def build():
 
     r = R('C8', 'catacombs', 9, 6, 4, 1, name='Bone Corridor')
     r.door('W', 0).door('E', 0)
-    r.block('^', 10, 12, 3, 1)                   # spike pits
-    r.block('^', 26, 12, 4, 1)
-    r.block('^', 44, 12, 3, 1)
+    r.block('^', 10, 12, 2, 1)                   # spike pits (two tiles: a running jump clears them)
+    r.block('^', 26, 12, 4, 1)                   # (this one has a stepping stone over it)
+    r.block('^', 44, 12, 2, 1)
     r.plat(27, 10, 3)
     r.plat(17, 8, 3).plat(37, 8, 3).plat(52, 8, 3)
     r.solid(30, 4, 4, 1)                         # a high shelf: a cake slice (the Leaven Boots)
@@ -196,7 +196,7 @@ def build():
     r.plat(10, 14, 5)                             # five tiles up: only the Leaven Boots reach it
     r.plat(1, 10, 6)                              # (above that, the steps are made for them)
     r.plat(7, 5, 4)                               # under the opening up into the Brine Works
-    r.plat(6, 32, 4).plat(2, 36, 3).plat(11, 36, 3).plat(6, 40, 4)
+    r.plat(1, 40, 4).plat(6, 37, 4).plat(11, 34, 4).plat(6, 31, 4)   # the lower stair: three tiles a step, back up to the gap
     r.item('packet', 7, 42, 'packet_c10')
     r.enemy('gnat', 8, 17).enemy('crawler', 3, 35)
 
@@ -227,7 +227,7 @@ def build():
     r.plat(4, 4, 6)                              # under the opening up to the Map Room
     r.plat(2, 8, 3).plat(12, 7, 5)
     r.solid(20, 10, 8, 3)                        # the sunken altar
-    r.plat(31, 8, 4).plat(39, 10, 4)
+    r.plat(39, 10, 4).plat(33, 8, 4).plat(28, 7, 3)   # steps back up over the altar from the pool's side
     r.liquid(28, 11, 9, 2)
     r.enemy('batter', 16, 3).enemy('crawler', 23, 9).enemy('gnat', 38, 5)
 
@@ -243,10 +243,8 @@ def build():
     r = R('F0', 'frost', 3, 10, 1, 3, name='Ice Shaft')
     r.door('N', 0).door('W', 1).door('W', 2).door('E', 1)
     r.plat(6, 4, 4)
-    zigzag(r, range(7, 26, 3), first='right')
-    r.solid(1, 28, 14, 1)
-    r.clear(7, 28, 2, 1)
-    zigzag(r, range(31, 42, 3), first='left')
+    zigzag(r, range(7, 41, 3), first='right')    # one climb, top to bottom (no floor half way to be caught under)
+    r.clear(1, 40, 1, 1)                         # (headroom at the bottom west door)
     r.enemy('crawler', 12, 12).enemy('hopper', 8, 27).enemy('gnat', 6, 36)
 
     r = R('F7', 'frost', 2, 11, 1, 1, name='Frost Map')
