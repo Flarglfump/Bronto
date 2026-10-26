@@ -70,7 +70,7 @@ The defaults:
 | Jump | Z, Space | A |
 | Pepper | X, J | X |
 | Hot sauce | C, L | B |
-| Aim (hold) | Shift, Q | LB |
+| Aim (hold) | Q, Shift | LB |
 | Roll up | E | Y |
 | Pause (map, items, diary, settings) | Enter, P (Esc always works) | Start |
 | Map | M, Tab | Back |
@@ -90,6 +90,10 @@ them can be changed under **CONTROLS**, in OPTIONS on the title or SYSTEM in the
 menu. Choose one and press the new key or button. They're saved for every journey, and
 the game's signs and item descriptions show your keys. The arrow keys, the d-pad, Enter,
 Escape, A and B always work on the controls screen, so it can't be made unusable.
+
+In LibreWolf (and Firefox with its privacy mode, resistFingerprinting), the page gets no
+events for Shift, Ctrl, Alt or Cmd on their own, so those can't be used there: aim with Q,
+or bind another key.
 
 **F9** shows what the game thinks is held (each action and key) and Basil's state, for
 tracking down trouble with a keyboard, a pad or a browser.

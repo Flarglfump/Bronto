@@ -124,24 +124,18 @@ test('keys are known by their code, or else by what they type', () => {
     assert.strictEqual(Bronto.keyOf({ code: '', key: 'é' }), 0);
 });
 
-test('modifiers held without their own key events still reach the game', () => {
+test('a modifier whose keyup went missing is let go, but never pressed on hearsay', () => {
     const none = { shiftKey: false, ctrlKey: false, altKey: false, metaKey: false };
     const held = new Map();
-    /* D pressed with Shift held, but Shift's keydown never came: Shift goes down first */
-    assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 68), [[340, true, 'held:shiftKey']]);
-    held.set('held:shiftKey', 340);
-    assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 68), [], 'still held: nothing to do');
-    assert.deepStrictEqual(Bronto.modifierChanges(held, none, 68), [[340, false, 'held:shiftKey']], 'let go');
-    /* Shift's own events are left to themselves */
-    held.clear();
-    held.set('ShiftLeft', 340);
-    assert.deepStrictEqual(Bronto.modifierChanges(held, none, 340), [], 'its own keyup does it');
+    /* D pressed with Shift held, but Shift's keydown never came (a privacy mode): not pressed,
+     * since nothing would reliably let it go again */
     assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 68), []);
+    /* Shift seen going down, then an event saying it's up: let go */
+    held.set('ShiftLeft', 340);
+    assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 68), [], 'still held');
+    assert.deepStrictEqual(Bronto.modifierChanges(held, none, 68), [[340, false, 'ShiftLeft']], 'let go');
+    assert.deepStrictEqual(Bronto.modifierChanges(held, none, 340), [], 'its own keyup does it');
     assert.deepStrictEqual(Bronto.modifierChanges(held, {}, 68), [], 'an event that doesn\'t say changes nothing');
-    held.clear();
-    assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 0, true), [], 'the mouse never presses one');
-    held.set('held:shiftKey', 340);
-    assert.deepStrictEqual(Bronto.modifierChanges(held, none, 0, true), [[340, false, 'held:shiftKey']], 'but it lets one go');
 });
 
 /* ---- a stand-in browser: just enough DOM for bronto.js ---- */

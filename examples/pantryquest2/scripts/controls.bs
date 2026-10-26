@@ -20,7 +20,7 @@ func start() -> void {
 
 func defaults() -> void {
     keys = [["left", "a"], ["right", "d"], ["up", "w"], ["down", "s"], ["z", "space"], ["x", "j"],
-            ["c", "l"], ["shift", "q"], ["enter", "p"], ["m", "tab"], ["e", ""]]
+            ["c", "l"], ["q", "shift"], ["enter", "p"], ["m", "tab"], ["e", ""]]
     pads = ["left", "right", "up", "down", "a", "x", "b", "lb", "start", "back", "y"]
 }
 

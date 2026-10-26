@@ -55,19 +55,22 @@ function keyOf(e) {
     return 0;
 }
 
-/* Every keyboard and pointer event says whether Shift, Ctrl, Alt and Meta are held, even
- * when the modifier's own key events never came (some privacy modes hold them back). From
- * what the page has seen held (held: code -> br_key) and an event, the modifier keys to
- * press or let go so the game agrees with the event: [[br_key, down, held name]...]. A
- * modifier the event is itself about (its own keydown or keyup) is left to that event. */
+/* Every keyboard and pointer event says whether Shift, Ctrl, Alt and Meta are held. When it
+ * says one is up that the page still has down (its keyup went missing), the page lets it go:
+ * from what the page has seen held (held: code -> br_key) and an event, the modifier keys to
+ * let go, [[br_key, false, held name]...]. A modifier the event is itself about (its own
+ * keyup) is left to that event.
+ *
+ * It never presses one from those flags. Some privacy modes (LibreWolf's) hold back the
+ * modifiers' own events entirely; a modifier pressed on the word of other events could then
+ * only be let go by some later event, and while nothing happens - a key held down, no
+ * repeats - it would stay down in the game. A modifier is pressed only by its own keydown. */
 const MODIFIER_FLAGS = [['shiftKey', 340, 344], ['ctrlKey', 341, 345], ['altKey', 342, 346], ['metaKey', 343, 347]];
-function modifierChanges(held, e, own, releaseOnly) {
+function modifierChanges(held, e, own) {
     const out = [];
     for (const [flag, left, right] of MODIFIER_FLAGS) {
-        if (own === left || own === right || typeof e[flag] !== 'boolean') continue;
-        const names = [...held.keys()].filter((n) => held.get(n) === left || held.get(n) === right);
-        if (e[flag] && names.length === 0 && !releaseOnly) out.push([left, true, 'held:' + flag]);
-        else if (!e[flag]) for (const n of names) out.push([held.get(n), false, n]);
+        if (own === left || own === right || typeof e[flag] !== 'boolean' || e[flag]) continue;
+        for (const n of [...held.keys()].filter((k) => held.get(k) === left || held.get(k) === right)) out.push([held.get(n), false, n]);
     }
     return out;
 }
@@ -454,10 +457,10 @@ async function start(opts) {
             doc.body.appendChild(keyLog);
             cleanup.push(() => keyLog.remove());
         }
-        const syncModifiers = (e, own, releaseOnly) => {
-            for (const [key, down, name] of modifierChanges(held, e, own, releaseOnly)) {
+        const syncModifiers = (e, own) => {
+            for (const [key, down, name] of modifierChanges(held, e, own)) {
                 if (down) held.set(name, key); else held.delete(name);
-                note('  (' + e.type + ' says shift/ctrl/alt) -> ' + key + (down ? ' down' : ' up'));
+                note('  (' + e.type + ' says a modifier is up) -> ' + key + ' up');
                 call(exports.bronto_web_key, key, 0, mods(e), down ? 1 : 0, 0);
             }
         };
@@ -503,14 +506,14 @@ async function start(opts) {
             e.preventDefault();
         };
         on(canvas, 'pointermove', (e) => {
-            syncModifiers(e, 0, true);                 /* (the mouse only lets modifiers go: some browsers' pointer events lag behind) */
+            syncModifiers(e, 0);
             const [x, y] = canvasPoint(e);
             if (isTouch(e)) { if (fingers.has(e.pointerId)) call(exports.bronto_web_touch, 1, e.pointerId, x, y); e.preventDefault(); return; }
             call(exports.bronto_web_mouse_move, x, y);
         });
         on(canvas, 'pointerdown', (e) => {
             resumeAudio();
-            syncModifiers(e, 0, true);
+            syncModifiers(e, 0);
             canvas.focus && canvas.focus();
             if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } }
             const [x, y] = canvasPoint(e);
