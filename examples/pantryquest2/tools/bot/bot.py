@@ -346,12 +346,16 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
         if self.debug:
             self.log('  move', mv.name, 'from', (b.x, b.y, b.sx), 'expect', expect)
         airborne = not b.grounded
+        room = self.room()
         for f in range(220):
             held = mv.keys(f, b) if f < 120 else set()
             self.tick(held)
             if self.state() != 'play':
                 self.wait_play()
                 return 'exit' if isinstance(expect, tuple) and expect[0] == 'exit' else None
+            if self.room() != room:                    # (up a shaft or down one: on into the next room)
+                self.arrive()
+                return 'exit'
             b = self.basil()
             if b.hurt_t > 0:
                 return None
@@ -466,6 +470,32 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
                 n += 1
         self._foe_last, self._foe_prev = seen, prev
         return n
+
+    def arrive(self):
+        """Just come into a room in mid-air (up or down a shaft): steer so as to land in it, not
+        fall straight back out the way he came."""
+        held = set()
+        for _ in range(200):
+            b = self.basil()
+            if b.grounded or self.state() != 'play':
+                break
+            g = self.grid()
+            has = self.has_fn()
+            best = None
+            for d in (0, -1, 1):
+                for k in (0, 4, 10, 20):
+                    mv = nav.Move('arrive', lambda f, bb, d=d, k=k: nav.held_of(d if f >= k else 0), 1)
+                    how, e, frames, _ = nav.play(mv, b, g, has, self.r.held, self.r.steps_ahead(200))
+                    if how == 'land':
+                        score = (e.hurt_count, frames + k)
+                        if best is None or score < best[0]:
+                            best = (score, d, k)
+            if best is None:
+                self.tick(())
+                continue
+            _, d, k = best
+            self.tick(nav.held_of(d) if k == 0 else ())
+        self.tick(())
 
     def wait_play(self, limit=6000):
         """Waits until the game is playing, reading through any talk on the way."""

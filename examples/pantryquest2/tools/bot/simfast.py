@@ -135,10 +135,9 @@ _tables = {}
 
 
 def table(move):
-    t = _tables.get(id(move))
+    t = getattr(move, '_table', None)                  # (kept on the move: ids of dead moves get reused)
     if t is None:
-        arr = (ctypes.c_int * 120)(*[bits(move.fn(f, None)) for f in range(120)])
-        t = _tables[id(move)] = arr
+        t = move._table = (ctypes.c_int * 120)(*[bits(move.fn(f, None)) for f in range(120)])
     return t
 
 
