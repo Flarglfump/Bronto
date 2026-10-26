@@ -241,7 +241,7 @@ class Fighting:
             g = self.grid()
             kind = self.beam()
             shot = self.best_shot(b, g, foes, kind)
-            if shot is None and use_rockets and self.inv()['rockets'] > 0:
+            if shot is None and (use_rockets or any(f.shield or f.armored for f in foes)) and self.inv()['rockets'] > 0:
                 shot = self.best_shot(b, g, foes, 'rocket')
                 if shot:
                     kind = 'rocket'
