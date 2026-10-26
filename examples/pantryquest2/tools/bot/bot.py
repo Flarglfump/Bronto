@@ -9,7 +9,7 @@ import sim
 from game import Game
 from runner import Runner, GameEnded
 from fight import Fighting
-from travel import Travel
+from travel import Travel, HearthTravel
 from boss import BossFight
 from blocks import Blocks
 from freeze import Freezing
@@ -23,7 +23,7 @@ class Died(Exception):
     pass
 
 
-class Bot(Fighting, Travel, BossFight, Blocks, Freezing):
+class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
     def __init__(self, runner, verbose=True, shots=None):
         self.r = runner
         self.g = Game(runner)

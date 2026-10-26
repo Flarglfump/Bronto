@@ -91,7 +91,7 @@ class Travel:
     # ---- the world ----
     def travel(self, target_room, offline_goal=None):
         """To a room (and, with offline_goal(spots), to a part of it), room by room."""
-        tried_hearth = False
+        tried_hearth = 0
         for attempt in range(60):
             self.wait_play()
             room = self.room()
@@ -109,8 +109,8 @@ class Travel:
                             break
             if plan is None:
                 self.log('no route from', room, node, 'to', target_room)
-                if not tried_hearth and self.return_to_hearth():
-                    tried_hearth = True
+                if tried_hearth < 2 and self.by_hearths(goal):
+                    tried_hearth += 1
                     continue
                 return False
             if not plan:
@@ -182,3 +182,75 @@ def parse_vec(t):
         a, b = t[1:-1].split(',')
         return float(a), float(b)
     return 0.0, 0.0
+
+
+def hearth_spot(room_id):
+    for th in wn.things(room_id, 'hearth'):
+        return (th.x, th.y, False)
+    return None
+
+
+class HearthTravel:
+    """Mixed into Bot: travelling between hearths (the hearth's menu), when there's no way on foot."""
+
+    def known_hearths(self):
+        return [f.split(':', 1)[1] for f in self.flags() if f.startswith('hearth:')]
+
+    def by_hearths(self, goal):
+        """Gets to a hearth from which goal(room, spots) can be reached on foot, travelling by the
+        hearths' menu (walking to a hearth first, or returning to the last one)."""
+        ab, fl = self.abilities(), self.flags()
+        ends = [h for h in self.known_hearths() if WN.route(h, hearth_spot(h), goal, ab, fl) is not None]
+        if not ends:
+            self.log('no hearth leads there either')
+            return False
+        room = self.room()
+        node = nav.node_of(self.settle())
+        start = None
+        if room in self.known_hearths():
+            start = room
+        else:
+            for h in self.known_hearths():
+                if WN.route(room, node, lambda r, s, h=h: r == h, ab, fl) is not None:
+                    start = h
+                    break
+        if start is None:
+            if not self.return_to_hearth():
+                return False
+            start = self.room()
+        elif start != room:
+            self.travel(start)
+        dest = ends[0]
+        self.log('travelling by hearth:', start, '->', dest)
+        return self.hearth_travel(dest)
+
+    def hearth_travel(self, dest):
+        for (s, i, nm, x, y) in self.r.tagged('hearth'):
+            self.use_here(x, y + 4, 'the hearth')
+            break
+        else:
+            return False
+        if not self.wait_until(lambda: self.r.scenes()[-1:] == ['hearth.scene'] or
+                               self.r.scenes()[-1:] == ['dialogue.scene'], 120):
+            return False
+        if self.r.scenes()[-1:] == ['dialogue.scene']:
+            self.read_talk()
+            return self.room() == dest
+        self.wait(15)
+        places = self.g.raw('Hearth', 'places')
+        rooms = [p.strip(' [') for p in places.strip('[]').split('],')]
+        rooms = [r.split(',')[0].strip(' []') for r in rooms]
+        if dest not in rooms:
+            self.tick(('rocket',))
+            self.tick(())
+            self.wait_play()
+            return False
+        for _ in range(rooms.index(dest) + 1):
+            self.tick(('down',))
+            self.tick(())
+        self.wait(10)
+        self.tick(('jump',))
+        self.tick(())
+        self.wait_until(lambda: self.room() == dest and self.state() == 'play', 400)
+        self.wait_play()
+        return self.room() == dest
