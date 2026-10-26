@@ -54,10 +54,13 @@ class Freezing:
     def _freeze_cross(self, goal, heur, goal_xy, limit, desc):
         useful_cache = {}
         start_frame = self.r.frames
+        room = self.room()
         while self.r.frames - start_frame < limit:
             if self.state() != 'play' or len(self.r.scenes()) > 1:
                 self.wait_play()
                 continue
+            if self.room() != room:                    # (through the way out: done)
+                return True
             b = self.basil()
             if b.hurt_t > 0 or not b.grounded:
                 self.tick(())
