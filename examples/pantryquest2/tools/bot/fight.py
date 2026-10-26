@@ -186,9 +186,13 @@ class Fighting:
         """(foe, aim, facing, crouch, steps) for a shot that hits from where he is, or None."""
         best = None
         stances = [(False,)] + ([(True,)] if allow_crouch else [])
+        tries = getattr(self, '_shots_at', {})
         for foe in foes:
             if not foe.visible or not self.can_hurt(foe, kind):
                 continue
+            t = tries.get(foe.id)
+            if t and t[0] >= 8 and t[1] == foe.hp:
+                continue                                  # (eight shots and no harm done: leave it be)
             for (crouch,) in stances:
                 for facing in (b.facing, -b.facing):
                     for aim in AIMS:
@@ -264,6 +268,9 @@ class Fighting:
             if b.shot_cd <= 0 and (kind == 'rocket' or n_shots < 3) and fire not in self.r.held:
                 keys = keys | {fire}
                 shot_any = True
+                tries = self.__dict__.setdefault('_shots_at', {})
+                t = tries.get(foe.id)
+                tries[foe.id] = (t[0] + 1, t[1]) if t and t[1] == foe.hp else (1, foe.hp)
             if crouch:
                 keys.discard('down')
             self.tick(keys)

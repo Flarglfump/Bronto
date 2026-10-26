@@ -316,6 +316,9 @@ def ending(bot):
 
 
 def main():
+    import faulthandler
+    import signal
+    faulthandler.register(signal.SIGUSR1)              # (kill -USR1: where is it? without stopping it)
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', default=os.path.join(HERE, '..', 'playthrough.brec'))
     ap.add_argument('--quiet', action='store_true')
