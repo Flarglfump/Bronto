@@ -287,7 +287,7 @@ class RoomGraph:
             self._add(out, how, e, frames, mv, None)
         return [(c, r, mv, dx) for r, (c, mv, dx) in out.items()]
 
-    def path(self, start, goal, heuristic=None, limit=4000, start_state=None):
+    def path(self, start, goal, heuristic=None, limit=4000, start_state=None, banned=()):
         """Cheapest way (in frames) from a node to one goal(node) says yes to: [(node, move, dx, next)].
         With start_state, the first moves are played from exactly there."""
         if goal(start):
@@ -316,6 +316,8 @@ class RoomGraph:
             if n_exp > limit:
                 break
             for c, r, mv, dx in (first if (n == start and first is not None) else self.moves(n)):
+                if banned and (n, mv.name) in banned:
+                    continue
                 nc = cost + c
                 if nc < best.get(r, 1e18):
                     best[r] = nc

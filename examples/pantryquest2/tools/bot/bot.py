@@ -134,6 +134,7 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
         (or once he's left the room: the goal was this room's)."""
         start_room = self.room()
         offs = {}
+        banned = set()
         for attempt in range(tries):
             self.wait_play()
             if self.room() != start_room:
@@ -148,7 +149,7 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
                 self.tick(())
                 continue
             self._escaping = rg.allow_hurt
-            path = rg.path(here, goal, heuristic, start_state=b)
+            path = rg.path(here, goal, heuristic, start_state=b, banned=banned)
             if path is None:
                 # through blocks he can break?
                 has = self.has_fn()
@@ -175,9 +176,14 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
             if ok == 'off':
                 at = nav.node_of(self.basil())
                 offs[at] = offs.get(at, 0) + 1
-                if offs[at] >= 2:                      # (knocked off the same way again: clear the way first)
+                if offs[at] == 2:                      # (knocked off the same way again: clear the way first)
                     self.log('  clearing the enemies about first')
                     self.engage(radius=240, max_frames=600, use_rockets=True, quiet=90)
+                elif offs[at] > 2 and path:            # (and again: some other way)
+                    self.log('  not that way again:', path[0][1].name, 'from', path[0][0])
+                    banned.add((path[0][0], path[0][1].name))
+                    if path[0][0] != at:
+                        banned.add((at, path[0][1].name))
             if ok == 'done':
                 return True
             if ok == 'exit':
