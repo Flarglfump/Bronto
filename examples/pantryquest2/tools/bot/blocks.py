@@ -133,3 +133,59 @@ class Blocks:
                     self.settle()
                     return True
         return False
+
+
+    def shoot_point(self, px, py, through_walls=False, half=(9, 11), done=None, limit=300):
+        """Stands somewhere a shot reaches a box (a switch behind a wall, with garlic) and fires
+        until done() (or limit frames)."""
+        g = self.grid()
+        rg = self.graph(g)
+        here = nav.node_of(self.settle())
+        kind = self.beam()
+        rng = 132.0 if kind in ('garlic', 'garlic_frost') else 88.0
+        best = None
+        for node, cost in rg.reachable(here).items():
+            if node[0] == 'exit' or node[2]:
+                continue
+            for a in rg.anchor_states(node):
+                for crouch in (False, True):
+                    for facing in (1, -1):
+                        for aim in AIMS:
+                            if crouch and aim == 'down':
+                                continue
+                            mx, my = muzzle(a.x, a.y, facing, aim, crouch)
+                            ddx, ddy = aim_dir(aim, facing)
+                            x, y, gone, ok = mx, my, 0.0, False
+                            while gone < rng:
+                                x += ddx * 2.5
+                                y += ddy * 2.5
+                                gone += 2.5
+                                if abs(x - px) < half[0] and abs(y - py) < half[1]:
+                                    ok = True
+                                    break
+                                t = g.tile_at(x, y)
+                                if t in ('Y', 'c') or (not through_walls and t in g.solid_chars):
+                                    break
+                            if ok and (best is None or cost < best[0]):
+                                best = (cost, node, aim, facing, crouch)
+        if best is None:
+            self.log('no spot to shoot', (px, py), 'from')
+            return False
+        _, node, aim, facing, crouch = best
+        self.goto(lambda n, node=node: n == node, nav.dist_heuristic(node[0] * 16 + 8, node[1] * 16), desc='a spot to shoot from')
+        for _ in range(limit):
+            if done and done():
+                break
+            b = self.basil()
+            if crouch and not b.crouch:
+                self.tick(())
+                self.tick(('down',))
+                continue
+            keys = stance_keys(aim, facing)
+            if crouch:
+                keys.discard('down')
+            if b.shot_cd <= 0 and 'fire' not in self.r.held:
+                keys.add('fire')
+            self.tick(keys)
+        self.release_stance()
+        return True

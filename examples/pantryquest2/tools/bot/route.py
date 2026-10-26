@@ -159,6 +159,162 @@ def leaven(bot):
     get(bot, 'M2', 'leaven')
 
 
+@step
+def high_places(bot):
+    bot.r.segment('The Leaven Boots')
+    get(bot, 'C8', 'cake_c8')
+    get(bot, 'V2r', 'cake_v2r')
+
+
+@step
+def page3(bot):
+    get(bot, 'F1', 'page3')
+
+
+@step
+def packet_c10(bot):
+    rest_at(bot, 'C5')
+    get(bot, 'C10', 'packet_c10')
+
+
+@step
+def brine_works(bot):
+    bot.r.segment('The Brine Works')
+    rest_at(bot, 'B2')
+    read_map(bot, 'B2')
+    get(bot, 'B1', 'page6')
+    get(bot, 'B1', 'packet_b1')
+
+
+@step
+def mitts(bot):
+    get(bot, 'B4', 'mitts')
+
+
+@step
+def garlic(bot):
+    get(bot, 'B6', 'page5')
+    get(bot, 'B6', 'garlic')
+
+
+@step
+def to_brine(bot):
+    rest_at(bot, 'B2')
+    if not bot.travel('B8'):
+        raise RuntimeError('could not get to Doctor Brine')
+
+
+@step
+def brine(bot):
+    bot.r.segment('Doctor Brine')
+    bot.goto(lambda n: n[0] != 'exit' and n[0] <= 22 and n[1] == 12, nav.dist_heuristic(300, 192), desc='into the lab')
+    if not boss.fight_brine(bot):
+        raise RuntimeError('Doctor Brine won')
+    bot.take_item('seal_vinegar')
+
+
+@step
+def whisk(bot):
+    bot.r.segment('The hot kitchens')
+    get(bot, 'M6', 'whisk')
+
+
+@step
+def hot_kitchens(bot):
+    get(bot, 'M5', 'cake_m5')
+    get(bot, 'M1', 'page4')
+
+
+@step
+def to_wyrm(bot):
+    rest_at(bot, 'M3')
+    if not bot.travel('M7'):
+        raise RuntimeError('could not get to Cheese Falls')
+    hit_switch(bot)
+    if not bot.travel('M8'):
+        raise RuntimeError('could not get to the Wyrm')
+
+
+def hit_switch(bot):
+    """Cheese Falls: the grate over the west door opens from a switch behind a wall; garlic
+    pepper goes through walls."""
+    for _ in range(3):
+        if any(f.startswith('switch:') for f in bot.flags()):
+            return
+        sw = [e for e in bot.r.find('Switch')]
+        if not sw:
+            return
+        sx, sy = bot.r.pos(*sw[0])
+        bot.set_frost(False)
+        bot.shoot_point(sx, sy, through_walls=True, done=lambda: any(f.startswith('switch:') for f in bot.flags()))
+
+
+@step
+def wyrm(bot):
+    bot.r.segment('The Flambe Wyrm')
+    if not boss.fight_wyrm(bot):
+        raise RuntimeError('the Wyrm won')
+    bot.take_item('seal_pepper')
+
+
+@step
+def castle(bot):
+    bot.r.segment('Castle Fromage')
+    rest_at(bot, 'V1')
+    if not bot.travel('X0'):
+        raise RuntimeError('could not get into the castle')
+    rest_at(bot, 'X0')
+    get(bot, 'X2', 'page7')
+    read_map(bot, 'X3')
+    get(bot, 'X3', 'page8')
+    get(bot, 'X3', 'packet_x3')
+    get(bot, 'X4', 'cake_x4')
+
+
+@step
+def to_count(bot):
+    rest_at(bot, 'X4')
+    if not bot.travel('X7'):
+        raise RuntimeError('could not get to the throne room')
+
+
+@step
+def count(bot):
+    bot.r.segment('Count Fromage')
+    bot.goto(lambda n: n[0] != 'exit' and 6 <= n[0] <= 26 and n[1] == 12, nav.dist_heuristic(256, 192), desc='into the throne room')
+    if not boss.fight_count(bot):
+        raise RuntimeError('the Count won')
+
+
+@step
+def pip(bot):
+    bot.r.segment('The escape')
+    if not bot.travel('X8'):
+        raise RuntimeError('could not get to Pip')
+    for (sc, i, nm, x, y) in bot.r.tagged('npc'):
+        bot.touch_point(x, y, (30, 30), desc='Pip')
+    bot.wait_play()
+
+
+@step
+def escape(bot):
+    bot.travel('V4')
+    bot.wait_until(lambda: bot.r.scenes()[:1] == ['ending.scene'], 600)
+
+
+@step
+def ending(bot):
+    bot.r.segment('The ending')
+    bot.watch_death = False
+    for _ in range(40):
+        if bot.r.scenes()[:1] == ['title.scene']:
+            break
+        bot.wait(240)
+        bot.tick(('jump',))
+        bot.tick(())
+    bot.wait(120)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', default=os.path.join(HERE, '..', 'playthrough.brec'))
