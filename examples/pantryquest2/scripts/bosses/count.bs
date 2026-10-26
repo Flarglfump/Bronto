@@ -40,7 +40,7 @@ func phase2() -> bool { return state == "change" or state == "big" or state == "
 
 func hit_by(p: vec2, r: number) -> bool {
     if state == "big" { return abs(p.x - self.x) < 26 + r and abs(p.y - self.y) < 26 + r }
-    return (state == "cast" or state == "appear") and abs(p.x - self.x) < 10 + r and abs(p.y - (self.y - 10)) < 14 + r
+    return (state == "cast" or state == "appear") and abs(p.x - self.x) < 10 + r and abs(p.y - self.y) < 22 + r   # (his whole height: a shot from a standing Basil hits)
 }
 
 func hit(amount: number, kind: string, from: vec2) -> bool {

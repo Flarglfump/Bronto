@@ -647,7 +647,7 @@ def fight_count(bot):
             return None
         if i['state'] == 'big':
             return (i['x'], i['y'], 26, 26, i['vel'][0], i['vel'][1])
-        return (i['x'], i['y'] - 10, 10, 14, 0, 0)
+        return (i['x'], i['y'], 10, 22, 0, 0)
 
     def prefer(s):
         i = st or look()
@@ -657,8 +657,15 @@ def fight_count(bot):
         p += abs(s.x - 256) * 0.02
         return p
 
+    def weapon():                                      # (hot sauce for the Count; only garlic hurts the Big Cheese)
+        return 'beam' if (st or look()).get('state') == 'big' or bot.inv()['rockets'] <= 0 else 'rocket'
+
+    bot.boss_weapon = weapon
     bot.set_frost(False)
     bot.log('fighting Count Fromage')
-    ok = bot.fight_loop(model, prefer, can_hurt, box, lambda: 'boss:count' in bot.flags())
+    try:
+        ok = bot.fight_loop(model, prefer, can_hurt, box, lambda: 'boss:count' in bot.flags())
+    finally:
+        bot.boss_weapon = None
     bot.wait_play()
     return ok
