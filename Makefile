@@ -21,6 +21,7 @@
 #   make web-test   run the test suite as WebAssembly (in Node) and check the web C library
 #   make playthrough / replay / replay-check / replay-web
 #                   Pantry Quest played through by a bot, and watched back frame for frame
+#   make pq2-playthrough / pq2-replay / pq2-replay-check / pq2-replay-web   the same for Pantry Quest II
 #   make clean
 
 CC      ?= cc
@@ -389,3 +390,19 @@ $(BOTRUNNER): tools/botrunner/main.c $(LIB)
 	$(CC) $(CFLAGS) tools/botrunner/main.c $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
 botrunner: $(BOTRUNNER)
 .PHONY: botrunner
+
+# Pantry Quest II, played through by its bot (examples/pantryquest2/tools/bot, Python 3) the same way:
+#   make pq2-playthrough      the bot plays the whole game and records it: $(PQ2_PLAYTHROUGH)
+#   make pq2-replay           watch the recording in a window (SEGMENT=N starts at segment N)
+#   make pq2-replay-check     play it back headless and check every recorded frame
+#   make pq2-replay-web       a one-file web page that plays it: $(WEB)/pantryquest2-replay/index.html
+PQ2_PLAYTHROUGH ?= examples/pantryquest2/tools/playthrough.brec
+pq2-playthrough: $(BOTRUNNER)
+	python3 -u examples/pantryquest2/tools/bot/route.py --out $(PQ2_PLAYTHROUGH)
+pq2-replay: $(PLAYER)
+	$(PLAYER) examples/pantryquest2 --replay $(PQ2_PLAYTHROUGH) $(if $(SEGMENT),--segment $(SEGMENT))
+pq2-replay-check: $(PLAYER)
+	$(PLAYER) examples/pantryquest2 --replay $(PQ2_PLAYTHROUGH) --headless
+pq2-replay-web: $(WEB_PLAYER) $(WEB_RUNTIME) $(WEB_TOOL)
+	$(WEB_TOOL) examples/pantryquest2 --runtime $(WEB) --replay $(PQ2_PLAYTHROUGH) -o $(WEB)/pantryquest2-replay/index.html
+.PHONY: pq2-playthrough pq2-replay pq2-replay-check pq2-replay-web

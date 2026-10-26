@@ -100,6 +100,9 @@ class Runner:
         return self.frames
 
     def segment(self, name):
+        if name == getattr(self, '_last_seg', None):      # (a step tried again: the same segment still)
+            return
+        self._last_seg = name
         self.ask('seg ' + name)
 
     # ---- reading ----
