@@ -4472,8 +4472,9 @@ static void sc_bind_one(sc_vm *vm, br_input *in, br_action act, const char *what
         }
     } else {
         br_key k = sc_key_named(what);
+        bool either = sc_strieq(what, "shift") || sc_strieq(what, "ctrl") || sc_strieq(what, "alt");   /* either side, as key_down() takes them */
         if (k == BR_KEY_UNKNOWN) sc_fail(vm, line, "bind(): there is no key called \"%s\" (or write mouse:0, pad:a, pad:left_x-)", what);
-        br_input_bind(in, act, BR_BIND_KEY, (int)k, -1);
+        br_input_bind(in, act, BR_BIND_KEY, (int)k, either ? BR_KEY_EITHER_SIDE : -1);
     }
 }
 static br_action sc_action(sc_vm *vm, const sc_value *v, int line, const char *what, bool create) {
@@ -4513,7 +4514,14 @@ static bool sc_action_state(sc_vm *vm, const sc_value *v, int line, int which, c
         const br_binding *b = &d->bindings[i];
         bool down = false, pressed = false, released = false;
         switch (b->kind) {
-        case BR_BIND_KEY: down = br_key_down(&e->input, (br_key)b->code); pressed = br_key_pressed(&e->input, (br_key)b->code); released = br_key_released(&e->input, (br_key)b->code); break;
+        case BR_BIND_KEY: {
+            br_key other = b->pad == BR_KEY_EITHER_SIDE ? br_key_right_partner((br_key)b->code) : BR_KEY_UNKNOWN;
+            down = br_key_down(&e->input, (br_key)b->code); pressed = br_key_pressed(&e->input, (br_key)b->code); released = br_key_released(&e->input, (br_key)b->code);
+            if (other != BR_KEY_UNKNOWN) {                       /* "shift": the right one too */
+                down |= br_key_down(&e->input, other); pressed |= br_key_pressed(&e->input, other); released |= br_key_released(&e->input, other);
+            }
+            break;
+        }
         case BR_BIND_MOUSE_BUTTON: down = br_mouse_down(&e->input, (br_mouse_button)b->code); pressed = br_mouse_pressed(&e->input, (br_mouse_button)b->code); released = br_mouse_released(&e->input, (br_mouse_button)b->code); break;
         case BR_BIND_PAD_BUTTON:
             for (p = 0; p < BR_MAX_GAMEPADS; ++p) {

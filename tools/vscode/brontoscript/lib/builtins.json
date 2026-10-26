@@ -1800,7 +1800,7 @@
   {
    "name": "bind",
    "signature": "bind(action, input, ...)",
-   "doc": "Adds inputs to a named action (up to 6): a key's name (\"space\"), \"mouse:0\", \"pad:a\", or \"pad:left_x-\" (a stick pushed that way).",
+   "doc": "Adds inputs to a named action (up to 6): a key's name (\"space\"), \"mouse:0\", \"pad:a\", or \"pad:left_x-\" (a stick pushed that way). \"shift\", \"ctrl\" and \"alt\" mean either side; \"leftshift\" one side.",
    "params": [
     "action",
     "input",

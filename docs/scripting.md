@@ -443,6 +443,8 @@ func update(dt: number) -> void {
 - `bind(action, input, ...)` adds up to six inputs: a key's name, `"mouse:0"` (1 right,
   2 middle), `"pad:a"` (any button `button_down()` names), or `"pad:left_x-"` /
   `"pad:right_y+"` / `"pad:lt+"` (a stick or trigger pushed that way past half way).
+  `"shift"`, `"ctrl"` and `"alt"` mean either side, as they do for `key_down()`;
+  `"leftshift"` or `"rightshift"` is one side only.
   `unbind(action)` takes them all off. Actions are kept for the whole game.
 - `action_down(name)`, `action_pressed(name)` (once per press, like `key_pressed()`),
   `action_released(name)`, and `action_axis(negative, positive)`: -1, 0 or 1.

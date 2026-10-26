@@ -296,6 +296,26 @@ void br_input_clear_bindings(br_input *in, br_action a) {
     if (a >= 0 && a < in->action_count) in->actions[a].binding_count = 0;
 }
 
+br_key br_key_right_partner(br_key k) {
+    switch (k) {
+    case BR_KEY_LEFT_SHIFT: return BR_KEY_RIGHT_SHIFT;
+    case BR_KEY_LEFT_CONTROL: return BR_KEY_RIGHT_CONTROL;
+    case BR_KEY_LEFT_ALT: return BR_KEY_RIGHT_ALT;
+    case BR_KEY_LEFT_SUPER: return BR_KEY_RIGHT_SUPER;
+    default: return BR_KEY_UNKNOWN;
+    }
+}
+
+/* A key binding's key, or (BR_KEY_EITHER_SIDE) its right partner too, in a key table. */
+static bool key_in(const br_binding *b, const bool *table) {
+    br_key other;
+    if (!valid_key(b->code)) return false;
+    if (table[b->code]) return true;
+    if (b->pad != BR_KEY_EITHER_SIDE) return false;
+    other = br_key_right_partner((br_key)b->code);
+    return other != BR_KEY_UNKNOWN && table[other];
+}
+
 static bool binding_down_on_pad(const br_input *in, const br_binding *b, int pad) {
     const br_gamepad_state *p = &in->pads[pad];
     switch (b->kind) {
@@ -314,7 +334,7 @@ static bool binding_down(const br_input *in, const br_binding *b) {
     int p;
     switch (b->kind) {
     case BR_BIND_KEY:
-        return valid_key(b->code) && in->keys[b->code];
+        return key_in(b, in->keys);
     case BR_BIND_MOUSE_BUTTON:
         return b->code >= 0 && b->code < BR_MOUSE_BUTTON_COUNT && in->mouse[b->code];
     case BR_BIND_PAD_BUTTON:
@@ -335,7 +355,7 @@ static bool binding_tapped(const br_input *in, const br_binding *b) {
     int p;
     switch (b->kind) {
     case BR_BIND_KEY:
-        return valid_key(b->code) && in->keys_pressed[b->code];
+        return key_in(b, in->keys_pressed);
     case BR_BIND_MOUSE_BUTTON:
         return b->code >= 0 && b->code < BR_MOUSE_BUTTON_COUNT && in->mouse_pressed[b->code];
     case BR_BIND_PAD_BUTTON:

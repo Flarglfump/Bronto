@@ -100,8 +100,16 @@ typedef enum br_binding_kind {
 typedef struct br_binding {
     br_binding_kind kind;
     int code;     /* key / button / axis */
-    int pad;      /* gamepad index, -1 = any */
+    int pad;      /* gamepad index, -1 = any; for a key, BR_KEY_EITHER_SIDE or -1 */
 } br_binding;
+
+/* br_binding.pad for a key binding: a left Shift, Ctrl, Alt or Super key also answers to
+ * the same key on the right (as "shift" means in scripts). */
+#define BR_KEY_EITHER_SIDE 1
+
+/* The right-hand partner of a left modifier key (BR_KEY_LEFT_SHIFT -> BR_KEY_RIGHT_SHIFT),
+ * or BR_KEY_UNKNOWN for any other key. */
+br_key br_key_right_partner(br_key k);
 
 typedef struct br_action_def {
     char name[BR_ACTION_NAME_MAX];

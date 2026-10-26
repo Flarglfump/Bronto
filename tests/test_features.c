@@ -461,6 +461,44 @@ static void test_broadcast_and_globals(void) {
     teardown();
 }
 
+/* "shift", "ctrl" and "alt" mean either side in bind(), as in key_down(); "leftshift" one side. */
+static void test_bind_either_side(void) {
+    br_entity s;
+    br_event ev;
+    br_action c_act;
+    setup();
+    s = scripted("p", "sides.bs",
+        "var aim: bool\nvar dash: bool\nvar edge: int = 0\n"
+        "func start() -> void {\n"
+        "    bind(\"aim\", \"shift\", \"q\")\n"
+        "    bind(\"dash\", \"leftshift\")\n"
+        "}\n"
+        "func update(dt: number) -> void {\n"
+        "    aim = action_down(\"aim\")\n"
+        "    dash = action_down(\"dash\")\n"
+        "    if action_pressed(\"aim\") { edge += 1 }\n"
+        "}\n");
+    steps(1);
+    br_input_begin_frame(&g_engine.input);
+    ev = br_event_key(BR_EVENT_KEY_DOWN, BR_KEY_RIGHT_SHIFT, BR_MOD_SHIFT, false);
+    br_input_handle_event(&g_engine.input, &ev);
+    br_input_end_events(&g_engine.input);
+    steps(1);
+    CHECK(num(s, "aim") == 1 && num(s, "dash") == 0 && num(s, "edge") == 1);
+    c_act = br_input_action(&g_engine.input, "aim");                 /* the C side agrees */
+    CHECK(br_action_down(&g_engine.input, c_act));
+    br_input_begin_frame(&g_engine.input);
+    ev = br_event_key(BR_EVENT_KEY_UP, BR_KEY_RIGHT_SHIFT, 0, false);
+    br_input_handle_event(&g_engine.input, &ev);
+    ev = br_event_key(BR_EVENT_KEY_DOWN, BR_KEY_LEFT_SHIFT, BR_MOD_SHIFT, false);
+    br_input_handle_event(&g_engine.input, &ev);
+    br_input_end_events(&g_engine.input);
+    steps(1);
+    CHECK(num(s, "aim") == 1 && num(s, "dash") == 1);
+    teardown();
+    CHECK(br_key_right_partner(BR_KEY_LEFT_ALT) == BR_KEY_RIGHT_ALT && br_key_right_partner(BR_KEY_A) == BR_KEY_UNKNOWN);
+}
+
 /* Every script's variables are set before any start() runs, so a start() can read another
  * entity's variables whichever was made first. */
 static void test_start_sees_others(void) {
@@ -593,6 +631,7 @@ void suite_features(void) {
     RUN(test_script_draw);
     RUN(test_voices_music_tones);
     RUN(test_broadcast_and_globals);
+    RUN(test_bind_either_side);
     RUN(test_start_sees_others);
     RUN(test_read_folder);
     RUN(test_scene_requests);
