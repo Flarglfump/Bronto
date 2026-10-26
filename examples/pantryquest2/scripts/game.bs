@@ -87,6 +87,7 @@ var story: entity
 func start() -> void {
     basil = find("Basil")
     cam = find("Camera")
+    cam.Camera.follow = basil                        # (the scene says so too; this keeps it so if entities are reordered)
     story = find("Story")
     rooms_data = find("World").rooms()
     slot = global("slot", "slot1")

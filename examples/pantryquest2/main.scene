@@ -54,7 +54,7 @@ entity
   Camera
     current = true
     zoom = 1
-    follow = 3
+    follow = 4
     follow_offset = 0 -8
     deadzone = 12 20
     smoothing = 0.06
