@@ -1,0 +1,162 @@
+@strict
+# The controls: two keys and one gamepad button for each action, which the player can
+# change (in OPTIONS on the title, or SYSTEM in the pause menu). They're kept in the save
+# "controls", shared by every journey, and put into effect as the engine's actions with
+# bind(), so every script just asks action_down("jump") and the like.
+#
+# Some inputs always stay as they are, so nobody can lock themselves out: the left stick
+# moves, and Escape pauses. A "Controls" entity in title.scene, main.scene and
+# pause.scene runs this; scripts/rebind.bs is the screen that changes it.
+
+var actions: list[string] = ["left", "right", "up", "down", "jump", "fire", "rocket", "aim", "pause", "map"]
+var names: list[string] = ["LEFT", "RIGHT", "UP", "DOWN", "JUMP", "PEPPER", "HOT SAUCE", "ANGLE AIM", "PAUSE", "MAP"]
+var keys: list[list] = []                 # for each action, [first key, second key] ("" = none)
+var pads: list[string] = []               # for each action, a gamepad button, as button_down() names them
+
+func start() -> void {
+    load()
+    apply()
+}
+
+func defaults() -> void {
+    keys = [["left", "a"], ["right", "d"], ["up", "w"], ["down", "s"], ["z", "space"], ["x", "j"],
+            ["c", "l"], ["shift", "q"], ["enter", "p"], ["m", "tab"]]
+    pads = ["left", "right", "up", "down", "a", "x", "b", "lb", "start", "back"]
+}
+
+func load() -> void {
+    defaults()
+    var d: any = load_data("controls")
+    if d == nil { return }
+    var l: list = d
+    if len(l) < 2 or len(l[0]) != len(actions) or len(l[1]) != len(actions) { return }   # (from another version: the defaults)
+    keys = l[0]
+    pads = l[1]
+}
+
+func save() -> void { save_data("controls", [keys, pads]) }
+
+# Puts the controls into effect: each action, its keys and button (and what never changes).
+func apply() -> void {
+    var always: list = [["left", "pad:left_x-"], ["right", "pad:left_x+"], ["up", "pad:left_y-"], ["down", "pad:left_y+"],
+                        ["pause", "escape"]]
+    for i in len(actions) {
+        var a: string = actions[i]
+        unbind(a)
+        var ins: list[string] = []
+        for k in keys[i] {
+            if k != "" { push(ins, k) }
+        }
+        if pads[i] != "" { push(ins, "pad:" + pads[i]) }
+        for x in always {
+            if x[0] == a and not contains(ins, x[1]) { push(ins, x[1]) }
+        }
+        for input in ins { bind(a, input) }
+    }
+}
+
+func index_of(action: string) -> int {
+    for i in len(actions) {
+        if actions[i] == action { return i }
+    }
+    return -1
+}
+
+# Gives an action a key (which = 0 or 1, its first or second). A key belongs to one
+# action only: taken from another, it leaves that one's place empty.
+func set_key(action: string, which: int, key: string) -> void {
+    var n: int = index_of(action)
+    if n < 0 { return }
+    for i in len(actions) {
+        for w in 2 {
+            if keys[i][w] == key { keys[i][w] = "" }
+        }
+    }
+    keys[n][which] = key
+    save()
+    apply()
+}
+
+# The same for its gamepad button: if another action had it, the two swap.
+func set_pad(action: string, button: string) -> void {
+    var n: int = index_of(action)
+    if n < 0 { return }
+    for i in len(actions) {
+        if i != n and pads[i] == button { pads[i] = pads[n] }
+    }
+    pads[n] = button
+    save()
+    apply()
+}
+
+func reset() -> void {
+    defaults()
+    save()
+    apply()
+}
+
+# How to show an input to the player, in five letters at most: "Z", "SPACE", "LSHFT"...
+func key_label(k: string) -> string {
+    if k == "" { return "-" }
+    var short: list = [["leftshift", "LSHFT"], ["rightshift", "RSHFT"], ["leftctrl", "LCTRL"], ["rightctrl", "RCTRL"],
+                       ["leftalt", "LALT"], ["rightalt", "RALT"], ["backspace", "BKSP"], ["escape", "ESC"],
+                       ["insert", "INS"], ["delete", "DEL"], ["pageup", "PGUP"], ["pagedown", "PGDN"], ["return", "ENTER"]]
+    for p in short {
+        if p[0] == k { return p[1] }
+    }
+    return substr(upper(k), 0, 5)
+}
+
+func pad_label(b: string) -> string {
+    if b == "" { return "-" }
+    var short: list = [["up", "D-UP"], ["down", "D-DN"], ["left", "D-LT"], ["right", "D-RT"]]
+    for p in short {
+        if p[0] == b { return p[1] }
+    }
+    return substr(upper(b), 0, 5)
+}
+
+# What to press for an action, in words, for whatever the player used last: a key (the
+# first one set) or a gamepad button.
+func label(action: string) -> string {
+    var n: int = index_of(action)
+    if n < 0 { return "?" }
+    if last_input() == "gamepad" or last_input() == "touch" { return pad_label(pads[n]) }
+    if keys[n][0] != "" { return key_label(keys[n][0]) }
+    return key_label(keys[n][1])
+}
+
+# Fills in "{jump}", "{fire}"... in a text with what to press for them.
+func fill(text: string) -> string {
+    var out: string = ""
+    var i: int = 0
+    while i < len(text) {
+        if text[i] == "{" {
+            var j: int = i + 1
+            while j < len(text) and text[j] != "}" { j += 1 }
+            out = out + label(substr(text, i + 1, j - i - 1))
+            i = j + 1
+        } else {
+            out = out + text[i]
+            i += 1
+        }
+    }
+    return out
+}
+
+func upper(s: string) -> string {
+    var lo: string = "abcdefghijklmnopqrstuvwxyz"
+    var hi: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    var out: string = ""
+    for i in len(s) {
+        var c: string = s[i]
+        for j in 26 {
+            if lo[j] == c {
+                c = hi[j]
+                break
+            }
+        }
+        out = out + c
+    }
+    return out
+}

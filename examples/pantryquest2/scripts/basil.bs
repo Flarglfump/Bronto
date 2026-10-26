@@ -24,7 +24,7 @@ var facing: int = 1
 var grounded: bool = false
 var ball: bool = false
 var spin: bool = false
-var aim_up: bool = false
+var aim: string = "fwd"              # where the mill points: fwd, up, diag_up, diag_down, down
 var shot_cd: int = 0
 var hurt_t: number = 0               # knocked back: no control
 var safe_t: number = 0               # just hurt: can't be hurt again
@@ -175,10 +175,30 @@ func update(dt: number) -> void {
     if control and left and not right { dir = -1 }
     if control and right and not left { dir = 1 }
     if dir != 0 { face(dir) }
-    aim_up = control and action_down("up") and not ball
+
+    # aiming: UP aims up, UP with LEFT or RIGHT aims up at an angle; in the air DOWN aims
+    # down (at an angle with LEFT or RIGHT). Holding AIM plants his feet and aims at an
+    # angle, up or (with DOWN) down, without walking.
+    var angle := control and action_down("aim") and not ball
+    var up := action_down("up")
+    var down := action_down("down")
+    var sideways := left or right
+    aim = "fwd"
+    if control and not ball {
+        if angle {
+            if down { aim = "diag_down" } else { aim = "diag_up" }
+        } elif up and sideways {
+            aim = "diag_up"
+        } elif up {
+            aim = "up"
+        } elif down and not grounded {
+            if sideways { aim = "diag_down" } else { aim = "down" }
+        }
+    }
+    if angle and grounded { dir = 0 }                # (he still turns to face the way pressed)
 
     # rolling up, and standing again
-    if control and not ball and game.has("dough") and action_pressed("down") and on_ground() {
+    if control and not ball and not angle and game.has("dough") and action_pressed("down") and on_ground() {
         ball = true
         spin = false
         self.y += 0                                  # (the box shrinks to the bottom: his feet stay put)
@@ -245,30 +265,40 @@ func jump(dir: int) -> void {
     play_sound("sfx/jump.wav", 0.6)
 }
 
-func muzzle(up: bool) -> vec2 {
-    if up { return vec2(self.x + facing * 3, self.y - 18) }
+# Where a shot leaves the mill, and which way it flies, for where he's aiming.
+func muzzle() -> vec2 {
+    if aim == "up" { return vec2(self.x + facing * 3, self.y - 18) }
+    if aim == "diag_up" { return vec2(self.x + facing * 10, self.y - 6) }
+    if aim == "diag_down" { return vec2(self.x + facing * 10, self.y + 9) }
+    if aim == "down" { return vec2(self.x + facing * 3, self.y + 14) }
     if grounded { return vec2(self.x + facing * 14, self.y + 2) }
     return vec2(self.x + facing * 14, self.y + 1)
 }
 
+func aim_dir() -> vec2 {
+    if aim == "up" { return vec2(0, -1) }
+    if aim == "down" { return vec2(0, 1) }
+    if aim == "diag_up" { return normalize(vec2(facing, -1)) }
+    if aim == "diag_down" { return normalize(vec2(facing, 1)) }
+    return vec2(facing, 0)
+}
+
 func shoot(rocket: bool) -> void {
-    var up := aim_up
-    var d := vec2(facing, 0)
-    if up { d = vec2(0, -1) }
+    var d := aim_dir()
     if rocket {
         if not game.use_rocket() {
             play_sound("sfx/click.wav", 0.5)
             shot_cd = SHOT_GAP
             return
         }
-        var r := spawn("prefabs/rocket.scene", muzzle(up))
+        var r := spawn("prefabs/rocket.scene", muzzle())
         r.launch(d)
         shot_cd = SHOT_GAP + 4
         play_sound("sfx/rocket.wav")
         return
     }
     if len(find_tagged("pepper")) >= 3 { return }
-    var s := spawn("prefabs/shot.scene", muzzle(up))
+    var s := spawn("prefabs/shot.scene", muzzle())
     s.launch(d, game.beam())
     shot_cd = SHOT_GAP
     spin = false
@@ -339,8 +369,14 @@ func animate() -> void {
     if not grounded {
         if spin {
             play_animation(self, "10-13", 20, true)
-        } elif aim_up {
+        } elif aim == "up" {
             play_animation(self, "8")
+        } elif aim == "diag_up" {
+            play_animation(self, "29")
+        } elif aim == "diag_down" {
+            play_animation(self, "30")
+        } elif aim == "down" {
+            play_animation(self, "31")
         } elif vel.y < 0 {
             play_animation(self, "5")
         } else {
@@ -349,9 +385,19 @@ func animate() -> void {
         return
     }
     if vel.x != 0 {
-        if aim_up { play_animation(self, "18-21", 10, true) } else { play_animation(self, "1-4", 10, true) }
-    } elif aim_up {
+        if aim == "up" {
+            play_animation(self, "18-21", 10, true)
+        } elif aim == "diag_up" {
+            play_animation(self, "25-28", 10, true)
+        } else {
+            play_animation(self, "1-4", 10, true)
+        }
+    } elif aim == "up" {
         play_animation(self, "7")
+    } elif aim == "diag_up" {
+        play_animation(self, "24")
+    } elif aim == "diag_down" {
+        play_animation(self, "32")
     } else {
         play_animation(self, "0")
     }

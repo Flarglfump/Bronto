@@ -7,42 +7,66 @@
 # "talk_id") and the scene is popped, so the game can carry on from there.
 
 var draw_layer: int = 80
-var pages: list = []
+var pages: list = []                      # as laid out: [speaker, portrait, lines] - each fits the box
 var page: int = 0
 var shown: number = 0                     # letters shown so far
 var lines: list[string] = []
 var t: number = 0
 var done: bool = false
 
+# The box: text starts at x 56 beside a portrait (16 without), and must end by x 232 (the
+# ">" sits past it), so a line holds 22 letters (27 without a portrait). Lines are 11 pixels
+# apart, and four fit in the box. A page that needs more lines
+# carries on over as many boxes as it takes.
+const WIDE: int = 27
+const NARROW: int = 22
+
 func start() -> void {
-    pages = global("talk", [])
-    if len(pages) == 0 { pages = [["", -1, "..."]] }
+    var given: list = global("talk", [])
+    if len(given) == 0 { given = [["", -1, "..."]] }
+    for p in given {
+        var width: int = NARROW
+        if p[1] < 0 { width = WIDE }
+        var most: int = 4
+        var all: list[string] = wrap(p[2], width)
+        var i: int = 0
+        while i < len(all) {
+            var chunk: list[string] = []
+            var j: int = i
+            while j < len(all) and j < i + most {
+                push(chunk, all[j])
+                j += 1
+            }
+            push(pages, [p[0], p[1], chunk])
+            i = j
+        }
+    }
     open_page()
 }
 
 func open_page() -> void {
-    var p: list = pages[page]
-    lines = wrap(p[2], 25)
-    if p[1] < 0 { lines = wrap(p[2], 29) }
+    lines = pages[page][2]
     shown = 0
 }
 
 # Breaks text into lines of up to `width` letters, at spaces ('|' forces a new line).
-func wrap(text: string, width: int) -> list[string] {
+func wrap(words: string, width: int) -> list[string] {
     var out: list[string] = []
     var line: string = ""
     var word: string = ""
-    for i in len(text) + 1 {
+    for i in len(words) + 1 {
         var c: string = " "
-        if i < len(text) { c = text[i] }
+        if i < len(words) { c = words[i] }
         if c == " " or c == "|" {
-            if len(line) + len(word) + 1 > width and line != "" {
-                push(out, line)
-                line = word
-            } elif line == "" {
-                line = word
-            } else {
-                line = line + " " + word
+            if word != "" {
+                if line != "" and len(line) + len(word) + 1 > width {
+                    push(out, line)
+                    line = word
+                } elif line == "" {
+                    line = word
+                } else {
+                    line = line + " " + word
+                }
             }
             word = ""
             if c == "|" {

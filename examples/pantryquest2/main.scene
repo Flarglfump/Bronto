@@ -5,6 +5,12 @@ bronto_scene 1
 
 entity
   Name
+    text = "Controls"
+  Script
+    file = "scripts/controls.bs"
+
+entity
+  Name
     text = "World"
   Script
     file = "scripts/world_data.bs"

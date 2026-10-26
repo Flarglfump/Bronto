@@ -19,7 +19,11 @@ func launch(d: vec2, k: string) -> void {
     if kind == "frost" { f = 1 }
     if kind == "garlic" { f = 2 }
     if kind == "garlic_frost" { f = 3 }
-    if dir.y != 0 { f += 4 }
+    if dir.x == 0 {
+        f += 4                                       # (straight up or down: the upright frame)
+    } elif dir.y != 0 {
+        self.rotation = angle(dir)                   # at an angle: the flat frame, turned
+    }
     self.Sprite.frame = f
 }
 

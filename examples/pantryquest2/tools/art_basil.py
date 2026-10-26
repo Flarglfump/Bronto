@@ -57,6 +57,20 @@ ARM_UP = [            # 6 x 13: the mill pointing up
     "kwWk..",
     ".kk...",
 ]
+ARM_DIAG_UP = [       # 10 x 10: the mill pointing up and forward (his shoulder at the bottom left)
+    ".......kk.",
+    "......kgWk",
+    ".....kNWWk",
+    "....kNnnk.",
+    "...kNnnk..",
+    "..kNnnk...",
+    ".kwNnk....",
+    "kwwWk.....",
+    "kwWk......",
+    ".kk.......",
+]
+ARM_DIAG_DOWN = ARM_DIAG_UP[::-1]          # down and forward
+ARM_DOWN = ARM_UP[::-1]                    # straight down (in the air)
 LEGS = {              # 12 x 8
     'stand': ["..kkk.kkk...",
               "..kNk.kNk...",
@@ -163,6 +177,12 @@ def frame(legs='stand', bob=0, arm='fwd', tint=None):
         c.text(ARM_FWD, 11, top + 14)
     elif arm == 'up':
         c.text(ARM_UP, 13, top + 1)
+    elif arm == 'diag_up':
+        c.text(ARM_DIAG_UP, 12, top + 7)
+    elif arm == 'diag_down':
+        c.text(ARM_DIAG_DOWN, 12, top + 13)
+    elif arm == 'down':
+        c.text(ARM_DOWN, 13, top + 13)
     if tint:
         c.recolor(tint)
     return c
@@ -229,6 +249,12 @@ def frames(tint=None):
     kneel = frame('jump', 2, 'none', tint=tint)
     f += [kneel]                                                                    # 22 kneel (saving, item fanfare)
     f += [frame('stand', 0, 'none', tint=tint)]                                     # 23 stand, arm down (talking)
+    f += [frame('stand', 0, 'diag_up', tint=tint)]                                 # 24 aim up and forward
+    f += [frame('run%d' % i, (0, 1, 0, 1)[i], 'diag_up', tint=tint) for i in range(4)]   # 25-28 run, aiming so
+    f += [frame('jump', 0, 'diag_up', tint=tint)]                                  # 29 in the air, up and forward
+    f += [frame('fall', 0, 'diag_down', tint=tint)]                                # 30 in the air, down and forward
+    f += [frame('fall', 0, 'down', tint=tint)]                                     # 31 in the air, straight down
+    f += [frame('stand', 0, 'diag_down', tint=tint)]                               # 32 standing, down and forward (angle held)
     return f
 
 

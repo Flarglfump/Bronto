@@ -62,14 +62,27 @@ each) and the **8 diary pages**: 24 items in the world, plus the four seals.
 
 ## Controls
 
+The defaults:
+
 | | Keyboard | Gamepad |
 |---|---|---|
-| Run, aim up, roll | arrows / WASD | stick or d-pad |
-| Jump | Z, K, Space | A |
-| Pepper (FIRE) | X, J | X |
-| Hot sauce (ROCKET) | C, L | B or RB |
-| Pause (map, items, diary, settings) | Enter, Esc | Start |
+| Run, aim, roll | arrows / WASD | d-pad (the left stick always works too) |
+| Jump | Z, Space | A |
+| Pepper | X, J | X |
+| Hot sauce | C, L | B |
+| Hold to aim at an angle | Shift, Q | LB |
+| Pause (map, items, diary, settings) | Enter, P (Esc always works) | Start |
 | Map | M, Tab | Back |
+
+**Aiming:** UP aims straight up, and UP while running aims up at an angle. In the air,
+DOWN aims straight down, and DOWN with LEFT or RIGHT aims down at an angle. Holding the
+angle button plants Basil's feet and aims up at an angle, or down at one with DOWN.
+
+**Changing the controls:** every action has two keys and a gamepad button, and all of
+them can be changed under **CONTROLS**, in OPTIONS on the title or SYSTEM in the pause
+menu. Choose one and press the new key or button. They're saved for every journey, and
+the game's signs and item descriptions show your keys. The arrow keys, the d-pad, Enter,
+Escape, A and B always work on the controls screen, so it can't be made unusable.
 
 On a phone or tablet, the web build shows an on-screen stick and buttons.
 
@@ -96,7 +109,9 @@ The game uses the engine features that BrontoScript and the editor can reach:
   escape timer), the pause menu, the dialogue box and the title, intro and ending screens
   are drawn in `draw()` callbacks on their own `draw_layer`.
 - **Actions** (`bind`, `action_pressed`) give every screen the same keyboard and gamepad
-  controls. **Music** crossfades between areas with `play_music` and carries on across
+  controls. The player chooses their own: the controls screen reads the new key or button
+  with `last_key()` / `last_button()`, and `controls.bs` rebinds the actions (`unbind`,
+  `bind`) and saves them. **Music** crossfades between areas with `play_music` and carries on across
   scene changes (the title music plays on under the story). `save_data` keeps three save
   slots and the shared settings.
 - **Tilemaps** per room (back, solid and front layers), with `tile_put`/`tile_get` for
@@ -110,6 +125,8 @@ title.scene           the title: three journeys, options                 scripts
 intro.scene           the story so far, before a new journey               scripts/intro.bs
 main.scene            the game: World, Story, Game, Basil, Camera, HUD
 pause.scene           the pause menu: map, items, diary, settings          scripts/pause.bs
+controls.scene        the controls screen                                 scripts/rebind.bs
+                      (each screen's Controls entity, scripts/controls.bs, keeps the keys)
 dialogue.scene        the dialogue box                                    scripts/dialogue.bs
 ending.scene          the ending                                          scripts/ending.bs
 rooms/*.scene         the 54 rooms (made by tools/make_rooms.py)

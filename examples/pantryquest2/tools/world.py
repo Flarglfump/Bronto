@@ -68,7 +68,7 @@ def build():
     r.solid(12, 11, 2, 2)                     # a crate stack: a first jump
     r.solid(19, 10, 3, 3)                     # a wall to jump over
     r.plat(25, 9, 3)
-    r.add('sign', 7, 12, text="Z: JUMP   X: FIRE|ARROWS: RUN.  UP AT A HEARTH: SAVE")
+    r.add('sign', 7, 12, text="{jump}: JUMP. {fire}: PEPPER.|{up}: AIM UP. {up} WHILE RUNNING AIMS AT AN ANGLE, AND SO DOES HOLDING {aim}.")
     r.add('sign', 23, 12, text="CRUMB VILLAGE, THIS WAY.|THE CASTLE ON THE HILL WAS NOT HERE YESTERDAY.")
     r.enemy('gnat', 27, 6)
 

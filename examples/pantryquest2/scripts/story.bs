@@ -155,15 +155,16 @@ func item_name(kind: string) -> string {
     return kind
 }
 
-func item_text(kind: string, keys: string) -> string {
-    if kind == "dough" { return "Press DOWN on the ground to curl up in dough and roll through narrow tunnels. UP or JUMP to stand." }
-    if kind == "popcorn" { return "While rolled up, FIRE drops popcorn. It pops cracked blocks - and pops Basil up if he's on top!" }
-    if kind == "sauce" { return "Press ROCKET (" + keys + ") to fire hot sauce. It melts red wax seals. Enemies may drop more." }
+# (What to press is written {jump}, {fire}...: the Controls entity fills in the player's own keys.)
+func item_text(kind: string) -> string {
+    if kind == "dough" { return "Press {down} on the ground to curl up in dough and roll through narrow tunnels. {up} or {jump} to stand." }
+    if kind == "popcorn" { return "While rolled up, {fire} drops popcorn. It pops cracked blocks - and pops Basil up if he's on top!" }
+    if kind == "sauce" { return "Press {rocket} to fire hot sauce. It melts red wax seals. Enemies may drop more." }
     if kind == "frost" { return "Peppercorns now freeze what they hit. Frozen enemies can be stood on. (Turn it off in the pause menu.)" }
     if kind == "leaven" { return "Springy soles: Basil jumps far higher." }
     if kind == "mitts" { return "Quilted against the heat: the hottest kitchens can't harm Basil, and every hurt is halved." }
     if kind == "garlic" { return "Peppercorns now carry garlic: they fly further, hit harder, pass through walls... and the Count fears them." }
-    if kind == "whisk" { return "Run and jump to spin. While spinning, JUMP again in mid-air to keep climbing - as high as you like." }
+    if kind == "whisk" { return "Run and jump to spin. While spinning, press {jump} again in mid-air to keep climbing - as high as you like." }
     if kind == "cake" { return "A whole extra 100 energy, and every bit of it restored." }
     if kind == "packet" { return "Basil can carry 5 more hot sauce rockets." }
     if kind == "page" { return "A page of Count Fromage's diary. Read it in the pause menu." }

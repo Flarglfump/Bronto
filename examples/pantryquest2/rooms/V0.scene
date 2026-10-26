@@ -74,7 +74,7 @@ entity
     layer = -4
   Script
     file = "scripts/sign.bs"
-    vars = "text = \"Z: JUMP   X: FIRE|ARROWS: RUN.  UP AT A HEARTH: SAVE\""
+    vars = "text = \"{jump}: JUMP. {fire}: PEPPER.|{up}: AIM UP. {up} WHILE RUNNING AIMS AT AN ANGLE, AND SO DOES HOLDING {aim}.\""
   Tags
     list = "sign"
   Parent

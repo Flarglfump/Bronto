@@ -14,27 +14,14 @@ var slots: list = []                      # each: nil (empty) or the saved list
 var leaving: number = -1                  # fading out: seconds gone (-1: not leaving)
 var go_to: string = ""
 var menu: list[string] = ["START", "OPTIONS", "QUIT"]
-var options: list[string] = ["MUSIC", "SOUND", "FULLSCREEN", "BACK"]
+var options: list[string] = ["MUSIC", "SOUND", "FULLSCREEN", "CONTROLS", "BACK"]
+var controls: entity
 
 func start() -> void {
-    bind_keys()
+    controls = find("Controls")
     apply_settings()
     play_music("music/title.wav", 1.0)
     read_slots()
-}
-
-# The same controls the game uses (see game.bs), so menus answer to them too.
-func bind_keys() -> void {
-    for a in ["left", "right", "up", "down", "jump", "fire", "rocket", "pause", "map"] { unbind(a) }   # (bound afresh)
-    bind("left", "left", "a", "pad:left", "pad:left_x-")
-    bind("right", "right", "d", "pad:right", "pad:left_x+")
-    bind("up", "up", "w", "pad:up", "pad:left_y-")
-    bind("down", "down", "s", "pad:down", "pad:left_y+")
-    bind("jump", "z", "k", "space", "pad:a")
-    bind("fire", "x", "j", "pad:x")
-    bind("rocket", "c", "l", "pad:b", "pad:rb")
-    bind("pause", "enter", "escape", "pad:start")
-    bind("map", "m", "tab", "pad:back")
 }
 
 # Settings live in their own save, so every journey shares them.
@@ -178,6 +165,11 @@ func update(dt: number) -> void {
             set_fullscreen(not fullscreen())
             save_settings()
         }
+        if o == "CONTROLS" and ok() {
+            play_sound("sfx/select.wav", 0.6)
+            push_scene("controls.scene", false, false)
+            return
+        }
         if back() or (o == "BACK" and ok()) {
             state = "menu"
             sel = 1
@@ -185,6 +177,9 @@ func update(dt: number) -> void {
         }
     }
 }
+
+# Back from the controls screen: read the keys again (it changed them).
+func on_resume() -> void { controls.load() }
 
 # ---- drawing ---------------------------------------------------------------------------------------
 func centred(s: string, y: number, colour: string) -> void {
@@ -265,16 +260,17 @@ func draw() -> void {
             panel(vec2(32, 140), vec2(192, 40))
             draw_rect(vec2(36, 144), vec2(184, 32), "#301018")
             centred("FORGET JOURNEY " + (sel + 1) + "?", 150, "#ff8080")
-            centred("JUMP: YES   C: NO", 164, "#ffffff")
+            centred(controls.fill("{jump}: YES   {rocket}: NO"), 164, "#ffffff")
         } else {
-            centred("JUMP: GO   C: BACK   M: FORGET", 214, "#c0a0d0")
+            centred(controls.fill("{jump}: GO   {rocket}: BACK"), 206, "#c0a0d0")
+            centred(controls.fill("{map}: FORGET A JOURNEY"), 216, "#c0a0d0")
         }
     }
     if state == "options" {
-        panel(vec2(24, 132), vec2(208, 84))
+        panel(vec2(24, 126), vec2(208, 94))
         for i in len(options) {
             var o: string = options[i]
-            var y: number = 142 + i * 18
+            var y: number = 136 + i * 17
             var label: string = o
             if o == "MUSIC" { label = "MUSIC   " + bar(global("music_volume", 0.8)) }
             if o == "SOUND" { label = "SOUND   " + bar(volume("sfx")) }

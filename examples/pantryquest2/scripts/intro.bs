@@ -29,23 +29,29 @@ func open_page() -> void {
     t = 0
 }
 
-func wrap(text: string, width: int) -> list[string] {
+func wrap(words: string, width: int) -> list[string] {
     var out: list[string] = []
     var line: string = ""
     var word: string = ""
-    for i in len(text) + 1 {
+    for i in len(words) + 1 {
         var c: string = " "
-        if i < len(text) { c = text[i] }
-        if c == " " {
-            if len(line) + len(word) + 1 > width and line != "" {
-                push(out, line)
-                line = word
-            } elif line == "" {
-                line = word
-            } else {
-                line = line + " " + word
+        if i < len(words) { c = words[i] }
+        if c == " " or c == "|" {
+            if word != "" {
+                if line != "" and len(line) + len(word) + 1 > width {
+                    push(out, line)
+                    line = word
+                } elif line == "" {
+                    line = word
+                } else {
+                    line = line + " " + word
+                }
             }
             word = ""
+            if c == "|" {
+                push(out, line)
+                line = ""
+            }
         } else {
             word = word + c
         }
@@ -121,7 +127,7 @@ func draw() -> void {
         y += 12
     }
     if shown >= total() and floor(t * 3) % 2 == 0 { draw_text(">", vec2(236, 222), "#f8c860") }
-    draw_text("ENTER: SKIP", vec2(4, 229), "#605070")
+    draw_text("ESC: SKIP", vec2(4, 229), "#605070")
     if a > 0 { draw_rect(vec2(0, 0), vec2(256, 240), rgb(0, 0, 0, 255 * a)) }
     if leaving >= 0 { draw_rect(vec2(0, 0), vec2(256, 240), rgb(0, 0, 0, 255 * clamp(leaving / 0.8, 0, 1))) }
 }

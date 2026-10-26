@@ -1,5 +1,5 @@
 @strict
-# A signpost: its words show while Basil stands by it ('|' starts a new line).
+# A signpost: its words show while Basil stands by it, wrapped to fit ('|' starts a new line).
 
 var text: string = ""
 var draw_layer: int = 55
@@ -14,21 +14,42 @@ func update(dt: number) -> void {
 
 func draw() -> void {
     if not near { return }
-    var lines: list[string] = []
-    var line: string = ""
-    for i in len(text) {
-        if text[i] == "|" {
-            push(lines, line)
-            line = ""
-        } else {
-            line = line + text[i]
-        }
-    }
-    push(lines, line)
+    var lines: list[string] = wrap(find("Controls").fill(text), 28)       # ({jump}: the player's own key)                # (28 letters: the box stays inside the screen)
     var w: number = 0
     for l in lines { w = max(w, text_size(l).x) }
-    var top: number = 30
+    var top: number = 74                                       # (below the area's name and the minimap)
     draw_rect(vec2(128 - w / 2 - 6, top - 4), vec2(w + 12, len(lines) * 10 + 6), rgb(30, 20, 10, 220))
     draw_rect(vec2(128 - w / 2 - 6, top - 4), vec2(w + 12, len(lines) * 10 + 6), "#c09060", false)
     for i in len(lines) { draw_text(lines[i], vec2(128 - text_size(lines[i]).x / 2, top + i * 10), "#f8e8c0") }
+}
+
+func wrap(words: string, width: int) -> list[string] {
+    var out: list[string] = []
+    var line: string = ""
+    var word: string = ""
+    for i in len(words) + 1 {
+        var c: string = " "
+        if i < len(words) { c = words[i] }
+        if c == " " or c == "|" {
+            if word != "" {
+                if line != "" and len(line) + len(word) + 1 > width {
+                    push(out, line)
+                    line = word
+                } elif line == "" {
+                    line = word
+                } else {
+                    line = line + " " + word
+                }
+            }
+            word = ""
+            if c == "|" {
+                push(out, line)
+                line = ""
+            }
+        } else {
+            word = word + c
+        }
+    }
+    if line != "" { push(out, line) }
+    return out
 }

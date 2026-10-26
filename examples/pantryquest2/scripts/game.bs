@@ -85,34 +85,19 @@ var pending_talks: list = []              # talks waiting their turn
 var story: entity
 
 func start() -> void {
-    bind_keys()
     basil = find("Basil")
     cam = find("Camera")
     story = find("Story")
     rooms_data = find("World").rooms()
     slot = global("slot", "slot1")
     if global("load", false) and load_game() {
-        enter(save_room, "", vec2(0, 0), true)
+        enter(save_room, "", hearth_spot(save_room), false)      # standing at the hearth he saved at
     } else {
         for it in start_items { inv.give(it) }
         if inv.has("sauce") and inv.max_rockets == 0 { inv.max_rockets = 5 }
         inv.rockets = inv.max_rockets
         enter(start_room, start_door, start_pos, false)
     }
-}
-
-# The controls, as actions any script can ask for (action_down("jump")).
-func bind_keys() -> void {
-    for a in ["left", "right", "up", "down", "jump", "fire", "rocket", "pause", "map"] { unbind(a) }   # (bound afresh)
-    bind("left", "left", "a", "pad:left", "pad:left_x-")
-    bind("right", "right", "d", "pad:right", "pad:left_x+")
-    bind("up", "up", "w", "pad:up", "pad:left_y-")
-    bind("down", "down", "s", "pad:down", "pad:left_y+")
-    bind("jump", "z", "k", "space", "pad:a")
-    bind("fire", "x", "j", "pad:x")
-    bind("rocket", "c", "l", "pad:b", "pad:rb")
-    bind("pause", "enter", "escape", "pad:start")
-    bind("map", "m", "tab", "pad:back")
 }
 
 # ---- asking about the world -----------------------------------------------------------------
@@ -401,6 +386,7 @@ func talk_pages(id: string, pages: list) -> void {
 
 # The scene on top was popped: a talk ended, or the pause menu closed.
 func on_resume() -> void {
+    find("Controls").load()                          # (the pause menu may have changed the keys)
     if talking != "" {
         var id: string = talking
         talking = ""
@@ -455,7 +441,7 @@ func collect(kind: string, iid: string) -> void {
     }
     if small { play_sound("sfx/small_item.wav") } else { play_sound("sfx/item.wav") }
     state = "pose"
-    var text: string = story.item_text(kind, "C")
+    var text: string = find("Controls").fill(story.item_text(kind))
     if kind == "page" { text = "\"" + story.page_text(iid) + "\"" }
     talk_pages("item:" + kind, [["", -1, "You found the " + story.item_name(kind) + "!|" + text]])
 }

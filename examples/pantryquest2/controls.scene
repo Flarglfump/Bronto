@@ -1,0 +1,15 @@
+# Pantry Quest II - the controls screen (scripts/rebind.bs), pushed over the title's options or
+# the pause menu. The Controls entity (scripts/controls.bs) keeps and applies the keys.
+bronto_scene 1
+
+entity
+  Name
+    text = "Controls"
+  Script
+    file = "scripts/controls.bs"
+
+entity
+  Name
+    text = "Rebind"
+  Script
+    file = "scripts/rebind.bs"

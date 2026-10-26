@@ -9,8 +9,12 @@ var map: entity
 func launch(d: vec2) -> void {
     dir = d
     map = find("Basil").map
-    if dir.y != 0 { self.rotation = -90 }
-    if dir.x < 0 { self.Sprite.flip_x = true }
+    if dir.x < 0 {                                   # (the picture points right: flipped, it points left)
+        self.Sprite.flip_x = true
+        self.rotation = -angle(vec2(-dir.x, dir.y))
+    } else {
+        self.rotation = angle(dir)
+    }
 }
 
 func update(dt: number) -> void {

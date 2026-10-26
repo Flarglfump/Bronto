@@ -24,7 +24,7 @@ var words: list[string] = [
 var cast: list = [
     ["PANTRY QUEST II", -1], ["THE CASTLE OF COUNT FROMAGE", -1], ["", -1],
     ["- CAST -", -1], ["", -1],
-    ["BASIL, AN APPRENTICE", 0], ["CHEF PIP", 2], ["OLD MOZZ, A BUTLER NO MORE", 1],
+    ["BASIL, AN APPRENTICE", 0], ["CHEF PIP", 2], ["OLD MOZZ", 1],
     ["SIR STALE", 4], ["THE ABOMINABLE SUNDAE", 5], ["DOCTOR BRINE", 6], ["THE FLAMBE WYRM", 7],
     ["COUNT FROMAGE", 3], ["", -1],
     ["MADE IN THE BRONTO EDITOR", -1], ["WRITTEN IN BRONTOSCRIPT", -1], ["", -1],
@@ -40,23 +40,29 @@ func start() -> void {
     }
 }
 
-func wrap(text: string, width: int) -> list[string] {
+func wrap(words: string, width: int) -> list[string] {
     var out: list[string] = []
     var line: string = ""
     var word: string = ""
-    for i in len(text) + 1 {
+    for i in len(words) + 1 {
         var c: string = " "
-        if i < len(text) { c = text[i] }
-        if c == " " {
-            if len(line) + len(word) + 1 > width and line != "" {
-                push(out, line)
-                line = word
-            } elif line == "" {
-                line = word
-            } else {
-                line = line + " " + word
+        if i < len(words) { c = words[i] }
+        if c == " " or c == "|" {
+            if word != "" {
+                if line != "" and len(line) + len(word) + 1 > width {
+                    push(out, line)
+                    line = word
+                } elif line == "" {
+                    line = word
+                } else {
+                    line = line + " " + word
+                }
             }
             word = ""
+            if c == "|" {
+                push(out, line)
+                line = ""
+            }
         } else {
             word = word + c
         }
@@ -160,7 +166,7 @@ func verdict(secs: number, pct: int) -> string {
     if pct >= 100 { return "NOT A CRUMB LEFT BEHIND!" }
     if secs < 2 * 3600 { return "SERVED PIPING HOT!" }
     if pct >= 75 { return "A HEARTY MEAL." }
-    return "HOME IN TIME FOR BREAKFAST."
+    return "HOME FOR BREAKFAST."
 }
 
 func draw_people(ground: number) -> void {
@@ -184,7 +190,7 @@ func draw() -> void {
         centred("MORNING", 40, "#ffffff")
     }
     if state == "words" {
-        draw_rect(vec2(0, 0), vec2(256, 80), rgb(0, 0, 0, 170))
+        draw_rect(vec2(0, 0), vec2(256, 84), rgb(0, 0, 0, 170))
         var left: int = floor(shown)
         var y: number = 12
         for l in lines {
@@ -200,12 +206,12 @@ func draw() -> void {
         var it: list = global("end_items", [0, 1])
         var pct: int = floor(it[0] * 100 / max(it[1], 1))
         var m: int = floor(secs / 60)
-        draw_rect(vec2(28, 30), vec2(200, 100), "#000000")
-        draw_rect(vec2(29, 31), vec2(198, 98), "#f8e8b0", false)
-        draw_rect(vec2(31, 33), vec2(194, 94), "#806030", false)
+        draw_rect(vec2(16, 30), vec2(224, 100), "#000000")
+        draw_rect(vec2(17, 31), vec2(222, 98), "#f8e8b0", false)
+        draw_rect(vec2(19, 33), vec2(218, 94), "#806030", false)
         centred("THE JOURNEY", 42, "#ffe070")
         centred("TIME  " + two(floor(m / 60)) + ":" + two(m % 60), 62, "#ffffff")
-        centred("TREASURE  " + it[0] + " / " + it[1] + "  (" + pct + "%)", 78, "#ffffff")
+        centred("ITEMS " + it[0] + "/" + it[1] + " (" + pct + "%)", 78, "#ffffff")
         centred(verdict(secs, pct), 104, "#ff9070")
     }
     if state == "credits" {

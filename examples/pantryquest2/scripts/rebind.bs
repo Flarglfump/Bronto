@@ -1,0 +1,147 @@
+@strict
+# The controls screen: every action with its two keys and its gamepad button. Choose one
+# and press the new key (or button) for it; Escape changes nothing. Pushed over the title's
+# options or the pause menu, and popped when done. The changes are saved and in effect
+# at once (see controls.bs).
+#
+# It always answers to the arrow keys, the d-pad and the stick, Enter and A (OK), and
+# Escape and B (back), whatever has been bound, so it can't be made unusable.
+
+var draw_layer: int = 90
+var controls: entity
+var row: int = 0                          # an action, or the two rows under them (RESET, DONE)
+var col: int = 0                          # 0, 1: its keys; 2: its button
+var waiting: bool = false                 # for a key or button to be pressed
+var wait_t: number = 0
+var t: number = 0
+var note: string = ""
+var note_t: number = 0
+
+func start() -> void {
+    controls = find("Controls")
+}
+
+func rows() -> int { return len(controls.actions) + 2 }
+
+func nav(dir: string) -> bool { return action_pressed(dir) or key_pressed(dir) or button_pressed(dir) }
+func ok() -> bool { return key_pressed("enter") or button_pressed("a") or action_pressed("jump") }
+func back() -> bool { return key_pressed("escape") or button_pressed("b") }
+
+func update(dt: number) -> void {
+    t += dt
+    if note_t > 0 { note_t -= dt }
+    if t < 0.15 { return }                     # (the press that opened it isn't a press in here)
+    if waiting {
+        wait_t += dt
+        if wait_t < 0.15 { return }
+        var a: string = controls.actions[row]
+        if key_pressed("escape") {
+            waiting = false
+            play_sound("sfx/back.wav", 0.5)
+            return
+        }
+        if col < 2 {
+            var k: string = last_key()
+            if k != "" {
+                controls.set_key(a, col, k)
+                waiting = false
+                play_sound("sfx/select.wav", 0.6)
+            }
+        } else {
+            var b: string = last_button()
+            if b != "" {
+                controls.set_pad(a, b)
+                waiting = false
+                play_sound("sfx/select.wav", 0.6)
+            }
+        }
+        return
+    }
+    var before := vec2(col, row)
+    if nav("up") { row = (row + rows() - 1) % rows() }
+    if nav("down") { row = (row + 1) % rows() }
+    if row < len(controls.actions) {
+        if nav("left") { col = (col + 2) % 3 }
+        if nav("right") { col = (col + 1) % 3 }
+    }
+    if vec2(col, row) != before { play_sound("sfx/blip.wav", 0.4) }
+    if back() {
+        close()
+        return
+    }
+    if row < len(controls.actions) and col < 2 and (key_pressed("backspace") or key_pressed("delete")) {
+        controls.set_key(controls.actions[row], col, "")
+        play_sound("sfx/back.wav", 0.5)
+        return
+    }
+    if ok() {
+        if row == len(controls.actions) {
+            controls.reset()
+            note = "BACK TO HOW THEY WERE"
+            note_t = 2
+            play_sound("sfx/select.wav", 0.6)
+        } elif row == len(controls.actions) + 1 {
+            close()
+        } else {
+            waiting = true
+            wait_t = 0
+            play_sound("sfx/select.wav", 0.5)
+        }
+    }
+}
+
+func close() -> void {
+    play_sound("sfx/select.wav", 0.5)
+    pop_scene()
+}
+
+# ---- drawing ---------------------------------------------------------------------------------------
+func centred(s: string, y: number, colour: string) -> void {
+    draw_text(s, vec2(128 - text_size(s).x / 2, y), colour)
+}
+
+func draw() -> void {
+    draw_rect(vec2(0, 0), vec2(256, 240), "#100818")
+    centred("CONTROLS", 6, "#f8c860")
+    var x0: number = 104
+    var heads: list[string] = ["KEY", "OR KEY", "PAD"]
+    for c in 3 { draw_text(heads[c], vec2(x0 + c * 50 + 22 - text_size(heads[c]).x / 2, 20), "#a090b0") }
+    draw_rect(vec2(4, 30), vec2(248, 1), "#a06838")
+    var n: int = len(controls.actions)
+    for i in n {
+        var y: number = 35 + i * 14
+        draw_text(controls.names[i], vec2(8, y), "#ffffff")
+        for c in 3 {
+            var cx: number = x0 + c * 50
+            var label: string = ""
+            if c < 2 { label = controls.key_label(controls.keys[i][c]) } else { label = controls.pad_label(controls.pads[i]) }
+            var selected := i == row and c == col
+            if selected {
+                var colour: string = "#a06838"
+                if waiting and floor(t * 6) % 2 == 0 { colour = "#f8c860" }
+                draw_rect(vec2(cx - 2, y - 3), vec2(48, 13), colour)
+            }
+            if selected and waiting { label = "?" }
+            draw_text(label, vec2(cx + 22 - text_size(label).x / 2, y), "#ffffff")
+        }
+    }
+    var ry: number = 35 + n * 14 + 4
+    var labels: list[string] = ["RESET TO DEFAULTS", "DONE"]
+    for k in 2 {
+        var y: number = ry + k * 14
+        if row == n + k { draw_rect(vec2(60, y - 3), vec2(136, 13), "#a06838") }
+        centred(labels[k], y, "#ffffff")
+    }
+    draw_rect(vec2(4, 207), vec2(248, 1), "#403050")
+    if waiting {
+        var what: string = "KEY"
+        if col == 2 { what = "BUTTON" }
+        centred("PRESS A " + what + " FOR " + controls.names[row], 212, "#f8c860")
+        centred("ESC: LEAVE IT AS IT WAS", 224, "#a090b0")
+    } elif note_t > 0 {
+        centred(note, 212, "#f8c860")
+    } else {
+        centred("ENTER: CHANGE   BKSP: CLEAR", 212, "#a090b0")
+        centred("THE STICK MOVES; ESC PAUSES", 224, "#706080")
+    }
+}
