@@ -133,10 +133,14 @@ def frost(bot):
 
 
 @step
-def sundae(bot):
-    bot.r.segment('The Abominable Sundae')
+def to_sundae(bot):
     if not bot.travel('F9'):
         raise RuntimeError('could not get to the Sundae')
+
+
+@step
+def sundae(bot):
+    bot.r.segment('The Abominable Sundae')
     bot.goto(lambda n: n[0] != 'exit' and n[0] >= 8 and n[1] == 12, nav.dist_heuristic(140, 192), desc='into the den')
     if not boss.fight_sundae(bot):
         raise RuntimeError('the Sundae won')

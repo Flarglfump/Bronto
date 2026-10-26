@@ -119,7 +119,7 @@ class BossFight:
                 best = (score, name, keys[0])
         return best
 
-    def fight_loop(self, boss_model, prefer, can_hurt, boss_box, done, limit=20000, kinds=None):
+    def fight_loop(self, boss_model, prefer, can_hurt, boss_box, done, limit=45000, kinds=None):
         """The guardian fight, frame by frame, until done()."""
         has = self.has_fn()
         for f in range(limit):
@@ -156,7 +156,10 @@ class BossFight:
         kind = self.beam()
         fire = 'fire'
         weapon = getattr(self, 'boss_weapon', None)
-        if weapon and weapon() == 'rocket':
+        want = weapon() if weapon else None
+        if want is None and self.inv()['rockets'] > 3 and 'rocket' not in self.r.held:
+            want = 'rocket'                              # (hot sauce hurts far more; keep a few for doors)
+        if want == 'rocket':
             if self.inv()['rockets'] <= 0 or 'rocket' in self.r.held:
                 return None
             fire, kind = 'rocket', 'rocket'
