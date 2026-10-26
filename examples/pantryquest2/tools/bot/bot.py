@@ -13,6 +13,7 @@ from travel import Travel, HearthTravel
 from boss import BossFight
 from blocks import Blocks
 from freeze import Freezing
+import worldnav as wn
 
 
 class Stuck(Exception):
@@ -161,8 +162,8 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
                     if blocks and self.clear_block(*blocks[0]):
                         continue
                 # over frozen enemies?
-                if has('frost') and any(f.brain in ('slider', 'leaper', 'flyer', 'crawler', 'hopper', 'walker', 'swooper')
-                                        for f in self.foes()):
+                if has('frost') and wn.ROOMS.get(g.room) is not None and wn.ROOMS[g.room].freeze_spots and \
+                        any(f.brain in ('slider', 'leaper', 'flyer', 'crawler', 'hopper', 'walker', 'swooper') for f in self.foes()):
                     gxy = getattr(heuristic, 'target', None)
                     if gxy and self.freeze_cross(goal, heuristic, gxy, desc=desc):
                         continue

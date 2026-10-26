@@ -241,10 +241,11 @@ def hit_switch(bot):
     for _ in range(3):
         if any(f.startswith('switch:') for f in bot.flags()):
             return
-        sw = [e for e in bot.r.find('Switch')]
+        sw = [(x, y) for (sc, i, nm, x, y) in bot.r.tagged('switch')]
         if not sw:
+            bot.log('no switch here')
             return
-        sx, sy = bot.r.pos(*sw[0])
+        sx, sy = sw[0]
         bot.set_frost(False)
         bot.shoot_point(sx, sy, through_walls=True, done=lambda: any(f.startswith('switch:') for f in bot.flags()))
 

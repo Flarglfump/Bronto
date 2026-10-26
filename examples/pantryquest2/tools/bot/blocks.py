@@ -94,8 +94,6 @@ class Blocks:
                 self.tick(nav.held_of(d))
                 continue
             keys = stance_keys(aim, facing)
-            if crouch:
-                keys.discard('down')
             if b.shot_cd <= 0 and fire not in self.r.held:
                 keys.add(fire)
             self.tick(keys)
@@ -142,7 +140,7 @@ class Blocks:
         rg = self.graph(g)
         here = nav.node_of(self.settle())
         kind = self.beam()
-        rng = 132.0 if kind in ('garlic', 'garlic_frost') else 88.0
+        rng = (132.0 if kind in ('garlic', 'garlic_frost') else 88.0) - 16    # (with room to spare)
         best = None
         for node, cost in rg.reachable(here).items():
             if node[0] == 'exit' or node[2]:
@@ -166,24 +164,27 @@ class Blocks:
                                 t = g.tile_at(x, y)
                                 if t in ('Y', 'c') or (not through_walls and t in g.solid_chars):
                                     break
-                            if ok and (best is None or cost < best[0]):
-                                best = (cost, node, aim, facing, crouch)
+                            if ok and (best is None or cost + (8 if crouch else 0) < best[0]):
+                                best = (cost + (8 if crouch else 0), node, aim, facing, crouch, a.x)
         if best is None:
             self.log('no spot to shoot', (px, py), 'from')
             return False
-        _, node, aim, facing, crouch = best
+        _, node, aim, facing, crouch, ax = best
+        self.log('  shooting', (px, py), 'from', node, aim, facing, 'crouched' if crouch else '')
         self.goto(lambda n, node=node: n == node, nav.dist_heuristic(node[0] * 16 + 8, node[1] * 16), desc='a spot to shoot from')
         for _ in range(limit):
             if done and done():
                 break
             b = self.basil()
+            if b.x != ax and abs(b.x - ax) < 24 and not b.crouch:     # (to the very spot the shot was worked out from)
+                self.tick(nav.held_of(1 if ax > b.x else -1))
+                self.tick(())
+                continue
             if crouch and not b.crouch:
                 self.tick(())
                 self.tick(('down',))
                 continue
             keys = stance_keys(aim, facing)
-            if crouch:
-                keys.discard('down')
             if b.shot_cd <= 0 and 'fire' not in self.r.held:
                 keys.add('fire')
             self.tick(keys)

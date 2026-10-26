@@ -271,8 +271,6 @@ class Fighting:
                 tries = self.__dict__.setdefault('_shots_at', {})
                 t = tries.get(foe.id)
                 tries[foe.id] = (t[0] + 1, t[1]) if t and t[1] == foe.hp else (1, foe.hp)
-            if crouch:
-                keys.discard('down')
             self.tick(keys)
         self.release_stance()
         return shot_any
