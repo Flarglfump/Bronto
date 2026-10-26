@@ -583,7 +583,7 @@ def fight_wyrm(bot):
         p = 0.0
         if s.in_liquid or s.hurt_count:
             p += 200
-        p += abs(s.x - 440) * 0.05
+        p += abs(s.x - 428) * 0.05                      # (on the dry landing; it wakes once he's past x 440)
         return p
 
     bot.set_frost(False)

@@ -253,6 +253,7 @@ def hit_switch(bot):
 @step
 def wyrm(bot):
     bot.r.segment('The Flambe Wyrm')
+    bot.goto(lambda n: n[0] != 'exit' and n[0] == 26 and n[1] == 12, nav.dist_heuristic(424, 192), desc='onto the landing')
     if not boss.fight_wyrm(bot):
         raise RuntimeError('the Wyrm won')
     bot.take_item('seal_pepper')
