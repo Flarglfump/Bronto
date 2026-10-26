@@ -130,9 +130,13 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
         return self.basil()
 
     def goto(self, goal, heuristic=None, tries=12, desc='', g=None):
-        """Plans and walks/jumps to a node goal(node) accepts (or an exit). True when there."""
+        """Plans and walks/jumps to a node goal(node) accepts (or an exit). True when there
+        (or once he's left the room: the goal was this room's)."""
+        start_room = self.room()
         for attempt in range(tries):
             self.wait_play()
+            if self.room() != start_room:
+                return True
             b = self.settle()
             here = nav.node_of(b)
             if goal(here):
