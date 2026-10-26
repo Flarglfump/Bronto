@@ -99,6 +99,13 @@ class Travel:
             def goal(rid, spots):
                 return rid == target_room and (offline_goal is None or offline_goal(rid, spots))
             plan = WN.route(room, node, goal, self.abilities(), self.flags())
+            if plan is None:                          # (his exact spot may not be one of the planner's: try those by it)
+                for dc, dr in ((0, 1), (0, -1), (-1, 0), (1, 0), (-1, 1), (1, 1), (0, 2), (-1, -1), (1, -1)):
+                    near = (node[0] + dc, node[1] + dr, node[2])
+                    if WN.graph(room, self.abilities()).stands(*near):
+                        plan = WN.route(room, near, goal, self.abilities(), self.flags())
+                        if plan is not None:
+                            break
             if plan is None:
                 # (where he stands may not be one of the planner's spots: try the nearest standing spot)
                 self.log('no route from', room, node, 'to', target_room)

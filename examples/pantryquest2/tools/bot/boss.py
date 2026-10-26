@@ -64,6 +64,16 @@ class BossFight:
             out.append(Hz(path, 3, 3, 'spit'))
         return out
 
+    def minion_hazards(self):
+        """Ordinary enemies about (the Count's spores, say): moving on in a straight line."""
+        out = []
+        self.threats(400)
+        for f in self.foes(within=200):
+            if f.frozen or not f.visible:
+                continue
+            out.append(Hz([(f.x + f.vx * k, f.y + f.vy * k) for k in range(H + 1)], f.half[0], f.half[1], 'enemy'))
+        return out
+
     def basil_hit(self, b, hz, k, margin=3):
         """Does Basil's box (as b is, k frames on) touch the hazard then, or a frame either side?"""
         mx, my = b.middle()
@@ -121,7 +131,7 @@ class BossFight:
                 continue
             b = self.basil()
             g = self.grid()
-            hazards = boss_model(b, g) + self.projectiles(g)
+            hazards = boss_model(b, g) + self.projectiles(g) + self.minion_hazards()
             if f % 60 == 0:
                 bv = self.g.vars('Game', ['boss_hp', 'room_id'])
                 self.log('  boss fight: basil', (b.x, b.y), 'energy', self.inv()['energy'], 'boss hp', bv['boss_hp'],
@@ -145,7 +155,12 @@ class BossFight:
         foe.vx, foe.vy = box[4], box[5]
         kind = self.beam()
         fire = 'fire'
-        if len(self.r.tagged('pepper')) >= 3 or 'fire' in self.r.held:
+        weapon = getattr(self, 'boss_weapon', None)
+        if weapon and weapon() == 'rocket':
+            if self.inv()['rockets'] <= 0 or 'rocket' in self.r.held:
+                return None
+            fire, kind = 'rocket', 'rocket'
+        elif len(self.r.tagged('pepper')) >= 3 or 'fire' in self.r.held:
             if 'rocket' in getattr(self, 'boss_rockets', ()) and self.inv()['rockets'] > 0 and 'rocket' not in self.r.held:
                 fire, kind = 'rocket', 'rocket'
             else:
@@ -378,4 +393,269 @@ def fight_sundae(bot):
     ok = bot.fight_loop(model, prefer, can_hurt, box, lambda: 'boss:sundae' in bot.flags())
     bot.wait_play()
     bot.set_frost(False)
+    return ok
+
+
+# ---- Doctor Brine and Frankenfurter ------------------------------------------------------------------
+def brine_model(bot):
+    def model(b, g):
+        out = []
+        for (s, i, nm, x, y) in bot.r.tagged('boss'):
+            if nm == 'Boss':                                     # Frankenfurter
+                v = bot.r.vars(s, i, ['state', 't', 'facing', 'right_wall'])
+                state, t, facing, right = v[0], float(v[1]), int(float(v[2])), float(v[3])
+                if state in ('sleep', 'down', 'done', 'dying'):
+                    continue
+                path = []
+                px = x
+                for k in range(H + 1):
+                    path.append((px, y))
+                    t += DT
+                    if state == 'walk':
+                        facing = 1 if b.x > px else -1
+                        px = min(max(px + facing * 0.6, 32), right)
+                        if t > 1.6:
+                            state = 'lunge' if abs(b.x - px) < 70 else 'lob'
+                            t = 0
+                    elif state == 'lunge':
+                        if 0.35 < t < 0.75:
+                            px = min(max(px + facing * 3.2, 32), right)
+                        if t > 1.2:
+                            state, t = 'walk', 0
+                    elif state == 'lob' and t > 1.0:
+                        state, t = 'walk', 0
+                out.append(Hz(path, 14, 24, 'monster'))
+            elif nm == 'Doctor':
+                v = bot.r.vars(s, i, ['state', 't', 'zap_x'])
+                state, t, zx = v[0], float(v[1]), float(v[2])
+                if state == 'zap':
+                    k_hit = max(0, int((0.8 - t) * 60))
+                    path = [None] * (H + 1)
+                    for k in range(max(0, k_hit - 2), min(H + 1, k_hit + 3)):
+                        path[k] = (zx, b.y)
+                    out.append(Hz(path, 8, 400, 'bolt'))
+                elif state == 'fight':
+                    mx, my = b.middle()
+                    path = []
+                    px, py = x, y
+                    for k in range(H + 1):
+                        path.append((px, py))
+                        dx, dy = mx - px, my - py
+                        d = math.hypot(dx, dy) or 1
+                        px += dx / d * 0.7
+                        py = min(max(py + dy / d * 0.7, 80), 180)
+                    out.append(Hz(path, 10, 14, 'doctor'))
+        return out
+    return model
+
+
+def fight_brine(bot):
+    """Frankenfurter first (any shot hurts it; keep away from its lunges, dodge the mustard and
+    the doctor's lightning), then the doctor: three rockets to crack his jar, then pepper."""
+    model = brine_model(bot)
+    st = {}
+
+    def look():
+        st.clear()
+        for (s, i, nm, x, y) in bot.r.tagged('boss'):
+            if nm == 'Boss':
+                st['monster'] = (bot.r.vars(s, i, ['state'])[0], x, y)
+            elif nm == 'Doctor':
+                v = bot.r.vars(s, i, ['state', 'jar'])
+                st['doctor'] = (v[0], x, y, int(float(v[1])))
+        return st
+
+    def target():
+        look()
+        m = st.get('monster')
+        if m and m[0] in ('walk', 'lunge', 'lob'):
+            return ('monster', m[1], m[2], 14, 24)
+        d = st.get('doctor')
+        if d and d[0] == 'fight':
+            return ('doctor', d[1], d[2], 10, 14)
+        return None
+
+    def can_hurt():
+        return target() is not None
+
+    def box():
+        t = target()
+        return (t[1], t[2], t[3], t[4], 0, 0) if t else None
+
+    def weapon():
+        d = st.get('doctor')
+        if d and d[0] == 'fight' and d[3] > 0:
+            return 'rocket'
+        return None
+
+    def prefer(s):
+        t = target() if not st else None
+        m = st.get('monster')
+        p = 0.0
+        if m and m[0] in ('walk', 'lunge', 'lob'):
+            dx = abs(s.x - m[1])
+            p += abs(dx - 100) * 0.3
+            behind = (s.x - 24) if s.x < m[1] else (488 - s.x)
+            p += max(0, 90 - behind) * 0.4
+        d = st.get('doctor')
+        if d and d[0] == 'fight':
+            p += abs(math.hypot(s.x - d[1], s.y - d[2]) - 70) * 0.2
+        return p
+
+    bot.boss_weapon = weapon
+    bot.set_frost(False)
+    bot.log('fighting Doctor Brine')
+    try:
+        ok = bot.fight_loop(model, prefer, can_hurt, box, lambda: 'boss:brine' in bot.flags())
+    finally:
+        bot.boss_weapon = None
+    bot.wait_play()
+    return ok
+
+
+# ---- the Flambé Wyrm --------------------------------------------------------------------------------
+def wyrm_model(bot):
+    hist = []                                       # the head's positions, frame by frame (while leaping)
+
+    def model(b, g):
+        e = bot.boss_entity('Boss')
+        if not e:
+            return []
+        s, i, x, y = e
+        v = bot.r.vars(s, i, ['state', 'vel'])
+        state = v[0]
+        vx, vy = parse_vec(v[1])
+        if state != 'leap':
+            hist.clear()
+            return []
+        if not hist or hist[-1] != (x, y):
+            hist.append((x, y))
+        head = []
+        px, py = x, y
+        for k in range(H + 1):
+            head.append((px, py))
+            vy += 0.13
+            px += vx
+            py += vy
+        out = [Hz(head, 12, 12, 'head')]
+        for n in range(1, 7):
+            path = []
+            for k in range(H + 1):
+                j = k - 5 * n
+                if j >= 0:
+                    path.append(head[j])
+                elif len(hist) + j - 1 >= 0:
+                    path.append(hist[len(hist) + j - 1])
+                else:
+                    path.append(None)
+            out.append(Hz(path, 7, 7, 'body'))
+        return out
+    return model
+
+
+def fight_wyrm(bot):
+    """The Flambé Wyrm: only its head, while it leaps, can be hurt. Stay on the dry landing by
+    the door, dodge the head, its body and its fire, and shoot the head."""
+    model = wyrm_model(bot)
+    st = {}
+
+    def look():
+        e = bot.boss_entity('Boss')
+        st.clear()
+        if e:
+            v = bot.r.vars(e[0], e[1], ['state', 'vel'])
+            st.update(state=v[0], x=e[2], y=e[3], vel=parse_vec(v[1]))
+        return st
+
+    def can_hurt():
+        return look().get('state') == 'leap'
+
+    def box():
+        i = look()
+        if not i:
+            return None
+        return (i['x'], i['y'], 12, 12, i['vel'][0], i['vel'][1])
+
+    def prefer(s):
+        p = 0.0
+        if s.in_liquid or s.hurt_count:
+            p += 200
+        p += abs(s.x - 440) * 0.05
+        return p
+
+    bot.set_frost(False)
+    bot.log('fighting the Flambe Wyrm')
+    ok = bot.fight_loop(model, prefer, can_hurt, box, lambda: 'boss:wyrm' in bot.flags())
+    bot.wait_play()
+    return ok
+
+
+# ---- Count Fromage, and the Big Cheese -------------------------------------------------------------
+def count_model(bot):
+    def model(b, g):
+        e = bot.boss_entity('Boss')
+        if not e:
+            return []
+        s, i, x, y = e
+        v = bot.r.vars(s, i, ['state', 't', 'vel', 'right_wall'])
+        state, t = v[0], float(v[1])
+        vx, vy = parse_vec(v[2])
+        right = float(v[3])
+        if state in ('appear', 'cast'):
+            k_end = int(max(0, (0.4 - t if state == 'appear' else 0) + (1.3 if state == 'appear' else 1.3 - t)) * 60)
+            path = [(x, y) if k <= k_end else None for k in range(H + 1)]
+            return [Hz(path, 10, 22, 'count')]
+        if state == 'big':
+            path = []
+            px, py = x, y
+            for k in range(H + 1):
+                path.append((px, py))
+                px += vx
+                py += vy
+                if px < 48 or px > right - 8:
+                    vx = -vx
+                if py < 60 or py > 176:
+                    vy = -vy
+            return [Hz(path, 26, 26, 'cheese')]
+        return []
+    return model
+
+
+def fight_count(bot):
+    """Count Fromage: hurt him while he's there (appearing or casting), dodge his fire; then the
+    Big Cheese, bouncing about the room: only garlic hurts it (Frost Sugar off: garlic alone)."""
+    model = count_model(bot)
+    st = {}
+
+    def look():
+        e = bot.boss_entity('Boss')
+        st.clear()
+        if e:
+            v = bot.r.vars(e[0], e[1], ['state', 'vel'])
+            st.update(state=v[0], x=e[2], y=e[3], vel=parse_vec(v[1]))
+        return st
+
+    def can_hurt():
+        return look().get('state') in ('appear', 'cast', 'big')
+
+    def box():
+        i = look()
+        if not i:
+            return None
+        if i['state'] == 'big':
+            return (i['x'], i['y'], 26, 26, i['vel'][0], i['vel'][1])
+        return (i['x'], i['y'] - 10, 10, 14, 0, 0)
+
+    def prefer(s):
+        i = st or look()
+        p = 0.0
+        if i and i.get('state') == 'big':
+            p += max(0, 90 - math.hypot(s.x - i['x'], s.y - i['y'])) * 0.5
+        p += abs(s.x - 256) * 0.02
+        return p
+
+    bot.set_frost(False)
+    bot.log('fighting Count Fromage')
+    ok = bot.fight_loop(model, prefer, can_hurt, box, lambda: 'boss:count' in bot.flags())
+    bot.wait_play()
     return ok

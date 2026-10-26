@@ -5,6 +5,7 @@ A move is a policy: given the frame number and Basil's state it says which keys 
 The same policy drives the planning (in the sim) and the playing (in the game), so a move
 the sim says lands on a spot lands there."""
 import heapq
+import itertools
 import math
 
 import sim
@@ -84,8 +85,28 @@ def make_bounces():
     return out
 
 
+CYCLE = 24                         # a Whisk Spin re-jump every 24 frames (jump held 20, let go 4)
+
+
+def make_whisk():
+    """With the Whisk Spin: a spin jump, then re-jumps in the air, each one drifting left or right,
+    then a way of steering the fall."""
+    out = []
+    for n in range(1, 5):
+        for pattern in itertools.product((-1, 1), repeat=n):
+            for post in (-1, 0, 1):
+                def fn(f, b, pattern=pattern, post=post):
+                    c, ph = divmod(f, CYCLE)
+                    if c < len(pattern):
+                        return held_of(pattern[c], ph < 20)
+                    return held_of(post)
+                out.append(Move('whisk%s%+d' % (''.join('R' if d > 0 else 'L' for d in pattern), post), fn, 1))
+    return out
+
+
 MOVES = make_moves()
 BALL_MOVES = make_ball_moves()
+WHISK = make_whisk()
 BOUNCES = make_bounces()
 WAIT = Move('wait', lambda f, b: set(), 1, 'walk')
 ROLL_UP = Move('roll_up', lambda f, b: {'ball'} if f == 0 else set(), 1, 'toggle')
@@ -227,6 +248,8 @@ class RoomGraph:
         candidates = BALL_MOVES if ball else MOVES
         if ball and self.has('popcorn'):
             candidates = candidates + BOUNCES
+        if not ball and self.has('whisk'):
+            candidates = candidates + WHISK
         for b in self.anchor_states(node):
             dx = b.x - (col * TILE + 8)
             for mv in candidates:
@@ -255,7 +278,8 @@ class RoomGraph:
     def moves_from_state(self, b):
         """The moves from exactly where he is (not a tile's anchor): dx is None for these."""
         out = {}
-        cands = (BALL_MOVES + (BOUNCES if self.has('popcorn') else []) if b.ball else MOVES) + [WAIT]
+        cands = (BALL_MOVES + (BOUNCES if self.has('popcorn') else []) if b.ball else
+                 MOVES + (WHISK if self.has('whisk') else [])) + [WAIT]
         if self.has('dough'):
             cands = cands + [STAND_UP if b.ball else ROLL_UP]
         for mv in cands:

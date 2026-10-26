@@ -297,7 +297,8 @@ class Bot(Fighting, Travel, BossFight, Blocks, Freezing):
             for d in (-1, 1):
                 pres.append([nav.held_of(d)] * n)
                 pres.append([nav.held_of(d)] * n + [set()])
-        others = [m for m in (nav.BALL_MOVES + (nav.BOUNCES if has('popcorn') else []) if b.ball else nav.MOVES) if m is not mv] + \
+        others = [m for m in (nav.BALL_MOVES + (nav.BOUNCES if has('popcorn') else []) if b.ball else
+                              nav.MOVES + (nav.WHISK if has('whisk') else [])) if m is not mv] + \
                  ([nav.STAND_UP if b.ball else nav.ROLL_UP] if has('dough') else [])
         best = None
         for pass_moves in ([mv], others):
