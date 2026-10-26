@@ -405,6 +405,36 @@ class Bot(Fighting, Travel, BossFight, Blocks, Freezing):
         self.wait_play()
         self.inv_cache = None
 
+    def return_to_hearth(self):
+        """RETURN TO LAST HEARTH, from the pause menu's SYSTEM page."""
+        self.log('returning to the last hearth')
+        self.wait_play()
+        self.settle()
+        before = self.room()
+        self.tick(())
+        self.tick(('pause',))
+        self.wait_until(lambda: self.r.scenes()[-1:] == ['pause.scene'], 60)
+        self.wait(20)
+        self.tick(('left',))                       # MAP -> SYSTEM
+        self.wait(12)
+        opts = self.g.raw('Pause', 'options')
+        names = [x.strip() for x in opts.strip('[]').split(',')]
+        if 'hearth' not in names:
+            self.log('  (not allowed here)')
+            self.tick(('pause',))
+            self.tick(())
+            self.wait_play()
+            return False
+        for _ in range(names.index('hearth')):
+            self.tick(('down',))
+            self.tick(())
+        self.wait(10)
+        self.tick(('jump',))
+        self.tick(())
+        self.wait_until(lambda: self.room() != before and self.state() == 'play', 400)
+        self.wait_play()
+        return True
+
     # ---- hearths ----
     def rest(self):
         """Rests at the hearth in this room (saving, and filling energy and hot sauce)."""

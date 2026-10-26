@@ -91,6 +91,7 @@ class Travel:
     # ---- the world ----
     def travel(self, target_room, offline_goal=None):
         """To a room (and, with offline_goal(spots), to a part of it), room by room."""
+        tried_hearth = False
         for attempt in range(60):
             self.wait_play()
             room = self.room()
@@ -107,8 +108,10 @@ class Travel:
                         if plan is not None:
                             break
             if plan is None:
-                # (where he stands may not be one of the planner's spots: try the nearest standing spot)
                 self.log('no route from', room, node, 'to', target_room)
+                if not tried_hearth and self.return_to_hearth():
+                    tried_hearth = True
+                    continue
                 return False
             if not plan:
                 return True
