@@ -1,0 +1,102 @@
+@strict
+# The hearth's menu, pushed over the game once Basil has rested (and been saved): stay, or
+# travel to any other hearth he has found. What to list comes in the globals "hearth_list"
+# ([room, name, area]), "hearth_here" and "hearth_saved"; the choice goes back in
+# "hearth_travel" (a room, or "" to stay). Keys, the d-pad, or the mouse.
+
+var draw_layer: int = 85
+var places: list = []
+var here: string = ""
+var saved: bool = true
+var sel: int = 0
+var t: number = 0
+var done: bool = false
+var last_mouse := vec2(-1, -1)
+
+func start() -> void {
+    places = global("hearth_list", [])
+    here = global("hearth_here", "")
+    saved = global("hearth_saved", true)
+}
+
+func rows() -> int { return len(places) + 1 }           # (row 0: stay here)
+
+func box_h() -> number { return 48 + rows() * 20 }
+func box_top() -> number { return max(6, 118 - box_h() / 2) }
+func row_y(i: int) -> number { return box_top() + 38 + i * 20 }
+
+func choose(i: int) -> void {
+    if done { return }
+    var to: string = ""
+    if i > 0 { to = places[i - 1][0] }
+    if to == here { to = "" }
+    set_global("hearth_travel", to)
+    done = true
+    play_sound("sfx/select.wav", 0.6)
+    pop_scene()
+}
+
+func update(dt: number) -> void {
+    t += dt
+    if done or t < 0.2 { return }
+    var before: int = sel
+    if action_pressed("up") or key_pressed("up") or button_pressed("up") { sel = (sel + rows() - 1) % rows() }
+    if action_pressed("down") or key_pressed("down") or button_pressed("down") { sel = (sel + 1) % rows() }
+    var m := mouse_position()                            # the mouse: pointing chooses, clicking goes
+    var over: int = -1
+    for i in rows() {
+        if m.x >= 20 and m.x < 236 and m.y >= row_y(i) - 3 and m.y < row_y(i) + 17 { over = i }
+    }
+    if m != last_mouse and over >= 0 { sel = over }
+    last_mouse = m
+    if sel != before { play_sound("sfx/blip.wav", 0.4) }
+    if mouse_pressed(0) and over >= 0 {
+        choose(over)
+        return
+    }
+    if action_pressed("jump") or action_pressed("fire") or key_pressed("enter") or button_pressed("a") { choose(sel) }
+    elif key_pressed("escape") or button_pressed("b") or action_pressed("rocket") { choose(0) }
+}
+
+func draw() -> void {
+    if done { return }
+    var h: number = box_h()
+    var top: number = box_top()
+    draw_rect(vec2(14, top), vec2(228, h), "#000000")
+    draw_rect(vec2(15, top + 1), vec2(226, h - 2), "#f8e8b0", false)
+    draw_rect(vec2(17, top + 3), vec2(222, h - 6), "#806030", false)
+    var head: string = "JOURNEY SAVED"
+    if not saved { head = "COULDN'T SAVE THE JOURNEY" }
+    draw_text(head, vec2(128 - text_size(head).x / 2, top + 10), "#f8c860")
+    draw_text("ENERGY AND SAUCE RESTORED", vec2(28, top + 24), "#c0b0a0")
+    for i in rows() {
+        var y: number = row_y(i)
+        if i == sel { draw_rect(vec2(22, y - 3), vec2(212, 19), "#503040") }
+        if i == 0 {
+            draw_text("STAY HERE", vec2(30, y + 2), "#ffffff")
+        } else {
+            var p: list = places[i - 1]
+            var name: string = upper_words(p[1])
+            if p[0] == here { name = name + " (HERE)" }
+            draw_text(name, vec2(30, y - 1), "#ffffff")
+            draw_text(p[2], vec2(38, y + 7), "#907880")
+        }
+    }
+}
+
+func upper_words(s: string) -> string {
+    var lo: string = "abcdefghijklmnopqrstuvwxyz"
+    var hi: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    var out: string = ""
+    for i in len(s) {
+        var c: string = s[i]
+        for j in 26 {
+            if lo[j] == c {
+                c = hi[j]
+                break
+            }
+        }
+        out = out + c
+    }
+    return out
+}

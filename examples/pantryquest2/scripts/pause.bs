@@ -1,9 +1,10 @@
 @strict
 # The pause menu: a scene pushed over the game (which waits underneath, unseen). Four
-# pages - MAP, ITEMS, DIARY and SYSTEM - turned with left and right (or LB / RB, or the
-# mouse on the tabs). What to show comes in globals the Game sets before pushing it
-# ("pause_inv", "pause_visited", ...); what to do after - quitting, Frost Sugar on or off -
-# goes back the same way. PAUSE (or MAP, or jump on the tabs) closes it.
+# pages - MAP, ITEMS, DIARY and SYSTEM - turned with left and right (or LB / RB, or a click
+# on the tabs). Everything here also answers to the mouse: pointing chooses, clicking goes.
+# What to show comes in globals the Game sets before pushing it ("pause_inv",
+# "pause_visited", "pause_marks", ...); what to do after - quitting, going back to the last
+# hearth, Frost Sugar on or off - goes back the same way. PAUSE (or MAP) closes it.
 
 var draw_layer: int = 70
 var tab: int = 0
@@ -17,6 +18,8 @@ var here := vec2(0, 0)
 var rooms: list = []
 var areas: list = []
 var room_id: string = ""
+var goal: list = []                       # where to go next: [room id, its name, its area's title]
+var hearth_ok: bool = false               # can he go back to his last hearth from here?
 var story: entity
 var sel: int = 0
 var reading: int = -1                     # the diary page open (-1: the list)
@@ -24,6 +27,13 @@ var t: number = 0
 var closing: bool = false
 var options: list[string] = []
 var confirm_quit: bool = false
+var showing_hint: bool = false           # the map's "where next?" box
+var last_mouse := vec2(-1, -1)
+var mouse_moved: bool = false
+var clicked: bool = false
+
+const KINDS: list = ["dough", "popcorn", "sauce", "frost", "leaven", "mitts", "garlic", "whisk",
+                     "seal_salt", "seal_sugar", "seal_vinegar", "seal_pepper"]
 
 func start() -> void {
     story = find("Story")
@@ -34,6 +44,8 @@ func start() -> void {
     marks = global("pause_marks", [])
     here = global("pause_cell", vec2(0, 0))
     room_id = global("pause_room", "")
+    goal = global("pause_goal", [])
+    hearth_ok = global("pause_hearth_ok", false)
     rooms = find("World").rooms()
     areas = find("World").areas()
     if action_down("map") { tab = 0 }
@@ -46,41 +58,58 @@ func area_colour(a: string) -> string {
     return "#808080"
 }
 
+func inside(m: vec2, p: vec2, size: vec2) -> bool {
+    return m.x >= p.x and m.y >= p.y and m.x < p.x + size.x and m.y < p.y + size.y
+}
+
+func set_tab(i: int) -> void {
+    if i == tab { return }
+    tab = i
+    sel = 0
+    reading = -1
+    confirm_quit = false
+    showing_hint = false
+    play_sound("sfx/blip.wav", 0.5)
+}
+
 func update(dt: number) -> void {
     t += dt
     if closing { return }
+    var m := mouse_position()
+    mouse_moved = m != last_mouse
+    last_mouse = m
+    clicked = mouse_pressed(0)
     if t < 0.15 { return }                     # (the press that opened it isn't a press in here)
     var turn: int = 0
-    if action_pressed("left") and reading < 0 and not (tab == 3) { turn = -1 }
-    if action_pressed("right") and reading < 0 and not (tab == 3) { turn = 1 }
+    if action_pressed("left") and reading < 0 and not (tab == 3) and not (tab == 1) { turn = -1 }
+    if action_pressed("right") and reading < 0 and not (tab == 3) and not (tab == 1) { turn = 1 }
+    if tab == 1 and reading < 0 {                      # (on the items, left and right move along; off the end turns the page)
+        if action_pressed("left") and sel % 4 == 0 { turn = -1 }
+        if action_pressed("right") and sel % 4 == 3 { turn = 1 }
+    }
     if button_pressed("lb") { turn = -1 }
     if button_pressed("rb") { turn = 1 }
-    if mouse_pressed(0) {
-        var m := mouse_position()
-        if m.y < 24 {
-            var i: int = floor((m.x - 8) / 60)
-            if i >= 0 and i < 4 and i != tab {
-                tab = i
-                sel = 0
-                reading = -1
-                play_sound("sfx/blip.wav", 0.5)
+    if turn != 0 { set_tab((tab + turn + 4) % 4) }
+    if clicked {
+        for i in 4 {
+            if inside(m, vec2(8 + i * 60, 6), vec2(56, 14)) {
+                set_tab(i)
+                clicked = false
             }
         }
-    }
-    if turn != 0 {
-        tab = (tab + turn + 4) % 4
-        sel = 0
-        reading = -1
-        confirm_quit = false
-        play_sound("sfx/blip.wav", 0.5)
+        if inside(m, vec2(204, 226), vec2(48, 12)) {     # the BACK button
+            close()
+            return
+        }
     }
     if action_pressed("pause") or action_pressed("map") {
         close()
         return
     }
-    if tab == 1 { items_input() }
-    if tab == 2 { diary_input() }
-    if tab == 3 { system_input() }
+    if tab == 0 { map_input(m) }
+    if tab == 1 { items_input(m) }
+    if tab == 2 { diary_input(m) }
+    if tab == 3 { system_input(m) }
 }
 
 # Back from the controls screen: read the keys again (it changed them).
@@ -95,28 +124,42 @@ func close() -> void {
     pop_scene()
 }
 
-func move_sel(n: int, cols: int) -> void {
-    var before: int = sel
-    if action_pressed("left") { sel -= 1 }
-    if action_pressed("right") { sel += 1 }
-    if action_pressed("up") { sel -= cols }
-    if action_pressed("down") { sel += cols }
-    sel = clamp(sel, 0, n - 1)
-    if sel != before { play_sound("sfx/blip.wav", 0.4) }
+# On the map: JUMP (or a click on the NEXT line) shows the hint for where to go next.
+func map_input(m: vec2) -> void {
+    if len(goal) < 4 { return }
+    var click_next := clicked and inside(m, vec2(8, 160), vec2(240, 22))
+    if showing_hint {
+        if action_pressed("jump") or action_pressed("fire") or action_pressed("rocket") or clicked {
+            showing_hint = false
+            play_sound("sfx/back.wav", 0.4)
+        }
+        return
+    }
+    if action_pressed("jump") or action_pressed("fire") or click_next {
+        showing_hint = true
+        play_sound("sfx/select.wav", 0.5)
+    }
 }
 
-func items_input() -> void {
+func slot_pos(i: int) -> vec2 { return vec2(40 + (i % 4) * 48, 44 + floor(i / 4) * 34) }
+
+func items_input(m: vec2) -> void {
     var before: int = sel
     if action_pressed("up") { sel -= 4 }
     if action_pressed("down") { sel += 4 }
+    if action_pressed("left") and sel % 4 > 0 { sel -= 1 }
+    if action_pressed("right") and sel % 4 < 3 { sel += 1 }
     sel = clamp(sel, 0, 11)
+    for i in 12 {
+        if (mouse_moved or clicked) and inside(m, slot_pos(i) - vec2(14, 14), vec2(28, 28)) { sel = i }
+    }
     if sel != before { play_sound("sfx/blip.wav", 0.4) }
 }
 
-func diary_input() -> void {
+func diary_input(m: vec2) -> void {
     var found: list = inv[5]
     if reading >= 0 {
-        if action_pressed("jump") or action_pressed("fire") or action_pressed("rocket") {
+        if action_pressed("jump") or action_pressed("fire") or action_pressed("rocket") or clicked {
             reading = -1
             play_sound("sfx/back.wav", 0.4)
         }
@@ -127,8 +170,14 @@ func diary_input() -> void {
     if action_pressed("up") { sel -= 1 }
     if action_pressed("down") { sel += 1 }
     sel = clamp(sel, 0, 7)
+    var over: int = -1
+    for i in 8 {
+        if inside(m, vec2(10, 49 + i * 16), vec2(150, 14)) { over = i }
+    }
+    if mouse_moved and over >= 0 { sel = over }
     if sel != before { play_sound("sfx/blip.wav", 0.4) }
-    if action_pressed("jump") or action_pressed("fire") {
+    if action_pressed("jump") or action_pressed("fire") or (clicked and over >= 0) {
+        if clicked { sel = over }
         if contains(found, "page" + (sel + 1)) {
             reading = sel
             play_sound("sfx/select.wav", 0.5)
@@ -143,17 +192,26 @@ func system_options() -> list[string] {
     push(out, "sound")
     push(out, "fullscreen")
     push(out, "controls")
+    if hearth_ok { push(out, "hearth") }
     push(out, "resume")
     push(out, "quit")
     return out
 }
 
-func system_input() -> void {
+func option_y(i: int) -> number { return 44 + i * 19 }
+
+func system_input(m: vec2) -> void {
     options = system_options()
     var before: int = sel
     if action_pressed("up") { sel -= 1 }
     if action_pressed("down") { sel += 1 }
     sel = clamp(sel, 0, len(options) - 1)
+    var over: int = -1
+    for i in len(options) {
+        if inside(m, vec2(10, option_y(i) - 4), vec2(236, 16)) { over = i }
+    }
+    if mouse_moved and over >= 0 { sel = over }
+    if clicked and over >= 0 { sel = over }
     if sel != before {
         play_sound("sfx/blip.wav", 0.4)
         confirm_quit = false
@@ -162,25 +220,18 @@ func system_input() -> void {
     var lr: int = 0
     if action_pressed("left") { lr = -1 }
     if action_pressed("right") { lr = 1 }
-    var ok := action_pressed("jump") or action_pressed("fire")
+    var ok := action_pressed("jump") or action_pressed("fire") or (clicked and over >= 0)
+    if (o == "music" or o == "sound") and clicked and over >= 0 {   # a click on the bar sets it there
+        var v: number = clamp(ceil((m.x - 74) / 8) / 10, 0, 1)
+        if m.x >= 70 and m.x < 160 { set_level(o, v) }
+        return
+    }
     if o == "frost" and (ok or lr != 0) {
         set_global("frost_on", not global("frost_on", true))
         play_sound("sfx/select.wav", 0.5)
     }
-    if o == "music" and lr != 0 {
-        var v: number = clamp(global("music_volume", 0.8) + lr * 0.1, 0, 1)
-        set_global("music_volume", v)
-        set_volume("music", v)
-        play_sound("sfx/blip.wav", 0.5)
-        save_settings()
-    }
-    if o == "sound" and lr != 0 {
-        var v: number = clamp(volume("sfx") + lr * 0.1, 0, 1)
-        set_volume("sfx", v)
-        set_global("sound_volume", v)
-        play_sound("sfx/blip.wav", 0.8)
-        save_settings()
-    }
+    if o == "music" and lr != 0 { set_level(o, global("music_volume", 0.8) + lr * 0.1) }
+    if o == "sound" and lr != 0 { set_level(o, volume("sfx") + lr * 0.1) }
     if o == "fullscreen" and (ok or lr != 0) {
         set_fullscreen(not fullscreen())
         play_sound("sfx/select.wav", 0.5)
@@ -189,6 +240,11 @@ func system_input() -> void {
     if o == "controls" and ok {
         play_sound("sfx/select.wav", 0.5)
         push_scene("controls.scene", false, false)
+        return
+    }
+    if o == "hearth" and ok {
+        set_global("pause_action", "hearth")
+        close()
         return
     }
     if o == "resume" and ok { close() }
@@ -203,6 +259,20 @@ func system_input() -> void {
     }
 }
 
+func set_level(which: string, value: number) -> void {
+    var v: number = clamp(round(value * 10) / 10, 0, 1)
+    if which == "music" {
+        set_global("music_volume", v)
+        set_volume("music", v)
+        play_sound("sfx/blip.wav", 0.5)
+    } else {
+        set_volume("sfx", v)
+        set_global("sound_volume", v)
+        play_sound("sfx/blip.wav", 0.8)
+    }
+    save_settings()
+}
+
 # The volumes and fullscreen are kept in their own save, shared by every journey (title.bs reads it).
 func save_settings() -> void {
     save_data("settings", [global("music_volume", 0.8), volume("sfx"), fullscreen()])
@@ -214,7 +284,7 @@ func draw() -> void {
     for i in 4 {
         var x: number = 8 + i * 60
         var col: string = "#403050"
-        if i == tab { col = "#a06838" }
+        if i == tab { col = "#a06838" } elif inside(last_mouse, vec2(x, 6), vec2(56, 14)) { col = "#604060" }
         draw_rect(vec2(x, 6), vec2(56, 14), col)
         var w: number = text_size(tabs[i]).x
         draw_text(tabs[i], vec2(x + 28 - w / 2, 9), "#ffffff")
@@ -224,14 +294,31 @@ func draw() -> void {
     if tab == 1 { draw_items() }
     if tab == 2 { draw_diary() }
     if tab == 3 { draw_system() }
-    draw_text("LEFT/RIGHT: PAGES   PAUSE: BACK", vec2(4, 230), "#706080")
+    draw_text("LEFT/RIGHT: PAGES", vec2(4, 230), "#706080")
+    var bc: string = "#403050"
+    if inside(last_mouse, vec2(204, 226), vec2(48, 12)) { bc = "#a06838" }
+    draw_rect(vec2(204, 226), vec2(48, 12), bc)
+    draw_text("BACK", vec2(212, 228), "#ffffff")
 }
 
+# A small "S" (3 x 5 pixels) for a save point.
+func draw_s(p: vec2, col: string) -> void {
+    draw_rect(p, vec2(3, 1), col)
+    draw_rect(p + vec2(0, 1), vec2(1, 1), col)
+    draw_rect(p + vec2(0, 2), vec2(3, 1), col)
+    draw_rect(p + vec2(2, 3), vec2(1, 1), col)
+    draw_rect(p + vec2(0, 4), vec2(3, 1), col)
+}
+
+const ITEM_COLOUR: string = "#ffd040"
+const LOCK_COLOUR: string = "#e83030"
+const GOAL_COLOUR: string = "#40e8ff"
+
 func draw_map() -> void {
-    var cw: number = 7
-    var ch: number = 6
-    var ox: number = 12
-    var oy: number = 40
+    var cw: number = 9
+    var ch: number = 7
+    var ox: number = 6
+    var oy: number = 37
     var name: string = ""
     var aname: string = ""
     for r in rooms {
@@ -253,27 +340,58 @@ func draw_map() -> void {
             }
         }
     }
-    for m in marks {
-        var parts: list = split_key(m[0])
-        var p := vec2(ox + parts[0] * cw + 2, oy + parts[1] * ch + 1)
-        if m[1] == "item" { draw_rect(p, vec2(2, 2), "#ffffff") }
-        if m[1] == "hearth" { draw_rect(p, vec2(3, 3), "#ff9030") }
-        if m[1] == "maptable" { draw_rect(p, vec2(3, 3), "#60c0ff") }
+    var blink := floor(t * 3) % 2 == 0
+    for kind in ["locked", "item", "goal", "maptable", "hearth"] {        # (in this order: the S on top)
+        for m in marks {
+            if m[1] != kind { continue }
+            var parts: list = split_key(m[0])
+            var p := vec2(ox + parts[0] * cw, oy + parts[1] * ch)
+            if kind == "locked" { draw_rect(p + vec2(1, 1), vec2(cw - 3, ch - 3), LOCK_COLOUR) }
+            if kind == "item" { draw_rect(p - vec2(1, 1), vec2(cw + 1, ch + 1), ITEM_COLOUR, false) }
+            if kind == "goal" and blink { draw_rect(p - vec2(1, 1), vec2(cw + 1, ch + 1), GOAL_COLOUR, false) }
+            if kind == "maptable" { draw_rect(p + vec2(5, 1), vec2(2, 2), "#60c0ff") }
+            if kind == "hearth" {
+                draw_rect(p + vec2(1, 0), vec2(5, 6), "#000000")
+                draw_s(p + vec2(2, 0), "#ffffff")
+            }
+        }
     }
     if floor(t * 4) % 2 == 0 {
         draw_rect(vec2(ox + here.x * cw + 1, oy + here.y * ch + 1), vec2(cw - 3, ch - 3), "#ffffff")
     }
-    draw_text(aname, vec2(12, 28), "#f8c860")
-    draw_text(name, vec2(12, 168), "#ffffff")
+    draw_text(aname, vec2(12, 27), "#f8c860")
+    draw_text(name, vec2(12, 152), "#ffffff")
+    if len(goal) > 0 {
+        draw_text("NEXT: " + goal[1], vec2(12, 163), GOAL_COLOUR)
+        draw_text(goal[2], vec2(60, 173), "#4090a0")
+        draw_text("JUMP OR CLICK NEXT: HOW TO GO", vec2(12, 213), "#507080")
+    }
+    var found: list = global("pause_found", [0, 0])
+    draw_text("ITEMS " + found[0] + "/" + found[1], vec2(160, 27), "#a090b0")
     var secs: int = floor(global("pause_time", 0))
     var tm: string = floor(secs / 3600) + ":" + two(floor(secs / 60) % 60) + ":" + two(secs % 60)
-    draw_text("TIME " + tm, vec2(12, 184), "#a090b0")
-    draw_rect(vec2(12, 200), vec2(4, 4), "#ff9030")
-    draw_text("HEARTH", vec2(20, 198), "#a090b0")
-    draw_rect(vec2(80, 200), vec2(4, 4), "#60c0ff")
-    draw_text("MAP", vec2(88, 198), "#a090b0")
-    draw_rect(vec2(124, 201), vec2(2, 2), "#ffffff")
-    draw_text("ITEM", vec2(130, 198), "#a090b0")
+    draw_text("TIME " + tm, vec2(152, 152), "#a090b0")
+    # the key
+    draw_rect(vec2(12, 189), vec2(5, 5), "#000000")
+    draw_s(vec2(13, 189), "#ffffff")
+    draw_text("SAVE", vec2(22, 188), "#a090b0")
+    draw_rect(vec2(70, 188), vec2(8, 7), ITEM_COLOUR, false)
+    draw_text("ITEMS LEFT", vec2(82, 188), "#a090b0")
+    draw_rect(vec2(12, 202), vec2(6, 5), LOCK_COLOUR)
+    draw_text("NEEDS GEAR YOU LACK", vec2(22, 200), "#a090b0")
+    draw_rect(vec2(178, 188), vec2(8, 7), GOAL_COLOUR, false)
+    draw_text("NEXT", vec2(190, 188), "#a090b0")
+    draw_rect(vec2(178, 202), vec2(6, 5), "#60c0ff")
+    draw_text("MAP", vec2(190, 200), "#a090b0")
+    if showing_hint and len(goal) >= 4 {                    # where next, and how
+        var lines: list[string] = wrap(goal[3], 27)
+        var h: number = 30 + min(len(lines), 9) * 11
+        var top: number = 120 - h / 2
+        draw_rect(vec2(14, top), vec2(228, h), "#000000")
+        draw_rect(vec2(15, top + 1), vec2(226, h - 2), GOAL_COLOUR, false)
+        draw_text("NEXT: " + goal[1], vec2(22, top + 7), GOAL_COLOUR)
+        for i in min(len(lines), 9) { draw_text(lines[i], vec2(22, top + 22 + i * 11), "#ffffff") }
+    }
 }
 
 func two(n: int) -> string {
@@ -288,11 +406,9 @@ func split_key(k: string) -> list {
 }
 
 func draw_items() -> void {
-    var kinds: list[string] = ["dough", "popcorn", "sauce", "frost", "leaven", "mitts", "garlic", "whisk",
-                               "seal_salt", "seal_sugar", "seal_vinegar", "seal_pepper"]
     for i in 12 {
-        var k: string = kinds[i]
-        var p := vec2(40 + (i % 4) * 48, 44 + floor(i / 4) * 34)
+        var k: string = KINDS[i]
+        var p := slot_pos(i)
         var frame: int = i
         if i >= 8 { frame = 11 + (i - 8) }
         var col: string = "#302038"
@@ -300,7 +416,7 @@ func draw_items() -> void {
         draw_rect(p - vec2(14, 14), vec2(28, 28), col)
         if contains(items, k) { draw_image("art/items.bmp", p, frame, vec2(16, 16)) } else { draw_text("?", p - vec2(3, 4), "#605070") }
     }
-    var k: string = kinds[sel]
+    var k: string = KINDS[sel]
     if contains(items, k) {
         draw_text(story.item_name(k), vec2(12, 150), "#f8c860")
         var lines: list[string] = wrap(find("Controls").fill(story.item_text(k)), 29)        # (29 letters: x 12 to 244)
@@ -322,7 +438,7 @@ func draw_diary() -> void {
         draw_rect(vec2(10, 48), vec2(236, 150), "#e8d8a8")
         var lines: list[string] = wrap(story.page_text("page" + (reading + 1)), 27)
         for i in len(lines) { draw_text(lines[i], vec2(18, 56 + i * 11), "#402818") }
-        draw_text("JUMP: BACK", vec2(12, 206), "#a090b0")
+        draw_text("JUMP OR CLICK: BACK", vec2(12, 206), "#a090b0")
         return
     }
     draw_text("THE COUNT'S DIARY", vec2(12, 34), "#f8c860")
@@ -337,14 +453,14 @@ func draw_diary() -> void {
         if i == sel { draw_rect(vec2(10, y - 3), vec2(150, 14), "#503040") }
         draw_text(label, vec2(16, y), col)
     }
-    if len(found) == 0 { draw_text("NO PAGES FOUND YET", vec2(16, 190), "#a090b0") } else { draw_text("JUMP: READ", vec2(16, 190), "#a090b0") }
+    if len(found) == 0 { draw_text("NO PAGES FOUND YET", vec2(16, 190), "#a090b0") } else { draw_text("JUMP OR CLICK: READ", vec2(16, 190), "#a090b0") }
 }
 
 func draw_system() -> void {
     options = system_options()
     for i in len(options) {
         var o: string = options[i]
-        var y: number = 48 + i * 20
+        var y: number = option_y(i)
         var label: string = ""
         if o == "frost" {
             label = "FROST SUGAR: OFF"
@@ -357,15 +473,16 @@ func draw_system() -> void {
             if fullscreen() { label = "FULLSCREEN: ON" }
         }
         if o == "controls" { label = "CONTROLS" }
+        if o == "hearth" { label = "RETURN TO LAST HEARTH" }
         if o == "resume" { label = "RESUME" }
         if o == "quit" {
             label = "QUIT TO TITLE"
-            if confirm_quit and i == sel { label = "QUIT? JUMP AGAIN TO SAY YES" }
+            if confirm_quit and i == sel { label = "SURE? CHOOSE IT AGAIN" }
         }
         if i == sel { draw_rect(vec2(10, y - 4), vec2(236, 16), "#503040") }
         draw_text(label, vec2(18, y), "#ffffff")
     }
-    draw_text("TO SAVE: PRESS UP AT A HEARTH", vec2(12, 200), "#a090b0")
+    draw_text("TO SAVE: PRESS UP AT A HEARTH", vec2(12, 206), "#a090b0")
 }
 
 func bar(v: number) -> string {

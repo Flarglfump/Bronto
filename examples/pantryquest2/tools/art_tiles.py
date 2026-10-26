@@ -62,7 +62,7 @@ def texture(style, x, y, variant=0):
     """The fill of a solid tile at pixel (x, y) (0..15), as a colour."""
     s = STYLES[style]
     base, light, dark = s['base'], s['light'], s['dark']
-    n = noise(x, y, variant * 7 + hash(style) % 97)
+    n = noise(x, y, variant * 7 + sum(ord(ch) for ch in style) % 97)   # (not hash(): Python changes it every run)
     pat = s['pattern']
     if pat == 'brick':                                  # bread-crust bricks, offset rows
         row = y // 8

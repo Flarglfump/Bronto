@@ -66,23 +66,47 @@ The defaults:
 
 | | Keyboard | Gamepad |
 |---|---|---|
-| Run, aim, roll | arrows / WASD | d-pad (the left stick always works too) |
+| Run, aim, crouch | arrows / WASD | d-pad (the left stick always works too) |
 | Jump | Z, Space | A |
 | Pepper | X, J | X |
 | Hot sauce | C, L | B |
-| Hold to aim at an angle | Shift, Q | LB |
+| Aim (hold) | Shift, Q | LB |
+| Roll up | E | Y |
 | Pause (map, items, diary, settings) | Enter, P (Esc always works) | Start |
 | Map | M, Tab | Back |
 
 **Aiming:** UP aims straight up, and UP while running aims up at an angle. In the air,
-DOWN aims straight down, and DOWN with LEFT or RIGHT aims down at an angle. Holding the
-angle button plants Basil's feet and aims up at an angle, or down at one with DOWN.
+DOWN aims straight down, and DOWN with LEFT or RIGHT aims down at an angle. Holding AIM
+plants Basil's feet and turns the direction keys into aiming alone: LEFT or RIGHT aims
+level, UP or DOWN straight up or down, and both together at an angle, eight ways.
+
+**Crouching and rolling up:** DOWN on the ground crouches; AIM works crouched too.
+DOWN again (not while aiming) rolls Basil up in the Dough Wrap, and so does ROLL UP at
+any time on the ground. UP, JUMP or LEFT/RIGHT stand him up again; if there's no room to
+stand, he unrolls into a crouch.
 
 **Changing the controls:** every action has two keys and a gamepad button, and all of
 them can be changed under **CONTROLS**, in OPTIONS on the title or SYSTEM in the pause
 menu. Choose one and press the new key or button. They're saved for every journey, and
 the game's signs and item descriptions show your keys. The arrow keys, the d-pad, Enter,
 Escape, A and B always work on the controls screen, so it can't be made unusable.
+
+**The mouse** works every menu: pointing at something chooses it, clicking does it, a
+click on a volume bar sets it there, and a BACK button closes the pause menu.
+
+## Finding the way
+
+- **The map** (pause, or MAP) marks each hearth with an **S**, rooms with **items still
+  to find** in gold, ways on that **need gear Basil hasn't got yet** in red (a wax door,
+  cracked blocks, a crawlspace, a ledge only the Leaven Boots reach, the heat of the
+  hottest kitchens...), and **where to go next** with a blinking blue frame. The minimap
+  in the corner shows the same. JUMP (or a click) on the map's NEXT line tells how to get
+  there.
+- **After each guardian**, a word on where to go next.
+- **Hearths**: UP at one saves the journey and restores energy and sauce, then offers to
+  **travel to any other hearth** Basil has found.
+- **RETURN TO LAST HEARTH**, in the pause menu's SYSTEM page, takes him straight back to
+  the hearth he last rested at (not during a guardian's fight or the escape).
 
 On a phone or tablet, the web build shows an on-screen stick and buttons.
 
@@ -125,6 +149,7 @@ title.scene           the title: three journeys, options                 scripts
 intro.scene           the story so far, before a new journey               scripts/intro.bs
 main.scene            the game: World, Story, Game, Basil, Camera, HUD
 pause.scene           the pause menu: map, items, diary, settings          scripts/pause.bs
+hearth.scene          the hearth's menu: stay, or travel to another         scripts/hearthmenu.bs
 controls.scene        the controls screen                                 scripts/rebind.bs
                       (each screen's Controls entity, scripts/controls.bs, keeps the keys)
 dialogue.scene        the dialogue box                                    scripts/dialogue.bs
@@ -149,7 +174,9 @@ Everything in `art/`, `sfx/`, `music/`, `rooms/` and `prefabs/` is made by Pytho
   keys, a pulse lead with an echo a sixteenth behind it, galloping triangle bass. Each
   bar is checked for length as it's read.
 - `world.py` describes every room. `make_rooms.py` turns it into scenes and
-  `scripts/world_data.bs`.
+  `scripts/world_data.bs`. `make_locks.py` works out, for the map, which parts of each
+  room need which gear (`tools/locks.json`, which `make_rooms.py` reads): it plays each
+  room with the abilities in the order they're found and notes what each one opens up.
 - `check_world.py` plays the world through on paper. It models Basil's jumps, rolls and
   bounces with the same numbers the game uses, picks up items as he reaches them, and beats
   each guardian once he has what it needs. It checks that every room, item and guardian can

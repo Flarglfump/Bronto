@@ -16,6 +16,10 @@ var go_to: string = ""
 var menu: list[string] = ["START", "OPTIONS", "QUIT"]
 var options: list[string] = ["MUSIC", "SOUND", "FULLSCREEN", "CONTROLS", "BACK"]
 var controls: entity
+var mouse := vec2(-1, -1)                 # the mouse: pointing at a row chooses it, clicking goes
+var mouse_moved: bool = false
+var click_row: int = -1                   # the row clicked this step (-1: none)
+var click_at := vec2(-1, -1)
 
 func start() -> void {
     controls = find("Controls")
@@ -49,10 +53,12 @@ func read_slots() -> void {
 }
 
 func ok() -> bool {
+    if click_row >= 0 and click_row == sel { return true }
     return action_pressed("jump") or action_pressed("fire") or key_pressed("enter") or button_pressed("start")
 }
 
 func back() -> bool {
+    if mouse_pressed(0) and inside(mouse, vec2(204, 226), vec2(48, 12)) and state != "press" and state != "menu" { return true }
     return action_pressed("rocket") or key_pressed("escape")
 }
 
@@ -72,6 +78,49 @@ func leave(scene: string) -> void {
     stop_music(0.8)
 }
 
+func inside(m: vec2, p: vec2, size: vec2) -> bool {
+    return m.x >= p.x and m.y >= p.y and m.x < p.x + size.x and m.y < p.y + size.y
+}
+
+# The rows of what's showing, for the mouse: [position, size] each.
+func row_rects() -> list {
+    var out: list = []
+    if state == "menu" {
+        for i in len(menu) { push(out, [vec2(64, 147 + i * 16), vec2(128, 14)]) }
+    }
+    if state == "slots" {
+        for i in 3 { push(out, [vec2(24, 100 + i * 36), vec2(208, 32)]) }
+    }
+    if state == "options" {
+        for i in len(options) { push(out, [vec2(30, 132 + i * 17), vec2(196, 16)]) }
+    }
+    if state == "erase" {
+        push(out, [vec2(52, 160), vec2(64, 14)])      # (YES, NO)
+        push(out, [vec2(140, 160), vec2(64, 14)])
+    }
+    return out
+}
+
+func mouse_input() -> void {
+    var m := mouse_position()
+    mouse_moved = m != mouse
+    mouse = m
+    click_row = -1
+    var over: int = -1
+    var rects: list = row_rects()
+    for i in len(rects) {
+        if inside(m, rects[i][0], rects[i][1]) { over = i }
+    }
+    if state == "erase" { return }
+    var before: int = sel
+    if (mouse_moved or mouse_pressed(0)) and over >= 0 { sel = over }
+    if sel != before { play_sound("sfx/blip.wav", 0.4) }
+    if mouse_pressed(0) and over >= 0 {
+        click_row = over
+        click_at = m
+    }
+}
+
 func update(dt: number) -> void {
     t += dt
     if leaving >= 0 {
@@ -79,6 +128,7 @@ func update(dt: number) -> void {
         if leaving > 0.8 { load_scene(go_to) }
         return
     }
+    mouse_input()
     if state == "press" {
         if t > 0.5 and (ok() or action_pressed("pause") or mouse_pressed(0)) {
             state = "menu"
@@ -116,7 +166,10 @@ func update(dt: number) -> void {
             sel = 0
             return
         }
-        if action_pressed("map") and slots[sel] != nil {
+        var forget := action_pressed("map")
+        if click_row >= 0 and click_at.x >= 206 { forget = true }      # (the X on a journey's panel)
+        if forget and slots[sel] != nil {
+            click_row = -1
             state = "erase"
             play_sound("sfx/select.wav", 0.6)
             return
@@ -134,12 +187,18 @@ func update(dt: number) -> void {
         return
     }
     if state == "erase" {
-        if ok() {
+        var yes := ok()
+        var no := back() or action_pressed("map")
+        if mouse_pressed(0) {
+            if inside(mouse, vec2(52, 160), vec2(64, 14)) { yes = true }
+            if inside(mouse, vec2(140, 160), vec2(64, 14)) { no = true }
+        }
+        if yes {
             delete_data("slot" + (sel + 1))
             read_slots()
             play_sound("sfx/crumble.wav", 0.7)
             state = "slots"
-        } elif back() or action_pressed("map") {
+        } elif no {
             state = "slots"
         }
         return
@@ -150,6 +209,18 @@ func update(dt: number) -> void {
         if action_pressed("left") { lr = -1 }
         if action_pressed("right") { lr = 1 }
         var o: string = options[sel]
+        if (o == "MUSIC" or o == "SOUND") and click_row == sel and click_at.x >= 100 and click_at.x < 184 {
+            var v: number = clamp(ceil((click_at.x - 104) / 8) / 10, 0, 1)   # a click on the bar sets it there
+            if o == "MUSIC" {
+                set_global("music_volume", v)
+                set_volume("music", v)
+            } else {
+                set_volume("sfx", v)
+                play_sound("sfx/blip.wav", 0.8)
+            }
+            save_settings()
+            return
+        }
         if o == "MUSIC" and lr != 0 {
             var v: number = clamp(global("music_volume", 0.8) + lr * 0.1, 0, 1)
             set_global("music_volume", v)
@@ -255,12 +326,25 @@ func draw() -> void {
             var lines: list[string] = slot_text(i)
             draw_text(lines[0], vec2(36, y + 7), "#ffe070")
             draw_text(lines[1], vec2(36, y + 18), "#ffffff")
+            if slots[i] != nil and state == "slots" {             # forget it (for the mouse)
+                var xc: string = "#604050"
+                if inside(mouse, vec2(206, y + 6), vec2(20, 20)) { xc = "#c04050" }
+                draw_rect(vec2(208, y + 8), vec2(16, 16), xc)
+                draw_text("X", vec2(212, y + 12), "#ffffff")
+            }
         }
         if state == "erase" {
-            panel(vec2(32, 140), vec2(192, 40))
-            draw_rect(vec2(36, 144), vec2(184, 32), "#301018")
-            centred("FORGET JOURNEY " + (sel + 1) + "?", 150, "#ff8080")
-            centred(controls.fill("{jump}: YES   {rocket}: NO"), 164, "#ffffff")
+            panel(vec2(32, 136), vec2(192, 46))
+            draw_rect(vec2(36, 140), vec2(184, 38), "#301018")
+            centred("FORGET JOURNEY " + (sel + 1) + "?", 145, "#ff8080")
+            for k in 2 {
+                var bx: number = 52 + k * 88
+                var bc: string = "#503040"
+                if inside(mouse, vec2(bx, 160), vec2(64, 14)) { bc = "#a06838" }
+                draw_rect(vec2(bx, 160), vec2(64, 14), bc)
+            }
+            draw_text(controls.fill("{jump}") + ": YES", vec2(56, 163), "#ffffff")
+            draw_text(controls.fill("{rocket}") + ": NO", vec2(144, 163), "#ffffff")
         } else {
             centred(controls.fill("{jump}: GO   {rocket}: BACK"), 206, "#c0a0d0")
             centred(controls.fill("{map}: FORGET A JOURNEY"), 216, "#c0a0d0")
@@ -270,7 +354,7 @@ func draw() -> void {
         panel(vec2(24, 126), vec2(208, 94))
         for i in len(options) {
             var o: string = options[i]
-            var y: number = 136 + i * 17
+            var y: number = 136 + i * 17                                 # (row_rects() has these too)
             var label: string = o
             if o == "MUSIC" { label = "MUSIC   " + bar(global("music_volume", 0.8)) }
             if o == "SOUND" { label = "SOUND   " + bar(volume("sfx")) }
@@ -283,6 +367,12 @@ func draw() -> void {
         }
     }
     draw_text("(C) THE BRONTO PANTRY", vec2(4, 229), "#605070")
+    if state == "slots" or state == "options" {                  # a BACK button, for the mouse
+        var bc: string = "#403050"
+        if inside(mouse, vec2(204, 226), vec2(48, 12)) { bc = "#a06838" }
+        draw_rect(vec2(204, 226), vec2(48, 12), bc)
+        draw_text("BACK", vec2(212, 228), "#ffffff")
+    }
     if leaving >= 0 {
         draw_rect(vec2(0, 0), vec2(256, 240), rgb(0, 0, 0, 255 * clamp(leaving / 0.7, 0, 1)))
     }

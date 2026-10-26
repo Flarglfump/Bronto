@@ -65,6 +65,10 @@ var fade: number = 1                      # 0 clear .. 1 black
 var next_room: string = ""
 var next_door: string = ""
 var next_speed := vec2(0, 0)
+var travel_pos := vec2(0, 0)              # travelling to a hearth: where he'll stand
+var hearth_menu: bool = false             # the hearth's menu is open (a scene over this one)
+var map_marks: list = []                  # marks() for the HUD's minimap, freshened twice a second
+var marks_t: number = 0
 var arrived_door: string = ""             # the door Basil came in by (it starts open)
 var area: string = ""
 var banner_t: number = 0
@@ -193,6 +197,7 @@ func enter(id: string, door: string, at: vec2, keep_speed: bool) -> void {
     cam.Camera.limit_max = size
     snap_camera()
     see_cells()
+    if has_hearth(id) { set_flag("hearth:" + id) }
     if data[5] != area {
         area = data[5]
         banner_t = 3
@@ -256,6 +261,10 @@ func neighbour(side: string, index: int) -> list {
 }
 
 func go_through() -> void {
+    if next_door == "" {                               # travelling to a hearth
+        enter(next_room, "", travel_pos, false)
+        return
+    }
     var side := substr(next_door, 0, 1)
     enter(next_room, next_door, vec2(0, 0), true)
     if side == "S" { basil.lift(max(-next_speed.y, 4.5)) }   # coming up a shaft: a lift over the edge
@@ -307,6 +316,11 @@ func update(dt: number) -> void {
     } elif state == "play" {
         play_time += dt
         see_cells()
+        marks_t -= dt
+        if marks_t <= 0 {
+            marks_t = 0.5
+            map_marks = marks()
+        }
         if escape_t > 0 {
             escape_t -= dt
             if floor(escape_t * 2) != floor((escape_t + dt) * 2) { shake_camera(1.5, 0.4) }
@@ -399,12 +413,19 @@ func on_resume() -> void {
         }
         return
     }
+    if hearth_menu {
+        hearth_menu = false
+        var to: string = global("hearth_travel", "")
+        if to != "" and to != room_id { travel_to(to) }
+        return
+    }
     var action: string = global("pause_action", "")
     set_global("pause_action", "")
     inv.frost_on = global("frost_on", inv.frost_on)
     if action == "quit" {
         load_scene("title.scene")
     }
+    if action == "hearth" { travel_to(save_room) }
 }
 
 func talk_done(id: string) -> void {
@@ -451,8 +472,53 @@ func rest_at_hearth() -> void {
     inv.energy = inv.max_energy()
     inv.rockets = inv.max_rockets
     save_room = room_id
+    set_flag("hearth:" + room_id)
     play_sound("sfx/save.wav")
-    if save_game() { talk("hearth") } else { talk("hearth_nosave") }
+    var saved := save_game()
+    var places: list = known_hearths()
+    if escape_t > 0 or len(places) < 2 {               # (nowhere else to go yet)
+        if saved { talk("hearth") } else { talk("hearth_nosave") }
+        return
+    }
+    set_global("hearth_list", places)                    # the hearth's menu: stay, or travel to another
+    set_global("hearth_here", room_id)
+    set_global("hearth_saved", saved)
+    set_global("hearth_travel", "")
+    hearth_menu = true
+    push_scene("hearth.scene", true, false)
+}
+
+# ---- travelling between hearths ------------------------------------------------------------------
+func has_hearth(id: string) -> bool {
+    for t in find("World").things() {
+        if t[0] == id and t[1] == "hearth" { return true }
+    }
+    return false
+}
+
+# The hearths Basil has found: [room, its name, its area's title], in the world's order.
+func known_hearths() -> list {
+    var out: list = []
+    for t in find("World").things() {
+        if t[1] != "hearth" or not flag("hearth:" + t[0]) { continue }
+        var r := info(t[0])
+        var title: string = ""
+        for a in find("World").areas() {
+            if a[0] == r[5] { title = a[1] }
+        }
+        push(out, [t[0], r[6], title])
+    }
+    return out
+}
+
+# Off to a hearth (fading out and in), to stand by it.
+func travel_to(id: string) -> void {
+    if not has_hearth(id) { return }
+    next_room = id
+    next_door = ""
+    travel_pos = hearth_spot(id)
+    state = "fade_out"
+    play_sound("sfx/door.wav", 0.6)
 }
 
 func read_map(which: string) -> void {
@@ -475,22 +541,97 @@ func pause() -> void {
     set_global("pause_time", play_time)
     set_global("pause_marks", marks())
     set_global("frost_on", inv.frost_on)
+    var g: list = next_goal()
+    var goal: list = []
+    if len(g) > 0 {
+        var r := info(g[2])
+        var title: string = ""
+        for a in find("World").areas() {
+            if a[0] == r[5] { title = a[1] }
+        }
+        goal = [g[2], upper_words(r[6]), title, find("Controls").fill(g[3])]
+    }
+    set_global("pause_goal", goal)
+    var found: int = 0
+    var all: int = 0
+    for t in find("World").things() {
+        if t[1] == "item" {
+            all += 1
+            if flag("item:" + t[4]) { found += 1 }
+        }
+    }
+    set_global("pause_found", [found, all])
+    set_global("pause_hearth_ok", escape_t <= 0 and has_hearth(save_room) and boss_max <= 0)
     play_sound("sfx/select.wav", 0.5)
     push_scene("pause.scene", false, false)
 }
 
 # What the map shows: where the hearths and map tables are (those seen), and the items not taken yet in mapped areas.
+# What the map marks, cell by cell ("x_y"): "hearth" (an S), "maptable", "item" (one not yet
+# taken, in a room seen or an area mapped), "locked" (a way on that needs something Basil
+# hasn't got), and "goal" (where to go next).
 func marks() -> list {
     var out: list = []
     for t in find("World").things() {
         var r := info(t[0])
         if len(r) == 0 { continue }
         var cell: string = (r[1] + floor(t[2] / 16)) + "_" + (r[2] + floor(t[3] / 15))
-        var seen := contains(visited, cell)
-        if t[1] == "item" and not flag("item:" + t[4]) and (contains(maps, r[5]) or seen) { push(out, [cell, "item"]) }
-        if (t[1] == "hearth" or t[1] == "maptable") and seen { push(out, [cell, t[1]]) }
+        var known := contains(maps, r[5]) or room_seen(r)
+        if t[1] == "item" and not flag("item:" + t[4]) and known { push(out, [cell, "item"]) }
+        if (t[1] == "hearth" or t[1] == "maptable") and known { push(out, [cell, t[1]]) }
+    }
+    for l in find("World").locks() {
+        var key: string = l[1] + "_" + l[2]
+        var r := info(l[0])
+        if len(r) == 0 or has_need(l[3]) { continue }
+        if contains(visited, key) or contains(maps, r[5]) { push(out, [key, "locked"]) }
+    }
+    var g: list = next_goal()
+    if len(g) > 0 {
+        var r := info(g[2])
+        for j in r[4] {
+            for i in r[3] { push(out, [(r[1] + i) + "_" + (r[2] + j), "goal"]) }
+        }
     }
     return out
+}
+
+# Has Basil seen any of a room?
+func room_seen(r: list) -> bool {
+    for j in r[4] {
+        for i in r[3] {
+            if contains(visited, (r[1] + i) + "_" + (r[2] + j)) { return true }
+        }
+    }
+    return false
+}
+
+# Does he have what a lock needs?
+func has_need(need: string) -> bool {
+    if need == "seals" { return inv.seals() >= 4 }
+    return inv.has(need)
+}
+
+# ---- where to go next ------------------------------------------------------------------------------
+# The first step of the way through (story.bs, goals()) not yet done: [what, which, room, hint].
+func next_goal() -> list {
+    for g in story.goals() {
+        var done := false
+        if g[0] == "item" { done = inv.has(g[1]) }
+        if g[0] == "boss" { done = flag("boss:" + g[1]) }
+        if g[0] == "flag" { done = flag(g[1]) }
+        if not done { return g }
+    }
+    return []
+}
+
+# After a guardian: a word on where to go next.
+func give_guidance() -> void {
+    var g: list = next_goal()
+    if len(g) == 0 { return }
+    var where := info(g[2])
+    var text: string = find("Controls").fill(g[3])
+    talk_pages("goal", [["WHERE NEXT", -1, text + " (It's marked on the map: " + where[6] + ".)"]])
 }
 
 # ---- the guardians ------------------------------------------------------------------------------
@@ -520,6 +661,7 @@ func boss_beaten(id: string, rewards: list, at: vec2, words: string) -> void {
         }
     }
     if words != "" { talk(words) }
+    give_guidance()
 }
 
 # Coming back to a beaten guardian's room: whatever it left that wasn't taken is still there.
@@ -585,4 +727,21 @@ func load_game() -> bool {
     save_room = l[5]
     play_time = l[6]
     return true
+}
+
+func upper_words(s: string) -> string {
+    var lo: string = "abcdefghijklmnopqrstuvwxyz"
+    var hi: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    var out: string = ""
+    for i in len(s) {
+        var c: string = s[i]
+        for j in 26 {
+            if lo[j] == c {
+                c = hi[j]
+                break
+            }
+        }
+        out = out + c
+    }
+    return out
 }

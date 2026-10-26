@@ -5,7 +5,12 @@
 # Movement is the old consoles' kind: speeds in pixels per step (60 steps a second),
 # moving a pixel at a time and stopping at walls. Walls are the room map's solid tiles
 # (tile_box_solid) and frozen enemies (tagged "platform"). His box is 12 x 26 standing,
-# 12 x 12 rolled up, with his feet at the bottom of his sprite.
+# 12 x 18 crouched and 12 x 12 rolled up, with his feet at the bottom of his sprite.
+#
+# The controls: DOWN on the ground crouches; DOWN again (or BALL, at any time on the
+# ground) rolls him up in the Dough Wrap. Holding AIM plants his feet and points the mill
+# with the direction keys, eight ways, standing or crouched. Without it, UP aims up (at an
+# angle while running) and in the air DOWN aims down (at an angle with LEFT or RIGHT).
 
 const RUN: number = 1.5
 const GRAVITY: number = 0.25
@@ -23,6 +28,7 @@ var sub := vec2(0, 0)                # what's left over after whole-pixel moves
 var facing: int = 1
 var grounded: bool = false
 var ball: bool = false
+var crouch: bool = false
 var spin: bool = false
 var aim: string = "fwd"              # where the mill points: fwd, up, diag_up, diag_down, down
 var shot_cd: int = 0
@@ -40,24 +46,37 @@ func start() -> void {
 }
 
 # ---- his box ------------------------------------------------------------------------------
-func box_size(rolled: bool) -> vec2 {
-    if rolled { return vec2(12, 12) }
+const STAND: int = 0
+const CROUCH: int = 1
+const BALL: int = 2
+
+func pose() -> int {
+    if ball { return BALL }
+    if crouch { return CROUCH }
+    return STAND
+}
+
+func box_size(how: int) -> vec2 {
+    if how == BALL { return vec2(12, 12) }
+    if how == CROUCH { return vec2(12, 18) }
     return vec2(12, 26)
 }
 
 # The middle of his box when his sprite is at p (his feet are at p.y + 16).
-func box_centre(p: vec2, rolled: bool) -> vec2 {
-    if rolled { return vec2(p.x, p.y + 10) }
-    return vec2(p.x, p.y + 3)
+func box_centre(p: vec2, how: int) -> vec2 {
+    return vec2(p.x, p.y + 16 - box_size(how).y / 2)
 }
 
 func feet() -> vec2 { return vec2(self.x, self.y + 16) }
-func middle() -> vec2 { return box_centre(self.position, ball) }
 
-# Does anything solid overlap his box with his sprite at p?
-func blocked(p: vec2, rolled: bool) -> bool {
-    var c := box_centre(p, rolled)
-    var s := box_size(rolled)
+# UP at a hearth, a map table or someone to talk to does that, unless he's busy aiming or rolled up.
+func up_to_use() -> bool { return action_pressed("up") and grounded and not ball and not action_down("aim") }
+func middle() -> vec2 { return box_centre(self.position, pose()) }
+
+# Does anything solid overlap his box (standing, crouched or rolled up) with his sprite at p?
+func blocked(p: vec2, how: int) -> bool {
+    var c := box_centre(p, how)
+    var s := box_size(how)
     if tile_box_solid(map, c, s) { return true }
     for e in platforms {
         if e.alive and e.blocks(c, s) { return true }
@@ -68,7 +87,7 @@ func blocked(p: vec2, rolled: bool) -> bool {
 # Is a world box (centre, half size) touching his? For enemies, shots and pickups.
 func touches(c: vec2, half: vec2) -> bool {
     var m := middle()
-    var s := box_size(ball) / 2
+    var s := box_size(pose()) / 2
     return abs(c.x - m.x) < half.x + s.x and abs(c.y - m.y) < half.y + s.y
 }
 
@@ -80,7 +99,7 @@ func move_x(dx: number) -> bool {
     var s := sign(steps)
     for i in abs(steps) {
         var next := self.position + vec2(s, 0)
-        if blocked(next, ball) {
+        if blocked(next, pose()) {
             sub.x = 0
             return false
         }
@@ -96,7 +115,7 @@ func move_y(dy: number) -> bool {
     var s := sign(steps)
     for i in abs(steps) {
         var next := self.position + vec2(0, s)
-        if blocked(next, ball) {
+        if blocked(next, pose()) {
             sub.y = 0
             return false
         }
@@ -105,7 +124,7 @@ func move_y(dy: number) -> bool {
     return true
 }
 
-func on_ground() -> bool { return blocked(self.position + vec2(0, 1), ball) }
+func on_ground() -> bool { return blocked(self.position + vec2(0, 1), pose()) }
 
 func tile_under_feet(dy: number) -> string { return tile_at(map, vec2(self.x, self.y + 16 + dy)) }
 
@@ -174,42 +193,59 @@ func update(dt: number) -> void {
     var dir: int = 0
     if control and left and not right { dir = -1 }
     if control and right and not left { dir = 1 }
-    if dir != 0 { face(dir) }
-
-    # aiming: UP aims up, UP with LEFT or RIGHT aims up at an angle; in the air DOWN aims
-    # down (at an angle with LEFT or RIGHT). Holding AIM plants his feet and aims at an
-    # angle, up or (with DOWN) down, without walking.
-    var angle := control and action_down("aim") and not ball
+    var aiming := control and action_down("aim") and not ball
     var up := action_down("up")
     var down := action_down("down")
-    var sideways := left or right
-    aim = "fwd"
-    if control and not ball {
-        if angle {
-            if down { aim = "diag_down" } else { aim = "diag_up" }
-        } elif up and sideways {
-            aim = "diag_up"
-        } elif up {
-            aim = "up"
-        } elif down and not grounded {
-            if sideways { aim = "diag_down" } else { aim = "down" }
-        }
-    }
-    if angle and grounded { dir = 0 }                # (he still turns to face the way pressed)
+    var sideways: int = 0
+    if left and not right { sideways = -1 }
+    if right and not left { sideways = 1 }
+    if sideways != 0 and control { face(sideways) }
 
-    # rolling up, and standing again
-    if control and not ball and not angle and game.has("dough") and action_pressed("down") and on_ground() {
-        ball = true
-        spin = false
-        self.y += 0                                  # (the box shrinks to the bottom: his feet stay put)
-        play_sound("sfx/roll.wav")
-        ball_t = 0
-    } elif control and ball and (action_pressed("up") or action_pressed("jump")) {
-        if not blocked(self.position, false) {
+    # crouching, rolling up, and standing again (not while aiming: there DOWN only aims)
+    if control and not ball and not aiming {
+        var roll := action_pressed("ball") and grounded
+        if crouch and action_pressed("down") { roll = true }
+        if roll and game.has("dough") {
+            ball = true
+            crouch = false
+            spin = false
+            play_sound("sfx/roll.wav")
+            ball_t = 0
+        } elif not crouch and grounded and action_pressed("down") {
+            crouch = true
+            play_sound("sfx/click.wav", 0.3)
+        } elif crouch and (sideways != 0 or action_pressed("up") or action_pressed("jump")) {
+            if not blocked(self.position, STAND) { crouch = false }
+        }
+    } elif control and ball and (action_pressed("up") or action_pressed("jump") or action_pressed("ball")) {
+        if not blocked(self.position, STAND) {
             ball = false
+            play_sound("sfx/unroll.wav")
+        } elif not blocked(self.position, CROUCH) {        # (no room to stand: crouched, until there is)
+            ball = false
+            crouch = true
             play_sound("sfx/unroll.wav")
         }
     }
+    if crouch and not grounded and not blocked(self.position, STAND) { crouch = false }
+
+    # aiming
+    aim = "fwd"
+    if control and not ball {
+        if aiming {                                      # AIM held: the keys only point the mill
+            if sideways != 0 and up { aim = "diag_up" }
+            elif sideways != 0 and down { aim = "diag_down" }
+            elif up { aim = "up" }
+            elif down { aim = "down" }
+        } elif not crouch {
+            if up and sideways != 0 { aim = "diag_up" }
+            elif up { aim = "up" }
+            elif down and not grounded {
+                if sideways != 0 { aim = "diag_down" } else { aim = "down" }
+            }
+        }
+    }
+    if aiming or crouch { dir = 0 }                       # planted: he turns, but doesn't walk
 
     # running
     var speed: number = RUN
@@ -227,7 +263,7 @@ func update(dt: number) -> void {
             spin = false
         }
         vel.y = 0
-        if control and not ball and action_pressed("jump") { jump(dir) }
+        if control and not ball and not crouch and action_pressed("jump") { jump(dir) }
     } else {
         var g: number = GRAVITY
         var top: number = MAX_FALL
@@ -267,11 +303,13 @@ func jump(dir: int) -> void {
 
 # Where a shot leaves the mill, and which way it flies, for where he's aiming.
 func muzzle() -> vec2 {
-    if aim == "up" { return vec2(self.x + facing * 3, self.y - 18) }
-    if aim == "diag_up" { return vec2(self.x + facing * 10, self.y - 6) }
-    if aim == "diag_down" { return vec2(self.x + facing * 10, self.y + 9) }
-    if aim == "down" { return vec2(self.x + facing * 3, self.y + 14) }
-    if grounded { return vec2(self.x + facing * 14, self.y + 2) }
+    var low: number = 0
+    if crouch { low = 4 }                            # (crouched, the mill is 4 pixels lower)
+    if aim == "up" { return vec2(self.x + facing * 3, self.y - 18 + low) }
+    if aim == "diag_up" { return vec2(self.x + facing * 10, self.y - 6 + low) }
+    if aim == "diag_down" { return vec2(self.x + facing * 10, self.y + 9 + low) }
+    if aim == "down" { return vec2(self.x + facing * 3, self.y + 12 + low) }
+    if grounded { return vec2(self.x + facing * 14, self.y + 2 + low) }
     return vec2(self.x + facing * 14, self.y + 1)
 }
 
@@ -314,7 +352,7 @@ func drop_popcorn() -> void {
 
 func hazards(dt: number) -> void {
     var m := middle()
-    var s := box_size(ball) / 2
+    var s := box_size(pose()) / 2
     var lava := false
     for p in [vec2(m.x - s.x + 2, m.y + s.y - 2), vec2(m.x + s.x - 2, m.y + s.y - 2), m] {
         if tile_at(map, p) == "~" { lava = true }
@@ -366,6 +404,15 @@ func animate() -> void {
         if vel.x != 0 { play_animation(self, "14-17", 14, true) } else { play_animation(self, "14") }
         return
     }
+    if crouch {                                      # 34-38: crouched, aiming each way
+        var f: int = 34
+        if aim == "up" { f = 35 }
+        if aim == "diag_up" { f = 36 }
+        if aim == "diag_down" { f = 37 }
+        if aim == "down" { f = 38 }
+        play_animation(self, "" + f)
+        return
+    }
     if not grounded {
         if spin {
             play_animation(self, "10-13", 20, true)
@@ -398,6 +445,8 @@ func animate() -> void {
         play_animation(self, "24")
     } elif aim == "diag_down" {
         play_animation(self, "32")
+    } elif aim == "down" {
+        play_animation(self, "33")
     } else {
         play_animation(self, "0")
     }

@@ -1,0 +1,9 @@
+# Pantry Quest II - the hearth's menu (scripts/hearthmenu.bs), pushed over the game after resting:
+# stay, or travel to another hearth.
+bronto_scene 1
+
+entity
+  Name
+    text = "Hearth"
+  Script
+    file = "scripts/hearthmenu.bs"

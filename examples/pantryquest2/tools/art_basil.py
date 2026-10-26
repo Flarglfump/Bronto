@@ -166,10 +166,22 @@ DUMPLING = [          # the Dough Wrap: Basil rolled up in dough, 16 x 16 (two f
 ]
 
 
+CROUCH_LEGS = [       # 12 x 4: knees bent, crouched low
+    "..kkkkkkkk..",
+    ".kNNNkkNNNk.",
+    "kGGGk..kGGGk",
+    "kkkkk..kkkkk",
+]
+
+
 def frame(legs='stand', bob=0, arm='fwd', tint=None):
     c = Canvas(24, 32)
+    if legs == 'crouch':                     # crouched: everything above the legs sits 4 lower
+        bob += 4
+        c.text(CROUCH_LEGS, 6, 28)
     top = 3 + bob
-    c.text(LEGS[legs], 6, 24)
+    if legs != 'crouch':
+        c.text(LEGS[legs], 6, 24)
     c.text(TORSO, 6, top + 12)
     c.text(HELMET, 2, top)
     c.text(FACE, 7, top + 8)
@@ -255,6 +267,8 @@ def frames(tint=None):
     f += [frame('fall', 0, 'diag_down', tint=tint)]                                # 30 in the air, down and forward
     f += [frame('fall', 0, 'down', tint=tint)]                                     # 31 in the air, straight down
     f += [frame('stand', 0, 'diag_down', tint=tint)]                               # 32 standing, down and forward (angle held)
+    f += [frame('stand', 0, 'down', tint=tint)]                                    # 33 standing, aiming straight down
+    f += [frame('crouch', 0, a, tint=tint) for a in ('fwd', 'up', 'diag_up', 'diag_down', 'down')]   # 34-38 crouched, aiming
     return f
 
 

@@ -211,6 +211,19 @@ def write_world_data(rooms):
     if marks:
         marks[-1] = marks[-1].rstrip(',')
     lines += marks + ['    ]', '}', '']
+    # the map's locks: parts of rooms that need something (tools/make_locks.py works them out)
+    locks = []
+    path = os.path.join(HERE, 'locks.json')
+    if os.path.exists(path):
+        import json
+        locks = json.load(open(path))
+    lines += ['func locks() -> list {',
+              '    # [room, map x, map y, what it needs]: an ability, "mitts", or "seals" (all four)',
+              '    return [']
+    rows = ['        [%s, %d, %d, %s],' % (bs_str(r), x, y, bs_str(n)) for r, x, y, n in locks]
+    if rows:
+        rows[-1] = rows[-1].rstrip(',')
+    lines += rows + ['    ]', '}', '']
     with open(os.path.join(ROOT, 'scripts', 'world_data.bs'), 'w') as f:
         f.write('\n'.join(lines))
 

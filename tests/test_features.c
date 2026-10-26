@@ -461,6 +461,37 @@ static void test_broadcast_and_globals(void) {
     teardown();
 }
 
+/* A key pressed and let go within one frame is still a press of its action (a quick tap,
+ * or a slow frame). */
+static void test_action_tap(void) {
+    br_entity s;
+    br_event ev;
+    setup();
+    s = scripted("p", "tap.bs",
+        "var presses: int = 0\nvar downs: int = 0\n"
+        "func start() -> void { bind(\"pause\", \"enter\") }\n"
+        "func update(dt: number) -> void {\n"
+        "    if action_pressed(\"pause\") { presses += 1 }\n"
+        "    if action_down(\"pause\") { downs += 1 }\n"
+        "}\n");
+    steps(1);
+    br_input_begin_frame(&g_engine.input);
+    ev = br_event_key(BR_EVENT_KEY_DOWN, BR_KEY_ENTER, 0, false);
+    br_input_handle_event(&g_engine.input, &ev);
+    ev = br_event_key(BR_EVENT_KEY_UP, BR_KEY_ENTER, 0, false);
+    br_input_handle_event(&g_engine.input, &ev);
+    br_input_end_events(&g_engine.input);
+    g_engine.frame = 1;
+    steps(1);
+    CHECK(num(s, "presses") == 1 && num(s, "downs") == 1);
+    br_input_begin_frame(&g_engine.input);
+    br_input_end_events(&g_engine.input);
+    g_engine.frame = 2;
+    steps(1);
+    CHECK(num(s, "presses") == 1 && num(s, "downs") == 1);
+    teardown();
+}
+
 /* "shift", "ctrl" and "alt" mean either side in bind(), as in key_down(); "leftshift" one side. */
 static void test_bind_either_side(void) {
     br_entity s;
@@ -631,6 +662,7 @@ void suite_features(void) {
     RUN(test_script_draw);
     RUN(test_voices_music_tones);
     RUN(test_broadcast_and_globals);
+    RUN(test_action_tap);
     RUN(test_bind_either_side);
     RUN(test_start_sees_others);
     RUN(test_read_folder);

@@ -34,7 +34,7 @@ func update(dt: number) -> void {
     if near and auto and first {
         game.set_flag("talked:" + say)
         game.talk(say)
-    } elif near and action_pressed("up") {
+    } elif near and basil.up_to_use() {
         game.set_flag("talked:" + say)
         if again != "" and not first { game.talk(again) } else { game.talk(say) }
     }

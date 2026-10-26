@@ -4507,7 +4507,7 @@ static bool sc_action_state(sc_vm *vm, const sc_value *v, int line, int which, c
     br_action act = sc_action(vm, v, line, what, false);
     const br_action_def *d;
     int i, p;
-    bool any_down = false, any_edge = false;
+    bool any_down = false, any_edge = false, any_tap = false;
     if (!e || act < 0) return false;
     d = &e->input.actions[act];
     for (i = 0; i < d->binding_count; ++i) {
@@ -4542,10 +4542,11 @@ static bool sc_action_state(sc_vm *vm, const sc_value *v, int line, int which, c
         default: break;
         }
         any_down |= down;
+        any_tap |= pressed;                              /* (down and up again within one frame: still a press) */
         any_edge |= which == 1 ? pressed : released;
     }
-    if (which == 0) return any_down;
-    if (which == 1) return any_edge && any_down;
+    if (which == 0) return any_down || any_tap;
+    if (which == 1) return any_edge;
     return any_edge && !any_down;
 }
 static sc_value bi_action_down(ARGS) { BR_UNUSED(n); return sc_bool(sc_action_state(vm, &a[0], line, 0, "action_down()")); }

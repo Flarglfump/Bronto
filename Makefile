@@ -193,7 +193,7 @@ pantryquest2:
 	@$(MAKE) --no-print-directory game GAME=$(PQ2) TARGET=$(TARGET)
 pantryquest2-assets:
 	python3 $(PQ2)/tools/make_art.py && python3 $(PQ2)/tools/make_sound.py && python3 $(PQ2)/tools/make_music.py
-	python3 $(PQ2)/tools/make_rooms.py && python3 $(PQ2)/tools/make_prefabs.py
+	python3 $(PQ2)/tools/make_locks.py && python3 $(PQ2)/tools/make_rooms.py && python3 $(PQ2)/tools/make_prefabs.py
 pantryquest2-check: $(BSCHECK)
 	$(BSCHECK) --strict --project $(PQ2) $(wildcard $(PQ2)/scripts/*.bs) $(wildcard $(PQ2)/scripts/bosses/*.bs)
 	python3 $(PQ2)/tools/check_scenes.py

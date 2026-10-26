@@ -23,7 +23,7 @@ func update(dt: number) -> void {
     t += dt
     if cool > 0 { cool -= dt }
     if game.state != "play" or cool > 0 { return }
-    if basil.touches(self.position + vec2(0, 4), vec2(12, 12)) and basil.grounded and action_pressed("up") {
+    if basil.touches(self.position + vec2(0, 4), vec2(12, 12)) and basil.up_to_use() {
         cool = 1.5
         game.rest_at_hearth()
     }

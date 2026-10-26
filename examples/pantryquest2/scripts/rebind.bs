@@ -23,6 +23,33 @@ func start() -> void {
 
 func rows() -> int { return len(controls.actions) + 2 }
 
+# Where things are: an action's row, a cell in it, and the two buttons under them.
+const X0: number = 104
+const ROW: number = 13
+func row_y(i: int) -> number { return 32 + i * ROW }
+func cell_pos(i: int, c: int) -> vec2 { return vec2(X0 + c * 50 - 2, row_y(i) - 3) }
+func button_y(k: int) -> number { return row_y(len(controls.actions)) + 3 + k * 14 }
+
+func inside(m: vec2, p: vec2, size: vec2) -> bool {
+    return m.x >= p.x and m.y >= p.y and m.x < p.x + size.x and m.y < p.y + size.y
+}
+
+# What the mouse is over: [row, col] (col -1 for the buttons), or [-1, -1].
+func under(m: vec2) -> list {
+    var n: int = len(controls.actions)
+    for i in n {
+        for c in 3 {
+            if inside(m, cell_pos(i, c), vec2(48, ROW)) { return [i, c] }
+        }
+    }
+    for k in 2 {
+        if inside(m, vec2(60, button_y(k) - 3), vec2(136, 13)) { return [n + k, -1] }
+    }
+    return [-1, -1]
+}
+
+var last_mouse := vec2(-1, -1)
+
 func nav(dir: string) -> bool { return action_pressed(dir) or key_pressed(dir) or button_pressed(dir) }
 func ok() -> bool { return key_pressed("enter") or button_pressed("a") or action_pressed("jump") }
 func back() -> bool { return key_pressed("escape") or button_pressed("b") }
@@ -35,7 +62,7 @@ func update(dt: number) -> void {
         wait_t += dt
         if wait_t < 0.15 { return }
         var a: string = controls.actions[row]
-        if key_pressed("escape") {
+        if key_pressed("escape") or mouse_pressed(1) or (mouse_pressed(0) and under(mouse_position())[0] != row) {
             waiting = false
             play_sound("sfx/back.wav", 0.5)
             return
@@ -58,6 +85,14 @@ func update(dt: number) -> void {
         return
     }
     var before := vec2(col, row)
+    var m := mouse_position()
+    var over: list = under(m)
+    if (m != last_mouse or mouse_pressed(0)) and over[0] >= 0 {
+        row = over[0]
+        if over[1] >= 0 { col = over[1] }
+    }
+    last_mouse = m
+    var clicked := mouse_pressed(0) and over[0] >= 0
     if nav("up") { row = (row + rows() - 1) % rows() }
     if nav("down") { row = (row + 1) % rows() }
     if row < len(controls.actions) {
@@ -74,7 +109,7 @@ func update(dt: number) -> void {
         play_sound("sfx/back.wav", 0.5)
         return
     }
-    if ok() {
+    if ok() or clicked {
         if row == len(controls.actions) {
             controls.reset()
             note = "BACK TO HOW THEY WERE"
@@ -103,13 +138,13 @@ func centred(s: string, y: number, colour: string) -> void {
 func draw() -> void {
     draw_rect(vec2(0, 0), vec2(256, 240), "#100818")
     centred("CONTROLS", 6, "#f8c860")
-    var x0: number = 104
+    var x0: number = X0
     var heads: list[string] = ["KEY", "OR KEY", "PAD"]
-    for c in 3 { draw_text(heads[c], vec2(x0 + c * 50 + 22 - text_size(heads[c]).x / 2, 20), "#a090b0") }
-    draw_rect(vec2(4, 30), vec2(248, 1), "#a06838")
+    for c in 3 { draw_text(heads[c], vec2(x0 + c * 50 + 22 - text_size(heads[c]).x / 2, 18), "#a090b0") }
+    draw_rect(vec2(4, 28), vec2(248, 1), "#a06838")
     var n: int = len(controls.actions)
     for i in n {
-        var y: number = 35 + i * 14
+        var y: number = row_y(i)
         draw_text(controls.names[i], vec2(8, y), "#ffffff")
         for c in 3 {
             var cx: number = x0 + c * 50
@@ -119,16 +154,15 @@ func draw() -> void {
             if selected {
                 var colour: string = "#a06838"
                 if waiting and floor(t * 6) % 2 == 0 { colour = "#f8c860" }
-                draw_rect(vec2(cx - 2, y - 3), vec2(48, 13), colour)
+                draw_rect(vec2(cx - 2, y - 3), vec2(48, ROW - 1), colour)
             }
             if selected and waiting { label = "?" }
             draw_text(label, vec2(cx + 22 - text_size(label).x / 2, y), "#ffffff")
         }
     }
-    var ry: number = 35 + n * 14 + 4
     var labels: list[string] = ["RESET TO DEFAULTS", "DONE"]
     for k in 2 {
-        var y: number = ry + k * 14
+        var y: number = button_y(k)
         if row == n + k { draw_rect(vec2(60, y - 3), vec2(136, 13), "#a06838") }
         centred(labels[k], y, "#ffffff")
     }
@@ -137,11 +171,12 @@ func draw() -> void {
         var what: string = "KEY"
         if col == 2 { what = "BUTTON" }
         centred("PRESS A " + what + " FOR " + controls.names[row], 212, "#f8c860")
-        centred("ESC: LEAVE IT AS IT WAS", 224, "#a090b0")
+        centred("ESC OR CLICK: LEAVE IT", 222, "#a090b0")
     } elif note_t > 0 {
         centred(note, 212, "#f8c860")
     } else {
-        centred("ENTER: CHANGE   BKSP: CLEAR", 212, "#a090b0")
-        centred("THE STICK MOVES; ESC PAUSES", 224, "#706080")
+        centred("CLICK OR ENTER: CHANGE", 211, "#a090b0")
+        centred("BACKSPACE: CLEAR A KEY", 221, "#a090b0")
+        centred("THE STICK AND ESC ALWAYS WORK", 231, "#706080")
     }
 }

@@ -446,7 +446,8 @@ func update(dt: number) -> void {
   `"shift"`, `"ctrl"` and `"alt"` mean either side, as they do for `key_down()`;
   `"leftshift"` or `"rightshift"` is one side only.
   `unbind(action)` takes them all off. Actions are kept for the whole game.
-- `action_down(name)`, `action_pressed(name)` (once per press, like `key_pressed()`),
+- `action_down(name)`, `action_pressed(name)` (once per press, like `key_pressed()`; a key
+  pressed and let go within one frame still counts),
   `action_released(name)`, and `action_axis(negative, positive)`: -1, 0 or 1.
 
 **More input:** `mouse_released(button)`, `mouse_wheel()` (how far the wheel turned since

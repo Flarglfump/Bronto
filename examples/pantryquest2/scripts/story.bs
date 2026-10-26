@@ -124,6 +124,27 @@ func talk(id: string) -> list {
     return [["", NONE, "..."]]
 }
 
+# ---- where to go next ----------------------------------------------------------------------------
+# The way through, in order: [what ("item", "boss" or "flag"), which, the room it's in, a hint].
+# The first one not yet done is where Basil should head (game.bs, next_goal()); it's marked on
+# the map, and after each guardian the hint is shown.
+func goals() -> list {
+    return [["item", "dough", "C2", "Down the old well in the Market Square lie the Rye Catacombs. Something waits to the west, past the Ossuary."],
+            ["boss", "stale", "C9", "Sir Stale guards the Seal of Salt at the east end of the Bone Corridor, beyond the Map Room's crawlspace."],
+            ["item", "sauce", "F2", "Under the Ossuary, the Crumbling Crypt leads west to the Deep Stair. Pop its cracked floor with popcorn (roll up, then {fire}) and go down into the Frostbite Cellar. A shrine on its west side keeps something fiery."],
+            ["item", "frost", "F6", "Past the Frost Hearth, down the Glacier Steps, the Sugar Vault is sealed with red wax. Hot sauce ({rocket}) melts it."],
+            ["boss", "sundae", "F9", "West of the Glacier Steps, freeze the pests in the Frozen Pipes to climb across, then go down through the Slush Pit to the Abominable Sundae's den. It holds the Seal of Sugar."],
+            ["item", "leaven", "M2", "East of the Rye Hearth, the Sunken Chapel's wax door leads down to the Molten Kitchens. In the Simmer Hall, freeze the fire beans to cross the cheese: a shrine lies beyond."],
+            ["item", "mitts", "B4", "With the Leaven Boots, climb the East Stair past Sir Stale's hall, up into the Brine Works. Doctor Brine keeps a pair of oven mitts in a locker off the Brine Shaft."],
+            ["item", "garlic", "B6", "The Count fears garlic. Doctor Brine grows it in a walled garden off the Brine Shaft: roll through the crawlspace and pop the cracked blocks."],
+            ["boss", "brine", "B8", "Doctor Brine's lab is at the bottom of the Brine Shaft. Beat him for the Seal of Vinegar."],
+            ["item", "whisk", "M6", "With the oven mitts on, the hottest kitchens are safe. Under Doctor Brine's lab, a drain leads down the Steam Pipe to the Whisk Pantry."],
+            ["boss", "wyrm", "M8", "The Flambe Wyrm burns beyond Cheese Falls, below the Leaven Shrine. A switch behind a wall opens the way: garlic pepper goes through walls."],
+            ["boss", "count", "X7", "Four seals! Take them to the castle gate, east of Chapel Road. Climb the clock tower at the castle's far end to the Count's throne room."],
+            ["flag", "escape", "X8", "Chef Pip is locked in the cell beside the throne room. Set him free!"],
+            ["flag", "won", "V4", "The castle is melting! Run back out through the castle gate!"]]
+}
+
 # ---- the Count's diary ---------------------------------------------------------------------------
 func diary() -> list {
     return [["page1", "DAY 1. The new cheesemonger set me in the deepest cellar to age. 'Be patient,' he said, 'and you will be the finest cheese in the kingdom.'"],

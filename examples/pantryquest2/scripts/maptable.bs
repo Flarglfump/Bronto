@@ -16,7 +16,7 @@ func start() -> void {
 func update(dt: number) -> void {
     t += dt
     near = game.state == "play" and abs(basil.x - self.x) < 20 and abs(basil.y - self.y) < 30
-    if near and action_pressed("up") { game.read_map(area) }
+    if near and basil.up_to_use() { game.read_map(area) }
 }
 
 func draw() -> void {

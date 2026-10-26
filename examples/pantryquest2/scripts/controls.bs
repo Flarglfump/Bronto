@@ -8,8 +8,8 @@
 # moves, and Escape pauses. A "Controls" entity in title.scene, main.scene and
 # pause.scene runs this; scripts/rebind.bs is the screen that changes it.
 
-var actions: list[string] = ["left", "right", "up", "down", "jump", "fire", "rocket", "aim", "pause", "map"]
-var names: list[string] = ["LEFT", "RIGHT", "UP", "DOWN", "JUMP", "PEPPER", "HOT SAUCE", "ANGLE AIM", "PAUSE", "MAP"]
+var actions: list[string] = ["left", "right", "up", "down", "jump", "fire", "rocket", "aim", "pause", "map", "ball"]
+var names: list[string] = ["LEFT", "RIGHT", "UP", "DOWN", "JUMP", "PEPPER", "HOT SAUCE", "AIM", "PAUSE", "MAP", "ROLL UP"]
 var keys: list[list] = []                 # for each action, [first key, second key] ("" = none)
 var pads: list[string] = []               # for each action, a gamepad button, as button_down() names them
 
@@ -20,8 +20,8 @@ func start() -> void {
 
 func defaults() -> void {
     keys = [["left", "a"], ["right", "d"], ["up", "w"], ["down", "s"], ["z", "space"], ["x", "j"],
-            ["c", "l"], ["shift", "q"], ["enter", "p"], ["m", "tab"]]
-    pads = ["left", "right", "up", "down", "a", "x", "b", "lb", "start", "back"]
+            ["c", "l"], ["shift", "q"], ["enter", "p"], ["m", "tab"], ["e", ""]]
+    pads = ["left", "right", "up", "down", "a", "x", "b", "lb", "start", "back", "y"]
 }
 
 func load() -> void {
@@ -29,9 +29,23 @@ func load() -> void {
     var d: any = load_data("controls")
     if d == nil { return }
     var l: list = d
-    if len(l) < 2 or len(l[0]) != len(actions) or len(l[1]) != len(actions) { return }   # (from another version: the defaults)
-    keys = l[0]
-    pads = l[1]
+    if len(l) < 2 or len(l[0]) != len(l[1]) or len(l[0]) > len(actions) { return }   # (not ours: the defaults)
+    var saved_keys: list = l[0]
+    var saved_pads: list = l[1]
+    for i in len(saved_keys) {                        # (saved before an action was added: it keeps its own
+        keys[i] = saved_keys[i]                       #  defaults, unless the player gave one of them away)
+        pads[i] = saved_pads[i]
+    }
+    for i in range(len(saved_keys), len(actions)) {
+        for w in 2 {
+            for j in len(saved_keys) {
+                if keys[i][w] != "" and (keys[j][0] == keys[i][w] or keys[j][1] == keys[i][w]) { keys[i][w] = "" }
+            }
+        }
+        for j in len(saved_keys) {
+            if pads[j] == pads[i] { pads[i] = "" }
+        }
+    }
 }
 
 func save() -> void { save_data("controls", [keys, pads]) }
