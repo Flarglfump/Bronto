@@ -199,8 +199,8 @@ class Fighting:
                         if crouch and aim == 'down':
                             continue
                         if foe.shield and kind not in ('rocket', 'frost', 'garlic_frost') and \
-                                (aim in ('up', 'down') or facing == foe.facing):
-                            continue                      # (pepper from the front bounces off a shield)
+                                aim not in ('up', 'down') and facing == -foe.facing:
+                            continue                      # (pepper at its face bounces off a shield; from above or behind, not)
                         mx, my = muzzle(b.x, b.y, facing, aim, crouch)
                         dx, dy = aim_dir(aim, facing)
                         k = self.shot_hits(g, mx, my, dx, dy, foe, kind)
