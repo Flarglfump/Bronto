@@ -133,6 +133,7 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
         """Plans and walks/jumps to a node goal(node) accepts (or an exit). True when there
         (or once he's left the room: the goal was this room's)."""
         start_room = self.room()
+        offs = {}
         for attempt in range(tries):
             self.wait_play()
             if self.room() != start_room:
@@ -171,6 +172,12 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
             self.log('path', here, '->', ' '.join('%s:%s' % (mv.name, nx) for (_, mv, _, nx) in path))
             ok = self.follow(path, g, rg)
             self.log('follow:', ok, 'at', nav.node_of(self.basil()), self.room(), self.state())
+            if ok == 'off':
+                at = nav.node_of(self.basil())
+                offs[at] = offs.get(at, 0) + 1
+                if offs[at] >= 2:                      # (knocked off the same way again: clear the way first)
+                    self.log('  clearing the enemies about first')
+                    self.engage(radius=240, max_frames=600, use_rockets=True, quiet=90)
             if ok == 'done':
                 return True
             if ok == 'exit':
