@@ -237,7 +237,9 @@ class HearthTravel:
             self.read_talk()
             return self.room() == dest
         self.wait(15)
-        places = self.g.raw('Hearth', 'places')
+        top = len(self.r.scenes()) - 1                  # (the menu's Hearth, not the room's hearth)
+        menu = [e for e in self.r.find('Hearth') if e[0] == top]
+        places = self.r.vars(menu[0][0], menu[0][1], ['places'])[0] if menu else ''
         rooms = [p.strip(' [') for p in places.strip('[]').split('],')]
         rooms = [r.split(',')[0].strip(' []') for r in rooms]
         if dest not in rooms:
