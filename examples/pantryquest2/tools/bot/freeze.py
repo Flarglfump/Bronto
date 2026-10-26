@@ -72,7 +72,7 @@ class Freezing:
             self._fz_grid = g
             has = self.has_fn()
             steps = self.frozen_steps()
-            rg = nav.RoomGraph(g, has, allow_hurt=nav.in_hazard(b, g))
+            rg = self.graph(g, allow_hurt=nav.in_hazard(b, g))
             self._escaping = rg.allow_hurt
             # anything coming close: freeze it (frozen, it can't hurt; it may even be a step)
             if not rg.allow_hurt and self.threats(72) and self.engage(radius=80, max_frames=40):

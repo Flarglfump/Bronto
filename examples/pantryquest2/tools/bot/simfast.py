@@ -68,8 +68,8 @@ def bits(keys):
 
 def cgrid(g, has):
     """The C side of a Grid (kept on it, rebuilt if what he has or the frozen steps change)."""
-    key = (bool(has('dough')), bool(has('whisk')), bool(has('leaven')), tuple(g.platforms), tuple(g.t))
-    c = getattr(g, '_c', None)
+    key = (bool(has('dough')), bool(has('whisk')), bool(has('leaven')))
+    c = getattr(g, '_c', None)                  # (a Grid's tiles and frozen steps don't change once made)
     if c is not None and c[0] == key:
         return c[1]
     cols, rows = g.cols, g.rows

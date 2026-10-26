@@ -388,6 +388,7 @@ def opened(g, has):
                 out.append(ch)
         g2.t[r] = ''.join(out)
     g2.memo = {}
+    g2.__dict__.pop('_c', None)
     return g2
 
 

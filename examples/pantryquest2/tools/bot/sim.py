@@ -39,12 +39,14 @@ class Grid:
         g.__dict__.update(self.__dict__)
         g.platforms = list(platforms)
         g.memo = {}
+        g.__dict__.pop('_c', None)
         return g
 
     def set_tile(self, c, r, ch):
         row = self.t[r]
         self.t[r] = row[:c] + ch + row[c + 1:]
         self.memo = {}
+        self.__dict__.pop('_c', None)
 
     def cell(self, c, r):
         if 0 <= r < self.rows and 0 <= c < self.cols:
