@@ -91,6 +91,9 @@ menu. Choose one and press the new key or button. They're saved for every journe
 the game's signs and item descriptions show your keys. The arrow keys, the d-pad, Enter,
 Escape, A and B always work on the controls screen, so it can't be made unusable.
 
+**F9** shows what the game thinks is held (each action and key) and Basil's state, for
+tracking down trouble with a keyboard, a pad or a browser.
+
 **The mouse** works every menu: pointing at something chooses it, clicking does it, a
 click on a volume bar sets it there, and a BACK button closes the pause menu.
 

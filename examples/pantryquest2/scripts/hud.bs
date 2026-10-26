@@ -9,6 +9,7 @@ var game: entity
 var cells: list = []                      # [x, y, area] of every map cell, for the minimap
 var colours: list = []                    # [area, colour]
 var t: number = 0
+var show_input: bool = false               # F9: what the game thinks is pressed (for tracking down control trouble)
 
 func start() -> void {
     game = find("Game")
@@ -28,7 +29,31 @@ func colour_of(area: string) -> string {
     return "#808080"
 }
 
-func update(dt: number) -> void { t += dt }
+func update(dt: number) -> void {
+    t += dt
+    if key_pressed("f9") { show_input = not show_input }
+}
+
+# The F9 readout: every action held, the keys behind them, and Basil's state.
+func draw_input() -> void {
+    var b: entity = find("Basil")
+    var c: entity = find("Controls")
+    var held: string = ""
+    var keys: string = ""
+    for i in len(c.actions) {
+        var a: string = c.actions[i]
+        if action_down(a) { held = held + a + " " }
+        for w in 2 {
+            var k: string = c.keys[i][w]
+            if k != "" and key_down(k) { keys = keys + k + " " }
+        }
+    }
+    draw_rect(vec2(0, 196), vec2(256, 44), rgb(0, 0, 0, 210))
+    draw_text("HELD: " + held, vec2(2, 198), "#80ff80")
+    draw_text("KEYS: " + keys + " (" + last_input() + ")", vec2(2, 208), "#a0d0ff")
+    draw_text("AIM " + b.aim + " CROUCH " + b.crouch + " BALL " + b.ball, vec2(2, 218), "#ffffff")
+    draw_text("GROUND " + b.grounded + " VEL " + round(b.vel.x * 10) / 10 + " HURT " + round(b.hurt_t * 10) / 10, vec2(2, 228), "#ffffff")
+}
 
 func shadow_text(s: string, p: vec2, colour: string) -> void {
     draw_text(s, p + vec2(1, 1), "#000000")
@@ -85,6 +110,7 @@ func draw() -> void {
         if secs % 60 < 10 { m = floor(secs / 60) + ":0" + (secs % 60) }
         shadow_text("ESCAPE " + m, vec2(96, 28), "#ff6060")
     }
+    if show_input { draw_input() }
     if game.fade > 0 { draw_rect(vec2(0, 0), vec2(256, 240), rgb(0, 0, 0, 255 * game.fade)) }
 }
 
