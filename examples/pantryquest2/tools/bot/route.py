@@ -183,7 +183,6 @@ def brine_works(bot):
     rest_at(bot, 'B2')
     read_map(bot, 'B2')
     get(bot, 'B1', 'page6')
-    get(bot, 'B1', 'packet_b1')
 
 
 @step
@@ -223,6 +222,7 @@ def whisk(bot):
 def hot_kitchens(bot):
     get(bot, 'M5', 'cake_m5')
     get(bot, 'M1', 'page4')
+    get(bot, 'B1', 'packet_b1')            # (on a shelf only the Whisk Spin reaches)
 
 
 @step
