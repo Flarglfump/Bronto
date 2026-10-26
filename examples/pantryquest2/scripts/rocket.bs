@@ -47,7 +47,7 @@ func hit_something() -> bool {
         return true
     }
     for e in find_tagged("enemy") {
-        if e.alive and e.hit_by(p, 4) {
+        if e.alive and e.hit_by(p, 2) {                 # (like a peppercorn: crouch for what crawls on the floor)
             if e.hit(8, "rocket", dir) { return true }
         }
     }

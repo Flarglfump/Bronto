@@ -13,7 +13,7 @@ func start() -> void {
     if game.flag("switch:" + sid) { open_gate(false) }
 }
 
-func hit_by(p: vec2, r: number) -> bool { return abs(p.x - self.x) < 7 + r and abs(p.y - self.y) < 7 + r }
+func hit_by(p: vec2, r: number) -> bool { return abs(p.x - self.x) < 7 + r and abs(p.y - self.y) < 9 + r }   # (tall enough to hit standing or crouched)
 
 func hit(amount: number, kind: string, from: vec2) -> bool {
     if on { return true }

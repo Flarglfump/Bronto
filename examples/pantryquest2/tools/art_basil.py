@@ -186,7 +186,7 @@ def frame(legs='stand', bob=0, arm='fwd', tint=None):
     c.text(HELMET, 2, top)
     c.text(FACE, 7, top + 8)
     if arm == 'fwd':
-        c.text(ARM_FWD, 11, top + 14)
+        c.text(ARM_FWD, 11, top + 10)         # (at his shoulder: a standing shot clears what crawls on the floor)
     elif arm == 'up':
         c.text(ARM_UP, 13, top + 1)
     elif arm == 'diag_up':

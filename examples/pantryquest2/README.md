@@ -82,7 +82,8 @@ level, UP or DOWN straight up or down, and both together at an angle, eight ways
 
 **Crouching and rolling up:** DOWN on the ground crouches; AIM works crouched too.
 DOWN again (not while aiming) rolls Basil up in the Dough Wrap, and so does ROLL UP at
-any time on the ground. UP, JUMP or LEFT/RIGHT stand him up again; if there's no room to
+any time on the ground. Standing, Basil fires from his shoulder, so his shots fly over
+anything crawling along the floor: crouch to hit those. UP, JUMP or LEFT/RIGHT stand him up again; if there's no room to
 stand, he unrolls into a crouch.
 
 **Changing the controls:** every action has two keys and a gamepad button, and all of

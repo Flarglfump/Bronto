@@ -50,21 +50,26 @@ def door_sheet():
 
 
 def shots_sheet():
-    """8 x 8: pepper, frost, garlic, garlic+frost (sideways), then the same going up."""
-    cols = [((70, 50, 40), (160, 120, 90)), ((140, 220, 255), (255, 255, 255)), ((240, 240, 200), (200, 240, 120)),
-            ((200, 240, 255), (160, 255, 200))]
+    """8 x 8: pepper, frost, garlic, garlic+frost (sideways), then the same going up. Each has a
+    dark outline round a ring that contrasts with its middle, so it shows up on dark rooms and pale ones alike."""
+    cols = [  # rim, middle, glint
+        ((255, 222, 120), (84, 46, 26), (255, 255, 255)),     # pepper: a dark peppercorn, glowing hot round the edge
+        ((30, 70, 170), (170, 235, 255), (255, 255, 255)),     # frost: ice with a deep blue edge
+        ((70, 110, 30), (240, 240, 200), (200, 240, 120)),     # garlic
+        ((30, 110, 120), (200, 240, 255), (160, 255, 200)),    # garlic + frost
+    ]
     frames = []
     for up in (False, True):
-        for main, light in cols:
+        for i, (rim, main, light) in enumerate(cols):
             c = Canvas(8, 8)
-            c.ellipse(4, 4, 2.6, 2.6, main)
+            c.ellipse(4, 4, 3.9, 3.9, (20, 12, 16))        # a dark outline, then a bright ring, then the middle
+            c.ellipse(4, 4, 2.9, 2.9, rim)
+            c.ellipse(4, 4, 1.8, 1.8, main)
             c.set(3, 3, light)
-            if main == cols[2][0] or main == cols[3][0]:     # the garlic wave: rings
+            if i >= 2:                                    # the garlic wave: rings
                 for k in range(8):
                     a = k * math.pi / 4
                     c.set(int(4 + math.cos(a) * 3.5), int(4 + math.sin(a) * 3.5), light)
-            if up:
-                pass
             frames.append(c)
     return sheet(frames, 8, 8)
 

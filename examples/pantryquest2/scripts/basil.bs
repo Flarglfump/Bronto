@@ -309,8 +309,8 @@ func muzzle() -> vec2 {
     if aim == "diag_up" { return vec2(self.x + facing * 10, self.y - 6 + low) }
     if aim == "diag_down" { return vec2(self.x + facing * 10, self.y + 9 + low) }
     if aim == "down" { return vec2(self.x + facing * 3, self.y + 12 + low) }
-    if grounded { return vec2(self.x + facing * 14, self.y + 2 + low) }
-    return vec2(self.x + facing * 14, self.y + 1)
+    # level: from his shoulder, so standing it flies over what crawls on the floor (crouch for those)
+    return vec2(self.x + facing * 14, self.y - 2 + low)
 }
 
 func aim_dir() -> vec2 {
