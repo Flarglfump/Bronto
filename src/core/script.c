@@ -4052,7 +4052,7 @@ static sc_value bi_draw_image(ARGS) {
     if (!img) sc_fail(vm, line, "draw_image(): can't load %s", path);
     if (n > 3 && a[3].t != V_NIL) fs = sc_need_vec(vm, &a[3], line, "draw_image() frame_size");
     src = br_recti_make(0, 0, img->width, img->height);
-    if (fs.x >= 1 && fs.y >= 1 && fs.x <= img->width && fs.y <= img->height) {
+    if (fs.x >= 1 && fs.y >= 1 && fs.x <= (float)img->width && fs.y <= (float)img->height) {
         int per_row = img->width / (int)fs.x, total = per_row * (img->height / (int)fs.y);
         if (frame < 0) frame = 0;
         if (frame >= total) frame = total - 1;
