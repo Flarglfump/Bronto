@@ -38,6 +38,40 @@ for (let i = 0; i < 26; i++) KEYS['Key' + String.fromCharCode(65 + i)] = 65 + i;
 for (let i = 0; i < 10; i++) { KEYS['Digit' + i] = 48 + i; KEYS['Numpad' + i] = 320 + i; }
 for (let i = 1; i <= 12; i++) KEYS['F' + i] = 289 + i;
 
+/* The br_key for a keyboard event: by its code (where the key is), or else by its key (what
+ * it types) - some browsers, and privacy modes such as LibreWolf's, leave the code out or
+ * change it. */
+const MODIFIER_KEYS = { Shift: [340, 344], Control: [341, 345], Alt: [342, 346], Meta: [343, 347], OS: [343, 347] };
+function keyOf(e) {
+    if (KEYS[e.code]) return KEYS[e.code];
+    const k = e.key || '';
+    if (MODIFIER_KEYS[k]) return MODIFIER_KEYS[k][e.location === 2 ? 1 : 0];
+    if (k === ' ') return 32;
+    if (KEYS[k]) return KEYS[k];                             /* Enter, Escape, Tab, ArrowLeft... (named as their codes) */
+    if (k.length === 1) {
+        const c = k.toUpperCase().charCodeAt(0);
+        if ((c >= 65 && c <= 90) || (c >= 48 && c <= 57)) return c;
+    }
+    return 0;
+}
+
+/* Every keyboard and pointer event says whether Shift, Ctrl, Alt and Meta are held, even
+ * when the modifier's own key events never came (some privacy modes hold them back). From
+ * what the page has seen held (held: code -> br_key) and an event, the modifier keys to
+ * press or let go so the game agrees with the event: [[br_key, down, held name]...]. A
+ * modifier the event is itself about (its own keydown or keyup) is left to that event. */
+const MODIFIER_FLAGS = [['shiftKey', 340, 344], ['ctrlKey', 341, 345], ['altKey', 342, 346], ['metaKey', 343, 347]];
+function modifierChanges(held, e, own) {
+    const out = [];
+    for (const [flag, left, right] of MODIFIER_FLAGS) {
+        if (own === left || own === right || typeof e[flag] !== 'boolean') continue;
+        const names = [...held.keys()].filter((n) => held.get(n) === left || held.get(n) === right);
+        if (e[flag] && names.length === 0) out.push([left, true, 'held:' + flag]);
+        else if (!e[flag]) for (const n of names) out.push([held.get(n), false, n]);
+    }
+    return out;
+}
+
 /* Browser shortcuts the page leaves to the browser. */
 const BROWSER_KEYS = new Set(['F5', 'F11', 'F12']);
 const BROWSER_CHORDS = new Set(['KeyR', 'KeyW', 'KeyT', 'KeyN', 'KeyQ', 'KeyL', 'Tab', 'Digit0', 'Minus', 'Equal']);
@@ -406,10 +440,17 @@ async function start(opts) {
         const held = new Map();
         const mods = (e) => (e.shiftKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.altKey ? 4 : 0) | (e.metaKey ? 8 : 0) |
                             (e.getModifierState && e.getModifierState('CapsLock') ? 16 : 0);
+        const syncModifiers = (e, own) => {
+            for (const [key, down, name] of modifierChanges(held, e, own)) {
+                if (down) held.set(name, key); else held.delete(name);
+                call(exports.bronto_web_key, key, 0, mods(e), down ? 1 : 0, 0);
+            }
+        };
         on(win, 'keydown', (e) => {
             resumeAudio();
-            const key = KEYS[e.code] || 0;
-            held.set(e.code, key);
+            const key = keyOf(e);
+            syncModifiers(e, key);
+            held.set(e.code || e.key, key);
             call(exports.bronto_web_key, key, e.keyCode || 0, mods(e), 1, e.repeat ? 1 : 0);
             const chars = [...(e.key || '')];
             if (chars.length === 1 && (!(e.ctrlKey || e.metaKey) || (e.ctrlKey && e.altKey))) call(exports.bronto_web_text, chars[0].codePointAt(0));
@@ -417,8 +458,10 @@ async function start(opts) {
             if (!leave) e.preventDefault();
         });
         on(win, 'keyup', (e) => {
-            held.delete(e.code);
-            call(exports.bronto_web_key, KEYS[e.code] || 0, e.keyCode || 0, mods(e), 0, 0);
+            const key = keyOf(e);
+            syncModifiers(e, key);
+            held.delete(e.code || e.key);
+            call(exports.bronto_web_key, key, e.keyCode || 0, mods(e), 0, 0);
             e.preventDefault();
         });
         on(win, 'blur', () => {                        /* keys let go while away would stay "down" */
@@ -442,12 +485,14 @@ async function start(opts) {
             e.preventDefault();
         };
         on(canvas, 'pointermove', (e) => {
+            syncModifiers(e, 0);
             const [x, y] = canvasPoint(e);
             if (isTouch(e)) { if (fingers.has(e.pointerId)) call(exports.bronto_web_touch, 1, e.pointerId, x, y); e.preventDefault(); return; }
             call(exports.bronto_web_mouse_move, x, y);
         });
         on(canvas, 'pointerdown', (e) => {
             resumeAudio();
+            syncModifiers(e, 0);
             canvas.focus && canvas.focus();
             if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } }
             const [x, y] = canvasPoint(e);
@@ -503,7 +548,7 @@ async function start(opts) {
     };
 }
 
-const Bronto = { start, fromBase64, toBase64, KEYS };
+const Bronto = { start, fromBase64, toBase64, KEYS, keyOf, modifierChanges };
 if (typeof module === 'object' && module.exports) module.exports = Bronto;
 else global.Bronto = Bronto;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

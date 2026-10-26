@@ -112,6 +112,34 @@ test('the C examples\' pages hold their programs and no pack', async () => {
     }
 });
 
+test('keys are known by their code, or else by what they type', () => {
+    assert.strictEqual(Bronto.keyOf({ code: 'KeyD', key: 'd' }), 68);
+    assert.strictEqual(Bronto.keyOf({ code: 'ShiftRight', key: 'Shift', location: 2 }), 344);
+    /* a privacy mode that leaves the code out, or makes it up */
+    assert.strictEqual(Bronto.keyOf({ code: '', key: 'Shift', location: 1 }), 340);
+    assert.strictEqual(Bronto.keyOf({ code: '', key: 'Shift', location: 2 }), 344);
+    assert.strictEqual(Bronto.keyOf({ code: 'Unidentified', key: 'D' }), 68);
+    assert.strictEqual(Bronto.keyOf({ code: '', key: 'ArrowLeft' }), 263);
+    assert.strictEqual(Bronto.keyOf({ code: '', key: ' ' }), 32);
+    assert.strictEqual(Bronto.keyOf({ code: '', key: 'é' }), 0);
+});
+
+test('modifiers held without their own key events still reach the game', () => {
+    const none = { shiftKey: false, ctrlKey: false, altKey: false, metaKey: false };
+    const held = new Map();
+    /* D pressed with Shift held, but Shift's keydown never came: Shift goes down first */
+    assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 68), [[340, true, 'held:shiftKey']]);
+    held.set('held:shiftKey', 340);
+    assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 68), [], 'still held: nothing to do');
+    assert.deepStrictEqual(Bronto.modifierChanges(held, none, 68), [[340, false, 'held:shiftKey']], 'let go');
+    /* Shift's own events are left to themselves */
+    held.clear();
+    held.set('ShiftLeft', 340);
+    assert.deepStrictEqual(Bronto.modifierChanges(held, none, 340), [], 'its own keyup does it');
+    assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 68), []);
+    assert.deepStrictEqual(Bronto.modifierChanges(held, {}, 68), [], 'an event that doesn\'t say changes nothing');
+});
+
 /* ---- a stand-in browser: just enough DOM for bronto.js ---- */
 function fakeBrowser() {
     const listeners = {};

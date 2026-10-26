@@ -227,6 +227,11 @@ void *br_file_read_all(const char *path, size_t *out_size) {
         fclose(f);
         return NULL;
     }
+    if (len == 0) {                                      /* (a folder can open, empty: reading it fails) */
+        char c;
+        if (fread(&c, 1, 1, f) == 0 && ferror(f)) { fclose(f); return NULL; }
+        rewind(f);
+    }
     buf = (char *)br_alloc((size_t)len + 1);
     if (!buf) { fclose(f); return NULL; }
     if (len > 0 && fread(buf, 1, (size_t)len, f) != (size_t)len) {
