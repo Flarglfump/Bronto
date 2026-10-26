@@ -61,12 +61,12 @@ function keyOf(e) {
  * press or let go so the game agrees with the event: [[br_key, down, held name]...]. A
  * modifier the event is itself about (its own keydown or keyup) is left to that event. */
 const MODIFIER_FLAGS = [['shiftKey', 340, 344], ['ctrlKey', 341, 345], ['altKey', 342, 346], ['metaKey', 343, 347]];
-function modifierChanges(held, e, own) {
+function modifierChanges(held, e, own, releaseOnly) {
     const out = [];
     for (const [flag, left, right] of MODIFIER_FLAGS) {
         if (own === left || own === right || typeof e[flag] !== 'boolean') continue;
         const names = [...held.keys()].filter((n) => held.get(n) === left || held.get(n) === right);
-        if (e[flag] && names.length === 0) out.push([left, true, 'held:' + flag]);
+        if (e[flag] && names.length === 0 && !releaseOnly) out.push([left, true, 'held:' + flag]);
         else if (!e[flag]) for (const n of names) out.push([held.get(n), false, n]);
     }
     return out;
@@ -440,15 +440,31 @@ async function start(opts) {
         const held = new Map();
         const mods = (e) => (e.shiftKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.altKey ? 4 : 0) | (e.metaKey ? 8 : 0) |
                             (e.getModifierState && e.getModifierState('CapsLock') ? 16 : 0);
-        const syncModifiers = (e, own) => {
-            for (const [key, down, name] of modifierChanges(held, e, own)) {
+        /* "#keys" at the end of the page's address: a list over the game of every key event the
+         * page gets and what it passes on (for tracking down keyboard trouble in a browser). */
+        let keyLog = null;
+        const note = (text) => {
+            if (!keyLog) return;
+            keyLog.textContent = (text + '\n' + keyLog.textContent).split('\n').slice(0, 16).join('\n');
+        };
+        if (typeof location === 'object' && /keys/.test(location.hash || '') && doc && doc.createElement && doc.body) {
+            keyLog = doc.createElement('pre');
+            keyLog.style.cssText = 'position:fixed;left:4px;top:4px;margin:0;padding:6px 8px;background:rgba(0,0,0,.75);' +
+                'color:#9f9;font:12px/1.3 monospace;z-index:10;pointer-events:none;white-space:pre';
+            doc.body.appendChild(keyLog);
+            cleanup.push(() => keyLog.remove());
+        }
+        const syncModifiers = (e, own, releaseOnly) => {
+            for (const [key, down, name] of modifierChanges(held, e, own, releaseOnly)) {
                 if (down) held.set(name, key); else held.delete(name);
+                note('  (' + e.type + ' says shift/ctrl/alt) -> ' + key + (down ? ' down' : ' up'));
                 call(exports.bronto_web_key, key, 0, mods(e), down ? 1 : 0, 0);
             }
         };
         on(win, 'keydown', (e) => {
             resumeAudio();
             const key = keyOf(e);
+            note('keydown ' + (e.code || '(no code)') + ' ' + e.key + ' shift=' + e.shiftKey + (e.repeat ? ' repeat' : '') + ' -> ' + key + ' down');
             syncModifiers(e, key);
             held.set(e.code || e.key, key);
             call(exports.bronto_web_key, key, e.keyCode || 0, mods(e), 1, e.repeat ? 1 : 0);
@@ -459,12 +475,14 @@ async function start(opts) {
         });
         on(win, 'keyup', (e) => {
             const key = keyOf(e);
+            note('keyup   ' + (e.code || '(no code)') + ' ' + e.key + ' shift=' + e.shiftKey + ' -> ' + key + ' up');
             syncModifiers(e, key);
             held.delete(e.code || e.key);
             call(exports.bronto_web_key, key, e.keyCode || 0, mods(e), 0, 0);
             e.preventDefault();
         });
         on(win, 'blur', () => {                        /* keys let go while away would stay "down" */
+            note('blur: every key let go');
             for (const key of held.values()) call(exports.bronto_web_key, key, 0, 0, 0, 0);
             held.clear();
             call(exports.bronto_web_focus, 0);
@@ -485,14 +503,14 @@ async function start(opts) {
             e.preventDefault();
         };
         on(canvas, 'pointermove', (e) => {
-            syncModifiers(e, 0);
+            syncModifiers(e, 0, true);                 /* (the mouse only lets modifiers go: some browsers' pointer events lag behind) */
             const [x, y] = canvasPoint(e);
             if (isTouch(e)) { if (fingers.has(e.pointerId)) call(exports.bronto_web_touch, 1, e.pointerId, x, y); e.preventDefault(); return; }
             call(exports.bronto_web_mouse_move, x, y);
         });
         on(canvas, 'pointerdown', (e) => {
             resumeAudio();
-            syncModifiers(e, 0);
+            syncModifiers(e, 0, true);
             canvas.focus && canvas.focus();
             if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } }
             const [x, y] = canvasPoint(e);

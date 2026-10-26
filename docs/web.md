@@ -93,7 +93,7 @@ Makefile's `$(WEB)/%.wasm` rule shows the flags. Then make its page with
 | | On the web |
 |---|---|
 | Picture | The framebuffer is drawn into a `<canvas>` that fills the page (or the frame it's embedded in), with the window's scale modes and HiDPI as on the desktop. |
-| Keyboard, mouse, wheel | As on the desktop, with the same key codes. The browser keeps a few of its own shortcuts (F5, F11, F12, Ctrl+R, Ctrl+W...). Browsers whose privacy settings hide which key was pressed (LibreWolf, say) still work: keys are then known by what they type, and Shift, Ctrl, Alt and Cmd by the state every other key and mouse event carries. |
+| Keyboard, mouse, wheel | As on the desktop, with the same key codes. The browser keeps a few of its own shortcuts (F5, F11, F12, Ctrl+R, Ctrl+W...). Browsers whose privacy settings hide which key was pressed (LibreWolf, say) still work: keys are then known by what they type, and Shift, Ctrl, Alt and Cmd by the state every other key event carries (the mouse's events only ever let one go). Add `#keys` to a page's address to list every key event it gets and what it passes on. |
 | Touch | Real multi-touch (`BR_EVENT_TOUCH_*`). A project's `touch_controls` (see below) puts an on-screen stick and buttons in the bars around the game; a touch that misses them is the left mouse button. The page doesn't scroll, zoom or pop up menus under a finger. |
 | Gamepads | Through the browser's Gamepad API, in the usual Xbox-style layout, with rumble where the browser supports it. |
 | Sound | WebAudio. Browsers only start sound after a click or key press, which is why the page opens with a **Play** button. |

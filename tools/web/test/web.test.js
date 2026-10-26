@@ -138,6 +138,10 @@ test('modifiers held without their own key events still reach the game', () => {
     assert.deepStrictEqual(Bronto.modifierChanges(held, none, 340), [], 'its own keyup does it');
     assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 68), []);
     assert.deepStrictEqual(Bronto.modifierChanges(held, {}, 68), [], 'an event that doesn\'t say changes nothing');
+    held.clear();
+    assert.deepStrictEqual(Bronto.modifierChanges(held, Object.assign({}, none, { shiftKey: true }), 0, true), [], 'the mouse never presses one');
+    held.set('held:shiftKey', 340);
+    assert.deepStrictEqual(Bronto.modifierChanges(held, none, 0, true), [[340, false, 'held:shiftKey']], 'but it lets one go');
 });
 
 /* ---- a stand-in browser: just enough DOM for bronto.js ---- */
