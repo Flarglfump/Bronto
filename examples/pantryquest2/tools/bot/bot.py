@@ -241,6 +241,9 @@ class Bot(Fighting, Travel, BossFight, Blocks, Freezing):
             # don't overshoot: if one more step goes past, tap instead (one step at a time)
             nb = b.copy()
             sim.frame(nb, nav.held_of(d), [], 1, g, has)
+            if not nb.grounded:                        # (and never walk off an edge the plan didn't mean)
+                self.tick(())
+                return nav.node_of(self.basil()) == target
             if (nb.x - tx) * d > 0 and abs(nb.x - tx) > abs(b.x - tx):
                 self.tick(())
                 return nav.node_of(self.basil()) == target

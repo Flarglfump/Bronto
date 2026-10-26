@@ -82,13 +82,13 @@ class Freezing:
                 self.follow(path, g, rg)
                 continue
             # on towards it, onto a step nearer the goal?
-            d_here = math.hypot(b.x - goal_xy[0], b.y - goal_xy[1])
+            d_here = abs(b.x - goal_xy[0])
 
             def progress(n, steps=steps):
                 if n[0] == 'exit' or n[2]:
                     return False
                 x, y = n[0] * 16 + 8, (n[1] + 1) * 16 - 16
-                if math.hypot(x - goal_xy[0], y - goal_xy[1]) > d_here - 24:
+                if abs(x - goal_xy[0]) > d_here - 16:
                     return False
                 return any(abs(p[0] - x) < 16 and int((p[1] - 24 + 15) // 16) == n[1] and p[2] > 2.5 for p in steps)
             path = rg.path(here, progress, heur, start_state=b, limit=1500)
@@ -99,7 +99,8 @@ class Freezing:
             if self.freeze_useful(b, g, has, here, goal, progress, heur, goal_xy, steps, useful_cache):
                 continue
             # (or first get as near the goal as he can on his own: the edge of the gap)
-            if not getattr(self, '_fz_edge_tried', None) == (g.room, here):
+            on_step = any(abs(p[0] - b.x) < 14 and 0 <= p[1] - 8 - (b.y + 16) < 3 for p in steps)
+            if not on_step and not getattr(self, '_fz_edge_tried', None) == (g.room, here):
                 reach = rg.reachable(here, limit=600)
                 best = min((n for n in reach if n[0] != 'exit' and not n[2]),
                            key=lambda n: math.hypot(n[0] * 16 + 8 - goal_xy[0], (n[1] + 1) * 16 - 16 - goal_xy[1]),
@@ -150,7 +151,7 @@ class Freezing:
                         g2 = g.copy_with(list(g.platforms) + [(px, py)])
                         rg2 = nav.RoomGraph(g2, has)
                         newsteps = steps + [(px, py, 6.0, -1)]
-                        d_here = math.hypot(b.x - goal_xy[0], b.y - goal_xy[1])
+                        d_here = abs(b.x - goal_xy[0])
 
                         def prog2(n):
                             if n[0] == 'exit':
@@ -160,7 +161,7 @@ class Freezing:
                             if n[2]:
                                 return False
                             x, y = n[0] * 16 + 8, (n[1] + 1) * 16 - 16
-                            if math.hypot(x - goal_xy[0], y - goal_xy[1]) > d_here - 40:
+                            if abs(x - goal_xy[0]) > d_here - 24:
                                 return False
                             return any(abs(p[0] - x) < 16 and int((p[1] - 24 + 15) // 16) == n[1] for p in newsteps)
                         ok = rg2.path(here, prog2, heur, start_state=b, limit=800) is not None

@@ -288,3 +288,94 @@ def fight_stale(bot):
     ok = bot.fight_loop(model, prefer, can_hurt, box, done)
     bot.wait_play()
     return ok
+
+
+# ---- the Abominable Sundae ---------------------------------------------------------------------------
+def sundae_model(bot):
+    def model(b, g):
+        e = bot.boss_entity('Boss')
+        if not e:
+            return []
+        s, i, x, y = e
+        v = bot.r.vars(s, i, ['state', 't', 'facing', 'vel', 'moves', 'bounces', 'ground', 'right_wall', 'chill_t'])
+        state, t, facing = v[0], float(v[1]), int(float(v[2]))
+        vy = parse_vec(v[3])[1]
+        moves, bounces = int(float(v[4])), int(float(v[5]))
+        ground, right = float(v[6]), float(v[7])
+        chill = float(v[8])
+        path = []
+        px, py = x, y
+        for k in range(H + 1):
+            path.append((px, py))
+            dt = DT * (0.3 if chill > 0 else 1)
+            chill -= DT
+            t += dt
+            if state == 'idle':
+                facing = 1 if b.x > px else -1
+                if t > 0.9:
+                    moves += 1
+                    state = ['roll', 'throw', 'stomp'][moves % 3]
+                    t = 0
+            elif state == 'throw':
+                if t > 1.5:
+                    state, t = 'idle', 0
+            elif state == 'stomp':
+                if t >= 0.25:
+                    if t - dt < 0.25:
+                        vy = -4.5
+                    vy += 0.25
+                    py += vy
+                    if py >= ground:
+                        py = ground
+                        state, t = 'idle', 0
+            elif state == 'roll':
+                if t >= 0.4:
+                    px += facing * 3.5
+                    if px < 40 or px > right:
+                        px = min(max(px, 40), right)
+                        facing = -facing
+                        bounces += 1
+                        if bounces >= 3:
+                            state, t = 'idle', 0
+        return [Hz(path, 20, 22, 'sundae')]
+    return model
+
+
+def fight_sundae(bot):
+    """The Abominable Sundae: it can be hurt except while rolling. Jump its rolls, dodge the
+    scoops and icicles, and keep shooting (Frost Sugar slows it)."""
+    model = sundae_model(bot)
+    info = {}
+
+    def look():
+        e = bot.boss_entity('Boss')
+        if not e:
+            info.clear()
+            return None
+        info.update(state=bot.r.vars(e[0], e[1], ['state'])[0], x=e[2], y=e[3])
+        return info
+
+    def can_hurt():
+        i = look()
+        return bool(i) and i['state'] not in ('roll', 'intro', 'sleep', 'dying')
+
+    def box():
+        i = look()
+        return (i['x'], i['y'], 20, 22, 0, 0) if i else None
+
+    def prefer(s):
+        i = info or look()
+        if not i:
+            return 0
+        dx = abs(s.x - i['x'])
+        p = abs(dx - 90) * 0.3
+        behind = (s.x - 24) if s.x < i['x'] else (488 - s.x)
+        p += max(0, 100 - behind) * 0.4
+        return p
+
+    bot.set_frost(True)
+    bot.log('fighting the Abominable Sundae')
+    ok = bot.fight_loop(model, prefer, can_hurt, box, lambda: 'boss:sundae' in bot.flags())
+    bot.wait_play()
+    bot.set_frost(False)
+    return ok
