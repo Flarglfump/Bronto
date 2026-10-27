@@ -111,7 +111,7 @@ entity
   Name
     text = "Crawler"
   Transform
-    position = 56 248
+    position = 56 296
   Sprite
     image = "art/crawler.bmp"
     layer = 2

@@ -201,7 +201,7 @@ def build():
     r.plat(7, 5, 4)                               # under the opening up into the Brine Works
     r.plat(1, 40, 4).plat(6, 37, 4).plat(11, 34, 4).plat(6, 31, 4)   # the lower stair: three tiles a step, back up to the gap
     r.item('packet', 7, 42, 'packet_c10')
-    r.enemy('gnat', 8, 17).enemy('crawler', 3, 35)
+    r.enemy('gnat', 8, 17).enemy('crawler', 3, 39)
 
     r = R('C4', 'catacombs', 4, 6, 3, 2, name='Crumbling Crypt')
     r.door('N', 1).door('E', 1).door('W', 1, 'open')  # (no cap: at the end of a crawlspace, a shot can't reach it)
@@ -240,7 +240,7 @@ def build():
     zigzag(r, range(16, 41, 3), first='right')
     r.block('x', 6, 43, 4, 2)                    # a cracked floor over the way down: popcorn
     r.solid(1, 43, 5, 1).solid(10, 43, 5, 1)
-    r.enemy('crawler', 12, 15).enemy('gnat', 6, 25).enemy('crawler', 3, 33)
+    r.enemy('crawler', 12, 15).enemy('gnat', 6, 25).enemy('crawler', 3, 36)
 
     # ================================================================== FROSTBITE CELLAR
     r = R('F0', 'frost', 3, 10, 1, 3, name='Ice Shaft')
@@ -284,7 +284,7 @@ def build():
     r.solid(1, 11, 5, 1).solid(4, 12, 2, 3)
     r.item('packet', 1, 13, 'packet_f4')
     r.solid(1, 15, 1, 1)
-    r.enemy('crawler', 16, 9).enemy('hopper', 6, 27).enemy('slider', 20, 20)
+    r.enemy('crawler', 16, 12).enemy('hopper', 6, 27).enemy('slider', 20, 20)
 
     r = R('F6', 'frost', 9, 13, 1, 1, name='Sugar Vault')
     r.door('W', 0, 'wax')
@@ -322,7 +322,7 @@ def build():
     r.door('W', 0).door('S', 0)
     zigzag(r, range(16, 41, 3), first='right')
     r.solid(1, 13, 8, 1)
-    r.enemy('crawler', 12, 18).enemy('gnat', 6, 30)
+    r.enemy('crawler', 12, 21).enemy('gnat', 6, 30)
 
     r = R('M1', 'molten', 9, 10, 4, 1, name='Simmer Hall')
     r.door('N', 2).door('W', 0).door('E', 0)
@@ -356,7 +356,7 @@ def build():
     r.plat(6, 4, 4)
     zigzag(r, range(7, 41, 3), first='left')
     r.clear(7, 43, 2, 2)
-    r.enemy('crawler', 3, 15).enemy('gnat', 8, 30)
+    r.enemy('crawler', 3, 18).enemy('gnat', 8, 30)
 
     r = R('M5', 'molten', 14, 13, 3, 1, name='Boiler Room', heat=True)
     r.door('W', 0).door('E', 0)
@@ -392,7 +392,7 @@ def build():
     r.solid(8, 18, 7, 1)
     r.add('switch', 12, 15, gate=[1, 25, 1, 3])  # ... opened by a switch behind the wall (garlic goes through walls)
     r.solid(9, 14, 1, 4)
-    r.enemy('crawler', 4, 22)
+    r.enemy('crawler', 4, 21)
 
     r = R('M8', 'molten', 11, 15, 2, 1, name="Wyrm's Furnace", boss='wyrm', music='music/boss.wav')
     r.door('E', 0, 'boss')
@@ -431,7 +431,7 @@ def build():
     r.plat(6, 4, 4)
     zigzag(r, range(7, 56, 3), first='left')
     r.clear(7, 58, 2, 2)
-    r.enemy('crawler', 3, 15).enemy('gnat', 8, 33).enemy('turret', 12, 48, shoots='brine')
+    r.enemy('crawler', 3, 18).enemy('gnat', 8, 33).enemy('turret', 12, 48, shoots='brine')
 
     r = R('B4', 'brine', 19, 6, 1, 1, name='Mitt Locker')
     r.door('E', 0)

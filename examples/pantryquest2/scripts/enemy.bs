@@ -61,6 +61,10 @@ class Crawler : Brain {
     override func setup(me: entity, b: Body) -> void {
         var c := tile_cell(b.map, me.position)
         me.position = tile_cell_center(b.map, c.x, c.y)
+        while b.solid(me.position) and me.y > 16 { me.position = me.position - vec2(0, 16) }    # (inside a wall: out of it)
+        if not this.on_surface(me, b) {                   # (in the air: down to the floor, to crawl from there)
+            while not b.solid(me.position + vec2(0, 16)) { me.position = me.position + vec2(0, 16) }
+        }
         var downs := [vec2(0, 1), vec2(-1, 0), vec2(1, 0), vec2(0, -1)]
         for d in downs {
             if b.solid(me.position + d * 16) {
@@ -71,6 +75,12 @@ class Crawler : Brain {
         this.dir = vec2(-this.up.y, this.up.x)            # clockwise: floor -> right
         if not this.clockwise { this.dir = this.dir * -1 }
         this.turn_sprite(me)
+    }
+    func on_surface(me: entity, b: Body) -> bool {
+        for d in [vec2(0, 1), vec2(-1, 0), vec2(1, 0), vec2(0, -1)] {
+            if b.solid(me.position + d * 16) { return true }
+        }
+        return false
     }
     func turn_sprite(me: entity) -> void { me.rotation = angle(this.up) + 90 }
     override func step(me: entity, b: Body, dt: number) -> void {

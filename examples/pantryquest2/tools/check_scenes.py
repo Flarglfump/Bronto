@@ -5,6 +5,9 @@ A scene file refers to another entity by its place in the file (0 for the first)
 adding or moving an entity above one shifts what the numbers mean. The editor keeps
 them right; this catches a scene edited by hand: the camera in main.scene must follow
 Basil.
+
+It also checks where world.py puts the crawlers: each must start against a wall, a floor
+or a ceiling (a crawler in the air has nothing to crawl along), not inside one.
 """
 import os
 import re
@@ -38,6 +41,19 @@ def main():
                 if target is None or (want and target != want):
                     print('%s: %s.%s = %d points at %s (should be %s)' % (f, name, field, n, target, want or 'an entity'))
                     ok = False
+    sys.path.insert(0, HERE)
+    import world
+    for room in world.build():
+        for th in room.things:
+            if th.kind != 'enemy:crawler':
+                continue
+            x, y = th.x, th.y
+            if room.solid_at(x, y):
+                print('%s: the crawler at (%d, %d) is inside a wall' % (room.id, x, y))
+                ok = False
+            elif not any(room.solid_at(x + dx, y + dy) for dx, dy in ((0, 1), (-1, 0), (1, 0), (0, -1))):
+                print('%s: the crawler at (%d, %d) is in the air' % (room.id, x, y))
+                ok = False
     print('scenes OK' if ok else 'PROBLEMS')
     return ok
 
