@@ -4,7 +4,7 @@ Each tileset is 16 tiles wide (16 x 16 pixels each):
   row 0   the solid tiles, by which neighbours are solid too (N=1 E=2 S=4 W=8): 'A'..'P'
   row 1   interior variants 'Q' 'R' 'S', then the special tiles (see SPECIAL)
   row 2   the background tiles (BG)
-  row 3   more background tiles
+  rows 3, 4  more background tiles
 The characters for each tile are in LEGEND (make_rooms.py uses the same lists).
 """
 from pixels import Canvas, PALETTE, noise, mix
@@ -26,13 +26,14 @@ SPECIAL = [                                 # row 1 after the variants
     ('g', 'grate'),      # a grate (solid, see-through)
     ('z', 'moss'),       # foreground moss / icicles / drips (front map)
 ]
-BG = [                                       # rows 2 and 3: the background (none of it is solid)
+BG = [                                       # rows 2 to 4: the background (none of it is solid)
     ('#', 'wall'), ('$', 'wall2'), ('%', 'wall3'), ('&', 'dark'), ('*', 'window'), ('+', 'torch'),
     ('(', 'arch_l'), (')', 'arch_r'), ('[', 'pillar_bg'), (']', 'banner'), ('{', 'shelf'), ('}', 'chain'),
     ('<', 'web'), ('>', 'skull'), ('|', 'column'), ('!', 'candle'),
     ('0', 'sky'), ('1', 'stars'), ('2', 'moon_tl'), ('3', 'moon_tr'), ('4', 'moon_bl'), ('5', 'moon_br'),
     ('6', 'roof'), ('7', 'house'), ('8', 'house_win'), ('9', 'hill'), ('@', 'hill_top'), ('`', 'fence'),
     (':', 'crate'), (';', 'barrel'), ('T', 'pipe_h'), ('U', 'pipe_v'),
+    ('W', 'rope'), ('V', 'lantern'),         # (row 4) a lantern hung down from the room above, in the sky
 ]
 LEGEND = SOLID_CHARS + FILL_VARIANTS + ''.join(c for c, _ in SPECIAL)
 LEGEND = LEGEND + '.' * (32 - len(LEGEND)) + ''.join(c for c, _ in BG)
@@ -378,6 +379,27 @@ def bg_tile(style, name):
             c.ellipse(8, 9, 6, 7, P['n'])
             c.rect(2, 6, 12, 1, P['G'])
             c.rect(2, 12, 12, 1, P['G'])
+    elif name in ('rope', 'lantern'):                       # hung from the room above: a way up's there
+        for y in range(16):
+            for x in range(16):
+                c.set(x, y, (14, 14, 40))
+        rope = (150, 120, 80)
+        if name == 'rope':
+            c.rect(8, 0, 1, 16, rope)
+            for y in range(1, 16, 3):
+                c.set(9, y, (110, 86, 56))
+        else:
+            for y in range(16):                             # its glow
+                for x in range(16):
+                    d = ((x - 8.5) ** 2 + (y - 10) ** 2) ** 0.5
+                    if d < 8:
+                        c.blend(x, y, (255, 200, 90), 0.35 * (1 - d / 8))
+            c.rect(8, 0, 1, 5, rope)
+            c.rect(6, 5, 5, 1, (60, 40, 30))                # cap, glass, base
+            c.rect(6, 6, 5, 7, (60, 40, 30))
+            c.rect(7, 7, 3, 5, (255, 220, 120))
+            c.rect(8, 8, 1, 3, (255, 250, 210))
+            c.rect(5, 13, 7, 1, (60, 40, 30))
     elif name in ('pipe_h', 'pipe_v'):
         fill()
         for i in range(16):
@@ -393,7 +415,7 @@ def bg_tile(style, name):
 
 
 def tileset(style):
-    out = Canvas(256, 64)
+    out = Canvas(256, 80)
     for m in range(16):
         out.paste(solid_tile(style, m), m * 16, 0)
     for i, v in enumerate(FILL_VARIANTS):

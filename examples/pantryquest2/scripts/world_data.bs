@@ -78,6 +78,7 @@ func things() -> list {
     # what the map marks: [room, kind, x, y] (kind: item, hearth, map, boss) - x, y in tiles
     return [
         ["V1", "hearth", 20, 12, ""],
+        ["V1", "maptable", 23, 12, ""],
         ["V2r", "item", 13, 6, "cake_v2r"],
         ["V3", "item", 22, 10, "page1"],
         ["C1", "item", 42, 12, "packet_c1"],

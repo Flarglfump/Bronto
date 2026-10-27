@@ -80,6 +80,7 @@ def build():
     r.plat(8, 8, 6).plat(17, 8, 7)            # its upper floor, fallen in the middle
     r.add('npc', 13, 12, who='mozz', say='mozz_meet', again='mozz_idle', until='seals4')
     r.add('hearth', 20, 12)
+    r.add('maptable', 23, 12, area='village')     # (beside the hearth: the village's map, rooftops and all)
 
     r = R('V2', 'village', 6, 3, 3, 1, name='Market Square')
     outdoor(r)
@@ -89,6 +90,8 @@ def build():
     r.plat(29, 10, 4)
     r.plat(35, 9, 5)                           # a rooftop ...
     r.solid(41, 4, 3, 1)                       # ... and a chimney ledge, high above it (the Leaven Boots)
+    r.bg('W', 40, 1).bg('V', 40, 2)            # a lantern hung down from the rooftops: the way up is there
+    r.add('sign', 37, 8, text="THE ROOFTOPS ARE UP THERE, BY THE LANTERN - TOO HIGH FOR ORDINARY BOOTS.")
     r.enemy('gnat', 15, 5).enemy('gnat', 33, 6)
     r.add('sign', 21, 12, text="THE OLD WELL. IT GOES DOWN A LONG WAY.")
 

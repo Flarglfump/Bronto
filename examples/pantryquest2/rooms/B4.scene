@@ -22,7 +22,7 @@ entity
     tile_size = 16
     columns = 16
     rows = 15
-    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TUWV"
     solid = ""
     tiles = "#####################$###$###$#####$###$###$###%#%#{#%########################################$#$###$###$###$#####%###%###%*##%##################################$###$###$###$#####$###$###%+##%#%########################################$###$#"
     layer = -30
@@ -39,7 +39,7 @@ entity
     tile_size = 16
     columns = 16
     rows = 15
-    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TUWV"
     solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
     tiles = "QPPPPPPPPPPQPPPPPLLLLLLLLLLLLLLPN..............HN..............HN..............HN..............HN..............HN..............HN..............HN..............DN...............N..GOOM.........N..HPPN.........POOPPSPOOOOOOOOOPPPRPPPPPPPPPPRP"
     layer = -10

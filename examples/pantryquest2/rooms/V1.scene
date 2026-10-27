@@ -22,7 +22,7 @@ entity
     tile_size = 16
     columns = 32
     rows = 15
-    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TUWV"
     solid = ""
     tiles = "000000010000000000100000000001000000000000100000000001000000000000100000000001000000000010000000000001000000000010000000000100000000000010000000000100000000001010000000000100000000001000000000@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@9999999999999999999999999999999999999999999999999999999999999999666666666666666666666666666666668888777777778888777777778888777788887777777788887777777788887777888877777777888877777777888877778888777777778888777777778888777788887777777788887777777788887777"
     layer = -30
@@ -39,7 +39,7 @@ entity
     tile_size = 16
     columns = 32
     rows = 15
-    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TU"
+    legend = "ABCDEFGHIJKLMNOPQRScxr^v~=-Yuhgz#$%&*+()[]{}<>|!0123456789@`:;TUWV"
     solid = "ABCDEFGHIJKLMNOPQRScxrYuhg"
     tiles = "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY..............................YY..............................YY..............................YY..............................YY..............................YY..............................YY..............................YY.......CKKKKI...CKKKKKI.......YY..............................Y.....................................GM..................GM..........HN..................HN.....OOOOOSPOOOOOOOOOOOOOOOOOOPQOOOOOPPPRPPPPPPPPPPRPPPPQPPPPPPPSPPPP"
     layer = -10
@@ -121,5 +121,27 @@ entity
     file = "scripts/hearth.bs"
   Tags
     list = "hearth"
+  Parent
+    entity = 0
+
+entity
+  Name
+    text = "MapTable"
+  Transform
+    position = 376 192
+  Sprite
+    image = "art/maptable.bmp"
+    layer = -5
+    frame_size = 32 32
+  Animation
+    frames = "0-1"
+    fps = 3
+    loop = true
+    playing = true
+  Script
+    file = "scripts/maptable.bs"
+    vars = "area = \"village\""
+  Tags
+    list = "maptable"
   Parent
     entity = 0
