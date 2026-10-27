@@ -16,6 +16,9 @@
 #
 # A Brain can't see this file's vars or `self` (an object can be handed about), so each
 # of its functions is given the entity it moves and the Body it shares with this file.
+#
+# Enemies belong to their room: outside it counts as wall to them, so an open door at the
+# edge of the room is somewhere to turn round, not a way out.
 
 class Body {
     var map: entity
@@ -28,8 +31,10 @@ class Body {
     var shield: bool = false              # pepper from the front bounces off
     var visible: bool = true
     var shoot: string = ""                # what it fires, if anything ("seed", "brine", "fire")
+    var room := vec2(256, 240)            # the room's size: it starts at (0, 0)
 
-    func solid(p: vec2) -> bool { return tile_solid(this.map, p) }
+    func outside(p: vec2) -> bool { return p.x < 0 or p.y < 0 or p.x >= this.room.x or p.y >= this.room.y }
+    func solid(p: vec2) -> bool { return this.outside(p) or tile_solid(this.map, p) }
     func near_basil(me: entity, dist: number) -> bool { return distance(me.position, this.basil.position) < dist }
     func toward_basil(me: entity) -> vec2 { return normalize(this.basil.middle() - me.position) }
     func fire(me: entity, at: vec2, speed: number) -> void {
@@ -76,11 +81,14 @@ class Crawler : Brain {
             var c := tile_cell(b.map, me.position)
             var centre := tile_cell_center(b.map, c.x, c.y)
             if abs(me.x - centre.x) < 0.01 and abs(me.y - centre.y) < 0.01 {   # at a cell's middle: corners?
-                if b.solid(me.position + this.dir * 16) {               # a wall ahead: up it
+                var ahead := me.position + this.dir * 16
+                if b.outside(ahead) or b.outside(ahead - this.up * 16) {   # the edge of the room (a doorway): back the way it came
+                    this.dir = this.dir * -1
+                } elif b.solid(ahead) {                                    # a wall ahead: up it
                     var d := this.dir
                     this.dir = this.up
                     this.up = d * -1
-                } elif not b.solid(me.position - this.up * 16) {        # the surface ends: round the edge
+                } elif not b.solid(me.position - this.up * 16) {           # the surface ends: round the edge
                     var d := this.dir
                     this.dir = this.up * -1
                     this.up = d
@@ -200,7 +208,7 @@ class Walker : Brain {
     override func step(me: entity, b: Body, dt: number) -> void {
         var ahead := me.position + vec2(b.facing * 8, 0)
         var floor_ahead := me.position + vec2(b.facing * 8, b.half.y + 2)
-        if b.solid(ahead) or not b.solid(floor_ahead) { b.facing = -b.facing }
+        if b.solid(ahead) or not b.solid(floor_ahead) or b.outside(floor_ahead) { b.facing = -b.facing }   # (a hole to the next room too)
         else { me.x += b.facing * this.speed }
         me.Sprite.flip_x = b.facing < 0
         if b.shoot != "" and b.near_basil(me, 150) {
@@ -327,6 +335,7 @@ func start() -> void {
     b.basil = find("Basil")
     b.hp = hp
     b.shoot = shoots
+    b.room = game.room_size()
     if brain == "walker" or brain == "knight" { b.half = vec2(6, 11) }
     mind = make_brain(brain)
     mind.setup(self, b)
@@ -403,6 +412,9 @@ func update(dt: number) -> void {
         return
     }
     mind.step(self, b, dt)
+    if b.outside(self.position) {                    # (one that goes through walls, kept in its room too)
+        self.position = vec2(clamp(self.x, 8, b.room.x - 8), clamp(self.y, 8, b.room.y - 8))
+    }
     if flash_t > 0 {
         flash_t -= dt
         self.Sprite.tint = rgb(255, 120, 120)
