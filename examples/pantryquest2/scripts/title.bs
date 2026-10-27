@@ -54,18 +54,18 @@ func read_slots() -> void {
 
 func ok() -> bool {
     if click_row >= 0 and click_row == sel { return true }
-    return action_pressed("jump") or action_pressed("fire") or key_pressed("enter") or button_pressed("start")
+    return action_pressed("ui_confirm")
 }
 
 func back() -> bool {
     if mouse_pressed(0) and inside(mouse, vec2(204, 226), vec2(48, 12)) and state != "press" and state != "menu" { return true }
-    return action_pressed("rocket") or key_pressed("escape")
+    return action_pressed("ui_cancel")
 }
 
 func move(n: int) -> void {
     var before: int = sel
-    if action_pressed("up") { sel -= 1 }
-    if action_pressed("down") { sel += 1 }
+    if action_pressed("ui_up") { sel -= 1 }
+    if action_pressed("ui_down") { sel += 1 }
     sel = clamp(sel, 0, n - 1)
     if sel != before { play_sound("sfx/blip.wav", 0.4) }
 }
@@ -166,7 +166,7 @@ func update(dt: number) -> void {
             sel = 0
             return
         }
-        var forget := action_pressed("map")
+        var forget := action_pressed("ui_erase")
         if click_row >= 0 and click_at.x >= 206 { forget = true }      # (the X on a journey's panel)
         if forget and slots[sel] != nil {
             click_row = -1
@@ -188,7 +188,7 @@ func update(dt: number) -> void {
     }
     if state == "erase" {
         var yes := ok()
-        var no := back() or action_pressed("map")
+        var no := back()
         if mouse_pressed(0) {
             if inside(mouse, vec2(52, 160), vec2(64, 14)) { yes = true }
             if inside(mouse, vec2(140, 160), vec2(64, 14)) { no = true }
@@ -206,8 +206,8 @@ func update(dt: number) -> void {
     if state == "options" {
         move(len(options))
         var lr: int = 0
-        if action_pressed("left") { lr = -1 }
-        if action_pressed("right") { lr = 1 }
+        if action_pressed("ui_left") { lr = -1 }
+        if action_pressed("ui_right") { lr = 1 }
         var o: string = options[sel]
         if (o == "MUSIC" or o == "SOUND") and click_row == sel and click_at.x >= 100 and click_at.x < 184 {
             var v: number = clamp(ceil((click_at.x - 104) / 8) / 10, 0, 1)   # a click on the bar sets it there
@@ -343,11 +343,11 @@ func draw() -> void {
                 if inside(mouse, vec2(bx, 160), vec2(64, 14)) { bc = "#a06838" }
                 draw_rect(vec2(bx, 160), vec2(64, 14), bc)
             }
-            draw_text(controls.fill("{jump}") + ": YES", vec2(56, 163), "#ffffff")
-            draw_text(controls.fill("{rocket}") + ": NO", vec2(144, 163), "#ffffff")
+            draw_text(controls.fill("{ui_confirm}") + ": YES", vec2(56, 163), "#ffffff")
+            draw_text(controls.fill("{ui_cancel}") + ": NO", vec2(144, 163), "#ffffff")
         } else {
-            centred(controls.fill("{jump}: GO   {rocket}: BACK"), 206, "#c0a0d0")
-            centred(controls.fill("{map}: FORGET A JOURNEY"), 216, "#c0a0d0")
+            centred(controls.fill("{ui_confirm}: GO   {ui_cancel}: BACK"), 206, "#c0a0d0")
+            centred(controls.fill("{ui_erase}: FORGET A JOURNEY"), 216, "#c0a0d0")
         }
     }
     if state == "options" {

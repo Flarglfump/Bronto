@@ -2,7 +2,7 @@
 # The hearth's menu, pushed over the game once Basil has rested (and been saved): stay, or
 # travel to any other hearth he has found. What to list comes in the globals "hearth_list"
 # ([room, name, area]), "hearth_here" and "hearth_saved"; the choice goes back in
-# "hearth_travel" (a room, or "" to stay). Keys, the d-pad, or the mouse.
+# "hearth_travel" (a room, or "" to stay). The menu actions (BACK stays), or the mouse.
 
 var draw_layer: int = 85
 var places: list = []
@@ -40,8 +40,8 @@ func update(dt: number) -> void {
     t += dt
     if done or t < 0.2 { return }
     var before: int = sel
-    if action_pressed("up") or key_pressed("up") or button_pressed("up") { sel = (sel + rows() - 1) % rows() }
-    if action_pressed("down") or key_pressed("down") or button_pressed("down") { sel = (sel + 1) % rows() }
+    if action_pressed("ui_up") { sel = (sel + rows() - 1) % rows() }
+    if action_pressed("ui_down") { sel = (sel + 1) % rows() }
     var m := mouse_position()                            # the mouse: pointing chooses, clicking goes
     var over: int = -1
     for i in rows() {
@@ -54,8 +54,8 @@ func update(dt: number) -> void {
         choose(over)
         return
     }
-    if action_pressed("jump") or action_pressed("fire") or key_pressed("enter") or button_pressed("a") { choose(sel) }
-    elif key_pressed("escape") or button_pressed("b") or action_pressed("rocket") { choose(0) }
+    if action_pressed("ui_confirm") { choose(sel) }
+    elif action_pressed("ui_cancel") { choose(0) }
 }
 
 func draw() -> void {

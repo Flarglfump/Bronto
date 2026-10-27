@@ -1,10 +1,13 @@
 @strict
 # The pause menu: a scene pushed over the game (which waits underneath, unseen). Four
-# pages - MAP, ITEMS, DIARY and SYSTEM - turned with left and right (or LB / RB, or a click
-# on the tabs). Everything here also answers to the mouse: pointing chooses, clicking goes.
+# pages - MAP, ITEMS, DIARY and SYSTEM - turned with PAGE LEFT and PAGE RIGHT (or LEFT and
+# RIGHT where they have nothing else to do, or a click on the tabs). It works with the menu
+# actions (UI_UP, UI_CONFIRM, UI_CANCEL...: see controls.bs), and everything here also
+# answers to the mouse: pointing chooses, clicking goes.
 # What to show comes in globals the Game sets before pushing it ("pause_inv",
 # "pause_visited", "pause_marks", ...); what to do after - quitting, going back to the last
-# hearth, Frost Sugar on or off - goes back the same way. PAUSE (or MAP) closes it.
+# hearth, Frost Sugar on or off - goes back the same way. BACK, PAUSE or MAP closes it
+# (PAUSE only when it isn't also OK: Enter pauses the game, but in here it's OK).
 
 var draw_layer: int = 70
 var tab: int = 0
@@ -81,14 +84,16 @@ func update(dt: number) -> void {
     clicked = mouse_pressed(0)
     if t < 0.15 { return }                     # (the press that opened it isn't a press in here)
     var turn: int = 0
-    if action_pressed("left") and reading < 0 and not (tab == 3) and not (tab == 1) { turn = -1 }
-    if action_pressed("right") and reading < 0 and not (tab == 3) and not (tab == 1) { turn = 1 }
-    if tab == 1 and reading < 0 {                      # (on the items, left and right move along; off the end turns the page)
-        if action_pressed("left") and sel % 4 == 0 { turn = -1 }
-        if action_pressed("right") and sel % 4 == 3 { turn = 1 }
+    if not showing_hint and reading < 0 {
+        if action_pressed("ui_left") and (tab == 0 or tab == 2) { turn = -1 }
+        if action_pressed("ui_right") and (tab == 0 or tab == 2) { turn = 1 }
+        if tab == 1 {                                  # (on the items, left and right move along; off the end turns the page)
+            if action_pressed("ui_left") and sel % 4 == 0 { turn = -1 }
+            if action_pressed("ui_right") and sel % 4 == 3 { turn = 1 }
+        }
     }
-    if button_pressed("lb") { turn = -1 }
-    if button_pressed("rb") { turn = 1 }
+    if action_pressed("ui_page_left") { turn = -1 }
+    if action_pressed("ui_page_right") { turn = 1 }
     if turn != 0 {                                      # (the press that turns the page does nothing on the new one:
         set_tab((tab + turn + 4) % 4)                  #  LEFT onto SYSTEM mustn't also change its first setting)
         return
@@ -105,7 +110,22 @@ func update(dt: number) -> void {
             return
         }
     }
-    if action_pressed("pause") or action_pressed("map") {
+    if action_pressed("ui_cancel") {                  # back: out of what's open on the page, or out of the menu
+        if showing_hint {
+            showing_hint = false
+            play_sound("sfx/back.wav", 0.4)
+        } elif reading >= 0 {
+            reading = -1
+            play_sound("sfx/back.wav", 0.4)
+        } elif confirm_quit {
+            confirm_quit = false
+            play_sound("sfx/back.wav", 0.4)
+        } else {
+            close()
+        }
+        return
+    }
+    if (action_pressed("pause") and not action_pressed("ui_confirm")) or action_pressed("map") {
         close()
         return
     }
@@ -127,18 +147,18 @@ func close() -> void {
     pop_scene()
 }
 
-# On the map: JUMP (or a click on the NEXT line) shows the hint for where to go next.
+# On the map: OK (or a click on the NEXT line) shows the hint for where to go next.
 func map_input(m: vec2) -> void {
     if len(goal) < 4 { return }
     var click_next := clicked and inside(m, vec2(8, 160), vec2(240, 22))
     if showing_hint {
-        if action_pressed("jump") or action_pressed("fire") or action_pressed("rocket") or clicked {
+        if action_pressed("ui_confirm") or clicked {
             showing_hint = false
             play_sound("sfx/back.wav", 0.4)
         }
         return
     }
-    if action_pressed("jump") or action_pressed("fire") or click_next {
+    if action_pressed("ui_confirm") or click_next {
         showing_hint = true
         play_sound("sfx/select.wav", 0.5)
     }
@@ -148,10 +168,10 @@ func slot_pos(i: int) -> vec2 { return vec2(40 + (i % 4) * 48, 44 + floor(i / 4)
 
 func items_input(m: vec2) -> void {
     var before: int = sel
-    if action_pressed("up") { sel -= 4 }
-    if action_pressed("down") { sel += 4 }
-    if action_pressed("left") and sel % 4 > 0 { sel -= 1 }
-    if action_pressed("right") and sel % 4 < 3 { sel += 1 }
+    if action_pressed("ui_up") { sel -= 4 }
+    if action_pressed("ui_down") { sel += 4 }
+    if action_pressed("ui_left") and sel % 4 > 0 { sel -= 1 }
+    if action_pressed("ui_right") and sel % 4 < 3 { sel += 1 }
     sel = clamp(sel, 0, 11)
     for i in 12 {
         if (mouse_moved or clicked) and inside(m, slot_pos(i) - vec2(14, 14), vec2(28, 28)) { sel = i }
@@ -162,7 +182,7 @@ func items_input(m: vec2) -> void {
 func diary_input(m: vec2) -> void {
     var found: list = inv[5]
     if reading >= 0 {
-        if action_pressed("jump") or action_pressed("fire") or action_pressed("rocket") or clicked {
+        if action_pressed("ui_confirm") or clicked {
             reading = -1
             play_sound("sfx/back.wav", 0.4)
         }
@@ -170,8 +190,8 @@ func diary_input(m: vec2) -> void {
     }
     if len(found) == 0 { return }
     var before: int = sel
-    if action_pressed("up") { sel -= 1 }
-    if action_pressed("down") { sel += 1 }
+    if action_pressed("ui_up") { sel -= 1 }
+    if action_pressed("ui_down") { sel += 1 }
     sel = clamp(sel, 0, 7)
     var over: int = -1
     for i in 8 {
@@ -179,7 +199,7 @@ func diary_input(m: vec2) -> void {
     }
     if mouse_moved and over >= 0 { sel = over }
     if sel != before { play_sound("sfx/blip.wav", 0.4) }
-    if action_pressed("jump") or action_pressed("fire") or (clicked and over >= 0) {
+    if action_pressed("ui_confirm") or (clicked and over >= 0) {
         if clicked { sel = over }
         if contains(found, "page" + (sel + 1)) {
             reading = sel
@@ -206,8 +226,8 @@ func option_y(i: int) -> number { return 44 + i * 19 }
 func system_input(m: vec2) -> void {
     options = system_options()
     var before: int = sel
-    if action_pressed("up") { sel -= 1 }
-    if action_pressed("down") { sel += 1 }
+    if action_pressed("ui_up") { sel -= 1 }
+    if action_pressed("ui_down") { sel += 1 }
     sel = clamp(sel, 0, len(options) - 1)
     var over: int = -1
     for i in len(options) {
@@ -221,9 +241,9 @@ func system_input(m: vec2) -> void {
     }
     var o: string = options[sel]
     var lr: int = 0
-    if action_pressed("left") { lr = -1 }
-    if action_pressed("right") { lr = 1 }
-    var ok := action_pressed("jump") or action_pressed("fire") or (clicked and over >= 0)
+    if action_pressed("ui_left") { lr = -1 }
+    if action_pressed("ui_right") { lr = 1 }
+    var ok := action_pressed("ui_confirm") or (clicked and over >= 0)
     if (o == "music" or o == "sound") and clicked and over >= 0 {   # a click on the bar sets it there
         var v: number = clamp(ceil((m.x - 74) / 8) / 10, 0, 1)
         if m.x >= 70 and m.x < 160 { set_level(o, v) }
@@ -297,7 +317,7 @@ func draw() -> void {
     if tab == 1 { draw_items() }
     if tab == 2 { draw_diary() }
     if tab == 3 { draw_system() }
-    draw_text("LEFT/RIGHT: PAGES", vec2(4, 230), "#706080")
+    draw_text(find("Controls").fill("{ui_page_left}/{ui_page_right}: PAGES"), vec2(4, 230), "#706080")
     var bc: string = "#403050"
     if inside(last_mouse, vec2(204, 226), vec2(48, 12)) { bc = "#a06838" }
     draw_rect(vec2(204, 226), vec2(48, 12), bc)
@@ -367,7 +387,7 @@ func draw_map() -> void {
     if len(goal) > 0 {
         draw_text("NEXT: " + goal[1], vec2(12, 163), GOAL_COLOUR)
         draw_text(goal[2], vec2(60, 173), "#4090a0")
-        draw_text("JUMP OR CLICK NEXT: HOW TO GO", vec2(12, 213), "#507080")
+        draw_text(find("Controls").fill("{ui_confirm} OR CLICK NEXT: HOW TO GO"), vec2(12, 213), "#507080")
     }
     var found: list = global("pause_found", [0, 0])
     draw_text("ITEMS " + found[0] + "/" + found[1], vec2(160, 27), "#a090b0")
@@ -441,7 +461,7 @@ func draw_diary() -> void {
         draw_rect(vec2(10, 48), vec2(236, 150), "#e8d8a8")
         var lines: list[string] = wrap(story.page_text("page" + (reading + 1)), 27)
         for i in len(lines) { draw_text(lines[i], vec2(18, 56 + i * 11), "#402818") }
-        draw_text("JUMP OR CLICK: BACK", vec2(12, 206), "#a090b0")
+        draw_text(find("Controls").fill("{ui_cancel} OR CLICK: BACK"), vec2(12, 206), "#a090b0")
         return
     }
     draw_text("THE COUNT'S DIARY", vec2(12, 34), "#f8c860")
@@ -456,7 +476,7 @@ func draw_diary() -> void {
         if i == sel { draw_rect(vec2(10, y - 3), vec2(150, 14), "#503040") }
         draw_text(label, vec2(16, y), col)
     }
-    if len(found) == 0 { draw_text("NO PAGES FOUND YET", vec2(16, 190), "#a090b0") } else { draw_text("JUMP OR CLICK: READ", vec2(16, 190), "#a090b0") }
+    if len(found) == 0 { draw_text("NO PAGES FOUND YET", vec2(16, 190), "#a090b0") } else { draw_text(find("Controls").fill("{ui_confirm} OR CLICK: READ"), vec2(16, 190), "#a090b0") }
 }
 
 func draw_system() -> void {

@@ -4,12 +4,23 @@
 # "controls", shared by every journey, and put into effect as the engine's actions with
 # bind(), so every script just asks action_down("jump") and the like.
 #
+# There are two sets of actions: the ones that play (MOVE, JUMP, PEPPER...) and the ones
+# that work the menus (UI_UP, UI_CONFIRM, UI_CANCEL...). A key belongs to one action in each
+# set at most, so the same key can jump in play and say OK in a menu.
+#
 # Some inputs always stay as they are, so nobody can lock themselves out: the left stick
-# moves, and Escape pauses. A "Controls" entity in title.scene, main.scene and
+# moves; Escape pauses; and in the menus the arrow keys, the d-pad and the stick move, Enter
+# says OK and Escape goes back. A "Controls" entity in title.scene, main.scene and
 # pause.scene runs this; scripts/rebind.bs is the screen that changes it.
-
-var actions: list[string] = ["left", "right", "up", "down", "jump", "fire", "rocket", "aim", "pause", "map", "ball"]
-var names: list[string] = ["LEFT", "RIGHT", "UP", "DOWN", "JUMP", "PEPPER", "HOT SAUCE", "AIM", "PAUSE", "MAP", "ROLL UP"]
+#
+# (They're saved in this order, so new ones go at the end: older saves keep theirs.)
+var actions: list[string] = ["left", "right", "up", "down", "jump", "fire", "rocket", "aim", "pause", "map", "ball",
+                             "cycle",
+                             "ui_up", "ui_down", "ui_left", "ui_right", "ui_page_left", "ui_page_right",
+                             "ui_confirm", "ui_cancel", "ui_erase"]
+var names: list[string] = ["LEFT", "RIGHT", "UP", "DOWN", "JUMP", "PEPPER", "HOT SAUCE", "AIM", "PAUSE", "MAP", "ROLL UP",
+                           "PEPPER TYPE",
+                           "UP", "DOWN", "LEFT", "RIGHT", "PAGE LEFT", "PAGE RIGHT", "OK", "BACK", "ERASE"]
 var keys: list[list] = []                 # for each action, [first key, second key] ("" = none)
 var pads: list[string] = []               # for each action, a gamepad button, as button_down() names them
 
@@ -20,9 +31,18 @@ func start() -> void {
 
 func defaults() -> void {
     keys = [["left", "a"], ["right", "d"], ["up", "w"], ["down", "s"], ["z", "space"], ["x", "j"],
-            ["c", "l"], ["q", "shift"], ["enter", "p"], ["m", "tab"], ["e", ""]]
-    pads = ["left", "right", "up", "down", "a", "x", "b", "lb", "start", "back", "y"]
+            ["c", "l"], ["q", "shift"], ["enter", "p"], ["m", "tab"], ["e", ""],
+            ["v", "k"],
+            ["up", "w"], ["down", "s"], ["left", "a"], ["right", "d"], ["q", "pageup"], ["e", "pagedown"],
+            ["enter", "z"], ["escape", "x"], ["delete", "backspace"]]
+    pads = ["left", "right", "up", "down", "a", "x", "b", "lb", "start", "back", "y",
+            "rb",
+            "up", "down", "left", "right", "lb", "rb", "a", "b", "y"]
 }
+
+# The menus' actions start "ui_"; the rest play.
+func is_ui(i: int) -> bool { return substr(actions[i], 0, 3) == "ui_" }
+func same_set(i: int, j: int) -> bool { return is_ui(i) == is_ui(j) }
 
 func load() -> void {
     defaults()
@@ -39,11 +59,11 @@ func load() -> void {
     for i in range(len(saved_keys), len(actions)) {
         for w in 2 {
             for j in len(saved_keys) {
-                if keys[i][w] != "" and (keys[j][0] == keys[i][w] or keys[j][1] == keys[i][w]) { keys[i][w] = "" }
+                if same_set(i, j) and keys[i][w] != "" and (keys[j][0] == keys[i][w] or keys[j][1] == keys[i][w]) { keys[i][w] = "" }
             }
         }
         for j in len(saved_keys) {
-            if pads[j] == pads[i] { pads[i] = "" }
+            if same_set(i, j) and pads[j] == pads[i] { pads[i] = "" }
         }
     }
 }
@@ -53,7 +73,12 @@ func save() -> void { save_data("controls", [keys, pads]) }
 # Puts the controls into effect: each action, its keys and button (and what never changes).
 func apply() -> void {
     var always: list = [["left", "pad:left_x-"], ["right", "pad:left_x+"], ["up", "pad:left_y-"], ["down", "pad:left_y+"],
-                        ["pause", "escape"]]
+                        ["pause", "escape"],
+                        ["ui_up", "up"], ["ui_up", "pad:up"], ["ui_up", "pad:left_y-"],
+                        ["ui_down", "down"], ["ui_down", "pad:down"], ["ui_down", "pad:left_y+"],
+                        ["ui_left", "left"], ["ui_left", "pad:left"], ["ui_left", "pad:left_x-"],
+                        ["ui_right", "right"], ["ui_right", "pad:right"], ["ui_right", "pad:left_x+"],
+                        ["ui_confirm", "enter"], ["ui_cancel", "escape"]]
     for i in len(actions) {
         var a: string = actions[i]
         unbind(a)
@@ -77,11 +102,12 @@ func index_of(action: string) -> int {
 }
 
 # Gives an action a key (which = 0 or 1, its first or second). A key belongs to one
-# action only: taken from another, it leaves that one's place empty.
+# action in its set only: taken from another, it leaves that one's place empty.
 func set_key(action: string, which: int, key: string) -> void {
     var n: int = index_of(action)
     if n < 0 { return }
     for i in len(actions) {
+        if not same_set(i, n) { continue }
         for w in 2 {
             if keys[i][w] == key { keys[i][w] = "" }
         }
@@ -91,12 +117,12 @@ func set_key(action: string, which: int, key: string) -> void {
     apply()
 }
 
-# The same for its gamepad button: if another action had it, the two swap.
+# The same for its gamepad button: if another action in its set had it, the two swap.
 func set_pad(action: string, button: string) -> void {
     var n: int = index_of(action)
     if n < 0 { return }
     for i in len(actions) {
-        if i != n and pads[i] == button { pads[i] = pads[n] }
+        if i != n and same_set(i, n) and pads[i] == button { pads[i] = pads[n] }
     }
     pads[n] = button
     save()

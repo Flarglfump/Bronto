@@ -413,18 +413,9 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
             return
         self.log('Frost Sugar', 'on' if on else 'off')
         self.wait_play()
-        self.settle()
         self.tick(())
-        self.tick(('pause',))
-        self.wait_until(lambda: self.r.scenes()[-1:] == ['pause.scene'], 60)
-        self.wait(20)
-        self.tick(('left',))                       # MAP -> SYSTEM
-        self.wait(20)
-        self.tick(('jump',))                       # the first option: FROST SUGAR
-        self.wait(30)
-        self.tick(('pause',))
+        self.tick(('cycle',))                      # PEPPER TYPE
         self.tick(())
-        self.wait_play()
         self.inv_cache = None
 
     def return_to_hearth(self):
@@ -522,7 +513,7 @@ class Bot(Fighting, Travel, HearthTravel, BossFight, Blocks, Freezing):
                 self.read_talk()
                 continue
             if sc and sc[-1] == 'hearth.scene':
-                self.tick(('rocket',))                  # (the hearth's menu: stay)
+                self.tick(('escape',))                  # (the hearth's menu: BACK, stay)
                 self.tick(())
                 continue
             self.tick(())

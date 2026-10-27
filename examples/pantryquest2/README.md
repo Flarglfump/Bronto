@@ -72,8 +72,20 @@ The defaults:
 | Hot sauce | C, L | B |
 | Aim (hold) | Q, Shift | LB |
 | Roll up | E | Y |
+| Pepper type (Frost Sugar on / off) | V, K | RB |
 | Pause (map, items, diary, settings) | Enter, P (Esc always works) | Start |
 | Map | M, Tab | Back |
+
+The menus have actions of their own, so a key can mean one thing in play and another in a
+menu (Enter pauses the game, but in the pause menu it's OK):
+
+| In the menus | Keyboard | Gamepad |
+|---|---|---|
+| Up, down, left, right | arrows / WASD | d-pad, left stick |
+| Page left, page right | Q, Page Up / E, Page Down | LB / RB |
+| OK | Enter, Z | A |
+| Back | Esc, X | B |
+| Erase (a key on the controls screen, a saved journey) | Delete, Backspace | Y |
 
 **Aiming:** UP aims straight up, and UP while running aims up at an angle. In the air,
 DOWN aims straight down, and DOWN with LEFT or RIGHT aims down at an angle. Holding AIM
@@ -88,9 +100,11 @@ stand, he unrolls into a crouch.
 
 **Changing the controls:** every action has two keys and a gamepad button, and all of
 them can be changed under **CONTROLS**, in OPTIONS on the title or SYSTEM in the pause
-menu. Choose one and press the new key or button. They're saved for every journey, and
-the game's signs and item descriptions show your keys. The arrow keys, the d-pad, Enter,
-Escape, A and B always work on the controls screen, so it can't be made unusable.
+menu, on two pages: PLAY and MENUS. Choose one and press the new key or button. A key
+belongs to one action in play and one in the menus at most. They're saved for every
+journey, and the game's signs, item descriptions and menus show your keys. In the menus
+the arrow keys, the d-pad, the stick, Enter (OK) and Escape (back) always work, so they
+can't be made unusable.
 
 In LibreWolf (and Firefox with its privacy mode, resistFingerprinting), the page gets no
 events for Shift, Ctrl, Alt or Cmd on their own, so those can't be used there: aim with Q,

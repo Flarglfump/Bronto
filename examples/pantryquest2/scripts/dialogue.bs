@@ -93,7 +93,7 @@ func update(dt: number) -> void {
     var before: int = floor(shown)
     shown = min(shown + dt * 45, total())
     if floor(shown) != before and floor(shown) % 3 == 0 { play_sound("sfx/text.wav", 0.4) }
-    if action_pressed("jump") or action_pressed("fire") or key_pressed("enter") or mouse_pressed(0) {
+    if action_pressed("ui_confirm") or mouse_pressed(0) {
         if shown < total() {
             shown = total()
         } else {

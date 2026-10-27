@@ -8,6 +8,6 @@ window_scale = 3
 # every script must declare its types (as if each began with @strict)
 strict_typing = true
 # on a phone or tablet (the web build): an on-screen stick and buttons, which work as a gamepad
-touch_controls = stick, a, x, b, y, lb, back, start
+touch_controls = stick, a, x, b, y, lb, rb, back, start
 # the tools that make the art, sounds and rooms aren't part of the game
 exclude = tools

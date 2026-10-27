@@ -243,7 +243,7 @@ class HearthTravel:
         rooms = [p.strip(' [') for p in places.strip('[]').split('],')]
         rooms = [r.split(',')[0].strip(' []') for r in rooms]
         if dest not in rooms:
-            self.tick(('rocket',))
+            self.tick(('escape',))
             self.tick(())
             self.wait_play()
             return False

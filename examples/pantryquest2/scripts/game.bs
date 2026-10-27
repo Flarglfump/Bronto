@@ -124,6 +124,18 @@ func area_title() -> string {
     }
     return ""
 }
+# PEPPER TYPE: the next kind of peppercorn he has (for now, with Frost Sugar or without).
+func cycle_pepper() -> void {
+    if not inv.has("frost") { return }
+    inv.frost_on = not inv.frost_on
+    if inv.frost_on {
+        say("FROST SUGAR ON")
+        play_sound("sfx/frost.wav", 0.6)
+    } else {
+        say("FROST SUGAR OFF")
+        play_sound("sfx/blip.wav", 0.6)
+    }
+}
 func say(text: string) -> void {
     toast = text
     toast_t = 2.5
@@ -338,6 +350,7 @@ func update(dt: number) -> void {
             pause()
             return
         }
+        if action_pressed("cycle") { cycle_pepper() }
         if room.heat and not inv.has("mitts") {
             heat_t -= dt
             if heat_t <= 0 {

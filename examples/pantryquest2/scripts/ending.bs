@@ -78,7 +78,7 @@ func total() -> int {
 }
 
 func next() -> bool {
-    return action_pressed("jump") or action_pressed("fire") or key_pressed("enter") or mouse_pressed(0)
+    return action_pressed("ui_confirm") or mouse_pressed(0)
 }
 
 func credits_height() -> number {
@@ -141,7 +141,7 @@ func update(dt: number) -> void {
         return
     }
     if state == "end" {
-        if t > 1.5 and (next() or action_pressed("pause")) {
+        if t > 1.5 and (next() or action_pressed("ui_cancel") or action_pressed("pause")) {
             leaving = 0
             stop_music(1.0)
         }

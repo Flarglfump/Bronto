@@ -181,7 +181,7 @@ func item_text(kind: string) -> string {
     if kind == "dough" { return "Press {down} on the ground to curl up in dough and roll through narrow tunnels. {up} or {jump} to stand." }
     if kind == "popcorn" { return "While rolled up, {fire} drops popcorn. It pops cracked blocks - and pops Basil up if he's on top!" }
     if kind == "sauce" { return "Press {rocket} to fire hot sauce. It melts red wax seals. Enemies may drop more." }
-    if kind == "frost" { return "Peppercorns now freeze what they hit. Frozen enemies can be stood on. (Turn it off in the pause menu.)" }
+    if kind == "frost" { return "Peppercorns now freeze what they hit. Frozen enemies can be stood on. {cycle} turns it on or off." }
     if kind == "leaven" { return "Springy soles: Basil jumps far higher." }
     if kind == "mitts" { return "Quilted against the heat: the hottest kitchens can't harm Basil, and every hurt is halved." }
     if kind == "garlic" { return "Peppercorns now carry garlic: they fly further, hit harder, pass through walls... and the Count fears them." }

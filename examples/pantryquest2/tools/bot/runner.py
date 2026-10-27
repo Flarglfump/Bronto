@@ -7,6 +7,7 @@ KEYS = {
     'right': 262, 'left': 263, 'down': 264, 'up': 265,
     'jump': 90, 'fire': 88, 'rocket': 67, 'aim': 81, 'ball': 69,    # Z X C Q E (the default keys)
     'enter': 257, 'escape': 256, 'map': 77, 'pause': 80,
+    'cycle': 86,                                                    # V: the pepper type (Frost Sugar on / off)
 }
 
 

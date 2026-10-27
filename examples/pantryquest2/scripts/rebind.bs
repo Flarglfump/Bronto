@@ -1,15 +1,17 @@
 @strict
-# The controls screen: every action with its two keys and its gamepad button. Choose one
+# The controls screen: every action with its two keys and its gamepad button, on two pages,
+# PLAY and MENUS (turned with PAGE LEFT / PAGE RIGHT, or a click on the tabs). Choose one
 # and press the new key (or button) for it; Escape changes nothing. Pushed over the title's
 # options or the pause menu, and popped when done. The changes are saved and in effect
 # at once (see controls.bs).
 #
-# It always answers to the arrow keys, the d-pad and the stick, Enter and A (OK), and
-# Escape and B (back), whatever has been bound, so it can't be made unusable.
+# It works with the menu actions, which always answer to the arrow keys, the d-pad and the
+# stick, Enter (OK) and Escape (back), whatever has been bound, so it can't be made unusable.
 
 var draw_layer: int = 90
 var controls: entity
-var row: int = 0                          # an action, or the two rows under them (RESET, DONE)
+var page: int = 0                         # 0: PLAY, 1: MENUS
+var row: int = 0                          # an action on the page, or the two rows under them (RESET, DONE)
 var col: int = 0                          # 0, 1: its keys; 2: its button
 var waiting: bool = false                 # for a key or button to be pressed
 var wait_t: number = 0
@@ -17,18 +19,32 @@ var t: number = 0
 var note: string = ""
 var note_t: number = 0
 
+const PAGES: list = ["PLAY", "MENUS"]
+
 func start() -> void {
     controls = find("Controls")
 }
 
-func rows() -> int { return len(controls.actions) + 2 }
+# The actions on this page, as their places in controls.actions (in the order shown).
+func shown() -> list[int] {
+    var order: list[string] = ["left", "right", "up", "down", "jump", "fire", "rocket", "cycle", "aim", "ball", "pause", "map"]
+    if page == 1 { order = ["ui_up", "ui_down", "ui_left", "ui_right", "ui_page_left", "ui_page_right", "ui_confirm", "ui_cancel", "ui_erase"] }
+    var out: list[int] = []
+    for a in order { push(out, controls.index_of(a)) }
+    return out
+}
+
+func count() -> int { return len(shown()) }
+func rows() -> int { return count() + 2 }
+func action_at(r: int) -> int { return shown()[r] }
 
 # Where things are: an action's row, a cell in it, and the two buttons under them.
 const X0: number = 104
-const ROW: number = 13
-func row_y(i: int) -> number { return 32 + i * ROW }
+const ROW: number = 12
+func row_y(i: int) -> number { return 34 + i * ROW }
 func cell_pos(i: int, c: int) -> vec2 { return vec2(X0 + c * 50 - 2, row_y(i) - 3) }
-func button_y(k: int) -> number { return row_y(len(controls.actions)) + 3 + k * 14 }
+func button_y(k: int) -> number { return row_y(count()) + 2 + k * 13 }
+func tab_pos(i: int) -> vec2 { return vec2(128 + i * 62, 4) }
 
 func inside(m: vec2, p: vec2, size: vec2) -> bool {
     return m.x >= p.x and m.y >= p.y and m.x < p.x + size.x and m.y < p.y + size.y
@@ -36,23 +52,27 @@ func inside(m: vec2, p: vec2, size: vec2) -> bool {
 
 # What the mouse is over: [row, col] (col -1 for the buttons), or [-1, -1].
 func under(m: vec2) -> list {
-    var n: int = len(controls.actions)
+    var n: int = count()
     for i in n {
         for c in 3 {
             if inside(m, cell_pos(i, c), vec2(48, ROW)) { return [i, c] }
         }
     }
     for k in 2 {
-        if inside(m, vec2(60, button_y(k) - 3), vec2(136, 13)) { return [n + k, -1] }
+        if inside(m, vec2(60, button_y(k) - 3), vec2(136, 12)) { return [n + k, -1] }
     }
     return [-1, -1]
 }
 
 var last_mouse := vec2(-1, -1)
 
-func nav(dir: string) -> bool { return action_pressed(dir) or key_pressed(dir) or button_pressed(dir) }
-func ok() -> bool { return key_pressed("enter") or button_pressed("a") or action_pressed("jump") }
-func back() -> bool { return key_pressed("escape") or button_pressed("b") }
+func set_page(p: int) -> void {
+    if p == page { return }
+    page = p
+    row = 0
+    col = 0
+    play_sound("sfx/blip.wav", 0.5)
+}
 
 func update(dt: number) -> void {
     t += dt
@@ -61,7 +81,7 @@ func update(dt: number) -> void {
     if waiting {
         wait_t += dt
         if wait_t < 0.15 { return }
-        var a: string = controls.actions[row]
+        var a: string = controls.actions[action_at(row)]
         if key_pressed("escape") or mouse_pressed(1) or (mouse_pressed(0) and under(mouse_position())[0] != row) {
             waiting = false
             play_sound("sfx/back.wav", 0.5)
@@ -84,8 +104,15 @@ func update(dt: number) -> void {
         }
         return
     }
+    if action_pressed("ui_page_left") { set_page(0) }
+    if action_pressed("ui_page_right") { set_page(1) }
     var before := vec2(col, row)
     var m := mouse_position()
+    if mouse_pressed(0) {
+        for i in 2 {
+            if inside(m, tab_pos(i), vec2(58, 13)) { set_page(i) }
+        }
+    }
     var over: list = under(m)
     if (m != last_mouse or mouse_pressed(0)) and over[0] >= 0 {
         row = over[0]
@@ -93,29 +120,29 @@ func update(dt: number) -> void {
     }
     last_mouse = m
     var clicked := mouse_pressed(0) and over[0] >= 0
-    if nav("up") { row = (row + rows() - 1) % rows() }
-    if nav("down") { row = (row + 1) % rows() }
-    if row < len(controls.actions) {
-        if nav("left") { col = (col + 2) % 3 }
-        if nav("right") { col = (col + 1) % 3 }
+    if action_pressed("ui_up") { row = (row + rows() - 1) % rows() }
+    if action_pressed("ui_down") { row = (row + 1) % rows() }
+    if row < count() {
+        if action_pressed("ui_left") { col = (col + 2) % 3 }
+        if action_pressed("ui_right") { col = (col + 1) % 3 }
     }
     if vec2(col, row) != before { play_sound("sfx/blip.wav", 0.4) }
-    if back() {
+    if action_pressed("ui_cancel") {
         close()
         return
     }
-    if row < len(controls.actions) and col < 2 and (key_pressed("backspace") or key_pressed("delete")) {
-        controls.set_key(controls.actions[row], col, "")
+    if row < count() and col < 2 and action_pressed("ui_erase") {
+        controls.set_key(controls.actions[action_at(row)], col, "")
         play_sound("sfx/back.wav", 0.5)
         return
     }
-    if ok() or clicked {
-        if row == len(controls.actions) {
+    if action_pressed("ui_confirm") or clicked {
+        if row == count() {
             controls.reset()
             note = "BACK TO HOW THEY WERE"
             note_t = 2
             play_sound("sfx/select.wav", 0.6)
-        } elif row == len(controls.actions) + 1 {
+        } elif row == count() + 1 {
             close()
         } else {
             waiting = true
@@ -137,19 +164,27 @@ func centred(s: string, y: number, colour: string) -> void {
 
 func draw() -> void {
     draw_rect(vec2(0, 0), vec2(256, 240), "#100818")
-    centred("CONTROLS", 6, "#f8c860")
+    draw_text("CONTROLS", vec2(8, 7), "#f8c860")
+    for i in 2 {
+        var p := tab_pos(i)
+        var col_t: string = "#403050"
+        if i == page { col_t = "#a06838" } elif inside(last_mouse, p, vec2(58, 13)) { col_t = "#604060" }
+        draw_rect(p, vec2(58, 13), col_t)
+        draw_text(PAGES[i], vec2(p.x + 29 - text_size(PAGES[i]).x / 2, p.y + 3), "#ffffff")
+    }
     var x0: number = X0
     var heads: list[string] = ["KEY", "OR KEY", "PAD"]
-    for c in 3 { draw_text(heads[c], vec2(x0 + c * 50 + 22 - text_size(heads[c]).x / 2, 18), "#a090b0") }
-    draw_rect(vec2(4, 28), vec2(248, 1), "#a06838")
-    var n: int = len(controls.actions)
+    for c in 3 { draw_text(heads[c], vec2(x0 + c * 50 + 22 - text_size(heads[c]).x / 2, 21), "#a090b0") }
+    draw_rect(vec2(4, 30), vec2(248, 1), "#a06838")
+    var n: int = count()
     for i in n {
+        var a: int = action_at(i)
         var y: number = row_y(i)
-        draw_text(controls.names[i], vec2(8, y), "#ffffff")
+        draw_text(controls.names[a], vec2(8, y), "#ffffff")
         for c in 3 {
             var cx: number = x0 + c * 50
             var label: string = ""
-            if c < 2 { label = controls.key_label(controls.keys[i][c]) } else { label = controls.pad_label(controls.pads[i]) }
+            if c < 2 { label = controls.key_label(controls.keys[a][c]) } else { label = controls.pad_label(controls.pads[a]) }
             var selected := i == row and c == col
             if selected {
                 var colour: string = "#a06838"
@@ -163,20 +198,20 @@ func draw() -> void {
     var labels: list[string] = ["RESET TO DEFAULTS", "DONE"]
     for k in 2 {
         var y: number = button_y(k)
-        if row == n + k { draw_rect(vec2(60, y - 3), vec2(136, 13), "#a06838") }
+        if row == n + k { draw_rect(vec2(60, y - 3), vec2(136, 12), "#a06838") }
         centred(labels[k], y, "#ffffff")
     }
     draw_rect(vec2(4, 207), vec2(248, 1), "#403050")
     if waiting {
         var what: string = "KEY"
         if col == 2 { what = "BUTTON" }
-        centred("PRESS A " + what + " FOR " + controls.names[row], 212, "#f8c860")
+        centred("PRESS A " + what + " FOR " + controls.names[action_at(row)], 212, "#f8c860")
         centred("ESC OR CLICK: LEAVE IT", 222, "#a090b0")
     } elif note_t > 0 {
         centred(note, 212, "#f8c860")
     } else {
-        centred("CLICK OR ENTER: CHANGE", 211, "#a090b0")
-        centred("BACKSPACE: CLEAR A KEY", 221, "#a090b0")
-        centred("THE STICK AND ESC ALWAYS WORK", 231, "#706080")
+        centred(controls.fill("{ui_confirm}: CHANGE  {ui_erase}: CLEAR A KEY"), 211, "#a090b0")
+        centred(controls.fill("{ui_page_left}/{ui_page_right}: PAGES  {ui_cancel}: DONE"), 221, "#a090b0")
+        centred("ARROWS, ENTER, ESC ALWAYS WORK", 231, "#706080")
     }
 }
