@@ -175,6 +175,12 @@ class Fighting:
                 return None
         return None
 
+    def can_stand(self, b):
+        """Is there room for him to stand up from the ball here?"""
+        nb = b.copy()
+        sim.frame(nb, set(), ['up'], 1, self.grid(), self.has_fn())
+        return not nb.ball
+
     def can_hurt(self, foe, kind):
         if foe.frozen:
             return kind in ('rocket',)
@@ -231,6 +237,10 @@ class Fighting:
             if self.state() != 'play' or len(self.r.scenes()) > 1:
                 return shot_any
             b = self.basil()
+            if b.ball and b.grounded and b.hurt_t <= 0 and self.can_stand(b):
+                self.tick(())                          # (rolled up, he can't shoot: stand, if there's room)
+                self.tick(('up',))
+                continue
             if b.hurt_t > 0 or not b.grounded or b.ball:
                 self.release_stance()
                 self.tick(())
