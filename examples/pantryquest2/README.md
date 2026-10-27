@@ -197,6 +197,11 @@ Everything in `art/`, `sfx/`, `music/`, `rooms/` and `prefabs/` is made by Pytho
 - `check_scenes.py` makes sure the hand-written scenes' references between entities
   still point where they should (the camera following Basil).
 - `make pantryquest2-check` runs `bscheck` and all three.
+- `bot/` plays the whole game, from the title to the ending, and records it as
+  `tools/playthrough.brec`, which plays back frame for frame: `make pq2-replay` watches
+  it, `make pq2-replay-check` checks it, `make pq2-replay-web` makes a web page of it and
+  `make pq2-playthrough` records a new one (see [bot/README.md](tools/bot/README.md) and
+  [docs/replay.md](../../docs/replay.md)).
 
 To try a part of the game in the editor, set the Game entity's Script vars in `main.scene`:
 `start_room`, `start_pos` (or `start_door`, like `"W0"`) and `start_items`

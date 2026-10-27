@@ -17,6 +17,15 @@ make replay-web              # one web page that plays it: build/web/pantryquest
 make playthrough             # let the bot play it again and record a new one
 ```
 
+Pantry Quest II has one too, made by its own bot (`examples/pantryquest2/tools/bot`):
+
+```sh
+make pq2-replay              # watch it in a window (SEGMENT=N starts at segment N)
+make pq2-replay-check        # play it headless and check every recorded frame
+make pq2-replay-web          # one web page that plays it: build/web/pantryquest2-replay/index.html
+make pq2-playthrough         # let the bot play it again and record a new one
+```
+
 ## Watching
 
 `bronto_player <game> --replay run.brec` plays a recording in a window.
@@ -144,3 +153,27 @@ build/pantrybot --test 'start_room = "d9_2_0", start_pos = vec2(128, 196), weapo
 ```
 
 The bot needs POSIX threads (Linux and macOS, or MinGW's winpthreads).
+
+## The Pantry Quest II bot
+
+`examples/pantryquest2/tools/bot` plays Pantry Quest II from the title to the ending, in
+16 segments: the title, each part of the world and its knight, the castle, the Count, the
+escape and the ending. It is written in Python (standard library only) and drives
+`tools/botrunner`, which runs the game headless and takes keys and questions on stdin.
+Like the Pantry Quest bot it only presses keys, so what it records replays exactly.
+
+Basil's movement is copied exactly into the bot (in Python, and again in C for speed), so
+it plans inside a room by trying moves (walks, jumps held for so many frames, ball
+bounces, whisk spins) and seeing where they land, and across the world from the game's
+own map. The knights and the Count each have a model that predicts where they and their
+shots will be, and the bot picks its moves frame by frame to keep clear of them while it
+shoots. Its [README](../examples/pantryquest2/tools/bot/README.md) describes the parts.
+
+The recorded run finishes the game in about 34 minutes of game time, taking every weapon,
+the four seals and the diary pages on the way; it has two game overs, after which the bot
+tries that stretch again. A run takes the bot about 40 minutes.
+
+Making it found three bugs in the game, now fixed: the crawlspace door in C4 couldn't be
+opened (a shot couldn't reach its cap), turning a page in the pause menu also changed a
+setting on the new page, and a shot from Basil standing on the throne room floor passed
+under Count Fromage.
