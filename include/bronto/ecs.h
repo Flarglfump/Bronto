@@ -63,9 +63,10 @@ typedef enum br_field_type {
     BR_FIELD_COLOR,     /* br_color                                   */
     BR_FIELD_STRING,    /* char[N], always NUL terminated              */
     BR_FIELD_ENUM,      /* int, shown and saved by name (enum_names)  */
-    BR_FIELD_ENTITY     /* br_entity: a reference to another entity. Scene
+    BR_FIELD_ENTITY,    /* br_entity: a reference to another entity. Scene
                            files save it as that entity's position in the
                            file (or "none"), and loading reconnects it */
+    BR_FIELD_VEC3       /* br_vec3: saved as "x y z"                    */
 } br_field_type;
 
 typedef struct br_field {

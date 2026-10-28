@@ -52,6 +52,8 @@ call :webgame bounce "Bounce" || goto :error
 call :webgame snake "Bronto Snake" || goto :error
 call :webgame towerdefense "Pop Defense" || goto :error
 build\bronto_web.exe examples\platformer --runtime build\web -o build\web\platformer\index.html || goto :error
+build\bronto_web.exe examples\marble --runtime build\web -o build\web\marble\index.html || goto :error
+build\bronto_web.exe examples\explorer --runtime build\web -o build\web\explorer\index.html || goto :error
 echo.
 echo Web build done: open build\web\snake\index.html (or any example's index.html) in a browser.
 echo The editor's Build ^> Web uses build\web\ (bronto_player.wasm, bronto.js, shell.html).

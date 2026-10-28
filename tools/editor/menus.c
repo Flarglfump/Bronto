@@ -216,6 +216,12 @@ static br_entity new_entity_at(editor *ed, const char *name, br_vec2 at, bool sh
     return e;
 }
 
+/* The menu's entity, for an action: with the rest of the selection if it's part of it. */
+static void pick(ed_doc *d, br_entity e) {
+    if (ed_doc_is_selected(d, e)) ed_doc_select_add(d, e);
+    else ed_doc_select(d, e);
+}
+
 static void entity_menu(editor *ed) {
     ed_doc *d = &ed->doc;
     br_world *w = &d->world;
@@ -227,10 +233,10 @@ static void entity_menu(editor *ed) {
     kids = br_children(w, e, NULL, 0) > 0;
     if (item(ed, "Rename", "F2", true)) { d->selected = e; ed_cmd_rename(ed); }
     if (item(ed, "Add Child", NULL, edit)) { d->selected = e; ed_cmd_add_child(ed); }
-    if (item(ed, "Duplicate", "Ctrl+D", edit)) { d->selected = e; ed_cmd_duplicate(ed); }
+    if (item(ed, "Duplicate", "Ctrl+D", edit)) { pick(d, e); ed_cmd_duplicate(ed); }
     sep(ed);
-    if (item(ed, "Cut", "Ctrl+X", edit)) { d->selected = e; ed_cmd_cut(ed); }
-    if (item(ed, "Copy", "Ctrl+C", true)) { d->selected = e; ed_cmd_copy(ed); }
+    if (item(ed, "Cut", "Ctrl+X", edit)) { pick(d, e); ed_cmd_cut(ed); }
+    if (item(ed, "Copy", "Ctrl+C", true)) { pick(d, e); ed_cmd_copy(ed); }
     if (item(ed, "Paste", "Ctrl+V", edit && ed->clipboard)) ed_cmd_paste(ed, NULL, parent);
     if (item(ed, "Paste as Child", NULL, edit && ed->clipboard)) ed_cmd_paste(ed, NULL, e);
     sep(ed);
@@ -240,7 +246,7 @@ static void entity_menu(editor *ed) {
     if (item(ed, "Frame in View", "F", true)) { d->selected = e; ed_cmd_frame(ed); }
     if (item(ed, "Save as Prefab", NULL, edit)) { d->selected = e; ed_assets_save_prefab(ed); }
     sep(ed);
-    if (item(ed, "Delete", "Del", edit)) { d->selected = e; ed_cmd_delete(ed); }
+    if (item(ed, "Delete", "Del", edit)) { pick(d, e); ed_cmd_delete(ed); }
     br_ui_menu_end(&ed->ui);
 }
 
@@ -250,7 +256,19 @@ static void hierarchy_menu(editor *ed) {
     uint32_t i;
     if (!br_ui_menu_begin(&ed->ui, "hierarchy")) return;
     if (item(ed, "New Entity", NULL, edit)) { d->selected = BR_ENTITY_NULL; ed_cmd_add_entity(ed); }
+    if (br_ui_menu_sub_begin(&ed->ui, "New 3D", edit)) {
+        int k;
+        for (k = 0; k < ED_NEW_COUNT; ++k) {
+            if (k == ED_NEW_CAMERA) sep(ed);
+            if (item(ed, ed_new3d_name((ed_new3d)k), NULL, true)) {
+                ed_new3d_at(ed, (ed_new3d)k, ed_view3d_place(ed));
+                if (!ed->view.three_d) ed_view_set_3d(ed, true);
+            }
+        }
+        br_ui_menu_sub_end(&ed->ui);
+    }
     if (item(ed, "Paste", "Ctrl+V", edit && ed->clipboard)) ed_cmd_paste(ed, NULL, BR_ENTITY_NULL);
+    if (item(ed, "Select All", "Ctrl+A", d->count > 0)) ed_cmd_select_all(ed);
     sep(ed);
     if (item(ed, "Expand All", NULL, ed->collapsed_count > 0)) ed->collapsed_count = 0;
     if (item(ed, "Collapse All", NULL, d->count > 0))
@@ -264,11 +282,52 @@ static void view_menu(editor *ed) {
     bool edit = !d->playing;
     br_vec2 at = ed->menu.world;
     if (!br_ui_menu_begin(&ed->ui, "view")) return;
+    if (ed->view.three_d) {
+        int k;
+        if (br_ui_menu_sub_begin(&ed->ui, "New 3D", edit)) {
+            for (k = 0; k < ED_NEW_COUNT; ++k) {
+                if (k == ED_NEW_CAMERA) sep(ed);
+                if (item(ed, ed_new3d_name((ed_new3d)k), NULL, true)) ed_new3d_at(ed, (ed_new3d)k, ed->menu.world3);
+            }
+            br_ui_menu_sub_end(&ed->ui);
+        }
+        if (item(ed, "Paste", "Ctrl+V", edit && ed->clipboard)) ed_cmd_paste(ed, NULL, BR_ENTITY_NULL);
+        sep(ed);
+        if (item(ed, "Frame Selection", "F", br_entity_alive(&d->world, d->selected))) ed_cmd_frame(ed);
+        if (item(ed, "Reset View", NULL, true)) ed_view3d_reset(&ed->view);
+        if (br_ui_menu_check(&ed->ui, "Look Through Scene Camera", ed->view.through_camera)) {
+            if (ed->view.through_camera || br_scene_camera3d(&d->world, NULL, NULL)) ed->view.through_camera = !ed->view.through_camera;
+            else ed_status(ed, "There's no active Camera in this scene");
+        }
+        if (br_ui_menu_check(&ed->ui, "3D View", true)) ed_view_set_3d(ed, false);
+        if (br_ui_menu_check(&ed->ui, "Grid", ed->view.grid)) ed->view.grid = !ed->view.grid;
+        if (br_ui_menu_check(&ed->ui, "Snap", ed->view.snap)) ed->view.snap = !ed->view.snap;
+        if (br_ui_menu_check(&ed->ui, "Show Colliders", ed->show_colliders)) ed->show_colliders = !ed->show_colliders;
+        sep(ed);
+        if (item(ed, d->playing ? "Stop" : "Play", "F5", true)) ed_cmd_play(ed);
+        br_ui_menu_end(&ed->ui);
+        return;
+    }
     if (item(ed, "New Entity Here", NULL, edit)) { new_entity_at(ed, "Entity", at, true); ed_status(ed, "Added an entity"); }
     if (item(ed, "New Label Here", NULL, edit)) {
         br_entity e = new_entity_at(ed, "Label", at, false);
         if (e != BR_ENTITY_NULL) snprintf(((br_label *)br_add(&d->world, e, d->ids.label, NULL))->text, sizeof(((br_label *)0)->text), "Text");
         ed_status(ed, "Added a label");
+    }
+    if (br_ui_menu_sub_begin(&ed->ui, "New Particles Here", edit)) {   /* ready-made looks (particles.h) */
+        int k, count;
+        const char *const *names = br_particles_presets(&count);
+        for (k = 0; k < count; ++k) {
+            char label[32];
+            snprintf(label, sizeof(label), "%c%s", names[k][0] - 'a' + 'A', names[k] + 1);
+            if (item(ed, label, NULL, true)) {
+                br_entity e = new_entity_at(ed, label, at, false);
+                br_particles *p = e != BR_ENTITY_NULL ? (br_particles *)br_add(&d->world, e, br_component_find(&d->world, "Particles"), NULL) : NULL;
+                if (p) br_particles_preset(p, names[k], false);
+                ed_status(ed, "Added %s particles: change them in the inspector", names[k]);
+            }
+        }
+        br_ui_menu_sub_end(&ed->ui);
     }
     if (item(ed, "New Camera Here", NULL, edit)) {      /* the game shows what it sees (components.h) */
         br_entity e = new_entity_at(ed, "Camera", at, false);
@@ -292,6 +351,7 @@ static void view_menu(editor *ed) {
     sep(ed);
     if (item(ed, "Frame Selection", "F", br_entity_alive(&d->world, d->selected))) ed_cmd_frame(ed);
     if (item(ed, "Reset View", NULL, true)) { ed->view.zoom = 2.0f; ed->view.center = br_v2_scale(ed->view.game_size, 0.5f); }
+    if (br_ui_menu_check(&ed->ui, "3D View", false)) ed_view_set_3d(ed, true);
     if (br_ui_menu_check(&ed->ui, "Grid", ed->view.grid)) ed->view.grid = !ed->view.grid;
     if (br_ui_menu_check(&ed->ui, "Snap to Grid", ed->view.snap)) ed->view.snap = !ed->view.snap;
     if (br_ui_menu_check(&ed->ui, "Show Colliders", ed->show_colliders)) ed->show_colliders = !ed->show_colliders;

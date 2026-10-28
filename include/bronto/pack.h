@@ -12,6 +12,9 @@
  *
  *   [file data ...][index][trailer: "BRONTOPK", version, count, index offset, pack size]
  *
+ * Version 2 compresses files that get much smaller (DEFLATE, inflate.h): text,
+ * scenes, scripts, sounds and plain images. Version 1 packs still mount.
+ *
  * Numbers are little-endian; offsets count from the start of the pack.
  */
 #ifndef BRONTO_PACK_H
@@ -20,12 +23,15 @@
 #include "types.h"
 
 #define BR_PACK_MAGIC "BRONTOPK"
-#define BR_PACK_VERSION 1
+#define BR_PACK_VERSION 2
 
 /* Return false to leave a file (or a whole folder) out of a pack. */
 typedef bool (*br_pack_filter)(const char *rel_path, bool is_dir, void *user);
 
-typedef struct br_pack_stats { uint32_t files; uint64_t bytes; } br_pack_stats;
+typedef struct br_pack_stats { uint32_t files; uint64_t bytes, unpacked; } br_pack_stats;   /* bytes: in the pack; unpacked: the files' own sizes */
+
+/* Compress what's packed from now on (on by default). */
+void br_pack_set_compression(bool on);
 
 /* Packs every file under `folder` (hidden ones aren't included) into
  * `out_path`, or adds the pack to the end of it with `append`. Paths in

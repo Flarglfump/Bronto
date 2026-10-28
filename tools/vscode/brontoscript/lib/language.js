@@ -14,7 +14,7 @@ const STRING_ARGS = data.string_args || { lists: {}, args: {} };
 const TYPE_RE = '(?:unsigned\\s+)?[A-Za-z_]\\w*(?:\\s*\\[\\s*(?:unsigned\\s+)?[A-Za-z_]\\w*\\s*\\])?';
 const MODIFIERS_RE = '(?:(?:public|private|protected|static|override)\\s+)*';
 // Words that only declare things at the top of a file or in a struct or class.
-const DECLARING = new Set(['func', 'class', 'struct', 'public', 'private', 'protected', 'static', 'override', 'unsigned']);
+const DECLARING = new Set(['func', 'class', 'struct', 'component', 'public', 'private', 'protected', 'static', 'override', 'unsigned']);
 
 // "list [ unsigned  int ]" -> "list[unsigned int]"
 function normType(t) { return t ? t.trim().replace(/\s*\[\s*/g, '[').replace(/\s*\]/g, ']').replace(/\s+/g, ' ') : ''; }
@@ -33,14 +33,20 @@ function funcHead(f) { return `func ${f.name}(${f.typedParams.map(paramText).joi
 // with the comment lines just above each (their docs).
 function parseDocument(text) {
     const lines = text.split(/\r?\n/);
-    const vars = [], funcs = [], classes = [];
-    let depth = 0, cls = null;
+    const vars = [], funcs = [], classes = [], components = [];
+    let depth = 0, cls = null, comp = null;
     const varRe = new RegExp('^\\s*(var|const(?:\\s+var)?)\\s+([A-Za-z_]\\w*)\\s*(?::\\s*(' + TYPE_RE + '))?\\s*(?:(:?=)\\s*(.*))?$');
     const funcRe = new RegExp('^\\s*func\\s+([A-Za-z_]\\w*)\\s*\\(([^)]*)\\)\\s*(?:->\\s*(' + TYPE_RE + '))?');
     for (let i = 0; i < lines.length; ++i) {
         const line = stripComment(lines[i]);
         if (depth === 0) {
             cls = null;
+            comp = null;
+            const cm = /^\s*component\s+([A-Za-z_]\w*)/.exec(line);
+            if (cm) {
+                comp = { name: cm[1], line: i, doc: commentAbove(lines, i), fields: [] };
+                components.push(comp);
+            }
             let m = varRe.exec(line);
             if (m) vars.push({
                 name: m[2], line: i, value: (m[5] || '').trim(), type: normType(m[3]), inferred: m[4] === ':=', isConst: m[1] !== 'var',
@@ -59,6 +65,9 @@ function parseDocument(text) {
                 cls = { name: m[2], kind: m[1], parent: m[3] || '', line: i, doc: commentAbove(lines, i), members: [] };
                 classes.push(cls);
             }
+        } else if (depth === 1 && comp) {                   // a component's field: var name: type [= value]
+            const fm = /^\s*var\s+([A-Za-z_]\w*)\s*(?::\s*([A-Za-z_]\w*(?:\([^)]*\))?))?/.exec(line);
+            if (fm) comp.fields.push({ name: fm[1], type: fm[2] || '', line: i, doc: trailingComment(lines[i]) });
         } else if (depth === 1 && cls) {                    // a member: [modifiers] var / const / func
             const m = new RegExp('^\\s*(' + MODIFIERS_RE + ')(var|const(?:\\s+var)?|func)\\s+([A-Za-z_]\\w*)(.*)$').exec(line);
             if (m) {
@@ -84,7 +93,15 @@ function parseDocument(text) {
             else if (ch === '}') depth = Math.max(0, depth - 1);
         }
     }
-    return { vars, funcs, classes };
+    return { vars, funcs, classes, components };
+}
+
+// The game's own components (`component Name { ... }`) in this file and the others, by name.
+function gameComponents(text, otherScripts) {
+    const out = {};
+    for (const s of [...(otherScripts || []), { components: parseDocument(text).components }])
+        for (const c of s.components || []) out[c.name] = c.fields.map(f => f.name);
+    return out;
 }
 
 // A class's members with the inherited ones (the nearest one of each name first).
@@ -186,13 +203,15 @@ function completions(text, line, character, otherScripts, assets) {
     }
     if (/^\s*@\w*$/.test(before)) {
         items.push({ label: '@strict', kind: 'keyword', doc: KEYWORDS['@strict'], insert: 'strict', filter: 'strict' });
+        items.push({ label: '@3d', kind: 'keyword', doc: KEYWORDS['@3d'], insert: '3d', filter: '3d' });
         return items;
     }
 
-    // self.Shape.|  ->  the component's fields
+    // self.Shape.|  ->  the component's fields (the engine's, or the game's own)
+    const own = gameComponents(text, otherScripts);
     let m = /\.\s*([A-Z]\w*)\s*\.\s*\w*$/.exec(before);
-    if (m && COMPONENTS[m[1]]) {
-        for (const f of COMPONENTS[m[1]]) items.push({ label: f, kind: 'field', detail: m[1] + '.' + f });
+    if (m && (COMPONENTS[m[1]] || own[m[1]])) {
+        for (const f of COMPONENTS[m[1]] || own[m[1]]) items.push({ label: f, kind: 'field', detail: m[1] + '.' + f });
         return items;
     }
     // this.|  super.|  Counter.|  ->  a struct's or class's members
@@ -216,8 +235,10 @@ function completions(text, line, character, otherScripts, assets) {
     if (/\.\s*\w*$/.test(before)) {
         for (const p of data.properties) items.push({ label: p.name, kind: 'property', detail: p.type, doc: p.doc });
         for (const c of Object.keys(COMPONENTS)) items.push({ label: c, kind: 'class', detail: 'component', doc: 'Fields: ' + COMPONENTS[c].join(', ') });
+        for (const c of Object.keys(own)) if (!COMPONENTS[c]) items.push({ label: c, kind: 'class', detail: "the game's component", doc: 'Fields: ' + own[c].join(', ') });
         for (const v of data.vec2) items.push({ label: v.name, kind: 'property', detail: 'vec2', doc: v.doc });
         const seen = new Set(items.map(i => i.label));
+        for (const v of data.vec3 || []) if (!seen.has(v.name)) { seen.add(v.name); items.push({ label: v.name, kind: 'property', detail: 'vec3', doc: v.doc }); }
         for (const s of [{ name: 'this file', ...parseDocument(text) }, ...(otherScripts || [])]) {
             for (const v of s.vars) if (!seen.has(v.name)) { seen.add(v.name); items.push({ label: v.name, kind: 'variable', detail: 'var in ' + s.name, doc: v.doc }); }
             for (const f of s.funcs) if (!seen.has(f.name) && !CALLBACKS.has(f.name)) {
@@ -241,8 +262,9 @@ function completions(text, line, character, otherScripts, assets) {
         for (const c of data.callbacks)
             if (!doc.funcs.some(f => f.name === c.name))
                 items.push({ label: 'func ' + c.name, kind: 'snippet', detail: c.signature, doc: c.doc, snippet: c.snippet, filter: c.name });
-        for (const k of ['var', 'const', 'func', 'struct', 'class']) items.push({ label: k, kind: 'keyword', doc: KEYWORDS[k] });
+        for (const k of ['var', 'const', 'func', 'struct', 'class', 'component']) items.push({ label: k, kind: 'keyword', doc: KEYWORDS[k] });
         if (!/@strict/.test(text)) items.push({ label: '@strict', kind: 'keyword', doc: KEYWORDS['@strict'] });
+        if (!/@3d\b/.test(text)) items.push({ label: '@3d', kind: 'keyword', doc: KEYWORDS['@3d'] });
         return items;
     }
     if (depthAt(lines, line) === 1 && classAt(doc, lines, line)) {          // a struct's or class's body: its members
@@ -369,6 +391,7 @@ function hover(text, line, character) {
         '\n\n' + cls.members.map(m => '`' + memberHead(m) + '`').join('  \n');
     if (TYPES.has(w.word) && /(?::|->|\[)\s*$/.test(before)) return '**' + w.word + '** (a type)  \n' + TYPES.get(w.word).doc;
     if (w.word === 'strict' && /@$/.test(before)) return '**@strict**  \n' + KEYWORDS['@strict'];
+    if (w.word === 'd' && /@3$/.test(before)) return '**@3d**  \n' + KEYWORDS['@3d'];
     const local = localsAt(text, line).find(l => l.name === w.word);
     if (local && !afterDot) return '`' + w.word + (local.type ? ': ' + local.type : '') + '` (' + local.kind + ')';
     const f = doc.funcs.find(x => x.name === w.word);
@@ -440,7 +463,7 @@ function quickCheck(text) {
     const problems = [];
     const lines = text.split(/\r?\n/);
     const doc = parseDocument(text);
-    const known = new Set([...BUILTINS.keys(), ...doc.funcs.map(f => f.name), ...doc.classes.map(c => c.name)]);
+    const known = new Set([...BUILTINS.keys(), ...doc.funcs.map(f => f.name), ...doc.classes.map(c => c.name), 'enum']);
     const stack = [];
     for (let i = 0; i < lines.length; ++i) {
         const code = stripStrings(stripComment(lines[i]));
@@ -461,8 +484,8 @@ function quickCheck(text) {
             if (KEYWORDS[name] || /\bfunc\s+$/.test(code.slice(0, m.index + m[1].length))) continue;
             if (!known.has(name)) problems.push({ line: i, character: m.index + m[1].length, length: name.length, message: `unknown function '${name}'` });
         }
-        const top = /^\s*(?!var\b|const\b|func\b|class\b|struct\b|@strict\b|#|$|\}|\{)(\S+)/.exec(lines[i]);
-        if (top && !continued && depthBefore(lines, i) === 0) problems.push({ line: i, character: lines[i].indexOf(top[1]), length: top[1].length, message: "only var, const, func, struct and class can be at the top of a script (put code inside start())" });
+        const top = /^\s*(?!var\b|const\b|func\b|class\b|struct\b|component\b|@strict\b|@3d\b|#|$|\}|\{)(\S+)/.exec(lines[i]);
+        if (top && !continued && depthBefore(lines, i) === 0) problems.push({ line: i, character: lines[i].indexOf(top[1]), length: top[1].length, message: "only var, const, func, struct, class and component can be at the top of a script (put code inside start())" });
     }
     for (const open of stack) problems.push({ line: open.line, character: open.character, length: 1, message: `this '${open.c}' is never closed` });
     return problems;

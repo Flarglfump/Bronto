@@ -24,6 +24,16 @@
  * entity references written as the entity's position in the file (0 is
  * the first) or "none". A reference to an entity that isn't saved with it
  * is written as none.
+ * Prefab instances: an entity with a Prefab component (file = "prefabs/x.scene")
+ * is made from that file when it loads (prefabs inside prefabs too), and its
+ * block lists only what this scene changes: fields that differ, components
+ * added, `remove Shape` for one taken off. A part of an instance that differs
+ * gets a block of its own, `PrefabPart { instance = <its root's position>,
+ * path = "Arm/Hand" }` (parts by their names below the root; "Leaf#2" is the
+ * second Leaf), or `remove entity` if it was deleted. So changing the prefab
+ * file changes every instance, everywhere, except where an instance says
+ * otherwise.
+ *
  * Indentation is optional and '#' starts a comment. Loading is forgiving
  * about what it doesn't know: an unknown component or field (say, from a
  * newer game) is skipped with a warning, and fields a file leaves out keep
@@ -47,6 +57,9 @@ char *br_world_to_text(const br_world *w, const br_entity *order, uint32_t count
  * (may be NULL). On an error the world is left unchanged. */
 int br_world_from_text(br_world *w, const char *text, br_entity *out, uint32_t cap,
                        char *err, size_t err_size);
+/* The same, with every entity it made (prefabs' parts too) in a br_alloc'd
+ * list (*out, br_free it). */
+int br_world_from_text_list(br_world *w, const char *text, br_entity **out, char *err, size_t err_size);
 
 bool br_world_save_file(const br_world *w, const br_entity *order, uint32_t count, const char *path);
 int  br_world_load_file(br_world *w, const char *path, br_entity *out, uint32_t cap,

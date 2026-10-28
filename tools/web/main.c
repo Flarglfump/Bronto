@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
     if (ok) {
         br_dir_entry e;
         printf("bronto_web: wrote %s (%.0f KB)", out, br_fs_stat(out, &e) ? (double)e.size / 1024.0 : 0.0);
-        if (pack) printf(" with %u project files packed in", st.files);
+        if (pack) printf(" with %u project files packed in (%.0f KB, from %.0f KB)", st.files, (double)st.bytes / 1024.0, (double)st.unpacked / 1024.0);
         printf("\n");
     } else {
         fprintf(stderr, "bronto_web: %s\n", err);

@@ -6,6 +6,11 @@ connects them to the browser are all inside it. You can open it straight from th
 put it on any web server, or upload it to a site like itch.io (as a zip holding
 `index.html`).
 
+The page is kept small: the program is compressed inside it (DEFLATE, unpacked by
+`bronto.js` as the page loads), and so are the game's files in its pack (unpacked by the
+engine as it reads them). The platformer's page is about 300 KB; Pantry Quest II, with
+its music, about 8.5 MB.
+
 No Emscripten or other SDK is involved. Plain `clang` can compile C to WebAssembly
 (`--target=wasm32`). What a browser lacks is a C library, so Bronto brings a small one
 of its own in `src/platform/web`. That keeps the engine's rule of no dependencies beyond

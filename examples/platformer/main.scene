@@ -41,11 +41,12 @@ entity
   Shape
     kind = rect
     size = 64 8
-    color = #6b7a90ff
+    color = #8a7aa0ff
     layer = 0
   Collider
     size = 64 8
     friction = 0.8
+    one_way = true
 
 entity
   Name

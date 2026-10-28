@@ -1,0 +1,895 @@
+# Explorer - a 3D example: walk the hills, find the crystals. Open this folder in the editor.
+# Made by tools/make_explorer.py; edit it in the editor from here on.
+bronto_scene 1
+
+entity
+  Name
+    text = "Sun"
+  Transform3D
+    position = 0 20 0
+    rotation = -50 -30 0
+    scale = 1 1 1
+  Light
+    kind = directional
+    color = #fff2dcff
+    intensity = 1
+    shadows = true
+    shadow_range = 16
+
+entity
+  Name
+    text = "Sky Light"
+  Transform3D
+    position = 0 20 0
+    rotation = 0 0 0
+    scale = 1 1 1
+  Light
+    kind = ambient
+    color = #8898c0ff
+    intensity = 0.45
+
+entity
+  Name
+    text = "Camera"
+  Transform3D
+    position = 0 5 9
+    rotation = 0 0 0
+    scale = 1 1 1
+  Camera3D
+    fov = 60
+    near_clip = 0.1
+    far_clip = 120
+    clear_color = #9cc4ecff
+    fog = true
+    fog_color = #9cc4ecff
+    fog_start = 14
+    fog_end = 40
+  Script
+    file = "scripts/camera.bs"
+
+entity
+  Name
+    text = "Hills"
+  Transform3D
+    position = 0 0 0
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    file = "models/hills.obj"
+    texture = "art/grass.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = mesh
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = -6 1.956 -9
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = -6 3.956 -9
+    rotation = 0 0 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = 7 2.9245 -6
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = 7 4.9245 -6
+    rotation = 0 37 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = -12 1.3803 3
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = -12 3.3803 3
+    rotation = 0 74 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = 11 2.1065 9
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = 11 4.1065 9
+    rotation = 0 111 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = -4 3.1154 14
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = -4 5.1154 14
+    rotation = 0 148 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = 15 1.3786 -14
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = 15 3.3786 -14
+    rotation = 0 185 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = -15 -0.0657 -15
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = -15 1.9343 -15
+    rotation = 0 222 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = 3 0.4805 -17
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = 3 2.4805 -17
+    rotation = 0 259 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = -18 0.6344 10
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = -18 2.6344 10
+    rotation = 0 296 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = 18 0.52 2
+    rotation = 0 0 0
+    scale = 0.5 2.4 0.5
+  Mesh
+    shape = cylinder
+    texture = "art/bark.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = capsule
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = 18 2.52 2
+    rotation = 0 333 0
+    scale = 2.4 2.8 2.4
+  Mesh
+    shape = cone
+    color = #3d9450ff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Rock"
+  Transform3D
+    position = 4 2.0712 4
+    rotation = 0 40 0
+    scale = 1.2 0.84 1.2
+  Mesh
+    shape = sphere
+    texture = "art/stone.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Rock"
+  Transform3D
+    position = -8 -0.0388 -3
+    rotation = 0 -80 0
+    scale = 1.6 1.12 1.6
+  Mesh
+    shape = sphere
+    texture = "art/stone.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Rock"
+  Transform3D
+    position = 9 -0.2699 -13
+    rotation = 0 90 0
+    scale = 2 1.4 2
+  Mesh
+    shape = sphere
+    texture = "art/stone.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Rock"
+  Transform3D
+    position = -13 0.2374 -8
+    rotation = 0 -130 0
+    scale = 1.1 0.77 1.1
+  Mesh
+    shape = sphere
+    texture = "art/stone.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Rock"
+  Transform3D
+    position = 13 0.6261 14
+    rotation = 0 130 0
+    scale = 1.5 1.05 1.5
+  Mesh
+    shape = sphere
+    texture = "art/stone.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Step"
+  Transform3D
+    position = -2 1.9692 8
+    rotation = 0 15 0
+    scale = 1.6 1.3 1.6
+  Mesh
+    shape = cube
+    texture = "art/stone.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = box
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Step"
+  Transform3D
+    position = 0.5 2.2522 10.5
+    rotation = 0 15 0
+    scale = 1.6 2.1 1.6
+  Mesh
+    shape = cube
+    texture = "art/stone.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = box
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Step"
+  Transform3D
+    position = 3 1.7451 13
+    rotation = 0 15 0
+    scale = 1.6 2.9 1.6
+  Mesh
+    shape = cube
+    texture = "art/stone.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = box
+    size = 1 1 1
+    radius = 0.5
+    friction = 0.8
+
+entity
+  Name
+    text = "Crystal"
+  Transform3D
+    position = 0 1.8504 -6
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/crystal.obj"
+    color = #9a7dffd8
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.6
+    friction = 0.8
+    trigger = true
+  Tags
+    list = "crystal"
+  Particles
+    rate = 6
+    max = 30
+    lifetime = 1.4
+    lifetime_random = 0.4
+    speed = 0.35
+    speed_random = 0.5
+    spread = 60
+    area = 0.8 0.8
+    gravity = -0.3
+    size_start = 0.12
+    size_end = 0
+    color_start = #e0d0ffff
+    color_end = #a0f0ff00
+    blend = add
+    local = true
+  Script
+    file = "scripts/crystal.bs"
+
+entity
+  Name
+    text = "Crystal"
+  Transform3D
+    position = 8 3.7234 -2
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/crystal.obj"
+    color = #9a7dffd8
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.6
+    friction = 0.8
+    trigger = true
+  Tags
+    list = "crystal"
+  Particles
+    rate = 6
+    max = 30
+    lifetime = 1.4
+    lifetime_random = 0.4
+    speed = 0.35
+    speed_random = 0.5
+    spread = 60
+    area = 0.8 0.8
+    gravity = -0.3
+    size_start = 0.12
+    size_end = 0
+    color_start = #e0d0ffff
+    color_end = #a0f0ff00
+    blend = add
+    local = true
+  Script
+    file = "scripts/crystal.bs"
+
+entity
+  Name
+    text = "Crystal"
+  Transform3D
+    position = -9 1.5505 7
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/crystal.obj"
+    color = #9a7dffd8
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.6
+    friction = 0.8
+    trigger = true
+  Tags
+    list = "crystal"
+  Particles
+    rate = 6
+    max = 30
+    lifetime = 1.4
+    lifetime_random = 0.4
+    speed = 0.35
+    speed_random = 0.5
+    spread = 60
+    area = 0.8 0.8
+    gravity = -0.3
+    size_start = 0.12
+    size_end = 0
+    color_start = #e0d0ffff
+    color_end = #a0f0ff00
+    blend = add
+    local = true
+  Script
+    file = "scripts/crystal.bs"
+
+entity
+  Name
+    text = "Crystal"
+  Transform3D
+    position = 12 1.3663 -9
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/crystal.obj"
+    color = #9a7dffd8
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.6
+    friction = 0.8
+    trigger = true
+  Tags
+    list = "crystal"
+  Particles
+    rate = 6
+    max = 30
+    lifetime = 1.4
+    lifetime_random = 0.4
+    speed = 0.35
+    speed_random = 0.5
+    spread = 60
+    area = 0.8 0.8
+    gravity = -0.3
+    size_start = 0.12
+    size_end = 0
+    color_start = #e0d0ffff
+    color_end = #a0f0ff00
+    blend = add
+    local = true
+  Script
+    file = "scripts/crystal.bs"
+
+entity
+  Name
+    text = "Crystal"
+  Transform3D
+    position = -14 0.4388 -12
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/crystal.obj"
+    color = #9a7dffd8
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.6
+    friction = 0.8
+    trigger = true
+  Tags
+    list = "crystal"
+  Particles
+    rate = 6
+    max = 30
+    lifetime = 1.4
+    lifetime_random = 0.4
+    speed = 0.35
+    speed_random = 0.5
+    spread = 60
+    area = 0.8 0.8
+    gravity = -0.3
+    size_start = 0.12
+    size_end = 0
+    color_start = #e0d0ffff
+    color_end = #a0f0ff00
+    blend = add
+    local = true
+  Script
+    file = "scripts/crystal.bs"
+
+entity
+  Name
+    text = "Crystal"
+  Transform3D
+    position = 6 0.1935 16
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/crystal.obj"
+    color = #9a7dffd8
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.6
+    friction = 0.8
+    trigger = true
+  Tags
+    list = "crystal"
+  Particles
+    rate = 6
+    max = 30
+    lifetime = 1.4
+    lifetime_random = 0.4
+    speed = 0.35
+    speed_random = 0.5
+    spread = 60
+    area = 0.8 0.8
+    gravity = -0.3
+    size_start = 0.12
+    size_end = 0
+    color_start = #e0d0ffff
+    color_end = #a0f0ff00
+    blend = add
+    local = true
+  Script
+    file = "scripts/crystal.bs"
+
+entity
+  Name
+    text = "Crystal"
+  Transform3D
+    position = -17 2.2711 0
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/crystal.obj"
+    color = #9a7dffd8
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.6
+    friction = 0.8
+    trigger = true
+  Tags
+    list = "crystal"
+  Particles
+    rate = 6
+    max = 30
+    lifetime = 1.4
+    lifetime_random = 0.4
+    speed = 0.35
+    speed_random = 0.5
+    spread = 60
+    area = 0.8 0.8
+    gravity = -0.3
+    size_start = 0.12
+    size_end = 0
+    color_start = #e0d0ffff
+    color_end = #a0f0ff00
+    blend = add
+    local = true
+  Script
+    file = "scripts/crystal.bs"
+
+entity
+  Name
+    text = "Crystal"
+  Transform3D
+    position = 3 4.2951 13
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/crystal.obj"
+    color = #ffd36ad8
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    size = 1 1 1
+    radius = 0.6
+    friction = 0.8
+    trigger = true
+  Tags
+    list = "crystal"
+  Particles
+    rate = 6
+    max = 30
+    lifetime = 1.4
+    lifetime_random = 0.4
+    speed = 0.35
+    speed_random = 0.5
+    spread = 60
+    area = 0.8 0.8
+    gravity = -0.3
+    size_start = 0.12
+    size_end = 0
+    color_start = #e0d0ffff
+    color_end = #a0f0ff00
+    blend = add
+    local = true
+  Script
+    file = "scripts/crystal.bs"
+
+entity
+  Name
+    text = "Explorer"
+  Transform3D
+    position = 0 1.05 0
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/explorer.glb"
+    color = #ffffffff
+    uv_scale = 1 1
+  Animator
+    clip = "idle"
+    speed = 1
+    loop = true
+    playing = true
+    blend = 0.15
+  Collider3D
+    shape = capsule
+    size = 1 2 1
+    radius = 0.5
+    friction = 0.8
+  RigidBody3D
+    type = kinematic
+  Script
+    file = "scripts/explorer.bs"
+
+entity
+  Name
+    text = "HUD"
+  Transform
+    position = 160 10
+  Label
+    text = "Crystals 0/8"
+    size = 1
+    color = #ffffffff
+    layer = 5
+  Script
+    file = "scripts/hud.bs"
+
+entity
+  Name
+    text = "Message"
+  Transform
+    position = 160 34
+  Label
+    text = "Find the eight crystals!"
+    size = 1
+    color = #fff0a0ff
+    layer = 5
+
+entity
+  Name
+    text = "Help"
+  Transform
+    position = 160 190
+  Label
+    text = "WASD walk   Q E look   space jump"
+    size = 1
+    color = #e8eef8c0
+    layer = 5

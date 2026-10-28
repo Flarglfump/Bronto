@@ -13,8 +13,11 @@ Editing support for Bronto engine scripts (`.bs` files):
   - after `self.Collider.`: that component's fields,
   - at the top of a file: the callbacks the script doesn't define yet (typed:
     `func update(dt: number) -> void`),
-  - after `:` and `->`: the types (`number`, `int`, `string`, `bool`, `vec2`, `list`,
-    `list[T]`, `entity`, `any`, `void`), and `@strict`,
+  - after `:` and `->`: the types (`number`, `int`, `string`, `bool`, `vec2`, `vec3`, `list`,
+    `list[T]`, `entity`, `any`, `void`), and `@strict` / `@3d`,
+  - 3D: `vec3`, the 3D functions (`look_at`, `overlap_sphere`, `world_to_screen`...), the
+    3D components (`Transform3D`, `Mesh`, `Camera3D`, `Light`, `RigidBody3D`...) and the
+    properties `z`, `forward`, `right` and `up`,
   - inside a string: the names that function takes - key names in `key_pressed("`,
     gamepad buttons in `button_down("`, axes in `axis("`, `"left"`/`"right"` in `stick("`,
     sound buses in `set_volume("`, components in `has(self, "`, and the project's sounds and
@@ -40,10 +43,10 @@ Editing support for Bronto engine scripts (`.bs` files):
 Either:
 
 - Build the package with `make vscode` (from the engine's folder; it needs Python 3), then
-  in VS Code run **Extensions: Install from VSIX...** and pick `build/brontoscript-0.3.1.vsix`.
-  From a terminal, `code --install-extension build/brontoscript-0.3.1.vsix` does the same.
+  in VS Code run **Extensions: Install from VSIX...** and pick `build/brontoscript-0.5.0.vsix`.
+  From a terminal, `code --install-extension build/brontoscript-0.5.0.vsix` does the same.
 - Or copy this `brontoscript` folder into your extensions folder as
-  `bronto.brontoscript-0.3.1`: `~/.vscode/extensions/` on macOS and Linux,
+  `bronto.brontoscript-0.5.0`: `~/.vscode/extensions/` on macOS and Linux,
   `%USERPROFILE%\.vscode\extensions\` on Windows. Then restart VS Code.
 
 For full error checking, build the checker with `make tools` (it lands in `build/bscheck`).

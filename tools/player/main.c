@@ -179,6 +179,10 @@ int main(int argc, char **argv) {
         return 1;
     }
     snprintf(g_main_scene, sizeof(g_main_scene), "%s", g_scene);
+    {   /* the game's own components, declared in its scripts */
+        char err[300];
+        if (br_script_components_from_project(g_root, err, sizeof(err)) < 0) fprintf(stderr, "bronto_player: %s\n", err);
+    }
     if (replay && !br_replay_load(replay)) { br_pack_unmount(); return 1; }
     br_script_set_strict(g_project.strict_typing);
     cfg.title = g_project.name;

@@ -1,0 +1,55 @@
+@strict @3d
+# marble.bs - the player. Arrows, WASD or the left stick roll it; space or A jumps.
+# Falling off the course brings it back to the last checkpoint it rolled over.
+var push: number = 7           # how hard the controls push (units / second^2)
+var drag: number = 1.1         # holds the top speed down to push / drag (units / second)
+var jump: number = 5.2         # the jump's upward kick (units / second)
+var checkpoint: vec3
+var hud: entity
+var won: bool = false
+
+func start() -> void {
+    checkpoint = self.position
+    hud = find("HUD")
+}
+
+func update(dt: number) -> void {
+    if won {                                   # at the flag: roll to a stop
+        self.velocity = self.velocity * 0.9
+        return
+    }
+    var dir := vec3(0, 0, 0)
+    if key_down("left") or key_down("a") { dir.x -= 1 }
+    if key_down("right") or key_down("d") { dir.x += 1 }
+    if key_down("up") or key_down("w") { dir.z -= 1 }       # away from the camera is -z
+    if key_down("down") or key_down("s") { dir.z += 1 }
+    var s: vec2 = stick("left")
+    dir.x += s.x
+    dir.z += s.y
+    if length(dir) > 1 { dir = normalize(dir) }
+    var v: vec3 = self.velocity
+    apply_force(self, dir * push - vec3(v.x, 0, v.z) * drag)
+    if (key_pressed("space") or button_pressed("a")) and grounded() {
+        apply_impulse(self, vec3(0, jump, 0))
+    }
+    if self.y < -12 { respawn() }
+}
+
+# Something solid just below?
+func grounded() -> bool {
+    return raycast(self.position, self.position - vec3(0, 0.7, 0), self) != nil
+}
+
+func respawn() -> void {
+    self.position = checkpoint + vec3(0, 1, 0)
+    self.velocity = vec3(0, 0, 0)
+    self.angular_velocity = vec3(0, 0, 0)
+    hud.say("Oops! Back to the checkpoint")
+}
+
+func on_trigger(other: entity) -> void {
+    if has_tag(other, "checkpoint") and distance(other.position, checkpoint) > 0.1 {
+        checkpoint = other.position
+        hud.say("Checkpoint!")
+    }
+}

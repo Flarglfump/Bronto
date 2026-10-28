@@ -400,9 +400,10 @@ bool br_image_load(br_image *img, const char *path) {
     void *data = br_file_read_all(path, &size);
     bool ok = false;
     if (!data) { BR_ERROR("could not read image '%s'", path); return false; }
-    if (ext_is(path, "bmp")) ok = br_image_load_bmp_mem(img, data, size);
+    if (ext_is(path, "png")) ok = br_image_load_png_mem(img, data, size);
+    else if (ext_is(path, "bmp")) ok = br_image_load_bmp_mem(img, data, size);
     else if (ext_is(path, "tga")) ok = br_image_load_tga_mem(img, data, size);
-    else BR_ERROR("unsupported image format: '%s' (use .bmp or .tga)", path);
+    else BR_ERROR("unsupported image format: '%s' (use .png, .bmp or .tga)", path);
     br_free(data);
     return ok;
 }

@@ -152,6 +152,76 @@ bool br_script_strict(void);
 const char *br_script_last_error(const br_world *w);
 uint32_t br_script_error_count(const br_world *w);
 
+/* ---- the debugger ----
+ * A host (the editor) attaches a hook; when a script reaches a breakpoint (or a
+ * step, or a pause asked for), the hook is called right there, in the middle of
+ * the script, and the game waits until it returns. While it runs it can look at
+ * the call stack and variables; what it returns says how to go on.
+ *
+ *   CONTINUE   run on to the next breakpoint
+ *   STEP_INTO  stop at the next statement, inside a call it makes too
+ *   STEP_OVER  stop at the next statement of this function (or after it returns)
+ *   STEP_OUT   stop once this function has returned
+ *   DETACH     run on, ignoring breakpoints until the next attach or resume
+ *
+ * Breakpoints are by file and line; a file matches a script's path when one ends
+ * with the other ("scripts/player.bs" finds "/home/me/game/scripts/player.bs").
+ * With no hook attached, scripts run at full speed: nothing is checked. */
+typedef enum br_debug_action {
+    BR_DEBUG_CONTINUE = 0, BR_DEBUG_STEP_INTO, BR_DEBUG_STEP_OVER, BR_DEBUG_STEP_OUT, BR_DEBUG_DETACH
+} br_debug_action;
+typedef struct br_debug_stop {
+    br_world *world;
+    br_entity entity;               /* whose script */
+    const char *file;               /* its path */
+    int line;
+    const char *reason;             /* "breakpoint", "step" or "paused" */
+} br_debug_stop;
+typedef struct br_debug_var { char name[32]; char value[120]; } br_debug_var;
+typedef br_debug_action (*br_debug_hook)(const br_debug_stop *stop, void *user);
+
+void br_script_debug_attach(br_debug_hook hook, void *user);      /* NULL: detach */
+bool br_script_debug_set_breakpoint(const char *file, int line, bool on);
+bool br_script_debug_has_breakpoint(const char *file, int line);
+int  br_script_debug_breakpoint(int index, const char **file, int *line);   /* returns how many */
+void br_script_debug_clear_breakpoints(void);
+void br_script_debug_pause(void);     /* stop at the next statement any script runs */
+void br_script_debug_resume(void);    /* forget a pause or a step; breakpoints count again */
+/* Only inside the hook: */
+bool br_script_debug_stopped(void);
+int  br_script_debug_frame_count(void);
+bool br_script_debug_frame(int index, const char **function, const char **file, int *line);   /* 0: innermost */
+int  br_script_debug_locals(int frame, br_debug_var *out, int max);
+int  br_script_debug_globals(int frame, br_debug_var *out, int max);
+
+/* ---- a game's own components ----
+ * Scripts can declare components; the scene files save them, the editor's
+ * inspector edits them, and scripts use them like the engine's (self.Health.hp,
+ * has(e, "Health"), add(e, "Health"), find_with("Health")):
+ *
+ *   component Health {
+ *       var hp: int = 3
+ *       var regen: number = 0.5
+ *       var tint: color = "#ff4040"
+ *       var team: enum(red, blue) = blue
+ *       var target: entity
+ *   }
+ *
+ * Field types: int, number, bool, string (up to 63 bytes), vec2, vec3, color,
+ * entity (starts as none) and enum(...). br_script_components_from_project reads
+ * every .bs file of a project (its pack, if one is mounted) and keeps the set;
+ * worlds made afterwards get them (br_builtin_register). The player and the editor
+ * do this when a project opens. Returns how many, or -1 if a declaration was wrong
+ * (the message in err; the good ones are kept). */
+int  br_script_components_from_project(const char *root, char *err, size_t err_size);
+int  br_script_scan_components(const char *source, const char *file, char *err, size_t err_size);
+void br_script_components_clear(void);
+void br_script_register_components(br_world *w);
+int  br_script_component_count(void);
+const br_component_desc *br_script_component(int index);
+uint32_t br_script_components_signature(void);   /* changes when the declarations do */
+void br_script_components_release(void);
+
 /* Where print() goes (default: the engine log). */
 void br_script_set_print(void (*fn)(const char *text, void *user), void *user);
 

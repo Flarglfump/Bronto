@@ -256,7 +256,7 @@ static bool build_web(editor *ed, const char *root, const char *player, const ch
     br_free(pack);
     if (!ok) { ed_status(ed, "Build: %s", err); return false; }
     snprintf(out, size, "%s", page_path);
-    printf("Build: packed %u files (%.1f KB, %d script%s checked) into %s\n", st.files, (double)st.bytes / 1024.0, scripts,
+    printf("Build: packed %u files (%.1f KB, from %.1f KB, %d script%s checked) into %s\n", st.files, (double)st.bytes / 1024.0, (double)st.unpacked / 1024.0, scripts,
            scripts == 1 ? "" : "s", out);
     ed_status(ed, "Built %s for the web: %s (open it in a browser, or put it on a web site)", ed->project.name, out);
     return true;
@@ -336,7 +336,7 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
         br_fs_make_executable(exe);
         snprintf(out, size, "%s", exe);
     }
-    printf("Build: packed %u files (%.1f KB, %d script%s checked) into %s\n", st.files, (double)st.bytes / 1024.0, scripts,
+    printf("Build: packed %u files (%.1f KB, from %.1f KB, %d script%s checked) into %s\n", st.files, (double)st.bytes / 1024.0, (double)st.unpacked / 1024.0, scripts,
            scripts == 1 ? "" : "s", out);
     ed_status(ed, "Built %s for %s: %s", ed->project.name, ed_target_name(t), out);
     return true;

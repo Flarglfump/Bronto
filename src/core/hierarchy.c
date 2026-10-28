@@ -6,6 +6,7 @@
  * the Parent pool, which is small next to everything else a frame does.
  */
 #include "bronto/hierarchy.h"
+#include "bronto/components3d.h"
 #include "bronto/memory.h"
 
 #include <math.h>
@@ -170,11 +171,13 @@ void br_set_world_rotation(br_world *w, br_entity e, float degrees) {
 bool br_set_parent(br_world *w, br_entity child, br_entity parent, bool keep_world) {
     br_component pc = hy_parent_id(w), tc = hy_transform_id(w);
     br_transform world;
+    br_mat4 world3;
     br_transform *t;
     if (pc == BR_COMPONENT_INVALID || !br_entity_alive(w, child)) return false;
     if (parent != BR_ENTITY_NULL && (!br_entity_alive(w, parent) || parent == child || br_is_ancestor(w, child, parent))) return false;
     if (br_parent_of(w, child) == parent) return true;
     world = br_world_transform(w, child);
+    world3 = br_world_matrix3d(w, child);
     if (parent == BR_ENTITY_NULL) br_remove(w, child, pc);
     else {
         br_parent *p = (br_parent *)br_get(w, child, pc);
@@ -185,6 +188,7 @@ bool br_set_parent(br_world *w, br_entity child, br_entity parent, bool keep_wor
     }
     if (keep_world && tc != BR_COMPONENT_INVALID && (t = (br_transform *)br_get(w, child, tc)) != NULL)
         *t = br_local_from_world(w, child, &world);
+    if (keep_world) br_set_world_matrix3d(w, child, world3);   /* (3D entities stay put too) */
     return true;
 }
 

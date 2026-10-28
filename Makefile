@@ -11,6 +11,8 @@
 #                   pack a project into a game people can run (the editor's Build menu,
 #                   as editor --build): build/games/<project>/<target>/ (host: this computer)
 #   make pantryquest   the same for Pantry Quest, for this computer
+#   make marble        build Marble (the 3D example) for this computer and play it
+#   make explorer      the same for Explorer (3D: walk the hills, find the crystals)
 #   make vscode     package the VS Code extension (tools/vscode) into build/*.vsix (needs python3)
 #   make vscode-icon  redraw the extension's icon from the editor's app icon (after changing it)
 #   make examples   build the examples (build/examples/*)
@@ -93,7 +95,7 @@ EDITOR   := $(BUILD)/editor
 BSCHECK  := $(BUILD)/bscheck
 PLAYER   := $(BUILD)/bronto_player
 
-.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player audio-test evdev-test vscode vscode-test vscode-icon web web-test web-check game pantryquest
+.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player audio-test evdev-test vscode vscode-test vscode-icon web web-test web-check game pantryquest marble explorer
 
 all: lib
 
@@ -202,6 +204,12 @@ pantryquest2-check: $(BSCHECK)
 	python3 $(PQ2)/tools/check_softlocks.py
 .PHONY: pantryquest2 pantryquest2-assets pantryquest2-check
 
+marble: $(PLAYER)
+	$(PLAYER) examples/marble
+
+explorer: $(PLAYER)
+	$(PLAYER) examples/explorer
+
 # The VS Code extension for .bs scripts: package it, and test it with node.
 vscode:
 	python3 tools/vscode/package_vsix.py $(BUILD)
@@ -220,6 +228,8 @@ run-examples: examples tools
 	@echo "== $(abspath $(PLAYER)) examples/platformer --headless"; $(PLAYER) examples/platformer --headless --frames 180
 	@echo "== $(abspath $(PLAYER)) examples/pantryquest --headless"; $(PLAYER) examples/pantryquest --headless --frames 120 && \
 	 $(PLAYER) examples/pantryquest/main.scene --headless --frames 300
+	@echo "== $(abspath $(PLAYER)) examples/marble --headless"; $(PLAYER) examples/marble --headless --frames 240
+	@echo "== $(abspath $(PLAYER)) examples/explorer --headless"; $(PLAYER) examples/explorer --headless --frames 240
 
 clean:
 	rm -rf build build-asan
@@ -335,6 +345,8 @@ $(BUILD)/libc_check: tests/web/libc_check.c
 web-test: $(WEB_TESTS) $(WEB)/libc_check.wasm $(BUILD)/libc_check $(WEB)/persist.wasm $(PLAYER) $(EXAMPLES) web
 	node tools/web/run_node.js $(WEB_TESTS) --mkdir build/test_out --dir examples/platformer=examples/platformer \
 	     --dir examples/pantryquest=examples/pantryquest \
+	     --dir examples/marble=examples/marble \
+	     --dir examples/explorer=examples/explorer \
 	     --file tools/vscode/brontoscript/lib/builtins.json=tools/vscode/brontoscript/lib/builtins.json \
 	     --file tools/vscode/brontoscript/syntaxes/brontoscript.tmLanguage.json=tools/vscode/brontoscript/syntaxes/brontoscript.tmLanguage.json \
 	     --file docs/scripting.md=docs/scripting.md -- --out build/test_out

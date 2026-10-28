@@ -721,6 +721,21 @@ bool br_ui_vec2(br_ui *ui, const char *label, br_vec2 *value, float speed) {
     return changed;
 }
 
+bool br_ui_vec3(br_ui *ui, const char *label, br_vec3 *value, float speed) {
+    static const char *const keys[3] = { "x", "y", "z" }, *const tags[3] = { "x ", "y ", "z " };
+    br_ui_id id = id_of(ui, label);
+    br_rect v = field_value(ui, label, br_ui_row(ui, 0));
+    float w = floorf((v.w - 2 * COLUMN_GAP) / 3), x = v.x;
+    float *c[3];
+    bool changed = false;
+    int i;
+    c[0] = &value->x; c[1] = &value->y; c[2] = &value->z;
+    for (i = 0; i < 3; ++i, x += w + COLUMN_GAP)
+        changed |= number_box(ui, hash_str(id, keys[i]), br_rect_make(x, v.y, i == 2 ? v.x + v.w - x : w, v.h), c[i], EDIT_FLOAT,
+                              speed, 0, 0, tags[i]);
+    return changed;
+}
+
 bool br_ui_color(br_ui *ui, const char *label, br_color *value) {
     static const char *const keys[4] = { "r", "g", "b", "a" };
     br_ui_id id = id_of(ui, label);
@@ -926,6 +941,14 @@ void br_ui_menu_end(br_ui *ui) {
 void br_ui_focus_next(br_ui *ui) { ui->focus_next = true; }
 
 void br_ui_stick_to_bottom(br_ui *ui) { br_ui_panel *p = top(ui); if (p) p->stick = true; }
+void br_ui_set_scroll(br_ui *ui, float scroll) {
+    br_ui_panel *p = top(ui);
+    if (!p) return;
+    if (scroll < 0) scroll = 0;
+    p->y += p->scroll - scroll;                  /* (kept within the content when the panel ends) */
+    p->scroll = scroll;
+    p->was_at_end = false;
+}
 
 static bool usable(const br_ui_menu_entry *it) { return !(it->flags & (MI_SEP | MI_DISABLED)); }
 

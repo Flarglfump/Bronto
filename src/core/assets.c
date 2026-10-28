@@ -5,6 +5,7 @@
 #include "bronto/memory.h"
 #include "bronto/log.h"
 #include "bronto/fs.h"
+#include "bronto/model.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -13,13 +14,15 @@
 
 #define ASSET_PATH_MAX 512
 
-typedef enum { ASSET_IMAGE, ASSET_SOUND } asset_kind;
+typedef enum { ASSET_IMAGE, ASSET_SOUND, ASSET_MESH } asset_kind;
 
 typedef struct asset_entry {
     char *path;          /* as asked for */
     asset_kind kind;
     br_image image;
     br_sound sound;
+    br_mesh mesh;
+    br_model *model;     /* a .gltf / .glb (its `merged` stands in for `mesh`) */
     bool ok;
 } asset_entry;
 
@@ -85,6 +88,15 @@ static asset_entry *find_or_load(const char *path, asset_kind kind) {
     if (kind == ASSET_IMAGE) {
         e->ok = br_image_load(&e->image, full);
         if (!e->ok) BR_WARN("asset: can't load image '%s'", full);
+    } else if (kind == ASSET_MESH) {
+        char err[160];
+        if (br_model_is_file(path)) {                    /* glTF: the model, and its parts as one mesh */
+            e->model = (br_model *)br_alloc(sizeof(br_model));
+            e->ok = e->model && br_model_load(e->model, full, err, sizeof(err));
+            if (!e->ok) { br_free(e->model); e->model = NULL; }
+        } else
+        e->ok = br_mesh_load_obj(&e->mesh, full, err, sizeof(err));
+        if (!e->ok) BR_WARN("asset: can't load model '%s': %s", full, err);
     } else {
         e->ok = br_sound_load_wav(&e->sound, full);
         if (!e->ok) BR_WARN("asset: can't load sound '%s'", full);
@@ -97,6 +109,17 @@ const br_image *br_asset_image(const char *path) {
     return e && e->ok ? &e->image : NULL;
 }
 
+const br_mesh *br_asset_mesh(const char *path) {
+    asset_entry *e = find_or_load(path, ASSET_MESH);
+    if (e && e->ok && e->model) return &e->model->merged;
+    return e && e->ok ? &e->mesh : NULL;
+}
+
+const br_model *br_asset_model(const char *path) {
+    asset_entry *e = br_model_is_file(path) ? find_or_load(path, ASSET_MESH) : NULL;
+    return e && e->ok ? e->model : NULL;
+}
+
 const br_sound *br_asset_sound(const char *path) {
     asset_entry *e = find_or_load(path, ASSET_SOUND);
     return e && e->ok ? &e->sound : NULL;
@@ -104,6 +127,8 @@ const br_sound *br_asset_sound(const char *path) {
 
 static void release_entry(asset_entry *e) {
     if (e->ok && e->kind == ASSET_IMAGE) br_image_destroy(&e->image);
+    if (e->ok && e->kind == ASSET_MESH) br_mesh_destroy(&e->mesh);
+    if (e->model) { br_model_destroy(e->model); br_free(e->model); }
     if (e->ok && e->kind == ASSET_SOUND) {
         if (S.mixer) br_mixer_stop_sound(S.mixer, &e->sound);
         br_sound_destroy(&e->sound);

@@ -264,6 +264,7 @@ bool br_ui_header(br_ui *ui, const char *label, bool *open, bool *remove);
 bool br_ui_drag_float(br_ui *ui, const char *label, float *value, float speed, float min, float max);
 bool br_ui_drag_int(br_ui *ui, const char *label, int *value, float speed, int min, int max);
 bool br_ui_vec2(br_ui *ui, const char *label, br_vec2 *value, float speed);
+bool br_ui_vec3(br_ui *ui, const char *label, br_vec3 *value, float speed);
 bool br_ui_color(br_ui *ui, const char *label, br_color *value);
 bool br_ui_text_field(br_ui *ui, const char *label, char *buffer, size_t size);
 bool br_ui_combo(br_ui *ui, const char *label, int *index, const char *const *items, int count);
@@ -309,5 +310,7 @@ void br_ui_focus_next(br_ui *ui);
 void br_ui_set_clipboard(br_ui *ui, const br_ui_clipboard *clipboard);
 /* In a panel: if it was scrolled to the end, keep it there as it grows (logs). */
 void br_ui_stick_to_bottom(br_ui *ui);
+/* In a panel, before its rows: scroll it to this far down (a line to show). */
+void br_ui_set_scroll(br_ui *ui, float scroll);
 
 #endif /* BRONTO_UI_H */

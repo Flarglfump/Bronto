@@ -6,11 +6,14 @@
  *   commands.c   everything the user can do (New, Save, Delete, Play...),
  *                called by buttons and keyboard shortcuts alike
  *   viewport.c   the scene view: pan, zoom, grid, picking, move/rotate/scale
+ *   viewport3d.c ... in 3D: an orbit camera, the ground grid, gizmos, 3D picking
  *   panels.c     toolbar, hierarchy, inspector, status bar, dialogs
  *   assets.c     the asset browser: the project's files, previews, file
  *                operations, and dragging assets into the scene
  *   icon.c       the app icon, a little brontosaurus drawn in code
  *   settings.c   preferences (the script editor) and the Settings dialog
+ *   code.c       the script editor in the Scripts tab: typing, undo, colours, mistakes
+ *   debugger.c   the script debugger around it: breakpoints, stepping, variables
  *   console.c    the console's lines: captured stdout / stderr, the log, print()
  *   menus.c      the right-click menus, and copy / paste of entities
  *   build.c      the Build menu (games: the player with the project packed in), Project Settings
@@ -29,6 +32,7 @@
 #define ED_PATH_MAX 260
 #define ED_UNDO_MAX 100
 #define ED_MAX_COLLAPSED 256
+#define ED_SELECT_MAX 512
 
 /* ======================= doc.c: the document ======================= */
 
@@ -43,9 +47,16 @@ typedef struct ed_overlay {
 typedef struct ed_doc {
     br_world world;
     br_builtin_ids ids;
+    br_ids3d ids3;
     br_entity *order;            /* hierarchy order = save order */
     uint32_t count, cap;
-    br_entity selected;
+    br_entity selected;          /* the primary selection: the inspector shows it */
+    /* More entities selected along with it (ed_doc_select_toggle...). Only
+     * valid while `selected` is still `multi_primary`: setting `selected`
+     * directly selects that one alone. */
+    br_entity multi[ED_SELECT_MAX];
+    uint32_t multi_count;
+    br_entity multi_primary;
     char path[ED_PATH_MAX];      /* "" = untitled */
     char root[ED_PATH_MAX];      /* the project folder asset paths are relative to */
     bool has_root;               /* false: each scene's own (br_assets_find_root) */
@@ -75,6 +86,17 @@ bool ed_doc_save(ed_doc *d, const char *path);
 bool ed_doc_dirty(const ed_doc *d);
 
 br_entity ed_doc_create(ed_doc *d, const char *name, br_vec2 pos);   /* Name + Transform, a root */
+/* Prefab instances (serialize.h): the file an entity is an instance of (NULL: none),
+ * the outermost instance it is part of, making them again after a prefab changes,
+ * and writing an instance back to its prefab. */
+const char *ed_doc_prefab_of(const ed_doc *d, br_entity e);
+br_entity ed_doc_instance_root(const ed_doc *d, br_entity e);
+bool ed_doc_refresh_prefabs(ed_doc *d);
+bool ed_doc_rebuild_world(ed_doc *d);
+struct editor;
+void ed_components_reload(struct editor *ed, bool force);   /* main.c: read the game's components again (when scripts changed, or force) */       /* after the game's components (script.h) change */
+bool ed_doc_apply_prefab(ed_doc *d, br_entity root);
+br_entity ed_doc_create3d(ed_doc *d, const char *name, br_vec3 pos);  /* Name + Transform3D, a root */
 br_entity ed_doc_create_child(ed_doc *d, br_entity parent, const char *name, br_vec2 local);
 br_entity ed_doc_duplicate(ed_doc *d, br_entity e);                  /* with its subtree, placed after it */
 void ed_doc_delete(ed_doc *d, br_entity e);                          /* with its subtree */
@@ -92,6 +114,19 @@ const char *ed_doc_name(const ed_doc *d, br_entity e, char *buf, size_t size);
 bool ed_doc_matches(const ed_doc *d, br_entity e, const char *filter);
 br_entity ed_doc_pick(const ed_doc *d, br_vec2 world);               /* topmost under a point */
 
+/* The selection: one or more entities, `selected` the primary one. */
+void ed_doc_select(ed_doc *d, br_entity e);                          /* just e (NULL: nothing) */
+void ed_doc_select_add(ed_doc *d, br_entity e);                      /* e too, as the primary */
+void ed_doc_select_toggle(ed_doc *d, br_entity e);                   /* in or out (ctrl / shift click) */
+bool ed_doc_is_selected(const ed_doc *d, br_entity e);
+/* Every selected entity, in hierarchy order (`roots`: leaving out those with a
+ * selected ancestor, since they move with it). Returns how many (up to max). */
+uint32_t ed_doc_selection(ed_doc *d, br_entity *out, uint32_t max, bool roots);
+uint32_t ed_doc_selection_count(ed_doc *d);
+void ed_doc_delete_selection(ed_doc *d);                             /* each with its subtree */
+uint32_t ed_doc_duplicate_selection(ed_doc *d);                      /* the copies become the selection */
+char *ed_doc_copy_selection(ed_doc *d);                              /* scene text of every selected subtree */
+
 /* Fixes the project folder (the editor's asset browser shows it). */
 void ed_doc_set_root(ed_doc *d, const char *root);
 /* Prefabs are ordinary scene files. Instantiating one adds copies of its
@@ -99,6 +134,7 @@ void ed_doc_set_root(ed_doc *d, const char *root);
  * position lands on `at`, and selects the first. Returns how many were
  * added, or -1 (d->error says why). */
 int  ed_doc_instantiate(ed_doc *d, const char *path, br_vec2 at);
+int  ed_doc_instantiate3d(ed_doc *d, const char *path, br_vec3 at);   /* the same for 3D roots */
 bool ed_doc_save_entity(ed_doc *d, br_entity e, const char *path);  /* one entity as a prefab */
 /* Copy and paste: an entity and its subtree as scene text (br_free it), and
  * that text added back - at `at` (NULL: where it was), under `parent`
@@ -170,7 +206,12 @@ bool ed_console_location(const char *text, char *file, size_t size, int *line);
 
 /* ======================= the editor ======================= */
 
-typedef enum ed_drag { ED_DRAG_NONE = 0, ED_DRAG_PAN, ED_DRAG_MOVE, ED_DRAG_ROTATE, ED_DRAG_SCALE } ed_drag;
+typedef enum ed_drag {
+    ED_DRAG_NONE = 0, ED_DRAG_PAN, ED_DRAG_MOVE, ED_DRAG_ROTATE, ED_DRAG_SCALE,
+    ED_DRAG_ORBIT, ED_DRAG_MOVE3, ED_DRAG_ROTATE3, ED_DRAG_SCALE3,         /* the 3D view */
+    ED_DRAG_BOX                                                           /* a box around things, to select them */
+} ed_drag;
+typedef enum ed_gizmo { ED_GIZMO_MOVE = 0, ED_GIZMO_ROTATE, ED_GIZMO_SCALE } ed_gizmo;
 
 typedef struct ed_view {
     br_rect rect;                /* on screen, this frame */
@@ -196,11 +237,37 @@ typedef struct ed_view {
     bool use_game_camera;
     br_camera2d game_camera;
     int game_ui_layer;
+
+    /* The 3D view (viewport3d.c): one view, switched per scene (a scene with
+     * 3D entities opens in 3D). */
+    bool three_d;
+    bool through_camera;         /* look through the scene's Camera instead of the orbit camera */
+    br_vec3 orbit_target;        /* the point the orbit camera turns around */
+    float orbit_yaw, orbit_pitch, orbit_dist;   /* degrees (pitch > 0: looking down), units */
+    ed_gizmo gizmo;
+    int hot_axis;                /* the gizmo handle under the mouse: 0..2 x y z, 3 the centre, -1 none */
+    int drag_axis;
+    br_transform3d drag_start3;
+    br_vec3 drag_from3;          /* the selection's world position when the drag began */
+    br_quat drag_rot3;           /* ... its world rotation */
+    float drag_param;            /* where along the axis (move), or the angle on screen (rotate) */
+    br_vec3 drag_hit3;           /* free move: where the mouse met the drag plane */
+    br_vec3 mouse_ground;        /* where the mouse ray meets the ground (y = 0) */
+    /* Dragging several selected entities: each one's place when the drag began. */
+    br_entity group[ED_SELECT_MAX];
+    br_vec2 group_from[ED_SELECT_MAX];
+    br_vec3 group_from3[ED_SELECT_MAX], group_scale3[ED_SELECT_MAX];
+    br_quat group_rot3[ED_SELECT_MAX];
+    uint32_t group_count;
+    br_vec2 drag_from2;          /* the primary's world position when a 2D drag began */
+    bool box_add;                /* the box adds to the selection (Shift / Ctrl held) */
+    bool mouse_on_ground;
+    br_r3d r3;
 } ed_view;
 
 /* What the asset browser makes of a file. */
 typedef enum ed_asset_kind {
-    ED_ASSET_FOLDER = 0, ED_ASSET_IMAGE, ED_ASSET_SOUND, ED_ASSET_SCENE, ED_ASSET_SCRIPT, ED_ASSET_OTHER
+    ED_ASSET_FOLDER = 0, ED_ASSET_IMAGE, ED_ASSET_SOUND, ED_ASSET_SCENE, ED_ASSET_SCRIPT, ED_ASSET_MODEL, ED_ASSET_OTHER
 } ed_asset_kind;
 
 #define ED_ENTITY_DRAG "entity"          /* a hierarchy row; the payload is the entity handle */
@@ -223,7 +290,60 @@ typedef struct ed_assets {
     bool focus_name;                     /* Rename: the preview's name box takes the keyboard */
 } ed_assets;
 
-typedef enum ed_bottom_tab { ED_TAB_FILES = 0, ED_TAB_CONSOLE } ed_bottom_tab;
+typedef enum ed_bottom_tab { ED_TAB_FILES = 0, ED_TAB_CONSOLE, ED_TAB_DEBUG } ed_bottom_tab;
+
+/* The script editor (code.c): the scripts open in the Scripts tab. */
+#define ED_CODE_FILES 12
+typedef struct ed_code_snap { char *text; int len, cursor, anchor; } ed_code_snap;
+typedef struct ed_code_file {
+    char path[ED_PATH_MAX * 2];        /* the full path (as breakpoints name it) */
+    char name[96];                     /* on its tab */
+    char *text;                        /* always 0-terminated */
+    int len, cap;
+    int *line_start, line_count, line_cap;   /* line k is [line_start[k], line_start[k+1] - 1) */
+    int cursor, anchor;                /* byte offsets: the selection is between them */
+    int want_col;                      /* up / down keep to this column (-1: the cursor's) */
+    float scroll_x, scroll_y;
+    bool dirty, close_asked;
+    int64_t modified;                  /* the file's time when last read or saved */
+    ed_code_snap *undo, *redo;
+    int undo_count, redo_count;
+    int group, group_end;              /* typing carries on one undo step... */
+    double group_time;                 /* ... while it's quick and in one place */
+    char error[256];                   /* the first mistake br_script_check found ("" : none) */
+    int error_line;
+    double check_at;                   /* when to check again (0: done) */
+} ed_code_file;
+typedef struct ed_code {
+    ed_code_file *files[ED_CODE_FILES];
+    int count, current;
+    bool focused;                      /* the text has the keyboard */
+    bool drawn, selecting;
+    int scroll_to;                     /* a line to bring into view (0: none) */
+    double blink, poll_at;
+} ed_code;
+
+/* The script debugger (debugger.c): the Debug tab, and the stop it is held at. */
+#define ED_DEBUG_VARS 64
+#define ED_DEBUG_FRAMES 16
+typedef struct ed_debug {
+    bool stopped;                      /* a script is held at a line (inside br_engine_frame) */
+    int action;                        /* what to do next (br_debug_action), -1: still waiting */
+    bool stop_after;                   /* Stop pressed while stopped: stop playing after this step */
+    char file[ED_PATH_MAX * 2];        /* the script shown in the Scripts tab (full path) */
+    int here;                          /* the line it is stopped at, in the frame shown... */
+    char here_file[ED_PATH_MAX * 2];   /* ... in this script (full path) */
+    int frame;                         /* the call-stack frame shown */
+    char reason[16];
+    br_entity entity;
+    struct { char fn[40]; char file[ED_PATH_MAX * 2]; int line; } frames[ED_DEBUG_FRAMES];
+    int nframes;
+    br_debug_var locals[ED_DEBUG_VARS], globals[ED_DEBUG_VARS];
+    int nlocals, nglobals;
+    int stops, last_line;              /* (for the self-test) */
+    int auto_frames, auto_action;      /* the self-test: answer by itself after so many frames */
+    const char *auto_shot;             /* ... saving the screen then (a .bmp), if set */
+} ed_debug;
 
 /* The panels around the scene view, each resized by dragging its edge and
  * collapsed with its arrow (main.c lays them out; saved with the settings). */
@@ -245,6 +365,7 @@ typedef enum ed_target { ED_TARGET_LINUX = 0, ED_TARGET_MACOS, ED_TARGET_WINDOWS
 typedef struct ed_menu_target {
     br_entity entity;                    /* hierarchy row / scene view */
     br_vec2 world;                       /* where the scene view was clicked */
+    br_vec3 world3;                      /* ... in 3D: on the ground (or in front of the camera) */
     char asset[ED_PATH_MAX];             /* a file or folder ("" = the folder shown) */
     br_component component;              /* an inspector section */
     int field;                           /* ... and its field (-1: the whole component) */
@@ -286,7 +407,9 @@ typedef struct editor {
     uint32_t script_errors_seen;       /* to report new script errors while playing */
     bool show_colliders;
 
-    ed_bottom_tab bottom_tab;          /* Files or Console under the scene view */
+    ed_bottom_tab bottom_tab;          /* Files, Console or Debug under the scene view */
+    ed_debug dbg;
+    ed_code code;
     ed_panels panels;
     int split_drag;                    /* the panel whose edge is being dragged, -1: none */
     float split_grab, split_start;     /* where on the edge it was taken; the size then */
@@ -334,14 +457,15 @@ void ed_cmd_play(editor *ed);              /* toggles play / stop */
 void ed_cmd_add_entity(editor *ed);
 void ed_cmd_add_child(editor *ed);          /* under the selection */
 void ed_cmd_duplicate(editor *ed);
-void ed_cmd_delete(editor *ed);
+void ed_cmd_delete(editor *ed);               /* the whole selection */
+void ed_cmd_select_all(editor *ed);
 void ed_cmd_copy(editor *ed);
 void ed_cmd_cut(editor *ed);
 void ed_cmd_paste(editor *ed, const br_vec2 *at, br_entity parent);   /* at NULL: next to where it was copied */
 void ed_clipboard_refresh(editor *ed);     /* scene text on the system clipboard -> ed->clipboard */
 void ed_cmd_rename(editor *ed);            /* the inspector's Name field */
 void ed_cmd_unparent(editor *ed);
-void ed_cmd_nudge(editor *ed, br_vec2 delta);
+void ed_cmd_nudge(editor *ed, br_vec2 delta);    /* in 3D: x along the ground to the right, y towards you */
 void ed_cmd_frame(editor *ed);             /* centre the view on the selection */
 bool ed_cmd_quit(editor *ed);              /* false: asked about unsaved changes first */
 void ed_cmd_answer(editor *ed, int choice);/* dialog: 0 save, 1 discard, 2 cancel */
@@ -353,6 +477,23 @@ void ed_view_init(ed_view *v);
 void ed_view_frame(editor *ed, br_rect rect);
 br_vec2 ed_view_to_screen(const ed_view *v, br_vec2 world);
 br_vec2 ed_view_to_world(const ed_view *v, br_vec2 screen);
+void ed_view_destroy(ed_view *v);
+void ed_view_grab_group(editor *ed);              /* where each selected root is, as a drag begins */
+
+/* viewport3d.c */
+void ed_view_set_3d(editor *ed, bool on);
+void ed_view3d_frame(editor *ed, br_rect rect);   /* ed_view_frame, in 3D */
+br_camera3d ed_view3d_camera(const ed_view *v);
+void ed_view3d_focus(editor *ed);                 /* Frame: orbit around the selection */
+void ed_view3d_reset(ed_view *v);
+br_vec3 ed_view3d_place(const editor *ed);        /* where new things go: the orbit point (snapped) */
+bool ed_view3d_project(const editor *ed, br_vec3 p, br_vec2 *screen);
+br_entity ed_view3d_pick(const editor *ed, br_vec2 screen);
+/* New 3D things: a Mesh of a shape (cube, sphere, ...), a character (a capsule with a
+ * capsule Collider3D, for move_and_slide()), a Camera3D, a Light or nothing. */
+typedef enum ed_new3d { ED_NEW_CUBE = 0, ED_NEW_SPHERE, ED_NEW_PLANE, ED_NEW_CYLINDER, ED_NEW_CONE, ED_NEW_CAPSULE, ED_NEW_CHARACTER, ED_NEW_PARTICLES, ED_NEW_CAMERA, ED_NEW_LIGHT, ED_NEW_EMPTY, ED_NEW_COUNT } ed_new3d;
+const char *ed_new3d_name(ed_new3d kind);
+br_entity ed_new3d_at(editor *ed, ed_new3d kind, br_vec3 at);
 
 /* icon.c: the brontosaurus at `size` x `size` pixels (transparent background) */
 void ed_make_icon(br_image *out, int size);
@@ -385,6 +526,10 @@ void ed_assets_play(editor *ed, const char *rel);          /* preview a sound (a
 /* Adds what an asset stands for at a world position: an image becomes a
  * sprite, a sound a Sound entity, a scene a prefab copy. */
 bool ed_assets_drop(editor *ed, const char *rel, br_vec2 world);
+/* ... in the 3D view: a model becomes a Mesh entity, an image the texture of
+ * the mesh `onto`, a script is attached to `onto` (or a new entity), a scene
+ * a prefab copy. */
+bool ed_assets_drop3d(editor *ed, const char *rel, br_vec3 at, br_entity onto);
 bool ed_field_accepts(const br_component_desc *c, const br_field *f, const char *rel);   /* can a drop fill this string field? */
 bool ed_assets_new_script(editor *ed);                    /* a template .bs in the shown folder */
 bool ed_assets_edit(editor *ed, const char *rel);        /* open in the OS's editor */
@@ -433,6 +578,29 @@ void ed_set_collapsed(editor *ed, br_entity e, bool collapsed);
 void ed_inspector(editor *ed, br_rect rect);
 void ed_statusbar(editor *ed, br_rect rect);
 void ed_bottom_tabs(editor *ed, br_rect rect);
+/* code.c */
+void ed_code_init(editor *ed);
+void ed_code_destroy(editor *ed);
+void ed_code_poll(editor *ed);
+/* Opens a script (project-relative or a full path) in the Scripts tab, at a line (0: where it was). */
+bool ed_code_open(editor *ed, const char *path, int line);
+int  ed_code_find(editor *ed, const char *path);              /* its index, -1: not open */
+ed_code_file *ed_code_current(editor *ed);
+bool ed_code_save(editor *ed, int index);
+int  ed_code_save_all(editor *ed);                          /* the ones with changes; how many */
+int  ed_code_dirty_count(const editor *ed);
+bool ed_code_close(editor *ed, int index, bool force);
+void ed_code_close_all(editor *ed);
+bool ed_code_has_keyboard(const editor *ed);
+int  ed_code_line_of(const ed_code_file *f, int pos);
+void ed_code_view(editor *ed, br_rect rect, int here);
+/* debugger.c */
+void ed_debug_init(editor *ed);
+void ed_debug_destroy(editor *ed);
+void ed_debug_panel(editor *ed, br_rect rect);
+bool ed_debug_show_file(editor *ed, const char *path, int line);
+bool ed_debug_toggle_breakpoint(editor *ed, int line);
+void ed_debug_after_frame(editor *ed);
 typedef enum ed_arrow { ED_ARROW_LEFT = 0, ED_ARROW_RIGHT, ED_ARROW_UP, ED_ARROW_DOWN } ed_arrow;
 /* A small clickable square (its own little panel, so it takes the mouse
  * before the panel it sits on). Returns BR_UI_* flags; draw it afterwards,

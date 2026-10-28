@@ -1,8 +1,9 @@
 # Bronto
 
-A small 2D game engine in C99 with **no dependencies beyond the C standard library and
-the operating system itself**. OS-specific code is kept in a separate platform layer,
-and the math and render APIs are designed so that 3D can be added later.
+A small 2D and 3D game engine in C99 with **no dependencies beyond the C standard library
+and the operating system itself**. OS-specific code is kept in a separate platform layer.
+3D is drawn in software too (a depth-buffered, textured, lit triangle rasterizer), with 3D
+rigid-body physics; see [docs/3d.md](docs/3d.md).
 
 > **Note:** much of the code in this project was written with Claude Opus 5.5, an AI
 > model made by Anthropic.
@@ -10,8 +11,9 @@ and the math and render APIs are designed so that 3D can be added later.
 Status (v0.1):
 - **Done:** the core systems; native windows, sound output and gamepads on Windows,
   macOS and Linux; web builds (WebAssembly, with no Emscripten), playable on phones and tablets with on-screen touch controls; two sample games, Snake
-  and Pop Defense; a visual scene editor; and recording and replaying runs frame for
-  frame, with a bot that plays Pantry Quest through.
+  and Pop Defense; a visual scene editor; recording and replaying runs frame for
+  frame, with a bot that plays Pantry Quest through; and 3D (rendering, physics, the
+  editor's 3D view and @3d scripts), with two 3D samples, Marble and Explorer.
 - **Next:** see the roadmap below.
 
 ## Quick start
@@ -25,6 +27,7 @@ make game GAME=examples/pantryquest   # pack a project into a game: build/games/
                    #   (TARGET=web|linux|macos|windows; default: this computer)
 make pantryquest   # the same for Pantry Quest
 make pantryquest2  # the same for Pantry Quest II (TARGET=web for a web page)
+make marble        # build and play Marble, the 3D example
 make test          # build libbronto.a and run the test suite
 make examples      # build examples/ into build/examples/
 make sanitize      # tests under AddressSanitizer + UndefinedBehaviorSanitizer
@@ -109,6 +112,11 @@ the rules.
 - **Viewport:** the scene exactly as a game draws it, with a grid and a frame showing
   the game's screen. Scroll to zoom, right-drag to pan, click to select. Drag to move,
   and use the handles to rotate and scale. Snap is optional.
+- **3D view:** scenes with 3D entities open in 3D (the toolbar's **3D** switches by hand),
+  with an orbit camera (right-drag), a ground grid, move / rotate / scale gizmos (W, E, R),
+  markers for cameras and lights, a view through the scene's camera (C), and **New 3D**
+  shapes, cameras and lights from the right-click menu. Drag `.obj` models in. See
+  [docs/3d.md](docs/3d.md#the-editor).
 - **Inspector:** the selected entity's components, with a widget for every field. It is
   generated from component descriptions, so any described component is editable with
   no editor code.
@@ -120,7 +128,7 @@ the rules.
 - **Assets:** a file browser for the project folder, with image thumbnails and a
   preview (image size, sound length with Play, scene entity count). Drag images, sounds
   and scenes into the view: an image becomes a sprite, a sound a Sound entity, and a
-  scene is placed as a prefab copy. Drop onto Sprite.image or Sound.file in the
+  scene is placed as a prefab instance, which follows the prefab when it changes (nested prefabs too). Drop onto Sprite.image or Sound.file in the
   inspector to fill them in. New folder, rename, delete (to a `.trash` folder),
   double-click to open a folder or scene or to hear a sound, and **To prefab** for the
   selected entity. Scripts (`.bs`) show their first lines and any mistake; drag one onto an
@@ -143,6 +151,11 @@ the rules.
 - **Clipboard:** text fields take Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+A (Cmd on a Mac) with the
   system clipboard. Copied entities go on it as scene text, so they paste into another
   editor window; menus copy console lines and file paths.
+- **Script editor:** the Scripts tab edits `.bs` files right in the editor: colours, undo,
+  indenting, Ctrl+/ comments, and mistakes marked at their line as you type. Play saves
+  the changed scripts first.
+- **Debugger:** in the same tab, click a line number for a breakpoint; the game stops there
+  with the call stack and variables, and steps line by line (see [docs/scripting.md](docs/scripting.md#debugging)).
 - **Undo / redo**, and a prompt to save before unsaved changes are lost.
 
 Scenes are saved as readable text files that games load with one call; see
@@ -162,7 +175,12 @@ hierarchy to reparent and reorder, and fold rows with their arrows (see `hierarc
 
 Add a **Collider** (a box or a circle) to make something solid, and a **RigidBody** to
 make it move: gravity, bouncing, friction, tumbling and stacking. A collider marked
-`trigger` reports what enters it instead of blocking it. A **Script** component runs a
+`trigger` reports what enters it instead of blocking it, and one marked `one_way` is a
+platform you can jump up through and stand on. A **Joint** ties two bodies together (a
+`hinge`, a `distance` rod, a `rope` or a `spring`; with no `other`, to a point in the
+world), and a RigidBody marked `bullet` sweeps along its path each step so it can't pass
+through thin walls however fast it goes. A **Particles** component gives off sparks, smoke, fire,
+rain and explosions (see [docs/scripting.md](docs/scripting.md#particles)). A **Script** component runs a
 BrontoScript file, a small language built into the engine:
 
 ```
@@ -188,8 +206,8 @@ guardians, a map, save slots, a story told in dialogue and a diary, and an endin
 described in [docs/scripting.md](docs/scripting.md). When speed matters, a script can
 instead be a behaviour written in C (`br_script_register_behaviour`).
 
-For editing scripts, **Settings** in the editor chooses the text editor that opens them,
-with presets for VS Code, Sublime Text, Notepad++ and Zed. `tools/vscode` is a VS Code
+Scripts open in the editor's own **Scripts** tab; **Settings** can send them to another
+text editor instead, with presets for VS Code, Sublime Text, Notepad++ and Zed. `tools/vscode` is a VS Code
 extension for `.bs` files with highlighting, completion, hover docs, signature help, go to
 definition and checking as you type (`make vscode` packages it). `bscheck` (`make tools`)
 checks scripts from the command line.
@@ -355,6 +373,8 @@ examples/towerdefense/  sample game: Pop Defense (tower defense)
 examples/platformer/    a level built only from the editor: physics + scripts, no C
 examples/pantryquest/   an adventure game made of scenes, Tilemaps, prefabs and scripts, no C
 examples/pantryquest2/  its sequel: a side-scrolling exploration game, no C (tools/ makes its assets)
+examples/marble/     a 3D game: meshes, a camera, lights, 3D physics and @3d scripts, no C
+examples/explorer/   3D: a walking character (move_and_slide) on hills, fog and shadows, no C
 tools/editor/        the visual scene editor
 tools/bscheck/       checks .bs scripts from the command line
 tools/player/        bronto_player: runs games (the editor's Build packs projects into it)
@@ -362,6 +382,7 @@ tools/vscode/        the BrontoScript extension for VS Code
 tools/web/           the web runtime (bronto.js), the page template, bronto_web (makes pages)
 tools/pantrybot/     a bot that plays Pantry Quest through and records it
 docs/scripting.md    the BrontoScript reference
+docs/3d.md           3D: coordinates, components, the editor's 3D view, the C API
 docs/web.md          web builds
 docs/replay.md       recording and replaying runs, and the Pantry Quest bot
 ```
@@ -371,23 +392,28 @@ docs/replay.md       recording and replaying runs, and the Pantry Quest bot
 | System | Header | What it does |
 |---|---|---|
 | Memory | `memory.h` | Tracked heap (`br_alloc`, leak stats, pluggable allocator), linear arena, fixed-size pool, file helpers |
-| Math | `bmath.h` | vec2/3/4, column-major mat4 (ortho, perspective, look-at, inverse), quaternions, rects, deterministic RNG |
+| Math | `bmath.h` | vec2/3/4, column-major mat4 (ortho, perspective, look-at, inverse, TRS and decomposing), quaternions (Euler angles, slerp, look rotations), rects, deterministic RNG |
 | Events | `event.h` | FIFO queue plus pub/sub bus. Handlers run by priority and can consume an event to stop it. Custom message types are registered at runtime and carry up to 48 bytes of payload |
 | Input | `input.h` | Keyboard, mouse, text and 4 gamepads, built purely from events. Pressed/released edges are frame-accurate. Named actions bind to keys, buttons and stick directions. Gamepad snapshot diffing is shared by all backends; rumble goes through `br_gamepad_rumble`. Fixed-step code sees each press exactly once (however many fixed steps a frame runs), and `last_device` says whether a key, the mouse, a gamepad or the touch screen was used last. Multi-touch events, with the touches down kept for each frame. With Steam Input on Linux, Valve's own controllers are left to Steam's virtual pad, so presses aren't counted twice |
 | ECS | `ecs.h` | Sparse-set storage with generation-checked entity handles. Components are registered at runtime. Queries take include and exclude lists. Supports deferred destruction, add/remove hooks, and systems ordered within 4 phases |
 | Scenes | `scene.h` | Scene stack where each scene has its own ECS world. `transparent` and `update_below` flags handle overlays and modals. Push/pop/switch requests are deferred to a safe point |
-| Render | `render.h` | Software rasterizer: shapes, triangles (including per-vertex colour; rasterised in fixed point so shared edges have no cracks or double pixels), affine sprites, 4 blend modes, 2D camera, 8x8 font, BMP/TGA |
+| Render | `render.h` | Software rasterizer: shapes, triangles (including per-vertex colour; rasterised in fixed point so shared edges have no cracks or double pixels), affine sprites, 4 blend modes, 2D camera, 8x8 font; BMP, TGA and PNG images (`inflate.h`: a small zlib codec, both ways; every PNG colour type, bit depth, palette, transparency and interlacing) |
 | Audio | `audio.h` | 32-voice mixer with volume, pan, pitch, looping, ramps, buses and resampling; WAV loader; tone generator; lock-free ring for audio threads |
 | Touch controls | `touch.h` | On-screen controls for phones and tablets: a stick and buttons, laid out in the bars around the game (or below it, held upright), drawn over the window at its own resolution. They act as a virtual gamepad (or press keys), show when the screen is touched, and pass other taps on as the mouse. `touch_controls` in a project's settings |
 | Window | `window.h` | Viewport and scale modes, mouse mapping, window state and control, the app icon (`br_window_set_icon`: window, taskbar and Dock), and the system clipboard (`br_clipboard_set` / `br_clipboard_get`: Win32 `CF_UNICODETEXT`, macOS `NSPasteboard`, X11 `CLIPBOARD` selection; a private one in headless and web builds) |
 | Platform | `platform.h` | Table of function pointers that each OS backend implements |
-| Scene files | `serialize.h` | Saves and loads worlds as readable text. Every *described* component (a list of its fields with names and types, `ecs.h`) is saved field by field. Loading skips unknown components and fields with a warning, and is all-or-nothing on errors |
+| Scene files | `serialize.h` | Saves and loads worlds as readable text. Prefab instances (nested to any depth) are made from their prefab files at load, with only each instance's changes in the scene. Every *described* component (a list of its fields with names and types, `ecs.h`) is saved field by field. Loading skips unknown components and fields with a warning, and is all-or-nothing on errors |
 | Built-in components | `components.h` | Name, Transform, Shape, Sprite, Label, Motion, Bounds, Sound, Tilemap (a grid of tiles from one tileset image, one character per cell, with solid characters for scripts to test) and Tags (words such as `enemy, flying` to find entities by kind: `br_tag_has`, `br_tag_add`, `br_find_tagged`; `find_tagged()` in scripts; the editor's hierarchy filters by `#tag`), with motion, audio and layered draw systems: enough to make and play simple scenes |
 | Scene tree | `hierarchy.h` | Parent component, local and world transforms, reparenting that keeps the on-screen position, children, subtrees and cascading destruction. Scene files store entity references (`BR_FIELD_ENTITY`) as positions in the file, reconnected on load |
-| Physics | `physics.h` | RigidBody (dynamic, static, kinematic), Collider (box or circle; friction, bounce, trigger, layers) and PhysicsWorld (gravity). Sort-and-sweep broad phase; circle and oriented-box contacts with clipping; a sequential-impulse solver, warm-started so stacks settle. Contact and trigger events, raycasts and point queries |
-| Scripts | `script.h` | The Script component. BrontoScript is interpreted from `.bs` files, re-read when they change, with a garbage-collected heap. Optional static types, plus structs (values) and classes (single inheritance, overrides) with public / private / protected, static and const members, and unsigned numbers. Errors give a file and line and stop only that script. Scripts read the keyboard, the mouse and gamepads (buttons by name, sticks, triggers, rumble). C behaviours can be registered by name |
+| Particles | `particles.h` | The Particles component: streams and bursts with lifetimes, speeds, spread, area, gravity, drag, sizes and colours over a life, circles, squares or images, blend modes, local or world space and auto-destroy; 2D on its layer, 3D splatted after the meshes (depth-tested and fogged). Seven presets, `emit()` from scripts, and a preview in the editor; deterministic, so replays match |
+| 3D rendering | `render3d.h` | Meshes (cube, sphere, plane, cylinder, cone, capsule, Wavefront `.obj`, with a BVH for rays and colliders), cameras (perspective, orthographic), lights (directional, point, ambient) and materials; a software pass with a depth buffer, near-plane clipping, back-face culling, perspective-correct textures, per-vertex lighting, see-through materials, distance fog, shadow maps from the sun (or soft blob shadows) and depth-tested lines; projecting and picking rays |
+| Models | `model.h` | glTF 2.0 (.gltf / .glb) read with no library: meshes, materials and PNG textures, the node tree, skins and animations; poses sampled, crossfaded and skinned on the CPU |
+| 3D components | `components3d.h` | Transform3D (position, Euler rotation, scale; parents work as in 2D), Mesh, Camera3D, Light and Animator; world matrices, `br_draw3d` (drawn before 2D, so 2D is the HUD) and `br_pick3d` |
+| 3D physics | `physics3d.h` | RigidBody3D, Collider3D (box, sphere, capsule or triangle mesh) and PhysicsWorld3D: sort and sweep, sphere and box contacts (separating axes with face clipping, up to four points kept by feature), capsule and mesh contacts, warm-started sequential impulses with friction and bounce; events with vec3 normals, raycasts and sphere overlaps; a character controller (`br_physics3d_move`: slide, walk up slopes, floor / wall / ceiling) |
+| Physics | `physics.h` | RigidBody (dynamic, static, kinematic; `bullet` for continuous collision), Collider (box or circle; friction, bounce, trigger, one-way, layers), Joint (hinge, distance, rope, spring) and PhysicsWorld (gravity). Sort-and-sweep broad phase; circle and oriented-box contacts with clipping; a sequential-impulse solver, warm-started so stacks settle. Contact and trigger events, raycasts and point queries |
+| Scripts | `script.h` | The Script component (`vec3` and `@3d` for 3D entities). BrontoScript is interpreted from `.bs` files, re-read when they change, with a garbage-collected heap. Optional static types, plus structs (values) and classes (single inheritance, overrides) with public / private / protected, static and const members, and unsigned numbers. A game's own components can be declared in its scripts (`component Health { var hp: int = 3 }`): scenes save them and the editor edits them. Tweens ease any property, field or variable over time (14 easing curves, delays, repeats, yoyo, callbacks). Errors give a file and line and stop only that script. Scripts read the keyboard, the mouse and gamepads (buttons by name, sticks, triggers, rumble). C behaviours can be registered by name |
 | Assets | `assets.h` | Image and sound cache: each file is loaded once, at a stable address, with relative paths resolved against the project folder (the nearest folder holding `project.bronto`, else the scene's own). Forgetting a sound silences it first. Project settings (`br_project`: name, main scene, screen size, strict typing, what built games leave out) live in `project.bronto` |
-| Packs | `pack.h` | A project folder in one file, or added to the end of a program (a built game). Once mounted, `br_file_read_all` finds files in it first, so the asset cache, scenes and scripts need no changes |
+| Packs | `pack.h` | A project folder in one file, or added to the end of a program (a built game), its files compressed with the engine's own DEFLATE (`inflate.h`) where that helps. Once mounted, `br_file_read_all` finds files in it first, so the asset cache, scenes and scripts need no changes |
 | File system | `fs.h` | List folders (folders first, sorted), stat, make folders, rename without overwriting, replace in one step, remove; the user's folders for settings and saved data; path string helpers. POSIX and Win32 backends in the platform layer |
 | Saved data | `save.h` | A game's save files, by name, in the system's place for them (`%APPDATA%`, `~/Library/Application Support`, `~/.local/share`, the browser's storage), written safely; `save_data` / `load_data` for scripts |
 | Output capture | `capture.h` | Redirects the program's own stdout and stderr into a buffer it reads back each frame (the editor's console), optionally still echoing to the terminal. Pipes plus a reader thread, in POSIX and Win32 backends in the platform layer; not available on the web (output goes to the browser's console) |
@@ -482,8 +508,5 @@ networking and golden-image tests practical. Two rules keep it that way:
 
 ## Roadmap
 
-1. PNG decoder (tilemaps, sprite sheets, Animation and Camera are in)
-2. Joints, one-way platforms and continuous collision for fast bodies; a script debugger
-3. Editor: multi-select, copy/paste between scenes, nested prefabs that update, game-specific components
-4. Web: a smaller page (compressing the pack)
-5. 3D path: depth buffer and perspective-correct triangles on the existing mat4/quat math
+1. Editor: find and replace, and completion in the Scripts tab
+2. 3D: inverse kinematics, morph targets, cascaded shadows for big outdoor scenes

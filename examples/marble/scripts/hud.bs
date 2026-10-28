@@ -1,0 +1,61 @@
+@strict
+# hud.bs - the gem count and the clock (a 2D Label over the 3D view), and messages.
+var gems: int = 0
+var total: int = 0
+var time: number = 0
+var done: bool = false
+var message_left: number = 3
+var message: entity
+
+func start() -> void {
+    total = len(find_tagged("gem"))
+    message = find("Message")
+    show()
+}
+
+func update(dt: number) -> void {
+    if not done { time += dt }
+    if message_left > 0 {
+        message_left -= dt
+        if message_left <= 0 and not done { message.Label.text = "" }
+    }
+    if done and (key_pressed("r") or key_pressed("enter") or button_pressed("start") or button_pressed("a")) {
+        load_scene("main.scene")
+    }
+    show()
+}
+
+func gem() -> void {
+    gems += 1
+    if gems == total {
+        say("All the gems! Now roll to the flag")
+    } else {
+        say("Gem " + gems + " of " + total)
+    }
+}
+
+func say(text: string) -> void {
+    message.Label.text = text
+    message_left = 2
+}
+
+func finish() -> void {
+    done = true
+    var how: string = "You made it in " + clock()
+    if gems == total {
+        how += " with every gem!"
+    } else {
+        how += ", " + gems + " of " + total + " gems"
+    }
+    message.Label.text = how + "\nR or Start: again"
+}
+
+func clock() -> string {
+    var s: int = floor(time)
+    var tenths: int = floor((time - s) * 10)
+    return s + "." + tenths + "s"
+}
+
+func show() -> void {
+    self.Label.text = "Gems " + gems + "/" + total + "     " + clock()
+}

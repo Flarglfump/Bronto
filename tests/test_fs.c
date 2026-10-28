@@ -196,7 +196,8 @@ static void test_pack(void) {
     br_path_join(pak, sizeof(pak), g_out_dir, "test.brpak");
     CHECK(br_pack_create(root, pak, false, skip_folder, NULL, &st, err, sizeof(err)));
     CHECK_EQ_INT(st.files, 3);
-    CHECK(st.bytes == 15 + sizeof(bin));
+    CHECK(st.unpacked == 15 + sizeof(bin));
+    CHECK(st.bytes <= st.unpacked);                                         /* (small files stay as they are) */
     CHECK(!br_pack_contains("main.scene") && !br_pack_mounted());
     CHECK(br_pack_mount(pak) && br_pack_mounted() && br_pack_file_count() == 3);
     CHECK(br_pack_contains("art/hero.bin") && br_pack_contains("./art\\hero.bin") && !br_pack_contains("skip/nope.txt") && !br_pack_contains(".hidden"));
@@ -226,6 +227,49 @@ static void test_pack(void) {
     br_free(text);
     br_pack_unmount();
     CHECK(!br_pack_create("no/such/folder", pak, false, NULL, NULL, NULL, err, sizeof(err)) && err[0]);
+
+    {   /* compression: a big text file shrinks and reads back whole; off, it doesn't */
+        char *big = (char *)br_alloc(200000), *back;
+        br_pack_stats a, b;
+        {
+            static const char unit[] = "entity\n  Name\n    text = \"Coin\"\n";
+            for (i = 0; i < 200000; ++i) big[i] = unit[i % (sizeof(unit) - 1)];
+        }
+        br_path_join(f, sizeof(f), root, "big.scene"); CHECK(br_file_write_all(f, big, 200000));
+        CHECK(br_pack_create(root, pak, false, skip_folder, NULL, &a, err, sizeof(err)));
+        CHECK(a.bytes < a.unpacked / 20);
+        CHECK(br_pack_mount(pak));
+        back = (char *)br_file_read_all("big.scene", &size);
+        CHECK(back && size == 200000 && memcmp(back, big, 200000) == 0 && back[200000] == 0);
+        br_free(back);
+        br_pack_unmount();
+        br_pack_set_compression(false);
+        CHECK(br_pack_create(root, pak, false, skip_folder, NULL, &b, err, sizeof(err)));
+        br_pack_set_compression(true);
+        CHECK(b.bytes == b.unpacked && b.unpacked == a.unpacked);
+        CHECK(br_pack_mount(pak));
+        back = (char *)br_pack_read("big.scene", &size);
+        CHECK(back && size == 200000 && memcmp(back, big, 200000) == 0);
+        br_free(back);
+        br_pack_unmount();
+        br_free(big);
+        br_path_join(f, sizeof(f), root, "big.scene");
+        br_fs_remove(f);
+    }
+    {   /* a version 1 pack (before compression) still mounts */
+        static const unsigned char v1[] = {
+            'h', 'i', '!',                                                   /* the data */
+            5, 0, 'a', '.', 't', 'x', 't', 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0,   /* the index */
+            'B', 'R', 'O', 'N', 'T', 'O', 'P', 'K', 1, 0, 0, 0, 1, 0, 0, 0,  /* trailer: version 1, 1 file */
+            3, 0, 0, 0, 0, 0, 0, 0, 3 + 23 + 32, 0, 0, 0, 0, 0, 0, 0 };
+        br_path_join(f, sizeof(f), g_out_dir, "old.brpak");
+        CHECK(br_file_write_all(f, v1, sizeof(v1)));
+        CHECK(br_pack_mount(f));
+        text = (char *)br_pack_read("a.txt", &size);
+        CHECK(text && size == 3 && strcmp(text, "hi!") == 0);
+        br_free(text);
+        br_pack_unmount();
+    }
 }
 
 static void test_project_settings(void) {

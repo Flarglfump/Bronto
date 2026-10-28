@@ -3,6 +3,7 @@
 A small level made with the editor, using physics and scripts and no C code:
 
 - `main.scene`: the level. The ground, the platforms and the walls are static colliders.
+  The lowest platform (the purple one) is `one_way`: jump up through it from below, land on top.
   The crates and the ball are dynamic rigid bodies. The coins are trigger colliders.
 - `scripts/player.bs`: running and jumping, with a raycast to check for ground.
 - `scripts/coin.bs`: spins, and when the player touches it, tells the HUD and removes itself.

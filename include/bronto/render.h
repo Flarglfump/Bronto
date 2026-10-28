@@ -71,9 +71,12 @@ BR_INLINE void br_image_set(br_image *img, int x, int y, br_color c) {
 }
 
 /* Image IO - dependency-free codecs.
+ * PNG: every standard kind - grey, grey + alpha, RGB, RGBA (8 or 16 bits),
+ *      paletted (1, 2, 4 or 8 bits), transparency (tRNS), interlaced (Adam7).
  * BMP: 8-bit paletted, 24-bit, 32-bit (BI_RGB / BI_BITFIELDS), top-down or bottom-up.
  * TGA: true-colour 24/32-bit, raw or RLE.                                    */
 bool br_image_load(br_image *img, const char *path);   /* by extension */
+bool br_image_load_png_mem(br_image *img, const void *data, size_t size);
 bool br_image_load_bmp_mem(br_image *img, const void *data, size_t size);
 bool br_image_load_tga_mem(br_image *img, const void *data, size_t size);
 bool br_image_save_bmp(const br_image *img, const char *path);  /* 32-bit, keeps alpha */
@@ -125,6 +128,8 @@ void br_renderer_reset_stats(br_renderer *r);
 void br_set_clip(br_renderer *r, br_recti clip);   /* screen space */
 void br_reset_clip(br_renderer *r);
 void br_set_blend(br_renderer *r, br_blend_mode mode);
+/* One pixel: `src` onto `*dst` in that mode (for code that writes pixels itself). */
+void br_blend_color(br_color *dst, br_color src, br_blend_mode mode);
 
 br_camera2d br_camera2d_make(br_vec2 target, br_vec2 offset);
 void br_begin_camera(br_renderer *r, const br_camera2d *cam);

@@ -63,6 +63,261 @@ static double num(br_entity e, const char *var) {
     return v;
 }
 
+/* The debugger: breakpoints, stepping, frames and variables (a hook standing in for the editor). */
+typedef struct dbg_log { int n; int line[8]; char where[8][40]; char vars[8][160]; br_debug_action next[8]; } dbg_log;
+
+static br_debug_action dbg_hook(const br_debug_stop *stop, void *user) {
+    dbg_log *L = (dbg_log *)user;
+    br_debug_var v[16];
+    const char *fn = "?";
+    int i, k, count;
+    if (L->n >= 8) return BR_DEBUG_DETACH;
+    i = L->n++;
+    L->line[i] = stop->line;
+    br_script_debug_frame(0, &fn, NULL, NULL);
+    snprintf(L->where[i], sizeof(L->where[i]), "%s %d %s", fn, br_script_debug_frame_count(), stop->reason);
+    L->vars[i][0] = 0;
+    count = br_script_debug_locals(0, v, 16);
+    for (k = 0; k < count; ++k) {
+        size_t at = strlen(L->vars[i]);
+        snprintf(L->vars[i] + at, sizeof(L->vars[i]) - at, "%s=%s ", v[k].name, v[k].value);
+    }
+    count = br_script_debug_globals(0, v, 16);
+    for (k = 0; k < count; ++k) {
+        size_t at = strlen(L->vars[i]);
+        snprintf(L->vars[i] + at, sizeof(L->vars[i]) - at, "g:%s=%s ", v[k].name, v[k].value);
+    }
+    CHECK(br_script_debug_stopped());
+    return L->next[i];
+}
+
+static void test_debugger(void) {
+    dbg_log L;
+    br_entity e;
+    memset(&L, 0, sizeof(L));
+    setup();
+    write_script("dbg.bs",
+        "var total: int = 0\n"                       /* 1 */
+        "func add(n: int) -> int {\n"                /* 2 */
+        "    var twice := n * 2\n"                   /* 3 */
+        "    return twice\n"                         /* 4 */
+        "}\n"                                        /* 5 */
+        "func update(dt: number) -> void {\n"        /* 6 */
+        "    var k := 3\n"                           /* 7 */
+        "    total += add(k)\n"                      /* 8 */
+        "    total += 1\n"                           /* 9 */
+        "    if total > 0 { var later := 1 }\n"      /* 10 */
+        "}\n");
+    e = scripted("Dbg", "dbg.bs", NULL, br_v2(0, 0));
+    steps(1);                                        /* (no debugger: runs as ever) */
+    CHECK(num(e, "total") == 7);
+    L.next[0] = BR_DEBUG_STEP_INTO; L.next[1] = BR_DEBUG_STEP_OUT; L.next[2] = BR_DEBUG_STEP_OVER;
+    L.next[3] = BR_DEBUG_CONTINUE; L.next[4] = BR_DEBUG_DETACH;
+    br_script_debug_attach(dbg_hook, &L);
+    CHECK(br_script_debug_set_breakpoint("dbg.bs", 8, true));
+    CHECK(br_script_debug_has_breakpoint(test_path("dbg.bs"), 8));
+    CHECK(!br_script_debug_has_breakpoint("bg.bs", 8));         /* (whole names only) */
+    steps(3);
+    CHECK_EQ_INT(L.n, 5);
+    CHECK(L.line[0] == 8 && strcmp(L.where[0], "update 1 breakpoint") == 0);
+    CHECK(strstr(L.vars[0], "dt=") && strstr(L.vars[0], "k=3 ") && strstr(L.vars[0], "g:total=7 "));
+    CHECK(!strstr(L.vars[0], "later"));                          /* (not reached yet) */
+    CHECK(L.line[1] == 3 && strcmp(L.where[1], "add 2 step") == 0);
+    CHECK(strstr(L.vars[1], "n=3 ") != NULL);
+    CHECK(L.line[2] == 9 && strcmp(L.where[2], "update 1 step") == 0);   /* out of add() */
+    CHECK(L.line[3] == 10);                                      /* over: the next line */
+    CHECK(L.line[4] == 8 && strstr(L.where[4], "breakpoint"));   /* the next step's update() */
+    CHECK(num(e, "total") == 7 * 4);                             /* (it all still ran) */
+    br_script_debug_resume();
+    L.n = 0;
+    L.next[0] = BR_DEBUG_CONTINUE;
+    br_script_debug_set_breakpoint("dbg.bs", 8, false);
+    br_script_debug_pause();
+    steps(2);
+    CHECK_EQ_INT(L.n, 1);
+    CHECK(L.line[0] == 7 && strstr(L.where[0], "paused"));
+    CHECK(br_script_debug_breakpoint(-1, NULL, NULL) == 0);
+    br_script_debug_attach(NULL, NULL);
+    CHECK(!br_script_debug_stopped());
+    teardown();
+}
+
+static void test_tweens(void) {
+    br_entity e, f;
+    br_transform *t;
+    const br_shape *sh;
+    setup();
+    write_script("tw.bs",
+        "@strict\n"
+        "var done: int = 0\n"
+        "var id: int = 0\n"
+        "var e1: number = 0\nvar e2: number = 0\nvar e3: number = 0\n"
+        "func start() -> void {\n"
+        "    id = tween(self, \"position\", vec2(100, 0), 1, \"linear\")\n"
+        "    tween_then(id, \"finished\")\n"
+        "    tween(self, \"Shape.color\", \"#ff000000\", 0.5)\n"
+        "    tween(self, \"rotation\", 90, 0.5, \"ease_out\", 0.5)\n"
+        "    var s := tween(self, \"scale\", 2, 0.25)\n"
+        "    tween_repeat(s, 1, true)\n"
+        "    e1 = ease(\"linear\", 0.25)\n    e2 = ease(\"ease_in\", 0.5)\n    e3 = ease(\"bounce_out\", 1)\n"
+        "}\n"
+        "func finished() -> void {\n"
+        "    done += 1\n"
+        "    tween(self, \"y\", 40, 0.5, \"back_out\")\n"
+        "}\n");
+    e = scripted("Mover", "tw.bs", NULL, br_v2(0, 0));
+    br_add(&W, e, ID.shape, NULL);
+    ((br_shape *)br_get(&W, e, ID.shape))->color = br_rgb(0, 0, 255);
+    steps(15);
+    t = (br_transform *)br_get(&W, e, ID.transform);
+    CHECK(fabsf(t->position.x - 25) < 0.01f);
+    CHECK(fabsf(t->scale.x - 2) < 0.01f);                         /* (there, and on its way back) */
+    steps(15);
+    t = (br_transform *)br_get(&W, e, ID.transform);
+    sh = (const br_shape *)br_get(&W, e, ID.shape);
+    CHECK(fabsf(t->position.x - 50) < 0.01f);
+    CHECK(sh->color.r == 255 && sh->color.b == 0 && sh->color.a == 0);
+    CHECK(fabsf(t->rotation) < 0.5f);                             /* (waiting) */
+    CHECK(fabsf(t->scale.x - 1) < 0.01f);                         /* back again */
+    CHECK(num(e, "e1") == 0.25 && num(e, "e2") == 0.25 && num(e, "e3") == 1);
+    steps(30);
+    t = (br_transform *)br_get(&W, e, ID.transform);
+    CHECK(fabsf(t->position.x - 100) < 0.01f && fabsf(t->rotation - 90) < 0.01f);
+    CHECK(num(e, "done") == 1);
+    steps(10);
+    CHECK(t->position.y > 0);                                     /* the tween its tween_then() started */
+    steps(40);
+    CHECK(fabsf(t->position.y - 40) < 0.01f);
+    /* stop_tween, is_tweening, other scripts' variables, and mistakes */
+    write_script("tw2.bs",
+        "var hp: number = 10\n"
+        "func start() {\n"
+        "    tween(self, \"hp\", 0, 1)\n"
+        "    tween(self, \"x\", 500, 10)\n"
+        "}\n"
+        "func stop() { stop_tween(self) }\n"
+        "func busy() { return is_tweening(self, \"x\") }\n");
+    f = scripted("Other", "tw2.bs", NULL, br_v2(0, 0));
+    steps(30);
+    CHECK(fabs(num(f, "hp") - 5) < 0.01);
+    CHECK(br_script_call(&W, f, "stop", NULL, 0));
+    steps(10);
+    CHECK(fabs(num(f, "hp") - 5) < 0.01);
+    write_script("tw3.bs", "func start() { tween(self, \"name\", \"Bob\", 1) }\n");
+    scripted("Bad", "tw3.bs", NULL, br_v2(0, 0));
+    steps(1);
+    CHECK(strstr(br_script_last_error(&W), "can't be eased") != NULL);
+    write_script("tw4.bs", "func start() { tween(self, \"x\", 5, 1, \"wobbly\") }\n");
+    scripted("Bad2", "tw4.bs", NULL, br_v2(0, 0));
+    steps(1);
+    CHECK(strstr(br_script_last_error(&W), "no ease") != NULL);
+    write_script("tw5.bs", "func start() { var t := tween(self, \"Shape.color\", \"#ffffff\", 1)\n    remove_component(self, \"Shape\") }\n");
+    e = scripted("Loses", "tw5.bs", NULL, br_v2(0, 0));
+    br_add(&W, e, ID.shape, NULL);
+    steps(5);                                                      /* (no error: the tween just stops) */
+    CHECK(strstr(br_script_last_error(&W), "no ease") != NULL);
+    teardown();
+}
+
+/* A game's own components, declared in a script: in scenes, the inspector's terms and scripts. */
+static void test_game_components(void) {
+    char err[300];
+    br_entity e, f;
+    const br_component_desc *d;
+    br_component hc;
+    char *text;
+    const char *decl =
+        "# the game's components\n"
+        "component Health {\n"
+        "    var hp: int = 3          # how much\n"
+        "    var regen: number = 0.5\n"
+        "    var shield: bool\n"
+        "    var label: string = \"brave # bold\"\n"
+        "    var spot: vec2 = vec2(4, -2)\n"
+        "    var aim: vec3 = vec3(1, 2, 3)\n"
+        "    var tint: color = \"#ff4040\"\n"
+        "    var team: enum(red, blue) = blue\n"
+        "    var target: entity\n"
+        "}\n"
+        "component Score\n{\n    var points: int\n}\n"
+        "func hurt() {\n}\n";
+    br_script_components_clear();
+    CHECK(br_script_scan_components(decl, "parts.bs", err, sizeof(err)) == 2);
+    CHECK(br_script_component_count() == 2);
+    d = br_script_component(0);
+    CHECK(d && strcmp(d->name, "Health") == 0 && d->field_count == 9);
+    {
+        char v[80];
+        int k;
+        for (k = 0; k < d->field_count; ++k) {
+            br_field_format(&d->fields[k], d->defaults, v, sizeof(v));
+            if (strcmp(d->fields[k].name, "hp") == 0) CHECK(strcmp(v, "3") == 0);
+            if (strcmp(d->fields[k].name, "label") == 0) CHECK(strcmp(v, "\"brave # bold\"") == 0);
+            if (strcmp(d->fields[k].name, "spot") == 0) CHECK(strcmp(v, "4 -2") == 0);
+            if (strcmp(d->fields[k].name, "tint") == 0) CHECK(strcmp(v, "#ff4040ff") == 0);
+            if (strcmp(d->fields[k].name, "team") == 0) CHECK(strcmp(v, "blue") == 0);
+        }
+    }
+    setup();                                                     /* (a world made now has them) */
+    hc = br_component_find(&W, "Health");
+    CHECK(hc != BR_COMPONENT_INVALID && br_component_find(&W, "Score") != BR_COMPONENT_INVALID);
+    write_script("medic.bs",
+        "func start() {\n"
+        "    var h = self.Health\n"
+        "    h.hp += 2\n"
+        "    h.team = \"red\"\n"
+        "    h.target = self\n"
+        "    add(self, \"Score\").points = 10\n"
+        "}\n"
+        "func update(dt) {\n"
+        "    for x in find_with(\"Health\") { x.Health.regen = len(find_with(\"Score\")) }\n"
+        "}\n");
+    e = scripted("Hero", "medic.bs", NULL, br_v2(0, 0));
+    br_add(&W, e, hc, NULL);
+    steps(2);
+    CHECK(br_script_error_count(&W) == 0);
+    {
+        const unsigned char *data = (const unsigned char *)br_get(&W, e, hc);
+        char v[80];
+        int k;
+        for (k = 0; data && k < d->field_count; ++k) {
+            br_field_format(&d->fields[k], data, v, sizeof(v));
+            if (strcmp(d->fields[k].name, "hp") == 0) CHECK(strcmp(v, "5") == 0);
+            if (strcmp(d->fields[k].name, "team") == 0) CHECK(strcmp(v, "red") == 0);
+            if (strcmp(d->fields[k].name, "regen") == 0) CHECK(strcmp(v, "1") == 0);
+        }
+    }
+    text = br_world_to_text(&W, &e, 1, NULL);                    /* in a scene file, and back */
+    CHECK(text && strstr(text, "Health\n") && strstr(text, "hp = 5") && strstr(text, "target = 0") && strstr(text, "Score\n    points = 10"));
+    {
+        br_entity made[2];
+        CHECK(br_world_from_text(&W, text, made, 2, NULL, 0) == 1);
+        f = made[0];
+        CHECK(br_has(&W, f, hc));
+        {
+            br_entity t;
+            const br_field *tf = NULL;
+            int k;
+            for (k = 0; k < d->field_count; ++k) if (strcmp(d->fields[k].name, "target") == 0) tf = &d->fields[k];
+            memcpy(&t, (const unsigned char *)br_get(&W, f, hc) + tf->offset, sizeof(t));
+            CHECK(t == f);                                       /* (the copy points at itself) */
+        }
+    }
+    br_free(text);
+    teardown();
+    /* mistakes, with where they are */
+    CHECK(br_script_scan_components("component Bad {\n    var x = 3\n}\n", "bad.bs", err, sizeof(err)) < 0 && strstr(err, "bad.bs:2") && strstr(err, "type"));
+    CHECK(br_script_scan_components("component Bad {\n    var x: list = 3\n}\n", "bad.bs", err, sizeof(err)) < 0 && strstr(err, "list"));
+    CHECK(br_script_scan_components("component lower {\n}\n", "bad.bs", err, sizeof(err)) < 0 && strstr(err, "capital"));
+    CHECK(br_script_scan_components("component Open {\n    var x: int\n", "bad.bs", err, sizeof(err)) < 0 && strstr(err, "never closed"));
+    CHECK(br_script_check(decl, "parts.bs", err, sizeof(err)));    /* (scripts with components in them still run) */
+    br_script_components_clear();
+    setup();
+    CHECK(br_component_find(&W, "Health") == BR_COMPONENT_INVALID);
+    teardown();
+    br_script_components_release();                              /* (the old sets are kept until no world can use them) */
+}
+
 static void test_check_and_errors(void) {
     char err[256];
     CHECK(br_script_check("var a = 1\nfunc update(dt) {\n  a += dt\n}\n", "ok.bs", err, sizeof(err)));
@@ -2102,7 +2357,7 @@ static void test_extension_knows_builtins(void) {
     {   /* the names offered inside strings, tried on the engine */
         static const struct { const char *list, *call; } uses[] = {
             { "keys", "key_down(v)" }, { "buttons", "button_down(v)" }, { "axes", "axis(v)" }, { "sticks", "stick(v)" },
-            { "buses", "volume(v)" }, { "components", "has(self, v)" },
+            { "buses", "volume(v)" }, { "components", "has(self, v)" }, { "eases", "ease(v, 0.5)" },
         };
         char *src = (char *)br_alloc(64 * 1024);
         size_t k;
@@ -2258,6 +2513,247 @@ static void test_types_at_run_time(void) {
     teardown();
 }
 
+/* Marble (examples/marble): the 3D example. The marble rolls up the course with the
+ * arrow keys, collects gems, rides the lift, falls back to a checkpoint, and finishes. */
+static void test_marble_example(void) {
+    char err[200];
+    br_entity marble, hud, lift;
+    br_ids3d i3;
+    br_transform3d *t;
+    double done = 0;
+    float lift_y;
+    setup();
+    br_ids3d_of(&W, &i3);
+    br_assets_set_root("examples/marble/");
+    br_script_set_strict(true);                        /* (project.bronto: strict_typing) */
+    CHECK(br_world_load_file(&W, "examples/marble/main.scene", NULL, 0, err, sizeof(err)) > 30);
+    marble = named("Marble");
+    hud = named("HUD");
+    lift = named("Lift");
+    steps(30);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    CHECK(num(hud, "total") == 8);
+    t = (br_transform3d *)br_get(&W, marble, i3.transform3d);
+    CHECK(t && fabsf(t->position.y - 0.5f) < 0.02f);                  /* resting on the start pad */
+    lift_y = ((br_transform3d *)br_get(&W, lift, i3.transform3d))->position.y;
+    hold_key(BR_KEY_UP, 240);                                          /* up the walkway */
+    t = (br_transform3d *)br_get(&W, marble, i3.transform3d);
+    CHECK(t->position.z < -8 && fabsf(t->position.x) < 1 && fabsf(t->position.y - 0.5f) < 0.05f);
+    CHECK(num(hud, "gems") >= 2);
+    CHECK(fabsf(((br_transform3d *)br_get(&W, lift, i3.transform3d))->position.y - lift_y) > 0.5f);   /* the lift moves */
+    {   /* on up the ramp, onto the upper deck, past its checkpoint */
+        int k;
+        g_engine.input.keys[BR_KEY_UP] = true;
+        for (k = 0; k < 400 && t->position.z > -22.5f; ++k) {
+            steps(1);
+            t = (br_transform3d *)br_get(&W, marble, i3.transform3d);
+        }
+        g_engine.input.keys[BR_KEY_UP] = false;
+    }
+    CHECK(t->position.z <= -22.5f && t->position.y > 2.3f && num(hud, "gems") >= 3);
+    if (t->position.z > -22.5f || num(hud, "gems") < 3) printf("      marble %.2f %.2f %.2f, gems %g\n", (double)t->position.x, (double)t->position.y, (double)t->position.z, num(hud, "gems"));
+    /* off the edge: back to the checkpoint on the upper deck */
+    t->position = br_v3(8, 3, -24);
+    steps(150);
+    t = (br_transform3d *)br_get(&W, marble, i3.transform3d);
+    CHECK(fabsf(t->position.z + 21) < 2.5f && t->position.y > 2.3f && fabsf(t->position.x) < 2);
+    {   /* a ride up on the lift, then off onto the high deck */
+        br_transform3d *f = (br_transform3d *)br_get(&W, lift, i3.transform3d);
+        int k;
+        for (k = 0; k < 600 && fabsf(f->position.y - 1.75f) > 0.01f; ++k) steps(1);   /* (waits for it at the bottom) */
+        t = (br_transform3d *)br_get(&W, marble, i3.transform3d);
+        t->position = br_v3(0, 2.5f, f->position.z);
+        ((br_rigidbody3d *)br_get(&W, marble, br_component_find(&W, "RigidBody3D")))->velocity = br_v3(0, 0, 0);
+        for (k = 0; k < 600 && f->position.y < 4.74f; ++k) steps(1);
+        t = (br_transform3d *)br_get(&W, marble, i3.transform3d);
+        CHECK(t->position.y > 5.3f);                                   /* carried up */
+        hold_key(BR_KEY_UP, 80);
+        t = (br_transform3d *)br_get(&W, marble, i3.transform3d);
+        CHECK(t->position.z < -31.5f && t->position.y > 5.3f);
+        if (!(t->position.z < -31.5f && t->position.y > 5.3f)) printf("      after the lift: %.2f %.2f %.2f\n", (double)t->position.x, (double)t->position.y, (double)t->position.z);
+    }
+    /* the flag */
+    t->position = br_v3(0, 5.6f, -38.5f);
+    steps(30);
+    CHECK(br_script_get_number(&W, hud, "done", &done) && done == 1);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+
+/* Explorer (examples/explorer): a capsule walked with move_and_slide over a mesh of
+ * hills: it keeps to the ground, picks up the crystal ahead, jumps, and can't walk
+ * through a tree. */
+static void test_explorer_example(void) {
+    char err[200];
+    br_entity hero, hud, trunk = BR_ENTITY_NULL;
+    br_ids3d i3;
+    br_transform3d *t;
+    float y0;
+    int k;
+    setup();
+    br_ids3d_of(&W, &i3);
+    br_assets_set_root("examples/explorer/");
+    br_script_set_strict(true);
+    CHECK(br_world_load_file(&W, "examples/explorer/main.scene", NULL, 0, err, sizeof(err)) > 30);
+    hero = named("Explorer");
+    hud = named("HUD");
+    steps(30);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    t = (br_transform3d *)br_get(&W, hero, i3.transform3d);
+    y0 = t->position.y;
+    CHECK(num(hud, "total") == 8);
+    CHECK(fabsf(t->position.y - 1.0f) < 0.1f);                        /* standing on the hills (flat in the middle) */
+    hold_key(BR_KEY_W, 90);                                            /* walk ahead: over the crystal at z -6 */
+    t = (br_transform3d *)br_get(&W, hero, i3.transform3d);
+    CHECK(t->position.z < -7 && fabsf(t->position.x) < 1);
+    CHECK(num(hud, "found_count") == 1);
+    {   /* on the ground: never sunk into the hills, never floating */
+        br_raycast3d_hit hit;
+        CHECK(br_physics3d_raycast(&W, br_v3_add(t->position, br_v3(0, 0, 0)), br_v3_add(t->position, br_v3(0, -3, 0)), -1, hero, &hit));
+        CHECK(hit.distance > 0.9f && hit.distance < 1.1f);
+        if (!(hit.distance > 0.9f && hit.distance < 1.1f)) printf("      %.3f above the ground\n", (double)(hit.distance - 1));
+    }
+    y0 = t->position.y;                                                /* jump */
+    g_engine.input.keys_pressed[BR_KEY_SPACE] = g_engine.input.keys[BR_KEY_SPACE] = true;
+    steps(1);
+    g_engine.input.keys_pressed[BR_KEY_SPACE] = g_engine.input.keys[BR_KEY_SPACE] = false;
+    steps(15);
+    t = (br_transform3d *)br_get(&W, hero, i3.transform3d);
+    CHECK(t->position.y > y0 + 1.0f);
+    steps(60);
+    for (k = 0; k < (int)W.pools[ID.name].count; ++k)                  /* a tree: walk straight into its trunk */
+        if (strcmp(((const br_name *)(W.pools[ID.name].data + (size_t)k * W.pools[ID.name].stride))->text, "Trunk") == 0) {
+            trunk = W.pools[ID.name].entities[k];
+            break;
+        }
+    if (trunk != BR_ENTITY_NULL) {
+        br_vec3 tp = ((br_transform3d *)br_get(&W, trunk, i3.transform3d))->position;
+        t = (br_transform3d *)br_get(&W, hero, i3.transform3d);
+        t->position = br_v3(tp.x, tp.y + 1, tp.z + 3);                 /* 3 units in front (+z) of it */
+        ((br_transform3d *)br_get(&W, named("Camera"), i3.transform3d))->position = br_v3_add(t->position, br_v3(0, 4.5f, 9));
+        hold_key(BR_KEY_W, 60);                                        /* (the camera is behind it: W walks to -z) */
+        t = (br_transform3d *)br_get(&W, hero, i3.transform3d);
+        CHECK(t->position.z > tp.z + 0.7f);                             /* stopped by it: trunk 0.25 + explorer 0.5 */
+        if (!(t->position.z > tp.z + 0.7f)) printf("      in front of the tree by %.2f\n", (double)(t->position.z - tp.z));
+    }
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+
+/* 3D: vec3 values, @3d files (position & co. are vec3s), 3D builtins and callbacks. */
+static br_entity scripted3(const char *name, const char *file, const char *vars, br_vec3 pos) {
+    br_entity e = br_entity_create(&W);
+    br_script *s;
+    br_ids3d i3;
+    br_ids3d_of(&W, &i3);
+    snprintf(((br_name *)br_add(&W, e, ID.name, NULL))->text, 32, "%s", name);
+    ((br_transform3d *)br_add(&W, e, i3.transform3d, NULL))->position = pos;
+    if (!file) return e;
+    s = (br_script *)br_add(&W, e, SCRIPT, NULL);
+    snprintf(s->file, sizeof(s->file), "%s", file);
+    snprintf(s->vars, sizeof(s->vars), "%s", vars ? vars : "");
+    return e;
+}
+
+static void test_script_3d(void) {
+    char err[256];
+    br_entity mover, ball, ground, target;
+    br_ids3d i3;
+    br_component rb3, col3;
+    /* the checker knows vec3 and @3d */
+    CHECK(br_script_check("@3d\nvar v: vec3 = vec3(1, 2, 3)\nfunc update(dt: number) -> void {\n  self.position += v * dt\n  var f: vec3 = self.forward\n  var l: number = length(cross(f, self.up))\n}\n", "a.bs", err, sizeof(err)));
+    CHECK(!br_script_check("@3d\nfunc f() -> void {\n  var p: vec2 = self.position\n}\n", "b.bs", err, sizeof(err)) && strstr(err, "b.bs:3"));
+    CHECK(!br_script_check("func f() -> void {\n  var p: vec2 = self.forward\n}\n", "c.bs", err, sizeof(err)));
+    CHECK(!br_script_check("func f() { var a = vec3(1, 2) }\n", "d.bs", err, sizeof(err)) && strstr(err, "vec3() takes 3"));
+    CHECK(!br_script_check("@three\n", "e.bs", err, sizeof(err)) && strstr(err, "@3d"));
+    CHECK(br_script_check("func on_collision(other, normal, speed) { }\n", "f.bs", err, sizeof(err)));
+    CHECK(!br_script_check("@3d\nfunc on_collision(other: entity, normal: vec2, speed: number) -> void { }\n", "g.bs", err, sizeof(err)));
+    CHECK(br_script_check("@3d\nfunc on_collision(other: entity, normal: vec3, speed: number) -> void { }\n", "h.bs", err, sizeof(err)));
+    CHECK(br_script_check("@strict @3d\nvar v: vec3 = vec3(1, 2, 3)\n", "i.bs", err, sizeof(err)));
+    CHECK(!br_script_check("@strict @3d\nvar v = vec3(1, 2, 3)\n", "j.bs", err, sizeof(err)) && strstr(err, "@strict"));
+
+    setup();
+    br_ids3d_of(&W, &i3);
+    rb3 = br_component_find(&W, "RigidBody3D");
+    col3 = br_component_find(&W, "Collider3D");
+    write_script("math3.bs",
+        "var a = vec3(1, 2, 3)\nvar b = vec3(4, 5, 6)\nvar sum = 0\nvar d = 0\nvar c = vec3(0, 0, 0)\nvar same = false\nvar l = 0\nvar m\n"
+        "func start() {\n"
+        "    var s = a + b * 2 - vec3(1, 1, 1) / 1\n"      /* (9, 11, 13) */
+        "    sum = s.x + s.y + s.z\n"
+        "    d = dot(a, b)\n"
+        "    c = cross(vec3(1, 0, 0), vec3(0, 1, 0))\n"
+        "    same = a == vec3(1, 2, 3) and a != b\n"
+        "    l = length(normalize(-b)) + distance(vec3(0, 0, 0), vec3(0, 3, 4))\n"
+        "    m = lerp(a, b, 0.5)\n"
+        "    m.z = 100\n"
+        "    print(m)\n"
+        "}\n");
+    write_script("mover3.bs",
+        "@3d\nvar speed: number = 2\nvar seen: number = 0\nvar fz: number = 0\nvar sx: number = 0\nvar hidden: number = 0\n"
+        "func update(dt: number) -> void {\n"
+        "    self.position += vec3(0, 0, -speed) * dt\n"
+        "    self.rotation = vec3(0, 90, 0)\n"
+        "    fz = self.forward.x\n"
+        "    seen = self.z\n"
+        "    var p: vec2 = world_to_screen(vec3(1000, 0, 0))\n"
+        "    hidden = p.x\n"
+        "}\n");
+    write_script("ball3.bs",
+        "@3d\nvar hits: number = 0\nvar ny: number = 0\nvar ray_hit: number = 0\nvar near: number = 0\nvar pushed: number = 0\n"
+        "func on_collision(other: entity, normal: vec3, speed: number) -> void {\n"
+        "    hits += 1\n"
+        "    ny = normal.y\n"
+        "}\n"
+        "func update(dt: number) -> void {\n"
+        "    var r = raycast(self.position + vec3(0, 5, 0), self.position - vec3(0, 5, 0), self)\n"
+        "    if r != nil and r[0].name == \"Ground\" { ray_hit = 1 }\n"
+        "    near = len(overlap_sphere(self.position, 2))\n"
+        "}\n"
+        "func kick() -> void {\n"
+        "    apply_impulse(self, vec3(3, 0, 0))\n"
+        "    pushed = self.velocity.x\n"
+        "}\n");
+    scripted("Math", "math3.bs", NULL, br_v2(0, 0));
+    mover = scripted3("Mover", "mover3.bs", "speed=6", br_v3(0, 0, 0));
+    ground = scripted3("Ground", NULL, NULL, br_v3(0, -0.5f, 0));
+    ((br_collider3d *)br_add(&W, ground, col3, NULL))->size = br_v3(20, 1, 20);
+    ball = scripted3("Ball", "ball3.bs", NULL, br_v3(5, 2, 0));
+    br_add(&W, ball, rb3, NULL);
+    ((br_collider3d *)br_add(&W, ball, col3, NULL))->shape = BR_COLLIDER3D_SPHERE;
+    target = scripted3("Target", NULL, NULL, br_v3(0, 0, -10));
+    steps(61);
+    CHECK_EQ_INT(br_script_error_count(&W), 0);
+    if (br_script_error_count(&W)) printf("      %s\n", br_script_last_error(&W));
+    CHECK(strcmp(g_printed, "(2.5, 3.5, 100)") == 0);
+    if (strcmp(g_printed, "(2.5, 3.5, 100)")) printf("      printed '%s'\n", g_printed);
+    CHECK(num(named("Math"), "sum") == 33 && num(named("Math"), "d") == 32);
+    CHECK(fabs(num(named("Math"), "l") - 6) < 1e-6);
+    CHECK_NEAR(((br_transform3d *)br_get(&W, mover, i3.transform3d))->position.z, -6, 0.15);
+    CHECK_NEAR(num(mover, "seen"), ((br_transform3d *)br_get(&W, mover, i3.transform3d))->position.z, 1e-4);
+    CHECK_NEAR(num(mover, "fz"), -1, 1e-4);
+    CHECK(num(mover, "hidden") == -100000);          /* (no camera: everything is "behind") */
+    CHECK(num(ball, "hits") == 1 && fabs(num(ball, "ny") + 1) < 0.01);   /* normal from the ball to the ground: down */
+    CHECK(num(ball, "near") == 2);                   /* itself and the ground */
+    {
+        CHECK(br_script_call(&W, ball, "kick", NULL, 0));
+        CHECK_NEAR(num(ball, "pushed"), 3, 1e-4);
+        CHECK(num(ball, "ray_hit") == 1);
+    }
+    BR_UNUSED(target);
+    /* a 2D entity has no z */
+    write_script("flat.bs", "func start() { var q = self.z }\n");
+    scripted("Flat", "flat.bs", NULL, br_v2(0, 0));
+    steps(2);
+    CHECK(br_script_error_count(&W) == 1 && strstr(br_script_last_error(&W), "Transform3D"));
+    if (br_script_error_count(&W) == 1 && !strstr(br_script_last_error(&W), "Transform3D")) printf("      %s\n", br_script_last_error(&W));
+    teardown();
+}
+
 void suite_script(void) {
     RUN(test_extension_knows_builtins);
     RUN(test_tree_from_scripts);
@@ -2280,6 +2776,9 @@ void suite_script(void) {
     RUN(test_pantryquest_pocket_pantry);
     RUN(test_pantryquest_gamepad);
     RUN(test_pantryquest_files_and_settings);
+    RUN(test_tweens);
+    RUN(test_game_components);
+    RUN(test_debugger);
     RUN(test_check_and_errors);
     RUN(test_types_checked);
     RUN(test_types_at_run_time);
@@ -2294,6 +2793,9 @@ void suite_script(void) {
     RUN(test_spawn_destroy_input);
     RUN(test_gamepad_input);
     RUN(test_script_tags);
+    RUN(test_script_3d);
+    RUN(test_marble_example);
+    RUN(test_explorer_example);
     RUN(test_tiles_substr_big_spawn);
     RUN(test_spawn_then_set);
     RUN(test_c_behaviour_and_reload);

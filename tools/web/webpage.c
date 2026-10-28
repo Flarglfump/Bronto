@@ -88,6 +88,20 @@ bool webpage_find_runtime(const char *dir, char *wasm, char *runtime_js, char *s
     return false;
 }
 
+/* The program (or a replay) in the page: compressed when that makes it smaller
+ * ("deflate:" and then the base64; the page's script inflates it). */
+static void wp_payload(wp_buf *b, const void *data, size_t size) {
+    size_t packed = 0;
+    void *z = size > 256 ? br_deflate(data, size, &packed, 9) : NULL;
+    if (z && packed < size - size / 20) {
+        wp_puts(b, "deflate:");
+        wp_base64(b, (const unsigned char *)z, packed);
+    } else {
+        wp_base64(b, (const unsigned char *)data, size);
+    }
+    br_free(z);
+}
+
 /* ---- packing a project ---- */
 typedef struct wp_filter { const br_project *project; } wp_filter;
 
@@ -170,9 +184,9 @@ bool webpage_write(const webpage *page, const char *runtime_js_path, const char 
         if (strcmp(name, "TITLE") == 0) wp_html(&b, title);
         else if (strcmp(name, "ICON") == 0) wp_icon(&b, page->icon);
         else if (strcmp(name, "RUNTIME") == 0) wp_puts(&b, js);
-        else if (strcmp(name, "WASM") == 0) wp_base64(&b, (const unsigned char *)page->wasm, page->wasm_size);
+        else if (strcmp(name, "WASM") == 0) wp_payload(&b, page->wasm, page->wasm_size);
         else if (strcmp(name, "PACK") == 0) { if (page->pack) wp_base64(&b, (const unsigned char *)page->pack, page->pack_size); }
-        else if (strcmp(name, "REPLAY") == 0) { if (page->replay) wp_base64(&b, (const unsigned char *)page->replay, page->replay_size); }
+        else if (strcmp(name, "REPLAY") == 0) { if (page->replay) wp_payload(&b, page->replay, page->replay_size); }
         else if (strcmp(name, "ARGS") == 0) {
             int i;
             wp_puts(&b, "[");

@@ -1,0 +1,10 @@
+bronto_project 1
+# Explorer: walk the hills and find the crystals. Open this folder in the editor.
+name = Explorer
+main_scene = main.scene
+width = 320
+height = 200
+window_scale = 3
+strict_typing = true
+exclude = tools
+touch_controls = stick, a, start

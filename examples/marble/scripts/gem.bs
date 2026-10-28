@@ -1,0 +1,23 @@
+@strict @3d
+# gem.bs - turns and bobs; the marble collects it by rolling through.
+var spin: number = 140         # degrees / second
+var t: number = 0
+var base: number = 0
+
+func start() -> void {
+    base = self.y
+    t = self.x + self.z                        # so the gems don't all bob together
+}
+
+func update(dt: number) -> void {
+    t += dt
+    self.rotation = vec3(0, t * spin, 0)
+    self.y = base + sin(t * 200) * 0.08        # (sin takes degrees)
+}
+
+func on_trigger(other: entity) -> void {
+    if other.name == "Marble" {
+        send(find("HUD"), "gem")
+        destroy(self)
+    }
+}

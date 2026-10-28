@@ -90,7 +90,9 @@ test('the C examples play the very same games as WebAssembly (pictures and sound
 function pagePayload(html, id) {
     const m = html.match(new RegExp('<script id="' + id + '" type="application/octet-stream">([^<]*)</script>'));
     assert.ok(m, 'the page has ' + id);
-    return Bronto.fromBase64(m[1].trim());
+    const text = m[1].trim();
+    if (text.startsWith('deflate:')) return Bronto.inflate(Bronto.fromBase64(text.slice(8)));   /* (the program, packed small) */
+    return Bronto.fromBase64(text);
 }
 
 test('a project\'s page holds the web player and the project\'s pack', async () => {
@@ -100,6 +102,8 @@ test('a project\'s page holds the web player and the project\'s pack', async () 
     const wasm = pagePayload(html, 'bronto-wasm'), pack = pagePayload(html, 'bronto-pack');
     assert.ok(WebAssembly.validate(wasm), 'the program is valid WebAssembly');
     assert.deepStrictEqual(Buffer.from(wasm), fs.readFileSync(path.join(web, 'bronto_player.wasm')));
+    assert.match(html, /id="bronto-wasm" type="application\/octet-stream">deflate:/, 'the program is compressed');
+    assert.ok(html.length < fs.statSync(path.join(web, 'bronto_player.wasm')).size, 'the page is smaller than the program alone');
     assert.strictEqual(Buffer.from(pack.subarray(pack.length - 32, pack.length - 24)).toString(), 'BRONTOPK', 'the pack ends in its trailer');
     assert.ok(Buffer.from(pack).includes('scripts/player.bs'), 'the project\'s scripts are packed');
 });

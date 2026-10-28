@@ -28,6 +28,7 @@
 #include "ecs.h"
 #include "scene.h"
 #include "render.h"
+#include "render3d.h"
 #include "audio.h"
 #include "platform.h"
 #include "window.h"
@@ -84,6 +85,7 @@ struct br_engine {
     br_input input;
     br_image framebuffer;
     br_renderer renderer;
+    br_r3d r3d;                     /* the 3D pass's depth buffer and lights (components3d.h) */
     br_mixer mixer;
     br_scene_manager scenes;
     br_window_state window;
@@ -123,6 +125,9 @@ br_engine_config br_engine_default_config(void);
 
 bool br_engine_init(br_engine *e, const br_engine_config *cfg);
 bool br_engine_frame(br_engine *e);   /* false once the engine should stop */
+/* A frame with the game held still: input, events and drawing only (a debugger's
+ * loop while a script is stopped; see br_script_debug_attach). */
+bool br_engine_frame_paused(br_engine *e);
 void br_engine_shutdown(br_engine *e);
 void br_engine_quit(br_engine *e);
 

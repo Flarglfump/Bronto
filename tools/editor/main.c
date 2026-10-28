@@ -209,6 +209,10 @@ static void shortcuts(editor *ed) {
     float step;
     if (br_ui_wants_keyboard(&ed->ui) || br_ui_menu_active(&ed->ui) ||                /* typing, a menu, or a dialog */
         ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible) return;
+    if (ed_code_has_keyboard(ed) && !ed->doc.playing) {   /* the script editor has the keyboard: only Play */
+        if (br_key_pressed(in, BR_KEY_F5) || (cmd && br_key_pressed(in, BR_KEY_P))) ed_cmd_play(ed);
+        return;
+    }
     if (ed->doc.playing) {                         /* the game has the keyboard: only Stop */
         if (br_key_pressed(in, BR_KEY_F5) || br_key_pressed(in, BR_KEY_ESCAPE) || (cmd && br_key_pressed(in, BR_KEY_P))) ed_cmd_play(ed);
         return;
@@ -220,6 +224,7 @@ static void shortcuts(editor *ed) {
     if (cmd && br_key_pressed(in, BR_KEY_Z)) { if (shift) ed_cmd_redo(ed); else ed_cmd_undo(ed); }
     if (cmd && br_key_pressed(in, BR_KEY_Y)) ed_cmd_redo(ed);
     if (cmd && br_key_pressed(in, BR_KEY_D)) ed_cmd_duplicate(ed);
+    if (cmd && br_key_pressed(in, BR_KEY_A)) ed_cmd_select_all(ed);
     if (cmd && br_key_pressed(in, BR_KEY_C)) {
         layout l = make_layout(ed);                 /* over the console: its selected line */
         br_vec2 m = br_v2(in->mouse_x, in->mouse_y);
@@ -285,6 +290,8 @@ static bool editor_enter(br_scene *s) {
     ed->split_drag = ed->split_hot = -1;
     ed_prefs_load(ed);
     ed_doc_init(&ed->doc);
+    ed_code_init(ed);                                /* the Scripts tab's editor (code.c) */
+    ed_debug_init(ed);                               /* breakpoints stop scripts here (debugger.c) */
     ed->doc.world.context = ed->engine;              /* Sound components play while playing */
     ed->doc.context = ed->engine;                    /* ... and in scenes pushed over it (push_scene) */
     {   /* the project: the scene's (see br_assets_find_root), or the folder the editor started in */
@@ -292,6 +299,7 @@ static bool editor_enter(br_scene *s) {
         if (g_open_path && !br_fs_is_dir(g_open_path)) br_assets_find_root(g_open_path, root, sizeof(root));
         ed_assets_init(ed, root);
     }
+    ed_components_reload(ed, true);                  /* (before a scene is opened: it may use them) */
     if (g_open_path && br_fs_is_dir(g_open_path)) {
         if (!ed_open_project(ed, g_open_path)) ed_sample_scene(&ed->doc);
     } else if (g_open_path) {
@@ -306,15 +314,19 @@ static bool editor_enter(br_scene *s) {
         ed_sample_scene(&ed->doc);
         ed_status(ed, "Welcome! This is a sample scene: click things, drag them, press Play");
     }
+    ed_view_set_3d(ed, br_world_has_3d(&ed->doc.world));
     ed_cmd_frame(ed);
     return true;
 }
 
 static void editor_exit(br_scene *s) {
     BR_UNUSED(s);
+    ed_debug_destroy(&ED);
+    ed_code_destroy(&ED);
     ed_assets_destroy(&ED);
     ed_picker_close(&ED);
     ed_doc_destroy(&ED.doc);
+    ed_view_destroy(&ED.view);
     br_image_destroy(&ED.badge);
     br_free(ED.clipboard);
     ED.clipboard = NULL;
@@ -325,6 +337,79 @@ static void editor_fixed(br_scene *s, float dt) {
     ed_doc_step(&ED.doc, dt);                       /* the scene's systems run only while playing */
 }
 
+/* The game's own components (declared in its scripts, script.h): read when a
+ * project opens, and again when a script changes; the scene's world is made again
+ * with them if they changed. */
+static int64_t scripts_stamp(const char *dir, int depth) {
+    br_dir_list l;
+    int64_t sum = 0;
+    int i;
+    if (depth > 8 || !br_fs_list(dir, false, &l)) return 0;
+    for (i = 0; i < l.count; ++i) {
+        const br_dir_entry *e = &l.entries[i];
+        char full[ED_PATH_MAX];
+        if (e->name[0] == '.' || strcmp(e->name, "builds") == 0) continue;
+        br_path_join(full, sizeof(full), dir, e->name);
+        if (e->is_dir) sum += scripts_stamp(full, depth + 1);
+        else if (br_path_has_ext(e->name, ".bs")) sum += e->modified * 31 + (int64_t)e->size;
+    }
+    br_dir_list_free(&l);
+    return sum;
+}
+
+void ed_components_reload(editor *ed, bool force) {
+    static int64_t stamp;
+    static double last;
+    char err[300];
+    int64_t now;
+    uint32_t before = br_script_components_signature();
+    const char *root = br_assets_root();
+    if (!force && (ed->doc.playing || ed->engine->time - last < 2.0)) return;
+    last = ed->engine ? ed->engine->time : 0;
+    now = root[0] ? scripts_stamp(root, 0) : 0;
+    if (!force && now == stamp) return;
+    stamp = now;
+    if (br_script_components_from_project(root, err, sizeof(err)) < 0) ed_status(ed, "Component: %s", err);
+    if (br_script_components_signature() != before && !ed->doc.playing) {
+        ed_doc_rebuild_world(&ed->doc);
+        if (!force) ed_status(ed, "The game's components changed (%d of them): the scene has them now", br_script_component_count());
+    }
+}
+
+/* Prefab files the scene's instances come from: when one changes on disk (saved in
+ * another editor, or made again by a tool), the instances are made again. */
+static void prefab_watch(editor *ed) {
+    static struct { char file[128]; int64_t when; } seen[32];
+    static int seen_count;
+    static double last;
+    br_component pc = br_component_find(&ed->doc.world, "Prefab");
+    const br_component_pool *pool;
+    bool changed = false;
+    uint32_t i;
+    int k, n = 0;
+    struct { char file[128]; int64_t when; } now[32];
+    if (ed->doc.playing || pc == BR_COMPONENT_INVALID || ed->engine->time - last < 1.0) return;
+    last = ed->engine->time;
+    pool = &ed->doc.world.pools[pc];
+    for (i = 0; i < pool->count && n < 32; ++i) {
+        const br_prefab *p = (const br_prefab *)(pool->data + (size_t)i * pool->stride);
+        char full[ED_PATH_MAX * 2];
+        br_dir_entry st;
+        bool dup = false;
+        for (k = 0; k < n; ++k) if (strcmp(now[k].file, p->file) == 0) dup = true;
+        if (dup || !p->file[0]) continue;
+        snprintf(full, sizeof(full), "%s%s", br_assets_root(), p->file);
+        snprintf(now[n].file, sizeof(now[n].file), "%s", p->file);
+        now[n].when = br_fs_stat(full, &st) ? st.modified : 0;
+        for (k = 0; k < seen_count; ++k)
+            if (strcmp(seen[k].file, now[n].file) == 0 && seen[k].when != now[n].when) changed = true;
+        ++n;
+    }
+    memcpy(seen, now, sizeof(now[0]) * (size_t)n);
+    seen_count = n;
+    if (changed && ed_doc_refresh_prefabs(&ed->doc)) ed_status(ed, "A prefab changed: its instances here were made again (keeping this scene's changes)");
+}
+
 static void editor_update(br_scene *s, float dt) {
     editor *ed = &ED;
     BR_UNUSED(s);
@@ -333,6 +418,10 @@ static void editor_update(br_scene *s, float dt) {
     if (ed->ui.active == 0 && !br_ui_wants_keyboard(&ed->ui) && ed->view.drag == ED_DRAG_NONE)
         ed_doc_checkpoint(&ed->doc);
     ed_console_poll(ed);
+    ed_debug_after_frame(ed);
+    prefab_watch(ed);
+    ed_code_poll(ed);
+    ed_components_reload(ed, false);
     shortcuts(ed);
     update_title(ed);
     if (ed->doc.playing) {                          /* what the game's scripts asked for, in each scene on the stack */
@@ -349,7 +438,10 @@ static void editor_update(br_scene *s, float dt) {
             }
             if (br_script_scene_request(w, next, sizeof(next))) {
                 snprintf(full, sizeof(full), "%s%s", br_assets_root(), next);
-                if (ed_doc_switch_scene(&ed->doc, full)) ed_status(ed, "load_scene(\"%s\") - Stop goes back to the scene you were editing", next);
+                if (ed_doc_switch_scene(&ed->doc, full)) {
+                    ed_view_set_3d(ed, br_world_has_3d(&ed->doc.world));
+                    ed_status(ed, "load_scene(\"%s\") - Stop goes back to the scene you were editing", next);
+                }
                 else ed_status(ed, "load_scene(\"%s\"): %s", next, ed->doc.error);
                 break;
             }
@@ -384,7 +476,8 @@ static void editor_render(br_scene *s) {
     br_engine *e = s->engine;
     layout l = make_layout(ed);
     br_ui_begin(&ed->ui, &e->renderer, &e->input, e->time);
-    br_ui_set_disabled(&ed->ui, ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible);
+    bool held = ed->dbg.stopped;                            /* a script is stopped mid-step: look, don't touch */
+    br_ui_set_disabled(&ed->ui, held || ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible);
     panel_chrome(ed, &l);                                   /* edges and arrows first: they get the mouse */
     l = make_layout(ed);
     ed_view_frame(ed, l.view);
@@ -393,9 +486,12 @@ static void editor_render(br_scene *s) {
     else if (ed_collapsed_strip(ed, l.hierarchy, ED_PANEL_SCENE, ED_ARROW_RIGHT)) ed_panel_set_open(ed, ED_PANEL_SCENE, true);
     if (ed->panels.open[ED_PANEL_INSPECTOR]) ed_inspector(ed, l.inspector);
     else if (ed_collapsed_strip(ed, l.inspector, ED_PANEL_INSPECTOR, ED_ARROW_LEFT)) ed_panel_set_open(ed, ED_PANEL_INSPECTOR, true);
+    if (held) br_ui_set_disabled(&ed->ui, false);
     ed_bottom_tabs(ed, l.tabs);
     if (!ed->panels.open[ED_PANEL_BOTTOM]) {
         /* only the tabs: clicking one opens it again */
+    } else if (ed->bottom_tab == ED_TAB_DEBUG) {
+        ed_debug_panel(ed, l.console);
     } else if (ed->bottom_tab == ED_TAB_CONSOLE) {
         ed_console_panel(ed, l.console);
     } else {
@@ -403,9 +499,10 @@ static void editor_render(br_scene *s) {
         if (ed->panels.open[ED_PANEL_PREVIEW]) ed_assets_preview(ed, l.preview);
         else if (ed_collapsed_strip(ed, l.preview, ED_PANEL_PREVIEW, ED_ARROW_LEFT)) ed_panel_set_open(ed, ED_PANEL_PREVIEW, true);
     }
+    if (held) br_ui_set_disabled(&ed->ui, true);
     ed_statusbar(ed, l.status);
     panel_chrome_draw(ed, &l);
-    if (ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible) br_ui_menu_close(&ed->ui);
+    if (held || ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible) br_ui_menu_close(&ed->ui);
     else ed_menus(ed);                                      /* the open right-click menu (drawn on top) */
     ed_dialog(ed, l.screen);
     ed_picker_dialog(ed, l.screen);
@@ -417,6 +514,11 @@ static void editor_render(br_scene *s) {
 
 static bool editor_event(br_scene *s, const br_event *ev) {
     BR_UNUSED(s);
+    if (ev->type == BR_EVENT_WINDOW_CLOSE_REQUESTED && ED.dbg.stopped) {          /* let the script go on, stop playing, then ask */
+        ED.dbg.action = BR_DEBUG_DETACH;
+        ED.dbg.stop_after = true;
+        return true;
+    }
     if (ev->type == BR_EVENT_WINDOW_CLOSE_REQUESTED) return !ed_cmd_quit(&ED);   /* consumed = stay open */
     if (ev->type == BR_EVENT_WINDOW_SCALE_CHANGED) {
         ED.engine->window.pixel_scale = (int)(br_window_scale(ED.engine) + 0.5f);
@@ -799,7 +901,7 @@ static int test_assets(br_engine *e) {
                 }
             }
             if (ed->console_capturing && !found) { printf("FAIL: the script error isn't in the console\n"); ++failures; }
-            ed->prefs.script_editor[0] = 0;
+            snprintf(ed->prefs.script_editor, sizeof(ed->prefs.script_editor), "system");
             if (!ed_open_script_named(ed, "broken.bs", 2) || !strstr(br_headless_last_opened(), "broken.bs"))
                 { printf("FAIL: opening a script named in a message (%s)\n", br_headless_last_opened()); ++failures; }
             ed->bottom_tab = ED_TAB_CONSOLE;
@@ -815,9 +917,16 @@ static int test_assets(br_engine *e) {
             ed_assets_edit(ed, "scripts/broken.bs");
             if (!strstr(br_headless_last_launched(), "myeditor --goto 2 \"") || !strstr(br_headless_last_launched(), "broken.bs\""))
                 { printf("FAIL: the script editor command (%s)\n", br_headless_last_launched()); ++failures; }
-            ed->prefs.script_editor[0] = 0;
-            ed_assets_edit(ed, "scripts/mover.bs");            /* empty: the system's default program */
+            snprintf(ed->prefs.script_editor, sizeof(ed->prefs.script_editor), "system");
+            ed_assets_edit(ed, "scripts/mover.bs");            /* "system": the system's default program */
             if (!strstr(br_headless_last_opened(), "mover.bs")) { printf("FAIL: opening with the default program\n"); ++failures; }
+            ed->prefs.script_editor[0] = 0;                    /* empty: the Scripts tab */
+            ed_assets_edit(ed, "scripts/broken.bs");
+            if (!ed_code_current(ed) || strcmp(ed_code_current(ed)->name, "broken.bs") != 0 || ed->bottom_tab != ED_TAB_DEBUG ||
+                ed_code_line_of(ed_code_current(ed), ed_code_current(ed)->cursor) != 1 || ed_code_current(ed)->error_line != 2)
+                { printf("FAIL: opening a script in the Scripts tab, at its mistake\n"); ++failures; }
+            ed_code_close_all(ed);
+            ed->bottom_tab = ED_TAB_FILES;
             ed_settings_open(ed);
             frames(e, 2);
             br_image_save_bmp(&e->framebuffer, "editor_settings.bmp");
@@ -894,7 +1003,7 @@ static int test_build(br_engine *e) {
     snprintf(p.main_scene, sizeof(p.main_scene), "main.scene");
     if (!ed_project_save(ed, &p) || strcmp(ed->project.name, "Test Game") != 0) { printf("FAIL: saving project settings\n"); ++failures; }
     /* the toolbar's Build menu */
-    inject_click(872, TOOLBAR_H / 2);
+    inject_click(906, TOOLBAR_H / 2);
     frames(e, 2);
     if (!br_ui_menu_is_open(&ed->ui, "build")) { printf("FAIL: the Build button didn't open its menu\n"); ++failures; }
     br_image_save_bmp(&e->framebuffer, "editor_build_menu.bmp");
@@ -1042,6 +1151,524 @@ static int test_panels(br_engine *e) {
     return failures;
 }
 
+/* The 3D view: a scene of meshes, a camera and a light; clicking, the gizmo,
+ * undo, play, a model dropped in, and reopening the scene in 3D. */
+static void inject_key(br_key k) {
+    br_event d = br_event_key(BR_EVENT_KEY_DOWN, k, 0, false), u = br_event_key(BR_EVENT_KEY_UP, k, 0, false);
+    br_headless_inject(&d);
+    br_headless_inject(&u);
+}
+
+static bool differs(const br_engine *e, br_vec2 p, br_color bg) {
+    br_color c = br_image_get(&e->framebuffer, (int)p.x, (int)p.y);
+    return abs((int)c.r - bg.r) + abs((int)c.g - bg.g) + abs((int)c.b - bg.b) > 30;
+}
+
+static int test_view3d(br_engine *e) {
+    editor *ed = &ED;
+    ed_doc *d = &ed->doc;
+    int failures = 0;
+    layout l = make_layout(ed);
+    br_vec2 mid = br_v2(l.view.x + l.view.w / 2, l.view.y + l.view.h / 2), s, tip;
+    br_entity cube, ground, cam, falling;
+    br_transform3d *t;
+    br_component rb3 = br_component_find(&d->world, "RigidBody3D"), col3 = br_component_find(&d->world, "Collider3D");
+
+    ed_cmd_new(ed);
+    ed_view_set_3d(ed, true);
+    ed_view3d_reset(&ed->view);
+    ground = ed_new3d_at(ed, ED_NEW_PLANE, br_v3(0, 0, 0));
+    cube = ed_new3d_at(ed, ED_NEW_CUBE, br_v3(0, 0, 0));
+    cam = ed_new3d_at(ed, ED_NEW_CAMERA, br_v3(0, 0, 0));
+    ed_new3d_at(ed, ED_NEW_LIGHT, br_v3(0, 0, 0));
+    ((br_mesh3d *)br_get(&d->world, cube, d->ids3.mesh))->color = br_rgb(240, 120, 40);
+    ((br_mesh3d *)br_get(&d->world, ground, d->ids3.mesh))->color = br_rgb(80, 150, 80);
+    d->selected = BR_ENTITY_NULL;
+    frames(e, 3);
+    br_image_save_bmp(&e->framebuffer, "editor_3d.bmp");
+    if (!ed_view3d_project(ed, br_v3(0, 0.5f, 0), &s) || br_v2_dist(s, mid) > 30) { printf("FAIL: 3D: the cube isn't in the middle of the view\n"); ++failures; }
+    if (!differs(e, mid, br_rgb(36, 40, 48))) { printf("FAIL: 3D: nothing drawn in the middle of the view\n"); ++failures; }
+    /* click it: selected */
+    ed_view3d_project(ed, br_v3(0, 0.5f, 0), &s);
+    inject_click(s.x, s.y);
+    frames(e, 2);
+    if (d->selected != cube) { printf("FAIL: 3D: clicking the cube didn't select it\n"); ++failures; }
+    /* the move gizmo's x arrow, dragged further out along itself */
+    t = (br_transform3d *)br_get(&d->world, cube, d->ids3.transform3d);
+    ed_view3d_project(ed, br_v3(0.1f, 0.5f, 0), &tip);
+    {
+        br_vec2 dir = br_v2_norm(br_v2_sub(tip, s));
+        br_vec2 grab = br_v2_add(s, br_v2_scale(dir, 40));
+        inject_drag(e, grab, br_v2_add(grab, br_v2_scale(dir, 60)));
+    }
+    if (t->position.x < 0.3f || fabsf(t->position.y - 0.5f) > 1e-3f || fabsf(t->position.z) > 1e-3f)
+        { printf("FAIL: 3D: dragging the x arrow moved the cube to (%.2f %.2f %.2f)\n", (double)t->position.x, (double)t->position.y, (double)t->position.z); ++failures; }
+    br_image_save_bmp(&e->framebuffer, "editor_3d_moved.bmp");
+    ed_doc_checkpoint(d);
+    ed_cmd_undo(ed);
+    ground = d->order[0];                                    /* (undo rebuilt the world: new handles) */
+    cube = d->order[1];
+    cam = d->order[2];
+    t = (br_transform3d *)br_get(&d->world, cube, d->ids3.transform3d);
+    if (!t || fabsf(t->position.x) > 1e-4f) { printf("FAIL: 3D: undo didn't bring the cube back\n"); ++failures; }
+    /* the scale gizmo (R): the centre box dragged right grows it evenly */
+    d->selected = cube;
+    inject_key(BR_KEY_R);
+    frames(e, 2);
+    ed_view3d_project(ed, br_v3(0, 0.5f, 0), &s);
+    inject_drag(e, s, br_v2_add(s, br_v2(50, 0)));
+    t = (br_transform3d *)br_get(&d->world, cube, d->ids3.transform3d);
+    if (ed->view.gizmo != ED_GIZMO_SCALE || t->scale.x < 1.3f || fabsf(t->scale.x - t->scale.z) > 1e-4f) { printf("FAIL: 3D: the scale gizmo (%.2f)\n", (double)t->scale.x); ++failures; }
+    /* rotate (E): the y ring, dragged around: it turns about y only */
+    inject_key(BR_KEY_E);
+    frames(e, 2);
+    {   /* find the y ring under the mouse (hovering lights it), straight below the centre */
+        br_vec2 a = s;
+        int k, found = 0;
+        ed_view3d_project(ed, br_v3(0, 0.5f, 0), &s);
+        for (k = 8; k < 140 && !found; k += 2) {
+            a = br_v2(s.x, s.y + (float)k);
+            inject_move(a.x, a.y);
+            frames(e, 1);
+            found = ed->view.hot_axis == 1;
+        }
+        if (found) inject_drag(e, a, br_v2_add(a, br_v2(40, 0)));
+        t = (br_transform3d *)br_get(&d->world, cube, d->ids3.transform3d);
+        if (!found || fabsf(t->rotation.y) < 5 || fabsf(t->rotation.x) > 0.5f || fabsf(t->rotation.z) > 0.5f)
+            { printf("FAIL: 3D: the rotate gizmo (%d: %.1f %.1f %.1f)\n", found, (double)t->rotation.x, (double)t->rotation.y, (double)t->rotation.z); ++failures; }
+    }
+    inject_key(BR_KEY_W);
+    /* the camera, picked by its marker */
+    {
+        br_vec3 p;
+        br_world_transform3d(&d->world, cam, &p, NULL, NULL);
+        if (ed_view3d_project(ed, p, &s)) { inject_click(s.x, s.y); frames(e, 2); }
+        if (d->selected != cam) { printf("FAIL: 3D: clicking the camera's marker\n"); ++failures; }
+    }
+    /* look through it (C), and back */
+    inject_key(BR_KEY_C);
+    frames(e, 2);
+    if (!ed->view.through_camera) { printf("FAIL: 3D: C didn't look through the scene camera\n"); ++failures; }
+    br_image_save_bmp(&e->framebuffer, "editor_3d_camera.bmp");
+    inject_key(BR_KEY_C);
+    frames(e, 2);
+    /* a model dropped in from the project */
+    {
+        char full[ED_PATH_MAX];
+        const char obj[] = "v -0.5 0 0.5\nv 0.5 0 0.5\nv 0 1 0\nv 0 0 -0.5\nf 1 2 3\nf 2 4 3\nf 4 1 3\nf 1 4 2\n";
+        ed_asset_path(ed, "pyramid3d.obj", full, sizeof(full));
+        br_file_write_all(full, obj, sizeof(obj) - 1);
+        if (!ed_assets_drop3d(ed, "pyramid3d.obj", br_v3(3, 0, 0), BR_ENTITY_NULL)) { printf("FAIL: 3D: dropping a model (%s)\n", ed->status); ++failures; }
+        else if (((br_mesh3d *)br_get(&d->world, d->selected, d->ids3.mesh))->shape != BR_MESH_MODEL) { printf("FAIL: 3D: the model's Mesh\n"); ++failures; }
+        if (ed_asset_kind_of("pyramid3d.obj", false) != ED_ASSET_MODEL) { printf("FAIL: .obj isn't a model asset\n"); ++failures; }
+        ed_assets_select(ed, "pyramid3d.obj");
+        frames(e, 2);
+        br_image_save_bmp(&e->framebuffer, "editor_3d_model.bmp");
+        ed_assets_select(ed, "");
+        br_fs_remove(full);
+    }
+    /* play: a box falls onto the ground; Stop puts it back */
+    falling = ed_new3d_at(ed, ED_NEW_CUBE, br_v3(-2, 4, 0));
+    br_add(&d->world, falling, rb3, NULL);
+    br_add(&d->world, falling, col3, NULL);
+    ((br_collider3d *)br_add(&d->world, ground, col3, NULL))->size = br_v3(1, 0.01f, 1);
+    ed_cmd_play(ed);
+    frames(e, 120);
+    t = (br_transform3d *)br_get(&d->world, falling, d->ids3.transform3d);
+    if (!t || fabsf(t->position.y - 0.5f) > 0.05f) { printf("FAIL: 3D: the box didn't land while playing (y %.2f)\n", t ? (double)t->position.y : -1.0); ++failures; }
+    br_image_save_bmp(&e->framebuffer, "editor_3d_play.bmp");
+    ed_cmd_play(ed);
+    frames(e, 2);
+    t = (br_transform3d *)br_get(&d->world, d->order[d->count - 1], d->ids3.transform3d);
+    if (!t || fabsf(t->position.y - 4) > 1e-4f) { printf("FAIL: 3D: Stop didn't put the box back\n"); ++failures; }
+    /* saved and opened again: it comes back in 3D */
+    snprintf(ed->path_field, sizeof(ed->path_field), "editor_3d.scene");
+    ed_cmd_save(ed);
+    ed_cmd_new(ed);
+    ed_view_set_3d(ed, false);
+    snprintf(ed->path_field, sizeof(ed->path_field), "editor_3d.scene");
+    ed_cmd_open(ed);
+    if (!ed->view.three_d || d->count != 6) { printf("FAIL: 3D: reopening (3D %d, %u entities)\n", ed->view.three_d, d->count); ++failures; }
+    ed_cmd_new(ed);
+    ed_view_set_3d(ed, false);
+    frames(e, 2);
+    return failures;
+}
+
+/* Selecting several: a box in the view, dragging them together, Shift-click in the
+ * list, Delete and undo, and the 3D gizmo moving two cubes at once. */
+static void inject_mod_key(br_key k, bool down, uint32_t mods) {
+    br_event ev = br_event_key(down ? BR_EVENT_KEY_DOWN : BR_EVENT_KEY_UP, k, mods, false);
+    br_headless_inject(&ev);
+}
+
+/* The debugger: a breakpoint stops the playing game's script, the Debug tab shows where,
+ * and Continue / Stop go on (the hook answers by itself here: auto_frames). */
+/* Prefabs that update: save one, place two, change one here, change the prefab: both follow, the change stays. */
+static br_entity child_named(editor *ed, br_entity parent, const char *name) {
+    br_entity kids[16];
+    uint32_t n = br_children(&ed->doc.world, parent, kids, 16), i;
+    char buf[64];
+    for (i = 0; i < n; ++i) if (strcmp(ed_doc_name(&ed->doc, kids[i], buf, sizeof(buf)), name) == 0) return kids[i];
+    return BR_ENTITY_NULL;
+}
+
+static int test_prefab_flow(br_engine *e) {
+    editor *ed = &ED;
+    ed_doc *d = &ed->doc;
+    int failures = 0;
+    br_entity lamp, glow, a = BR_ENTITY_NULL, b = BR_ENTITY_NULL;
+    char rel[ED_PATH_MAX], full[ED_PATH_MAX * 2];
+    uint32_t i, before;
+    ed_doc_mark_clean(d);
+    ed_cmd_new(ed);
+    ed_assets_destroy(ed);
+    ed_assets_init(ed, "editor_project");
+    lamp = ed_doc_create(d, "Lamp", br_v2(100, 100));
+    ((br_shape *)br_add(&d->world, lamp, d->ids.shape, NULL))->color = br_rgb(200, 200, 0);
+    glow = ed_doc_create(d, "Glow", br_v2(100, 90));
+    br_add(&d->world, glow, d->ids.shape, NULL);
+    br_set_parent(&d->world, glow, lamp, true);
+    ed_doc_normalize(d);
+    d->selected = lamp;
+    if (!ed_assets_save_prefab(ed) || !ed_doc_prefab_of(d, lamp)) { printf("FAIL: prefabs: saving one didn't make the entity its instance\n"); ++failures; return failures; }
+    snprintf(rel, sizeof(rel), "%s", ed_doc_prefab_of(d, lamp));
+    snprintf(full, sizeof(full), "%s%s", br_assets_root(), rel);
+    before = d->count;
+    if (ed_doc_instantiate(d, full, br_v2(200, 100)) < 0 || d->count != before + 2) { printf("FAIL: prefabs: placing one (%u -> %u)\n", before, d->count); ++failures; }
+    for (i = 0; i < d->count; ++i)
+        if (ed_doc_prefab_of(d, d->order[i])) { if (a == BR_ENTITY_NULL) a = d->order[i]; else b = d->order[i]; }
+    if (a == BR_ENTITY_NULL || b == BR_ENTITY_NULL || child_named(ed, b, "Glow") == BR_ENTITY_NULL) { printf("FAIL: prefabs: two instances, with their parts\n"); ++failures; return failures; }
+    ((br_shape *)br_get(&d->world, child_named(ed, b, "Glow"), d->ids.shape))->color = br_rgb(255, 0, 0);   /* an override, on B */
+    frames(e, 2);
+    {   /* the prefab file changes (as if edited elsewhere): both follow, B keeps its red glow */
+        size_t len = 0;
+        char *text = (char *)br_file_read_all(full, &len), *at;
+        if (text && (at = strstr(text, "#c8c800ff")) != NULL) memcpy(at, "#00c8c8ff", 9);   /* the lamp: yellow -> teal */
+        if (text) br_file_write_all(full, text, strlen(text));
+        br_free(text);
+    }
+    if (!ed_doc_refresh_prefabs(d)) { printf("FAIL: prefabs: making instances again\n"); ++failures; }
+    {
+        int teal = 0, red = 0;
+        for (i = 0; i < d->count; ++i) {
+            const br_shape *sh = (const br_shape *)br_get(&d->world, d->order[i], d->ids.shape);
+            if (sh && sh->color.r == 0 && sh->color.g == 200 && sh->color.b == 200) ++teal;
+            if (sh && sh->color.r == 255 && sh->color.g == 0) ++red;
+        }
+        if (teal != 2 || red != 1) { printf("FAIL: prefabs: after the prefab changed: %d teal lamps, %d red glows\n", teal, red); ++failures; }
+    }
+    {   /* Apply: an instance's change written to the prefab, for every instance */
+        br_entity first = BR_ENTITY_NULL;
+        for (i = 0; i < d->count && first == BR_ENTITY_NULL; ++i) if (ed_doc_prefab_of(d, d->order[i])) first = d->order[i];
+        ((br_shape *)br_get(&d->world, first, d->ids.shape))->size = br_v2(40, 40);
+        if (!ed_doc_apply_prefab(d, first)) { printf("FAIL: prefabs: Apply\n"); ++failures; }
+        {
+            int big = 0;
+            for (i = 0; i < d->count; ++i) {
+                const br_shape *sh = (const br_shape *)br_get(&d->world, d->order[i], d->ids.shape);
+                if (sh && ed_doc_prefab_of(d, d->order[i]) && sh->size.x == 40) ++big;
+            }
+            if (big != 2) { printf("FAIL: prefabs: after Apply, %d of 2 instances changed\n", big); ++failures; }
+        }
+    }
+    frames(e, 2);
+    br_image_save_bmp(&e->framebuffer, "editor_prefabs.bmp");
+    ed_doc_mark_clean(d);
+    return failures;
+}
+
+/* The game's own components: a script declares one, the editor's world has it, scenes keep it. */
+static int test_own_components(br_engine *e) {
+    editor *ed = &ED;
+    ed_doc *d = &ed->doc;
+    int failures = 0;
+    br_entity gem;
+    br_component gc;
+    const char decl[] = "component Gem {\n    var value: int = 5\n    var colour: enum(red, green) = green\n}\n";
+    ed_doc_mark_clean(d);
+    ed_cmd_new(ed);
+    br_fs_mkdir("editor_project/scripts");
+    br_file_write_all("editor_project/scripts/parts.bs", decl, sizeof(decl) - 1);
+    ed_assets_destroy(ed);
+    ed_assets_init(ed, "editor_project");
+    gem = ed_doc_create(d, "Gem", br_v2(50, 50));
+    ed_components_reload(ed, true);
+    gc = br_component_find(&d->world, "Gem");
+    if (gc == BR_COMPONENT_INVALID) { printf("FAIL: own components: the editor's world doesn't have Gem\n"); return failures + 1; }
+    gem = d->count ? d->order[0] : BR_ENTITY_NULL;                  /* (the world was made again: the entity is new) */
+    if (!br_entity_alive(&d->world, gem) || !br_add(&d->world, gem, gc, NULL)) { printf("FAIL: own components: adding Gem\n"); ++failures; }
+    d->selected = gem;
+    frames(e, 2);
+    {   /* in the scene's text, and changed declarations keep the values */
+        const char decl2[] = "component Gem {\n    var value: int = 5\n    var colour: enum(red, green) = green\n    var shine: number = 1\n}\n";
+        int *value = (int *)br_get(&d->world, gem, gc);
+        if (value) *value = 9;
+        br_file_write_all("editor_project/scripts/parts.bs", decl2, sizeof(decl2) - 1);
+        ed_components_reload(ed, true);
+        gc = br_component_find(&d->world, "Gem");
+        gem = d->count ? d->order[0] : BR_ENTITY_NULL;
+        if (gc == BR_COMPONENT_INVALID || br_component_get_desc(&d->world, gc)->field_count != 3 || !br_get(&d->world, gem, gc) || *(const int *)br_get(&d->world, gem, gc) != 9)
+            { printf("FAIL: own components: a changed declaration lost the scene's values\n"); ++failures; }
+    }
+    br_fs_remove("editor_project/scripts/parts.bs");
+    ed_components_reload(ed, true);
+    ed_doc_mark_clean(d);
+    ed_cmd_new(ed);
+    return failures;
+}
+
+static void inject_key_mods(br_key key, uint32_t mods) {      /* (the up keeps the modifiers: they're read after) */
+    br_event k = br_event_key(BR_EVENT_KEY_DOWN, key, mods, false);
+    br_headless_inject(&k);
+    k = br_event_key(BR_EVENT_KEY_UP, key, mods, false);
+    br_headless_inject(&k);
+}
+
+static void inject_text(br_engine *e, const char *text) {
+    for (; *text; ++text) {
+        br_event t = br_event_make(BR_EVENT_TEXT_INPUT);
+        t.u.text.codepoint = (unsigned char)*text;
+        br_headless_inject(&t);
+        frames(e, 1);
+    }
+}
+
+static void key_frame(br_engine *e, br_key key, uint32_t mods) {
+    br_event up = br_event_key(BR_EVENT_KEY_UP, key, 0, false);
+    inject_key_mods(key, mods);
+    frames(e, 1);
+    br_headless_inject(&up);                                       /* the modifiers let go */
+}
+
+/* The Scripts tab's editor: typing, indenting, undo, saving, mistakes, breakpoints that move. */
+static int test_code_editor(br_engine *e) {
+    editor *ed = &ED;
+    int failures = 0;
+    ed_code_file *f;
+    char *disk;
+    size_t size;
+    const char start[] = "func update(dt) {\n}\n";
+    br_fs_mkdir("editor_project/scripts");
+    br_file_write_all("editor_project/scripts/typed.bs", start, sizeof(start) - 1);
+    ed_code_close_all(ed);
+    ed_assets_destroy(ed);
+    ed_assets_init(ed, "editor_project");
+    if (!ed_code_open(ed, "scripts/typed.bs", 1) || !(f = ed_code_current(ed))) { printf("FAIL: code: opening a script\n"); return 1; }
+    frames(e, 2);
+    ed->code.focused = true;
+    f->cursor = f->anchor = 17;                                     /* after the '{' */
+    key_frame(e, BR_KEY_ENTER, 0);
+    inject_text(e, "self.x += 1");
+    if (strcmp(f->text, "func update(dt) {\n    self.x += 1\n}\n") != 0 || !f->dirty) { printf("FAIL: code: typing (%s)\n", f->text); ++failures; }
+    key_frame(e, BR_KEY_Z, BR_MOD_CONTROL);                         /* the typing, then the new line */
+    if (strcmp(f->text, "func update(dt) {\n    \n}\n") != 0) { printf("FAIL: code: undo (%s)\n", f->text); ++failures; }
+    key_frame(e, BR_KEY_Z, BR_MOD_CONTROL);
+    if (strcmp(f->text, start) != 0) { printf("FAIL: code: undo twice (%s)\n", f->text); ++failures; }
+    key_frame(e, BR_KEY_Z, BR_MOD_CONTROL | BR_MOD_SHIFT);
+    key_frame(e, BR_KEY_Y, BR_MOD_CONTROL);
+    if (strcmp(f->text, "func update(dt) {\n    self.x += 1\n}\n") != 0) { printf("FAIL: code: redo (%s)\n", f->text); ++failures; }
+    key_frame(e, BR_KEY_S, BR_MOD_CONTROL);
+    disk = (char *)br_file_read_all("editor_project/scripts/typed.bs", &size);
+    if (f->dirty || !disk || size != (size_t)f->len || memcmp(disk, f->text, size) != 0) { printf("FAIL: code: Ctrl+S\n"); ++failures; }
+    br_free(disk);
+    if (ed_doc_dirty(&ed->doc) && strstr(ed->status, "scene")) { printf("FAIL: code: Ctrl+S saved the scene too\n"); ++failures; }
+    {   /* a mistake is found as you type, and goes when it's mended */
+        inject_text(e, " +");
+        frames(e, 40);
+        if (f->error_line != 2 || !f->error[0]) { printf("FAIL: code: the mistake on line 2 wasn't found (%d: %s)\n", f->error_line, f->error); ++failures; }
+        br_image_save_bmp(&e->framebuffer, "editor_code.bmp");
+        key_frame(e, BR_KEY_BACKSPACE, 0);
+        key_frame(e, BR_KEY_BACKSPACE, 0);
+        frames(e, 40);
+        if (f->error_line != 0) { printf("FAIL: code: the mistake stayed (%s)\n", f->error); ++failures; }
+    }
+    {   /* breakpoints move with their lines */
+        br_script_debug_set_breakpoint(f->path, 3, true);
+        f->cursor = f->anchor = 0;
+        key_frame(e, BR_KEY_ENTER, 0);                                  /* a line above */
+        if (!br_script_debug_has_breakpoint(f->path, 4) || br_script_debug_has_breakpoint(f->path, 3)) { printf("FAIL: code: a breakpoint didn't move down\n"); ++failures; }
+        key_frame(e, BR_KEY_Z, BR_MOD_CONTROL);
+        if (!br_script_debug_has_breakpoint(f->path, 3)) { printf("FAIL: code: a breakpoint didn't move back with undo\n"); ++failures; }
+        br_script_debug_clear_breakpoints();
+    }
+    {   /* indenting lines, commenting them out, a '}' that steps back */
+        f->anchor = 0;
+        f->cursor = f->len;
+        key_frame(e, BR_KEY_TAB, 0);
+        if (strncmp(f->text, "    func update(dt) {\n        self.x", 36) != 0) { printf("FAIL: code: Tab on lines (%s)\n", f->text); ++failures; }
+        key_frame(e, BR_KEY_TAB, BR_MOD_SHIFT);
+        key_frame(e, BR_KEY_SLASH, BR_MOD_CONTROL);
+        if (strncmp(f->text, "# func update(dt) {\n    # self.x += 1\n# }", 40) != 0) { printf("FAIL: code: Ctrl+/ (%s)\n", f->text); ++failures; }
+        key_frame(e, BR_KEY_SLASH, BR_MOD_CONTROL);
+        if (strcmp(f->text, "func update(dt) {\n    self.x += 1\n}\n") != 0) { printf("FAIL: code: Ctrl+/ again (%s)\n", f->text); ++failures; }
+        f->cursor = f->anchor = 33;                                     /* the end of line 2 */
+        key_frame(e, BR_KEY_ENTER, 0);
+        inject_text(e, "}");
+        if (strcmp(f->text, "func update(dt) {\n    self.x += 1\n}\n}\n") != 0) { printf("FAIL: code: '}' on an empty line (%s)\n", f->text); ++failures; }
+        key_frame(e, BR_KEY_Z, BR_MOD_CONTROL);
+        key_frame(e, BR_KEY_Z, BR_MOD_CONTROL);
+    }
+    {   /* Play saves it; while playing it's read-only */
+        f->cursor = f->anchor = f->len;
+        inject_text(e, "# end\n");
+        ed_cmd_play(ed);
+        frames(e, 2);
+        disk = (char *)br_file_read_all("editor_project/scripts/typed.bs", &size);
+        if (f->dirty || !disk || !strstr(disk, "# end")) { printf("FAIL: code: Play didn't save the script\n"); ++failures; }
+        br_free(disk);
+        ed->code.focused = true;
+        inject_text(e, "zz");
+        if (strstr(f->text, "zz")) { printf("FAIL: code: typing while playing changed the script\n"); ++failures; }
+        ed_cmd_play(ed);
+        frames(e, 2);
+    }
+    {   /* changed by another program: read again */
+        const char other[] = "var changed = 1\n";
+        br_file_write_all("editor_project/scripts/typed.bs", other, sizeof(other) - 1);
+        f->modified = 1;
+        frames(e, 70);
+        if (strcmp(f->text, other) != 0) { printf("FAIL: code: a script changed elsewhere wasn't read again\n"); ++failures; }
+    }
+    {   /* closing one with changes asks first */
+        ed->code.focused = true;
+        inject_text(e, "x");
+        if (ed_code_close(ed, ed->code.current, false) || !ed_code_close(ed, ed->code.current, false) || ed_code_find(ed, "scripts/typed.bs") >= 0)
+            { printf("FAIL: code: closing a changed script (%s)\n", ed->status); ++failures; }
+    }
+    br_fs_remove("editor_project/scripts/typed.bs");
+    ed->bottom_tab = ED_TAB_FILES;
+    frames(e, 2);
+    return failures;
+}
+
+static int test_debugger(br_engine *e) {
+    editor *ed = &ED;
+    int failures = 0;
+    br_entity hero;
+    const char mover[] = "var steps = 0\nfunc update(dt) {\n    steps += 1\n    var far = self.x + 2\n    self.x = far\n}\n";
+    br_fs_mkdir("editor_project/scripts");
+    br_file_write_all("editor_project/scripts/stepper.bs", mover, sizeof(mover) - 1);
+    ed_doc_mark_clean(&ed->doc);
+    ed_cmd_new(ed);
+    ed_assets_destroy(ed);
+    ed_assets_init(ed, "editor_project");
+    hero = ed_doc_create(&ed->doc, "Stepper", br_v2(100, 90));
+    snprintf(((br_script *)br_add(&ed->doc.world, hero, br_component_find(&ed->doc.world, "Script"), NULL))->file, 96, "scripts/stepper.bs");
+    frames(e, 2);
+    ed->bottom_tab = ED_TAB_DEBUG;
+    ed_panel_set_open(ed, ED_PANEL_BOTTOM, true);
+    if (!ed_debug_show_file(ed, "scripts/stepper.bs", 0) || !ed_code_current(ed) || ed_code_current(ed)->line_count != 7)
+        { printf("FAIL: the debugger didn't show the script (%d lines)\n", ed_code_current(ed) ? ed_code_current(ed)->line_count : -1); ++failures; }
+    if (!ed_debug_toggle_breakpoint(ed, 4)) { printf("FAIL: setting a breakpoint\n"); ++failures; }
+    frames(e, 2);
+    ed->dbg.auto_frames = 3;
+    ed->dbg.auto_action = BR_DEBUG_CONTINUE;
+    ed->dbg.auto_shot = "editor_debugger.bmp";
+    ed_cmd_play(ed);
+    frames(e, 4);
+    if (ed->dbg.stops < 2 || ed->dbg.last_line != 4) { printf("FAIL: the breakpoint didn't stop the script (%d stops, line %d)\n", ed->dbg.stops, ed->dbg.last_line); ++failures; }
+    if (ed->dbg.nlocals < 1 || strcmp(ed->dbg.locals[0].name, "dt") != 0) { printf("FAIL: the debugger didn't see update()'s variables\n"); ++failures; }
+    if (ed->dbg.nglobals < 1 || strcmp(ed->dbg.globals[0].name, "steps") != 0) { printf("FAIL: the debugger didn't see the script's variables\n"); ++failures; }
+    if (ed->dbg.stopped) { printf("FAIL: still stopped after Continue\n"); ++failures; }
+    ed->dbg.auto_action = BR_DEBUG_DETACH;                        /* Stop: the game stops playing */
+    frames(e, 3);
+    if (ed->doc.playing) { printf("FAIL: Stop in the debugger didn't stop playing\n"); ++failures; }
+    ed_debug_toggle_breakpoint(ed, 4);
+    if (br_script_debug_breakpoint(-1, NULL, NULL) != 0) { printf("FAIL: clearing the breakpoint\n"); ++failures; }
+    ed->dbg.auto_frames = 0;
+    ed->bottom_tab = ED_TAB_FILES;
+    frames(e, 2);
+    return failures;
+}
+
+static int test_multi_select(br_engine *e) {
+    editor *ed = &ED;
+    ed_doc *d = &ed->doc;
+    int failures = 0;
+    br_vec2 a, b, title0, ball0;
+    br_entity title, ball, sky;
+    uint32_t count;
+    ed_sample_scene(d);
+    ed_view_set_3d(ed, false);
+    ed->view.zoom = 2.0f;
+    ed->view.center = br_v2(160, 90);
+    frames(e, 2);
+    sky = d->order[0];
+    title = d->order[2];
+    ball = d->order[3];
+    title0 = br_world_transform(&d->world, title).position;
+    ball0 = br_world_transform(&d->world, ball).position;
+    a = ed_view_to_screen(&ed->view, br_v2(-20, -20));          /* outside the game's screen: empty */
+    b = ed_view_to_screen(&ed->view, br_v2(170, 130));
+    inject_drag(e, a, b);
+    count = ed_doc_selection_count(d);
+    if (count != 4 || !ed_doc_is_selected(d, title) || !ed_doc_is_selected(d, ball) || !ed_doc_is_selected(d, sky))
+        { printf("FAIL: the box selected %u entities\n", (unsigned)count); ++failures; }
+    br_image_save_bmp(&e->framebuffer, "editor_multi.bmp");
+    a = ed_view_to_screen(&ed->view, ball0);                    /* drag Ball: all four move */
+    inject_drag(e, a, br_v2_add(a, br_v2(20 * ed->view.zoom, 0)));
+    if (fabsf(br_world_transform(&d->world, ball).position.x - ball0.x - 20) > 0.5f ||
+        fabsf(br_world_transform(&d->world, title).position.x - title0.x - 20) > 0.5f)
+        { printf("FAIL: dragging one of the selection didn't move the rest\n"); ++failures; }
+    if (ed_doc_selection_count(d) != 4) { printf("FAIL: dragging lost the selection\n"); ++failures; }
+    ed_cmd_undo(ed);
+    frames(e, 2);
+    /* the list: click row 1, Shift-click row 4: rows 1 to 4 */
+    inject_click(60, HIER_ROW_Y(1));
+    frames(e, 2);
+    inject_mod_key(BR_KEY_LEFT_SHIFT, true, BR_MOD_SHIFT);
+    inject_click(60, HIER_ROW_Y(4));
+    frames(e, 2);
+    inject_mod_key(BR_KEY_LEFT_SHIFT, false, 0);
+    frames(e, 1);
+    if (ed_doc_selection_count(d) != 4 || !ed_doc_is_selected(d, d->order[1]) || !ed_doc_is_selected(d, d->order[4]))
+        { printf("FAIL: Shift-click in the list selected %u\n", (unsigned)ed_doc_selection_count(d)); ++failures; }
+    inject_mod_key(BR_KEY_LEFT_CONTROL, true, BR_MOD_CONTROL);   /* Ctrl-click row 2: out */
+    inject_click(60, HIER_ROW_Y(2));
+    frames(e, 2);
+    inject_mod_key(BR_KEY_LEFT_CONTROL, false, 0);
+    frames(e, 1);
+    if (ed_doc_selection_count(d) != 3 || ed_doc_is_selected(d, d->order[2])) { printf("FAIL: Ctrl-click in the list\n"); ++failures; }
+    br_image_save_bmp(&e->framebuffer, "editor_multi_list.bmp");
+    count = d->count;
+    ed_cmd_delete(ed);
+    if (d->count != count - 3) { printf("FAIL: Delete took %u, not 3\n", (unsigned)(count - d->count)); ++failures; }
+    ed_doc_checkpoint(d);
+    ed_cmd_undo(ed);
+    if (d->count != count) { printf("FAIL: undoing a multiple delete\n"); ++failures; }
+    /* 3D: two cubes, the move gizmo's x arrow moves both */
+    {
+        br_entity c1, c2;
+        br_vec2 s, tip, dir;
+        const br_transform3d *t1, *t2;
+        ed_doc_mark_clean(d);                                /* (no "save changes?" question) */
+        ed_cmd_new(ed);
+        ed_view_set_3d(ed, true);
+        ed_view3d_reset(&ed->view);
+        ed->view.gizmo = ED_GIZMO_MOVE;
+        c1 = ed_new3d_at(ed, ED_NEW_CUBE, br_v3(0, 0, 0));
+        c2 = ed_new3d_at(ed, ED_NEW_CUBE, br_v3(-3, 0, 2));
+        ed_doc_select(d, c2);
+        ed_doc_select_add(d, c1);
+        frames(e, 2);
+        ed_view3d_project(ed, br_v3(0, 0.5f, 0), &s);
+        ed_view3d_project(ed, br_v3(0.1f, 0.5f, 0), &tip);
+        dir = br_v2_norm(br_v2_sub(tip, s));
+        inject_drag(e, br_v2_add(s, br_v2_scale(dir, 40)), br_v2_add(s, br_v2_scale(dir, 100)));
+        t1 = (const br_transform3d *)br_get(&d->world, c1, d->ids3.transform3d);
+        t2 = (const br_transform3d *)br_get(&d->world, c2, d->ids3.transform3d);
+        if (t1->position.x < 0.3f || fabsf((t2->position.x + 3) - t1->position.x) > 1e-3f || fabsf(t2->position.z - 2) > 1e-3f)
+            { printf("FAIL: 3D: the gizmo didn't move both cubes (%.2f, %.2f)\n", (double)t1->position.x, (double)t2->position.x); ++failures; }
+        br_image_save_bmp(&e->framebuffer, "editor_multi_3d.bmp");
+        ed_doc_mark_clean(d);                                /* (no "save changes?" question) */
+        ed_cmd_new(ed);
+        ed_view_set_3d(ed, false);
+    }
+    frames(e, 2);
+    return failures;
+}
+
 /* ---- --build: the Build menu from the command line ------------------------------------ */
 
 static int run_build(br_engine *e, ed_target t) {
@@ -1154,6 +1781,12 @@ static int run_headless(br_engine *e) {
     failures += test_menus_console(e);
     failures += test_assets(e);
     failures += test_panels(e);
+    failures += test_view3d(e);
+    failures += test_multi_select(e);
+    failures += test_debugger(e);
+    failures += test_prefab_flow(e);
+    failures += test_own_components(e);
+    failures += test_code_editor(e);
     failures += test_build(e);
     printf("editor (headless): %s - wrote editor*.bmp, editor_demo.scene, editor_project/\n",
            failures ? "FAILED" : "all checks passed");

@@ -11,6 +11,12 @@
  *                 `trigger` (reports overlaps but doesn't collide).
  *                 A Collider without a RigidBody is static scenery.
  *   PhysicsWorld  optional, on any one entity: gravity and solver iterations
+ *   Joint         ties two bodies together (or one to the world): a hinge,
+ *                 a rod, a rope or a spring
+ *
+ * A Collider with `one_way` is a platform you can jump up through and land
+ * on; a RigidBody with `bullet` is swept along its path each step, so a fast
+ * one hits thin walls instead of passing through them.
  *
  * Units are the scene's: pixels, seconds and degrees, with +y pointing
  * down, so the default gravity (0, 600) pulls things down the screen.
@@ -47,6 +53,7 @@ typedef struct br_rigidbody {
     float linear_damping;      /* per second, 0 = none */
     float angular_damping;
     bool fixed_rotation;
+    bool bullet;               /* fast: swept each step so it can't pass through thin walls */
     /* runtime only (not saved): forces gathered for the next step */
     br_vec2 force;
     float torque;
@@ -62,7 +69,32 @@ typedef struct br_collider {
     bool trigger;              /* overlaps are reported, nothing collides */
     int layer;                 /* 0..31 */
     int mask;                  /* layers it collides with (bits), -1 = all */
+    bool one_way;              /* a platform: things land on its top side (its -y) and pass up through from below */
 } br_collider;
+
+/* Joint: ties this entity's body to `other`'s (nil: to the world, where the
+ * anchor is when the scene starts). `anchor` and `other_anchor` are points in
+ * each entity's own space.
+ *   hinge     the two anchors stay together; the bodies turn freely about it
+ *   distance  the anchors stay `length` apart (a rod; 0: as placed)
+ *   rope      ... at most `length` apart (slack when closer)
+ *   spring    pulled toward `length`: `stiffness` in Hz (how fast it bounces
+ *             back), `damping` 0 (bouncy) .. 1 (no overshoot)
+ * `collide`: the two bodies still collide with each other. */
+typedef enum br_joint_kind { BR_JOINT_HINGE = 0, BR_JOINT_DISTANCE, BR_JOINT_ROPE, BR_JOINT_SPRING } br_joint_kind;
+typedef struct br_joint {
+    int kind;                  /* br_joint_kind */
+    br_entity other;
+    br_vec2 anchor, other_anchor;
+    float length;
+    float stiffness, damping;
+    bool collide;
+    /* runtime only (not saved) */
+    bool started;
+    br_vec2 world_point;       /* where it's pinned, for a joint to the world */
+    float rest;                /* the length in use */
+    br_vec2 impulse;           /* accumulated, for warm starting */
+} br_joint;
 
 typedef struct br_physics_world {
     br_vec2 gravity;           /* pixels / second^2 */

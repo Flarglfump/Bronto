@@ -24,6 +24,10 @@
 #include "bronto/script.h"
 #include "bronto/components.h"
 #include "bronto/physics.h"
+#include "bronto/components3d.h"
+#include "bronto/physics3d.h"
+#include "bronto/particles.h"
+#include "bronto/model.h"
 #include "bronto/hierarchy.h"
 #include "bronto/serialize.h"
 #include "bronto/assets.h"
@@ -36,6 +40,7 @@
 #include <ctype.h>
 #include <math.h>
 #include <setjmp.h>
+#include <stddef.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,7 +55,7 @@
 /* 1. values and the heap                                                   */
 /* ======================================================================== */
 
-typedef enum { V_NIL = 0, V_BOOL, V_NUM, V_STR, V_VEC, V_ENT, V_LIST, V_COMP, V_OBJ } sc_type;
+typedef enum { V_NIL = 0, V_BOOL, V_NUM, V_STR, V_VEC, V_ENT, V_LIST, V_COMP, V_OBJ, V_VEC3 } sc_type;
 enum { OBJ_STR = 1, OBJ_LIST, OBJ_OBJECT };
 
 typedef struct sc_obj { struct sc_obj *next; uint8_t kind, marked, pinned; } sc_obj;
@@ -67,7 +72,7 @@ typedef struct sc_value {
         bool b;
         double n;
         sc_str *s;
-        struct { double x, y; } v;
+        struct { double x, y, z; } v;          /* vec2 (z unused) and vec3 */
         br_entity e;
         sc_list *l;
         sc_object *o;
@@ -81,6 +86,8 @@ static sc_value sc_nil(void) { sc_value v; memset(&v, 0, sizeof(v)); return v; }
 static sc_value sc_bool(bool b) { sc_value v = sc_nil(); v.t = V_BOOL; v.as.b = b; return v; }
 static sc_value sc_num(double n) { sc_value v = sc_nil(); v.t = V_NUM; v.as.n = n; return v; }
 static sc_value sc_vec(double x, double y) { sc_value v = sc_nil(); v.t = V_VEC; v.as.v.x = x; v.as.v.y = y; return v; }
+static sc_value sc_vec3(double x, double y, double z) { sc_value v = sc_nil(); v.t = V_VEC3; v.as.v.x = x; v.as.v.y = y; v.as.v.z = z; return v; }
+static sc_value sc_v3val(br_vec3 p) { return sc_vec3(p.x, p.y, p.z); }
 static sc_value sc_ent(br_entity e) { sc_value v = sc_nil(); v.t = V_ENT; v.as.e = e; return v; }
 
 static sc_str *sc_str_alloc(sc_heap *h, const char *s, size_t len, bool pinned) {
@@ -327,8 +334,10 @@ enum { REF_UNRESOLVED = 0, REF_LOCAL, REF_GLOBAL, REF_FUNC, REF_BUILTIN, REF_CLA
 
 /* Static types. TY_NONE: not known until it runs (no annotation). */
 typedef enum {
-    TY_NONE = 0, TY_ANY, TY_NIL, TY_BOOL, TY_INT, TY_NUM, TY_STR, TY_VEC, TY_LIST, TY_ENT, TY_COMP, TY_VOID, TY_OBJ
+    TY_NONE = 0, TY_ANY, TY_NIL, TY_BOOL, TY_INT, TY_NUM, TY_STR, TY_VEC, TY_LIST, TY_ENT, TY_COMP, TY_VOID, TY_OBJ, TY_VEC3
 } sc_tyk;
+#define TY_LAST TY_VEC3
+static bool sc_vecty(int t) { return t == TY_VEC || t == TY_VEC3; }
 enum {
     TYF_UNSIGNED = 1,              /* an unsigned int / number: never below 0 */
     TYF_ELEM_UNSIGNED = 2,         /* a list of those */
@@ -353,8 +362,12 @@ typedef struct sc_node {
     struct sc_member *mem;         /* N_SUPER: the parent's function */
 } sc_node;
 
+typedef struct sc_dbg_local { const char *name; int slot, from, to; } sc_dbg_local;   /* (the debugger's) */
+
 typedef struct sc_func {
     const char *name;
+    const sc_dbg_local *dbg;       /* its locals' names: which slot, from which line to which */
+    int dbg_count;
     int params, locals, line;
     sc_node *body;
     sc_ty *param_ty;               /* per parameter (arena) */
@@ -423,6 +436,7 @@ typedef struct sc_program {
     int pinned_count, pinned_cap;
     bool ok;
     bool strict;                   /* @strict, or br_script_set_strict(): every declaration has a type */
+    bool three_d;                  /* @3d: entities' position, rotation, scale, velocity... are vec3s */
     char error[256];
 } sc_program;
 
@@ -434,6 +448,8 @@ typedef struct sc_parser {
     /* the function being parsed: its locals, innermost scope last */
     const char *locals[256];
     int local_count, max_locals;
+    sc_dbg_local dbg[512];         /* the debugger's names of the locals (sc_func.dbg) */
+    int dbg_count;
     /* the type checker: the function being checked and its slots' types */
     const sc_func *fn;
     sc_ty slot_ty[256];
@@ -600,8 +616,8 @@ static bool sc_derives(const sc_class *c, const sc_class *base) {
 
 static const char *sc_tyk_name(int t) {
     static const char *const names[] = { "untyped", "any", "nil", "bool", "int", "number", "string", "vec2", "list",
-                                         "entity", "component", "void", "object" };
-    return t >= 0 && t <= TY_OBJ ? names[t] : "?";
+                                         "entity", "component", "void", "object", "vec3" };
+    return t >= 0 && t <= TY_LAST ? names[t] : "?";
 }
 
 static const char *sc_ty_name(sc_ty ty, char *buf, size_t size) {
@@ -617,7 +633,7 @@ static int sc_type_word(const char *s, int len) {
     static const struct { const char *word; int t; } words[] = {
         { "number", TY_NUM }, { "float", TY_NUM }, { "int", TY_INT }, { "string", TY_STR }, { "bool", TY_BOOL },
         { "vec2", TY_VEC }, { "list", TY_LIST }, { "entity", TY_ENT }, { "any", TY_ANY }, { "void", TY_VOID },
-        { "uint", TY_INT },
+        { "uint", TY_INT }, { "vec3", TY_VEC3 },
     };
     size_t i;
     for (i = 0; i < BR_ARRAY_COUNT(words); ++i)
@@ -653,8 +669,8 @@ static sc_ty sc_parse_one_type(sc_parser *P, bool allow_void, const char *what) 
     }
     if (t.t != T_NAME || (k = sc_type_word(t.start, t.len)) < 0) {
         if (t.t == T_NAME || t.t == T_NIL)
-            sc_parse_error(P, t.line, "unknown type '%.*s' (the types: number, int, uint, string, bool, vec2, list, entity, any, or a struct or class)", t.len, t.start);
-        sc_parse_error(P, t.line, "expected %s (number, int, string, bool, vec2, list, entity, any, or a struct or class)", what);
+            sc_parse_error(P, t.line, "unknown type '%.*s' (the types: number, int, uint, string, bool, vec2, vec3, list, entity, any, or a struct or class)", t.len, t.start);
+        sc_parse_error(P, t.line, "expected %s (number, int, string, bool, vec2, vec3, list, entity, any, or a struct or class)", what);
     }
     if (k == TY_VOID && !allow_void) sc_parse_error(P, t.line, "void is only for what a function returns (-> void)");
     if (t.len == 4 && strncmp(t.start, "uint", 4) == 0) {
@@ -690,10 +706,24 @@ static int sc_find_local(const sc_parser *P, const char *name, int len) {
     return -1;
 }
 
+/* A scope ends: its locals' names stop at this line (for the debugger). */
+static void sc_close_locals(sc_parser *P, int saved) {
+    int i;
+    for (i = 0; i < P->dbg_count; ++i)
+        if (P->dbg[i].slot >= saved && P->dbg[i].to == (1 << 30)) P->dbg[i].to = P->prev.line;
+}
+
 static int sc_add_local(sc_parser *P, const char *name, int line) {
     if (P->local_count == 256) sc_parse_error(P, line, "too many local variables");
     P->locals[P->local_count] = name;
     if (P->local_count + 1 > P->max_locals) P->max_locals = P->local_count + 1;
+    if (P->dbg_count < 512 && (name[0] != ' ' || strcmp(name, " this") == 0)) {
+        sc_dbg_local *d = &P->dbg[P->dbg_count++];
+        d->name = name[0] == ' ' ? name + 1 : name;
+        d->slot = P->local_count;
+        d->from = line;
+        d->to = 1 << 30;
+    }
     return P->local_count++;
 }
 
@@ -983,6 +1013,7 @@ static sc_node *sc_statement(sc_parser *P) {
         n->c->index = sc_add_local(P, " for", t.line);
         P->local_const[n->c->index] = false;
         n->b = sc_block(P);
+        sc_close_locals(P, saved);
         P->local_count = saved;
         sc_skip_newlines(P);
         return n;
@@ -1037,6 +1068,7 @@ static sc_node *sc_block(sc_parser *P) {
         sc_nodes_push(P, &body, sc_statement(P));
     }
     sc_advance(P);
+    sc_close_locals(P, saved);
     P->local_count = saved;                              /* block-scoped names, slots keep growing */
     sc_nodes_store(P, n, &body);
     return n;
@@ -1058,6 +1090,7 @@ static int sc_find_global(const sc_program *p, const char *name) {
 static void sc_func_rest(sc_parser *P, sc_func *f, bool has_this) {
     int line = f->line;
     P->local_count = P->max_locals = 0;
+    P->dbg_count = 0;
     P->has_this = has_this;
     P->in_func = true;
     f->has_this = has_this;
@@ -1096,6 +1129,10 @@ static void sc_func_rest(sc_parser *P, sc_func *f, bool has_this) {
         sc_parse_error(P, P->cur.line, "@strict: say what %s() returns (-> void if nothing)", f->name);
     f->body = sc_block(P);
     f->locals = P->max_locals;
+    if (P->dbg_count) {                                    /* the locals' names, for the debugger */
+        sc_dbg_local *d = (sc_dbg_local *)sc_arena_alloc(P->prog, sizeof(sc_dbg_local) * (size_t)P->dbg_count);
+        if (d) { memcpy(d, P->dbg, sizeof(sc_dbg_local) * (size_t)P->dbg_count); f->dbg = d; f->dbg_count = P->dbg_count; }
+    }
     P->has_this = false;
     P->in_func = false;
 }
@@ -1528,12 +1565,13 @@ static sc_ty sc_sig_type(char c) {
     case 'n': return sc_ty_make(TY_NUM, 0);  case 'i': return sc_ty_make(TY_INT, 0);
     case 's': return sc_ty_make(TY_STR, 0);  case 'b': return sc_ty_make(TY_BOOL, 0);
     case 'v': return sc_ty_make(TY_VEC, 0);  case 'l': return sc_ty_make(TY_LIST, 0);
+    case '3': return sc_ty_make(TY_VEC3, 0);
     case 'e': return sc_ty_make(TY_ENT, 0);  case 'c': return sc_ty_make(TY_COMP, 0);
     case 'L': return sc_ty_make(TY_LIST, TY_ENT);
     case 'R': return sc_ty_make(TY_LIST, TY_INT);
     case 'W': return sc_ty_make(TY_LIST, TY_STR);
     case '-': return sc_ty_make(TY_VOID, 0);
-    default:  return sc_ty_make(TY_NONE, 0);   /* a (any), x / t / p / q: checked below */
+    default:  return sc_ty_make(TY_NONE, 0);   /* a (any), x / t / p / q / V: checked below */
     }
 }
 
@@ -1546,9 +1584,10 @@ static void sc_check_arg(sc_parser *P, const sc_node *call, int i, char code, sc
     sc_ty need;
     if (!sc_known(got) || code == 'a') return;
     switch (code) {
-    case 'x': if (sc_numeric(got.t) || got.t == TY_VEC) return; snprintf(want, sizeof(want), "a number or a vec2"); break;
+    case 'x': if (sc_numeric(got.t) || sc_vecty(got.t)) return; snprintf(want, sizeof(want), "a number or a vector"); break;
+    case 'V': if (sc_vecty(got.t)) return; snprintf(want, sizeof(want), "a vec2 or a vec3"); break;
     case 't': if (got.t == TY_LIST || got.t == TY_STR) return; snprintf(want, sizeof(want), "a list or a string"); break;
-    case 'p': if (got.t == TY_VEC || got.t == TY_NIL) return; snprintf(want, sizeof(want), "a vec2 (or nil)"); break;
+    case 'p': if (sc_vecty(got.t) || got.t == TY_NIL) return; snprintf(want, sizeof(want), "a vector (or nil)"); break;
     case 'q': if (got.t == TY_ENT || got.t == TY_NIL) return; snprintf(want, sizeof(want), "an entity (or nil)"); break;
     default:
         need = sc_sig_type(code);
@@ -1584,7 +1623,7 @@ static sc_ty sc_builtin_type(sc_parser *P, sc_node *n) {
     case 'S': {                                  /* like the arguments: abs, min, max, clamp, lerp, push */
         if (n->count == 0) return sc_ty_make(TY_NONE, 0);
         if (strcmp(n->name, "push") == 0) return args[0];
-        if (args[0].t == TY_VEC) return args[0];
+        if (sc_vecty(args[0].t)) return args[0];
         for (i = 0, r = sc_ty_make(TY_INT, 0); i < n->count && i < 16; ++i) {
             if (strcmp(n->name, "lerp") == 0 && i == 2) break;
             if (!sc_known(args[i])) return sc_ty_make(TY_NONE, 0);
@@ -1600,12 +1639,14 @@ static sc_ty sc_builtin_type(sc_parser *P, sc_node *n) {
     }
 }
 
-/* Entity properties: their types, and what setting them takes. */
-static const struct { const char *name; uint8_t t; bool settable; } k_props[] = {
-    { "name", TY_STR, true }, { "id", TY_INT, false }, { "alive", TY_BOOL, false },
-    { "position", TY_VEC, true }, { "x", TY_NUM, true }, { "y", TY_NUM, true }, { "rotation", TY_NUM, true },
-    { "scale", TY_VEC, true }, { "global_position", TY_VEC, true }, { "global_rotation", TY_NUM, true },
-    { "parent", TY_ENT, true }, { "velocity", TY_VEC, true }, { "angular_velocity", TY_NUM, true },
+/* Entity properties: their types (in 2D, and in @3d scripts), and what setting them takes. */
+static const struct { const char *name; uint8_t t, t3; bool settable; } k_props[] = {
+    { "name", TY_STR, TY_STR, true }, { "id", TY_INT, TY_INT, false }, { "alive", TY_BOOL, TY_BOOL, false },
+    { "position", TY_VEC, TY_VEC3, true }, { "x", TY_NUM, TY_NUM, true }, { "y", TY_NUM, TY_NUM, true },
+    { "z", TY_NUM, TY_NUM, true }, { "rotation", TY_NUM, TY_VEC3, true },
+    { "scale", TY_VEC, TY_VEC3, true }, { "global_position", TY_VEC, TY_VEC3, true }, { "global_rotation", TY_NUM, TY_VEC3, true },
+    { "parent", TY_ENT, TY_ENT, true }, { "velocity", TY_VEC, TY_VEC3, true }, { "angular_velocity", TY_NUM, TY_VEC3, true },
+    { "forward", TY_VEC3, TY_VEC3, false }, { "right", TY_VEC3, TY_VEC3, false }, { "up", TY_VEC3, TY_VEC3, false },
 };
 
 /* A struct's or class's member, as code in P->cls sees it: an error if it can't. */
@@ -1651,12 +1692,17 @@ static sc_ty sc_member_type(sc_parser *P, sc_node *n, bool setting) {
         if (strcmp(n->name, "length") == 0 && !setting) return sc_ty_make(TY_NUM, 0);
         sc_parse_error(P, n->line, "a vec2 has x, y and length, not '%s'", n->name);
     }
+    if (obj.t == TY_VEC3) {
+        if (strcmp(n->name, "x") == 0 || strcmp(n->name, "y") == 0 || strcmp(n->name, "z") == 0) return sc_ty_make(TY_NUM, 0);
+        if (strcmp(n->name, "length") == 0 && !setting) return sc_ty_make(TY_NUM, 0);
+        sc_parse_error(P, n->line, "a vec3 has x, y, z and length, not '%s'", n->name);
+    }
     if (obj.t == TY_ENT) {
         if (isupper((unsigned char)n->name[0])) return sc_ty_make(TY_COMP, 0);
         for (i = 0; i < BR_ARRAY_COUNT(k_props); ++i)
             if (strcmp(k_props[i].name, n->name) == 0) {
                 if (setting && !k_props[i].settable) sc_parse_error(P, n->line, "%s can't be changed", n->name);
-                return sc_ty_make(k_props[i].t, 0);
+                return sc_ty_make(P->prog->three_d ? k_props[i].t3 : k_props[i].t, 0);
             }
         if (n->a->kind == N_SELF) {                    /* self.speed: this script's own variable */
             int g = sc_find_global(P->prog, n->name);
@@ -1686,9 +1732,9 @@ static sc_ty sc_binary_type(sc_parser *P, int op, sc_ty a, sc_ty b, int line) {
         if (op != T_MINUS && (a.flags & b.flags & TYF_UNSIGNED)) r.flags |= TYF_UNSIGNED;   /* stays 0 or more */
         return r;
     }
-    if (a.t == TY_VEC && b.t == TY_VEC && (op == T_PLUS || op == T_MINUS || op == T_STAR)) return a;
-    if (a.t == TY_VEC && sc_numeric(b.t) && (op == T_STAR || op == T_SLASH)) return a;
-    if (sc_numeric(a.t) && b.t == TY_VEC && op == T_STAR) return b;
+    if (sc_vecty(a.t) && a.t == b.t && (op == T_PLUS || op == T_MINUS || op == T_STAR)) return a;
+    if (sc_vecty(a.t) && sc_numeric(b.t) && (op == T_STAR || op == T_SLASH)) return a;
+    if (sc_numeric(a.t) && sc_vecty(b.t) && op == T_STAR) return b;
     if (a.t == TY_LIST && b.t == TY_LIST && op == T_PLUS) return sc_same_ty(a, b) ? a : sc_ty_make(TY_LIST, a.elem == b.elem && a.elem != TY_OBJ ? a.elem : TY_NONE);
     sc_parse_error(P, line, "can't use %s on %s %s and %s %s", sym, sc_article(a.t), sc_ty_name(a, an, sizeof(an)), sc_article(b.t), sc_ty_name(b, bn, sizeof(bn)));
     return sc_ty_make(TY_NONE, 0);
@@ -1791,7 +1837,7 @@ static sc_ty sc_expr_type(sc_parser *P, sc_node *n) {
         a = sc_expr_type(P, n->a);
         a.flags &= (uint8_t)~TYF_UNSIGNED;
         if (n->a->kind == N_NUM) a.flags |= TYF_NEGATIVE;            /* -3: for unsigned's checks */
-        if (!sc_known(a) || sc_numeric(a.t) || a.t == TY_VEC) return a;
+        if (!sc_known(a) || sc_numeric(a.t) || sc_vecty(a.t)) return a;
         sc_parse_error(P, n->line, "can't negate %s %s", sc_article(a.t), sc_ty_name(a, an, sizeof(an)));
         return a;
     case N_NOT: sc_expr_type(P, n->a); return sc_ty_make(TY_BOOL, 0);
@@ -1948,8 +1994,9 @@ static void sc_check_stmt(sc_parser *P, sc_node *n) {
     }
 }
 
-/* What the engine passes to each callback. */
+/* What the engine passes to each callback (in @3d scripts, on_collision's normal is a vec3). */
 static const char *const k_callback_sig[CB_COUNT] = { "", "n", "evn", "e", "e", "e", "", "", "" };
+static const char *const k_callback_sig3[CB_COUNT] = { "", "n", "e3n", "e", "e", "e", "", "", "" };
 
 /* A function's body: its parameters' (and this's) types, then its statements. */
 static void sc_check_func(sc_parser *P, sc_func *f) {
@@ -2012,7 +2059,8 @@ static SC_NOINLINE void sc_typecheck(sc_parser *P) {
             if (strcmp(f->name, k_callbacks[cb]) != 0) continue;
             for (k = 0; k < f->params; ++k) {
                 char want[32], have[32];
-                sc_ty need = k < (int)strlen(k_callback_sig[cb]) ? sc_sig_type(k_callback_sig[cb][k]) : sc_ty_make(TY_NIL, 0);
+                const char *sig = prog->three_d ? k_callback_sig3[cb] : k_callback_sig[cb];
+                sc_ty need = k < (int)strlen(sig) ? sc_sig_type(sig[k]) : sc_ty_make(TY_NIL, 0);
                 if (sc_known(f->param_ty[k]) && !sc_fits(f->param_ty[k], need))
                     sc_parse_error(P, f->line, "the engine passes %s %s as %s()'s parameter '%s', not %s %s", sc_article(need.t),
                                    sc_ty_name(need, want, sizeof(want)), f->name, f->param_names[k], sc_article(f->param_ty[k].t),
@@ -2061,15 +2109,37 @@ static sc_program *sc_compile(const char *source, const char *path) {
     sc_skip_newlines(&P);
     prog->strict = g_strict_default;
     while (P.cur.t != T_EOF) {
-        if (P.cur.t == T_AT) {                                   /* @strict */
+        if (P.cur.t == T_AT) {                                   /* @strict, @3d */
             int line = P.cur.line;
             sc_advance(&P);
+            if (P.cur.t == T_NUM && P.cur.len == 1 && P.cur.num == 3 && (P.cur.start[1] == 'd' || P.cur.start[1] == 'D') &&
+                !isalnum((unsigned char)P.cur.start[2]) && P.cur.start[2] != '_') {
+                if (P.decls) sc_parse_error(&P, line, "@3d goes at the top of the file, before any var, func or class");
+                sc_advance(&P);                                  /* "3", then "d" */
+                sc_advance(&P);
+                prog->three_d = true;
+                if (P.cur.t != T_AT) sc_end_statement(&P);   /* (@strict @3d: both on one line) */
+                continue;
+            }
             if (P.cur.t != T_NAME || P.cur.len != 6 || strncmp(P.cur.start, "strict", 6) != 0)
-                sc_parse_error(&P, line, "unknown annotation '@%.*s' (there is @strict)", P.cur.len, P.cur.start);
+                sc_parse_error(&P, line, "unknown annotation '@%.*s' (there are @strict and @3d)", P.cur.len, P.cur.start);
             if (P.decls) sc_parse_error(&P, line, "@strict goes at the top of the file, before any var, func or class");
             sc_advance(&P);
             prog->strict = true;
-            sc_end_statement(&P);
+            if (P.cur.t != T_AT) sc_end_statement(&P);   /* (@strict @3d: both on one line) */
+            continue;
+        }
+        if (P.cur.t == T_NAME && P.cur.len == 9 && strncmp(P.cur.start, "component", 9) == 0) {   /* (read by gamecomp.c: skipped here) */
+            int depth = 0;
+            sc_advance(&P);
+            while (P.cur.t != T_EOF && P.cur.t != T_LBRACE) sc_advance(&P);
+            do {
+                if (P.cur.t == T_LBRACE) ++depth;
+                else if (P.cur.t == T_RBRACE) --depth;
+                else if (P.cur.t == T_EOF) sc_parse_error(&P, P.cur.line, "a component is never closed with '}'");
+                sc_advance(&P);
+            } while (depth > 0);
+            sc_skip_newlines(&P);
             continue;
         }
         P.decls++;
@@ -2078,7 +2148,7 @@ static sc_program *sc_compile(const char *source, const char *path) {
         else if (P.cur.t == T_CLASS || P.cur.t == T_STRUCT) sc_class_decl(&P);
         else if (P.cur.t >= T_PUBLIC && P.cur.t <= T_OVERRIDE)
             sc_parse_error(&P, P.cur.line, "'%.*s' is for the members of a struct or class", P.cur.len, P.cur.start);
-        else sc_parse_error(&P, P.cur.line, "only var, const, func, struct and class can be at the top of a script (put code inside start())");
+        else sc_parse_error(&P, P.cur.line, "only var, const, func, struct, class and component can be at the top of a script (put code inside start())");
         sc_skip_newlines(&P);
     }
     sc_link_classes(&P);
@@ -2123,8 +2193,25 @@ static int g_behaviour_count;
 static void (*g_print)(const char *, void *);
 static void *g_print_user;
 
+/* A tween: one property eased from where it is to a value over some seconds (tween()). */
+typedef struct sc_tween {
+    int id;
+    br_entity e, owner;             /* what it changes; whose script made it (for tween_then()) */
+    char comp[32], prop[32];        /* "Shape" "color", or "" "position" */
+    int kind;                       /* 0 number, 1 vec2, 2 vec3, 3 colour */
+    double from[4], to[4];
+    float time, dur, delay;
+    int ease;
+    int repeat;                     /* more times to go (-1: for ever) */
+    bool yoyo, backward, started;
+    char then[32];                  /* the owner's function to call when it ends */
+} sc_tween;
+
 struct sc_runtime {
     br_world *w;
+    sc_tween *tweens;
+    int tween_count, tween_cap, next_tween;
+    float dt;                       /* this step's (move_and_slide() moves by velocity * dt) */
     sc_heap heap;
     sc_program **programs;
     int program_count, program_cap;
@@ -2133,6 +2220,8 @@ struct sc_runtime {
     br_component script_id;
     br_builtin_ids ids;
     br_component body_id, collider_id;
+    br_ids3d ids3;
+    br_component body3_id;
     char last_error[300];
     uint32_t error_count;
     char scene_request[BR_PATH_MAX];  /* load_scene(), for the game to act on */
@@ -2158,6 +2247,9 @@ struct sc_vm {
     jmp_buf *fail;
     const sc_class *cls;            /* the class whose function is running (NULL: none): what private and protected allow */
     bool in_init;                   /* running that class's init(): its const fields can be set */
+    uint32_t serial;                /* which run this is (the debugger's stepping tells them apart) */
+    int nframes;                    /* the functions running, innermost last (for the debugger) */
+    struct { const sc_func *f; sc_instance *inst; int base, line; } frames[SC_MAX_DEPTH + 1];
 };
 
 enum { FLOW_NORMAL = 0, FLOW_BREAK, FLOW_CONTINUE, FLOW_RETURN };
@@ -2185,7 +2277,7 @@ static const char *sc_type_name(const sc_value *v) {
     case V_NIL: return "nil";       case V_BOOL: return "a true/false";
     case V_NUM: return "a number";  case V_STR: return "a string";
     case V_VEC: return "a vec2";    case V_ENT: return "an entity";
-    case V_LIST: return "a list";
+    case V_LIST: return "a list";   case V_VEC3: return "a vec3";
     case V_OBJ: {                                    /* "a Point": a few at a time can be in one message */
         static char names[4][80];
         static int next;
@@ -2227,6 +2319,7 @@ static void sc_append(sc_vm *vm, char *buf, size_t size, const sc_value *v, int 
     case V_NUM: snprintf(p, left, "%.10g", v->as.n); break;
     case V_STR: snprintf(p, left, "%s", v->as.s->chars); break;
     case V_VEC: snprintf(p, left, "(%.10g, %.10g)", v->as.v.x, v->as.v.y); break;
+    case V_VEC3: snprintf(p, left, "(%.10g, %.10g, %.10g)", v->as.v.x, v->as.v.y, v->as.v.z); break;
     case V_ENT:
         if (!br_entity_alive(vm->rt->w, v->as.e)) snprintf(p, left, "<destroyed entity>");
         else snprintf(p, left, "<%s>", sc_entity_name(vm->rt, v->as.e)[0] ? sc_entity_name(vm->rt, v->as.e) : "entity");
@@ -2281,6 +2374,7 @@ static bool sc_equal(const sc_value *a, const sc_value *b) {
     case V_NUM: return a->as.n == b->as.n;
     case V_STR: return a->as.s->len == b->as.s->len && memcmp(a->as.s->chars, b->as.s->chars, a->as.s->len) == 0;
     case V_VEC: return a->as.v.x == b->as.v.x && a->as.v.y == b->as.v.y;
+    case V_VEC3: return a->as.v.x == b->as.v.x && a->as.v.y == b->as.v.y && a->as.v.z == b->as.v.z;
     case V_ENT: return a->as.e == b->as.e;
     case V_LIST: return a->as.l == b->as.l;
     case V_COMP: return a->as.comp.e == b->as.comp.e && a->as.comp.c == b->as.comp.c;
@@ -2310,6 +2404,7 @@ static bool sc_value_is(const sc_value *v, sc_ty ty) {
         return v->t == V_OBJ && sc_derives(v->as.o->cls, ty.cls);
     case TY_STR: return v->t == V_STR;
     case TY_VEC: return v->t == V_VEC;
+    case TY_VEC3: return v->t == V_VEC3;
     case TY_ENT: return v->t == V_ENT || v->t == V_NIL;
     case TY_COMP: return v->t == V_COMP || v->t == V_NIL;
     case TY_LIST:
@@ -2395,6 +2490,17 @@ static sc_value sc_arith(sc_vm *vm, int op, sc_value a, sc_value b, int line) {
         return op == T_STAR ? sc_vec(a.as.v.x * b.as.n, a.as.v.y * b.as.n) : sc_vec(a.as.v.x / b.as.n, a.as.v.y / b.as.n);
     }
     if (a.t == V_NUM && b.t == V_VEC && op == T_STAR) return sc_vec(a.as.n * b.as.v.x, a.as.n * b.as.v.y);
+    if (a.t == V_VEC3 && b.t == V_VEC3 && (op == T_PLUS || op == T_MINUS || op == T_STAR)) {
+        if (op == T_PLUS) return sc_vec3(a.as.v.x + b.as.v.x, a.as.v.y + b.as.v.y, a.as.v.z + b.as.v.z);
+        if (op == T_MINUS) return sc_vec3(a.as.v.x - b.as.v.x, a.as.v.y - b.as.v.y, a.as.v.z - b.as.v.z);
+        return sc_vec3(a.as.v.x * b.as.v.x, a.as.v.y * b.as.v.y, a.as.v.z * b.as.v.z);
+    }
+    if (a.t == V_VEC3 && b.t == V_NUM && (op == T_STAR || op == T_SLASH)) {
+        if (op == T_SLASH && b.as.n == 0) sc_fail(vm, line, "division by zero");
+        return op == T_STAR ? sc_vec3(a.as.v.x * b.as.n, a.as.v.y * b.as.n, a.as.v.z * b.as.n)
+                            : sc_vec3(a.as.v.x / b.as.n, a.as.v.y / b.as.n, a.as.v.z / b.as.n);
+    }
+    if (a.t == V_NUM && b.t == V_VEC3 && op == T_STAR) return sc_vec3(a.as.n * b.as.v.x, a.as.n * b.as.v.y, a.as.n * b.as.v.z);
     if (a.t == V_LIST && b.t == V_LIST && op == T_PLUS) {
         sc_list *l = sc_list_alloc(&vm->rt->heap);
         sc_value r = sc_nil();
@@ -2443,6 +2549,7 @@ static sc_value sc_default(sc_vm *vm, sc_ty ty, int line) {
     case TY_BOOL: return sc_bool(false);
     case TY_STR: return sc_string(vm, "", 0);
     case TY_VEC: return sc_vec(0, 0);
+    case TY_VEC3: return sc_vec3(0, 0, 0);
     case TY_LIST: return sc_new_list(vm, line);
     default: return sc_nil();
     }
@@ -2564,10 +2671,11 @@ static void sc_assign(sc_vm *vm, sc_node *target, sc_value val) {
             sc_store_field(vm, m, obj.as.o, val, target->line);
             return;
         }
-        if (obj.t == V_VEC) {                                    /* a copy: change it, store it back */
+        if (obj.t == V_VEC || obj.t == V_VEC3) {                 /* a copy: change it, store it back */
             if (strcmp(target->name, "x") == 0) obj.as.v.x = sc_need_num(vm, &val, target->line, "x");
             else if (strcmp(target->name, "y") == 0) obj.as.v.y = sc_need_num(vm, &val, target->line, "y");
-            else sc_fail(vm, target->line, "a vec2 has only x and y");
+            else if (obj.t == V_VEC3 && strcmp(target->name, "z") == 0) obj.as.v.z = sc_need_num(vm, &val, target->line, "z");
+            else sc_fail(vm, target->line, obj.t == V_VEC3 ? "a vec3 has only x, y and z" : "a vec2 has only x and y");
             sc_assign(vm, target->a, obj);
             return;
         }
@@ -2666,6 +2774,7 @@ static sc_value sc_eval(sc_vm *vm, sc_node *n) {
         sc_value a = sc_eval(vm, n->a);
         if (a.t == V_NUM) return sc_num(-a.as.n);
         if (a.t == V_VEC) return sc_vec(-a.as.v.x, -a.as.v.y);
+        if (a.t == V_VEC3) return sc_vec3(-a.as.v.x, -a.as.v.y, -a.as.v.z);
         sc_fail(vm, n->line, "can't negate %s", sc_type_name(&a));
         return sc_nil();
     }
@@ -2699,8 +2808,16 @@ static int sc_exec_block(sc_vm *vm, sc_node *n) {
     return FLOW_NORMAL;
 }
 
+static void sc_debug_statement(sc_vm *vm, int line);
+static bool g_debug_on;                                     /* a debugger is attached (and has something to do) */
+static uint32_t g_debug_serial;
+
 static int sc_exec(sc_vm *vm, sc_node *n) {
     if (--vm->budget < 0) sc_fail(vm, n->line, "this took too long (an endless loop?)");
+    if (n->kind != N_BLOCK) {
+        if (vm->nframes > 0 && vm->nframes <= SC_MAX_DEPTH + 1) vm->frames[vm->nframes - 1].line = n->line;
+        if (g_debug_on) sc_debug_statement(vm, n->line);
+    }
     switch (n->kind) {
     case N_BLOCK: return sc_exec_block(vm, n);
     case N_EXPR: sc_eval(vm, n->a); return FLOW_NORMAL;
@@ -2804,8 +2921,16 @@ static sc_value sc_invoke(sc_vm *vm, sc_instance *inst, const sc_func *f, const 
         }
     }
     vm->depth++;
+    if (vm->nframes <= SC_MAX_DEPTH) {
+        vm->frames[vm->nframes].f = f;
+        vm->frames[vm->nframes].inst = inst;
+        vm->frames[vm->nframes].base = vm->base;
+        vm->frames[vm->nframes].line = f->line;
+    }
+    vm->nframes++;
     vm->ret = sc_nil();
     result = sc_exec(vm, f->body) == FLOW_RETURN ? sc_own(vm, vm->ret, line) : sc_nil();
+    vm->nframes--;
     if (f->ret.t && f->ret.t != TY_VOID) {
         char what[96];
         snprintf(what, sizeof(what), "what %s() returns", f->name);
@@ -2869,6 +2994,69 @@ static br_vec2 *sc_velocity(sc_vm *vm, br_entity e, int line) {
     return NULL;
 }
 
+/* ---- 3D entities (a Transform3D) ---- */
+static br_transform3d *sc_t3(sc_runtime *rt, br_entity e) {
+    return rt->ids3.transform3d == BR_COMPONENT_INVALID ? NULL : (br_transform3d *)br_get(rt->w, e, rt->ids3.transform3d);
+}
+static br_vec3 sc_need_vec3(sc_vm *vm, const sc_value *v, int line, const char *what) {
+    if (v->t != V_VEC3) sc_fail(vm, line, "%s needs a vec3, not %s", what, sc_type_name(v));
+    return br_v3((float)v->as.v.x, (float)v->as.v.y, (float)v->as.v.z);
+}
+static br_rigidbody3d *sc_body3(sc_vm *vm, br_entity e, int line, const char *what) {
+    br_rigidbody3d *rb = vm->rt->body3_id == BR_COMPONENT_INVALID ? NULL : (br_rigidbody3d *)br_get(vm->rt->w, e, vm->rt->body3_id);
+    if (!rb) sc_fail(vm, line, "%s needs a RigidBody3D", what);
+    return rb;
+}
+/* A 3D entity's property (true if `name` is one). */
+static bool sc_get3(sc_vm *vm, br_entity e, br_transform3d *t, const char *name, int line, sc_value *out) {
+    br_world *w = vm->rt->w;
+    if (strcmp(name, "position") == 0) { *out = sc_v3val(t->position); return true; }
+    if (strcmp(name, "x") == 0) { *out = sc_num(t->position.x); return true; }
+    if (strcmp(name, "y") == 0) { *out = sc_num(t->position.y); return true; }
+    if (strcmp(name, "z") == 0) { *out = sc_num(t->position.z); return true; }
+    if (strcmp(name, "rotation") == 0) { *out = sc_v3val(t->rotation); return true; }
+    if (strcmp(name, "scale") == 0) { *out = sc_v3val(t->scale); return true; }
+    if (strcmp(name, "global_position") == 0 || strcmp(name, "global_rotation") == 0) {
+        br_vec3 p;
+        br_quat q;
+        br_world_transform3d(w, e, &p, &q, NULL);
+        *out = name[7] == 'p' ? sc_v3val(p) : sc_v3val(br_quat_to_euler(q));
+        return true;
+    }
+    if (strcmp(name, "forward") == 0) { *out = sc_v3val(br_forward3d(w, e)); return true; }
+    if (strcmp(name, "right") == 0) { *out = sc_v3val(br_right3d(w, e)); return true; }
+    if (strcmp(name, "up") == 0) { *out = sc_v3val(br_up3d(w, e)); return true; }
+    if (strcmp(name, "velocity") == 0) { *out = sc_v3val(sc_body3(vm, e, line, "velocity")->velocity); return true; }
+    if (strcmp(name, "angular_velocity") == 0) { *out = sc_v3val(sc_body3(vm, e, line, "angular_velocity")->angular_velocity); return true; }
+    return false;
+}
+static bool sc_set3(sc_vm *vm, br_entity e, br_transform3d *t, const char *name, const sc_value *val, int line) {
+    br_world *w = vm->rt->w;
+    if (strcmp(name, "position") == 0) { t->position = sc_need_vec3(vm, val, line, "position"); return true; }
+    if (strcmp(name, "x") == 0) { t->position.x = (float)sc_need_num(vm, val, line, "x"); return true; }
+    if (strcmp(name, "y") == 0) { t->position.y = (float)sc_need_num(vm, val, line, "y"); return true; }
+    if (strcmp(name, "z") == 0) { t->position.z = (float)sc_need_num(vm, val, line, "z"); return true; }
+    if (strcmp(name, "rotation") == 0) { t->rotation = sc_need_vec3(vm, val, line, "rotation"); return true; }
+    if (strcmp(name, "scale") == 0) {
+        if (val->t == V_NUM) t->scale = br_v3((float)val->as.n, (float)val->as.n, (float)val->as.n);
+        else t->scale = sc_need_vec3(vm, val, line, "scale");
+        return true;
+    }
+    if (strcmp(name, "global_position") == 0) { br_set_world_position3d(w, e, sc_need_vec3(vm, val, line, "global_position")); return true; }
+    if (strcmp(name, "global_rotation") == 0) {
+        br_set_world_rotation3d(w, e, br_quat_from_euler(sc_need_vec3(vm, val, line, "global_rotation")));
+        return true;
+    }
+    if (strcmp(name, "velocity") == 0) { sc_body3(vm, e, line, "velocity")->velocity = sc_need_vec3(vm, val, line, "velocity"); return true; }
+    if (strcmp(name, "angular_velocity") == 0) {
+        sc_body3(vm, e, line, "angular_velocity")->angular_velocity = sc_need_vec3(vm, val, line, "angular_velocity");
+        return true;
+    }
+    if (strcmp(name, "forward") == 0 || strcmp(name, "right") == 0 || strcmp(name, "up") == 0)
+        sc_fail(vm, line, "%s can't be changed (turn it with rotation or look_at())", name);
+    return false;
+}
+
 static sc_value sc_field_get(sc_vm *vm, const br_field *f, const void *data) {
     const unsigned char *p = (const unsigned char *)data + f->offset;
     switch (f->type) {
@@ -2876,6 +3064,7 @@ static sc_value sc_field_get(sc_vm *vm, const br_field *f, const void *data) {
     case BR_FIELD_FLOAT: return sc_num(*(const float *)p);
     case BR_FIELD_BOOL: return sc_bool(*(const bool *)p);
     case BR_FIELD_VEC2: return sc_vec(((const br_vec2 *)p)->x, ((const br_vec2 *)p)->y);
+    case BR_FIELD_VEC3: return sc_vec3(((const br_vec3 *)p)->x, ((const br_vec3 *)p)->y, ((const br_vec3 *)p)->z);
     case BR_FIELD_STRING: return sc_string(vm, (const char *)p, strlen((const char *)p));
     case BR_FIELD_ENTITY: {
         br_entity e;
@@ -2898,6 +3087,7 @@ static void sc_field_set(sc_vm *vm, const br_field *f, void *data, const sc_valu
     case BR_FIELD_FLOAT: *(float *)p = (float)sc_need_num(vm, v, line, f->name); return;
     case BR_FIELD_BOOL: *(bool *)p = sc_truthy(v); return;
     case BR_FIELD_VEC2: *(br_vec2 *)p = sc_need_vec(vm, v, line, f->name); return;
+    case BR_FIELD_VEC3: *(br_vec3 *)p = sc_need_vec3(vm, v, line, f->name); return;
     case BR_FIELD_STRING: snprintf((char *)p, f->size, "%s", sc_need_str(vm, v, line, f->name)); return;
     case BR_FIELD_ENTITY: {
         br_entity e = v->t == V_NIL ? BR_ENTITY_NULL : sc_need_entity(vm, v, line, f->name);
@@ -2937,6 +3127,13 @@ static sc_value sc_get_member(sc_vm *vm, const sc_value *obj, const char *name, 
         if (strcmp(name, "length") == 0) return sc_num(sqrt(obj->as.v.x * obj->as.v.x + obj->as.v.y * obj->as.v.y));
         sc_fail(vm, line, "a vec2 has x, y and length, not '%s'", name);
     }
+    if (obj->t == V_VEC3) {
+        if (strcmp(name, "x") == 0) return sc_num(obj->as.v.x);
+        if (strcmp(name, "y") == 0) return sc_num(obj->as.v.y);
+        if (strcmp(name, "z") == 0) return sc_num(obj->as.v.z);
+        if (strcmp(name, "length") == 0) return sc_num(sqrt(obj->as.v.x * obj->as.v.x + obj->as.v.y * obj->as.v.y + obj->as.v.z * obj->as.v.z));
+        sc_fail(vm, line, "a vec3 has x, y, z and length, not '%s'", name);
+    }
     if (obj->t == V_COMP) {
         const br_component_desc *d = br_component_get_desc(rt->w, obj->as.comp.c);
         const void *data = br_get(rt->w, obj->as.comp.e, obj->as.comp.c);
@@ -2953,6 +3150,13 @@ static sc_value sc_get_member(sc_vm *vm, const sc_value *obj, const char *name, 
         if (!br_entity_alive(rt->w, e)) sc_fail(vm, line, "can't read .%s: that entity was destroyed", name);
         if (strcmp(name, "name") == 0) { const char *s = sc_entity_name(rt, e); return sc_string(vm, s, strlen(s)); }
         if (strcmp(name, "id") == 0) return sc_num((double)e);
+        {                                                      /* a 3D entity: vec3s */
+            br_transform3d *t3 = sc_t3(rt, e);
+            sc_value r3;
+            if (t3 && sc_get3(vm, e, t3, name, line, &r3)) return r3;
+            if (!t3 && (strcmp(name, "z") == 0 || strcmp(name, "forward") == 0 || strcmp(name, "right") == 0 || strcmp(name, "up") == 0))
+                sc_fail(vm, line, ".%s is for 3D entities (with a Transform3D)", name);
+        }
         if (strcmp(name, "position") == 0) { br_transform *t = sc_transform(vm, e, line); return sc_vec(t->position.x, t->position.y); }
         if (strcmp(name, "x") == 0) return sc_num(sc_transform(vm, e, line)->position.x);
         if (strcmp(name, "y") == 0) return sc_num(sc_transform(vm, e, line)->position.y);
@@ -3007,6 +3211,11 @@ static void sc_set_member(sc_vm *vm, const sc_value *obj, const char *name, cons
             if (!n) n = (br_name *)br_add(rt->w, e, rt->ids.name, NULL);
             if (n) snprintf(n->text, sizeof(n->text), "%s", sc_need_str(vm, val, line, "name"));
             return;
+        }
+        {
+            br_transform3d *t3 = sc_t3(rt, e);
+            if (t3 && sc_set3(vm, e, t3, name, val, line)) return;
+            if (!t3 && strcmp(name, "z") == 0) sc_fail(vm, line, ".z is for 3D entities (with a Transform3D)");
         }
         if (strcmp(name, "position") == 0) { sc_transform(vm, e, line)->position = sc_need_vec(vm, val, line, "position"); return; }
         if (strcmp(name, "x") == 0) { sc_transform(vm, e, line)->position.x = (float)sc_need_num(vm, val, line, "x"); return; }
@@ -3104,6 +3313,9 @@ static sc_value bi_lerp(ARGS) {
     BR_UNUSED(n);
     if (a[0].t == V_VEC && a[1].t == V_VEC)
         return sc_vec(a[0].as.v.x + (a[1].as.v.x - a[0].as.v.x) * t, a[0].as.v.y + (a[1].as.v.y - a[0].as.v.y) * t);
+    if (a[0].t == V_VEC3 && a[1].t == V_VEC3)
+        return sc_vec3(a[0].as.v.x + (a[1].as.v.x - a[0].as.v.x) * t, a[0].as.v.y + (a[1].as.v.y - a[0].as.v.y) * t,
+                       a[0].as.v.z + (a[1].as.v.z - a[0].as.v.z) * t);
     return sc_num(NUM(0, "lerp()") + (NUM(1, "lerp()") - a[0].as.n) * t);
 }
 static sc_value bi_random(ARGS) {
@@ -3113,25 +3325,46 @@ static sc_value bi_random(ARGS) {
     return sc_num(NUM(0, "random()") + u * (NUM(1, "random()") - a[0].as.n));
 }
 static sc_value bi_vec2(ARGS) { BR_UNUSED(n); return sc_vec(NUM(0, "vec2()"), NUM(1, "vec2()")); }
-static sc_value bi_length(ARGS) { br_vec2 v = sc_need_vec(vm, &a[0], line, "length()"); BR_UNUSED(n); return sc_num(sqrt((double)v.x * v.x + (double)v.y * v.y)); }
-static sc_value bi_normalize(ARGS) {
-    double x, y, l;
+static sc_value bi_vec3(ARGS) { BR_UNUSED(n); return sc_vec3(NUM(0, "vec3()"), NUM(1, "vec3()"), NUM(2, "vec3()")); }
+/* A vec2 or a vec3 (z = 0 for a vec2), for the functions that take either. */
+static void sc_need_anyvec(sc_vm *vm, const sc_value *v, int line, const char *what) {
+    if (v->t != V_VEC && v->t != V_VEC3) sc_fail(vm, line, "%s needs a vec2 or a vec3, not %s", what, sc_type_name(v));
+}
+static void sc_same_vecs(sc_vm *vm, const sc_value *a, const sc_value *b, int line, const char *what) {
+    sc_need_anyvec(vm, a, line, what);
+    sc_need_anyvec(vm, b, line, what);
+    if (a->t != b->t) sc_fail(vm, line, "%s needs two vec2s or two vec3s, not %s and %s", what, sc_type_name(a), sc_type_name(b));
+}
+static double sc_vz(const sc_value *v) { return v->t == V_VEC3 ? v->as.v.z : 0; }
+static sc_value bi_length(ARGS) {
     BR_UNUSED(n);
-    sc_need_vec(vm, &a[0], line, "normalize()");
-    x = a[0].as.v.x; y = a[0].as.v.y; l = sqrt(x * x + y * y);
+    sc_need_anyvec(vm, &a[0], line, "length()");
+    return sc_num(sqrt(a[0].as.v.x * a[0].as.v.x + a[0].as.v.y * a[0].as.v.y + sc_vz(&a[0]) * sc_vz(&a[0])));
+}
+static sc_value bi_normalize(ARGS) {
+    double x, y, z, l;
+    BR_UNUSED(n);
+    sc_need_anyvec(vm, &a[0], line, "normalize()");
+    x = a[0].as.v.x; y = a[0].as.v.y; z = sc_vz(&a[0]); l = sqrt(x * x + y * y + z * z);
+    if (a[0].t == V_VEC3) return l > 0 ? sc_vec3(x / l, y / l, z / l) : sc_vec3(0, 0, 0);
     return l > 0 ? sc_vec(x / l, y / l) : sc_vec(0, 0);
 }
 static sc_value bi_dot(ARGS) {
     BR_UNUSED(n);
-    sc_need_vec(vm, &a[0], line, "dot()"); sc_need_vec(vm, &a[1], line, "dot()");
-    return sc_num(a[0].as.v.x * a[1].as.v.x + a[0].as.v.y * a[1].as.v.y);
+    sc_same_vecs(vm, &a[0], &a[1], line, "dot()");
+    return sc_num(a[0].as.v.x * a[1].as.v.x + a[0].as.v.y * a[1].as.v.y + sc_vz(&a[0]) * sc_vz(&a[1]));
+}
+static sc_value bi_cross(ARGS) {
+    br_vec3 x = sc_need_vec3(vm, &a[0], line, "cross()"), y = sc_need_vec3(vm, &a[1], line, "cross()");
+    BR_UNUSED(n);
+    return sc_vec3((double)x.y * y.z - (double)x.z * y.y, (double)x.z * y.x - (double)x.x * y.z, (double)x.x * y.y - (double)x.y * y.x);
 }
 static sc_value bi_distance(ARGS) {
-    double dx, dy;
+    double dx, dy, dz;
     BR_UNUSED(n);
-    sc_need_vec(vm, &a[0], line, "distance()"); sc_need_vec(vm, &a[1], line, "distance()");
-    dx = a[1].as.v.x - a[0].as.v.x; dy = a[1].as.v.y - a[0].as.v.y;
-    return sc_num(sqrt(dx * dx + dy * dy));
+    sc_same_vecs(vm, &a[0], &a[1], line, "distance()");
+    dx = a[1].as.v.x - a[0].as.v.x; dy = a[1].as.v.y - a[0].as.v.y; dz = sc_vz(&a[1]) - sc_vz(&a[0]);
+    return sc_num(sqrt(dx * dx + dy * dy + dz * dz));
 }
 static sc_value bi_angle(ARGS) { BR_UNUSED(n); sc_need_vec(vm, &a[0], line, "angle()"); return sc_num(atan2(a[0].as.v.y, a[0].as.v.x) * (180.0 / BR_PI)); }
 static sc_value bi_from_angle(ARGS) { double d = NUM(0, "from_angle()") * (BR_PI / 180.0), l = n > 1 ? NUM(1, "from_angle()") : 1; return sc_vec(cos(d) * l, sin(d) * l); }
@@ -3536,6 +3769,17 @@ static sc_value bi_tags(ARGS) {
     for (i = 0; br_tag_at(vm->rt->w, e, i, tag, sizeof(tag)); ++i) sc_list_push(vm, list.as.l, sc_string(vm, tag, strlen(tag)), line);
     return list;
 }
+/* find_with("Health"): every entity with that component. */
+static sc_value bi_find_with(ARGS) {
+    const char *name = sc_need_str(vm, &a[0], line, "find_with()");
+    br_component c = br_component_find(vm->rt->w, name);
+    sc_value list = sc_new_list(vm, line);
+    uint32_t i;
+    BR_UNUSED(n);
+    if (c == BR_COMPONENT_INVALID) sc_fail(vm, line, "find_with(): there is no component called %s", name);
+    for (i = 0; i < vm->rt->w->pools[c].count; ++i) sc_list_push(vm, list.as.l, sc_ent(vm->rt->w->pools[c].entities[i]), line);
+    return list;
+}
 static sc_value bi_destroy(ARGS) {
     BR_UNUSED(n);
     if (a[0].t == V_ENT && br_entity_alive(vm->rt->w, a[0].as.e)) br_entity_destroy_deferred(vm->rt->w, a[0].as.e);
@@ -3569,7 +3813,17 @@ static sc_value bi_spawn(ARGS) {
         for (i = 0; i < count; ++i)
             if (br_parent_of(rt->w, made[i]) == BR_ENTITY_NULL) br_set_parent(rt->w, made[i], parent, false);
     }
-    if (n > 1 && a[1].t != V_NIL) {                       /* move it so the first entity lands at pos */
+    if (n > 1 && a[1].t == V_VEC3) {                      /* 3D: the same with Transform3Ds */
+        br_vec3 at = sc_need_vec3(vm, &a[1], line, "spawn() position");
+        br_transform3d *t0 = (br_transform3d *)br_get(rt->w, made[0], rt->ids3.transform3d);
+        br_vec3 shift = t0 ? br_v3_sub(at, t0->position) : br_v3(0, 0, 0);
+        for (i = 0; i < count; ++i) {
+            br_transform3d *t = (br_transform3d *)br_get(rt->w, made[i], rt->ids3.transform3d);
+            br_entity pe = br_parent_of(rt->w, made[i]);
+            bool root = pe == BR_ENTITY_NULL || (n > 2 && a[2].t == V_ENT && pe == a[2].as.e);
+            if (t && root) t->position = br_v3_add(t->position, shift);
+        }
+    } else if (n > 1 && a[1].t != V_NIL) {                /* move it so the first entity lands at pos */
         br_vec2 at = sc_need_vec(vm, &a[1], line, "spawn() position");
         br_transform *t0 = (br_transform *)br_get(rt->w, made[0], rt->ids.transform);
         br_vec2 shift = t0 ? br_v2_sub(at, t0->position) : br_v2(0, 0);
@@ -3635,24 +3889,50 @@ static sc_value bi_remove_component(ARGS) {
 }
 static sc_value bi_apply_force(ARGS) {
     br_entity e = sc_need_entity(vm, &a[0], line, "apply_force()");
-    br_vec2 f = sc_need_vec(vm, &a[1], line, "apply_force()"), p;
+    br_vec2 f, p;
+    if (a[1].t == V_VEC3) {                                  /* 3D: a RigidBody3D */
+        br_vec3 f3 = sc_need_vec3(vm, &a[1], line, "apply_force()"), p3;
+        if (n > 2) { p3 = sc_need_vec3(vm, &a[2], line, "apply_force() point"); br_physics3d_apply_force(vm->rt->w, e, f3, &p3); }
+        else br_physics3d_apply_force(vm->rt->w, e, f3, NULL);
+        return sc_nil();
+    }
+    f = sc_need_vec(vm, &a[1], line, "apply_force()");
     if (n > 2) { p = sc_need_vec(vm, &a[2], line, "apply_force() point"); br_physics_apply_force(vm->rt->w, e, f, &p); }
     else br_physics_apply_force(vm->rt->w, e, f, NULL);
     return sc_nil();
 }
 static sc_value bi_apply_impulse(ARGS) {
     br_entity e = sc_need_entity(vm, &a[0], line, "apply_impulse()");
-    br_vec2 f = sc_need_vec(vm, &a[1], line, "apply_impulse()"), p;
+    br_vec2 f, p;
+    if (a[1].t == V_VEC3) {
+        br_vec3 f3 = sc_need_vec3(vm, &a[1], line, "apply_impulse()"), p3;
+        if (n > 2) { p3 = sc_need_vec3(vm, &a[2], line, "apply_impulse() point"); br_physics3d_apply_impulse(vm->rt->w, e, f3, &p3); }
+        else br_physics3d_apply_impulse(vm->rt->w, e, f3, NULL);
+        return sc_nil();
+    }
+    f = sc_need_vec(vm, &a[1], line, "apply_impulse()");
     if (n > 2) { p = sc_need_vec(vm, &a[2], line, "apply_impulse() point"); br_physics_apply_impulse(vm->rt->w, e, f, &p); }
     else br_physics_apply_impulse(vm->rt->w, e, f, NULL);
     return sc_nil();
 }
 static sc_value bi_raycast(ARGS) {
-    br_vec2 from = sc_need_vec(vm, &a[0], line, "raycast()"), to = sc_need_vec(vm, &a[1], line, "raycast()");
+    br_vec2 from, to;
     br_entity ignore = n > 2 && a[2].t == V_ENT ? a[2].as.e : BR_ENTITY_NULL;
     int mask = n > 3 && a[3].t != V_NIL ? (int)NUM(3, "raycast() mask") : -1;
     br_raycast_hit hit;
     sc_value list;
+    if (a[0].t == V_VEC3) {                                  /* 3D: Collider3Ds */
+        br_vec3 f3 = sc_need_vec3(vm, &a[0], line, "raycast()"), t3 = sc_need_vec3(vm, &a[1], line, "raycast()");
+        br_raycast3d_hit h3;
+        if (!br_physics3d_raycast(vm->rt->w, f3, t3, mask, ignore, &h3)) return sc_nil();
+        list = sc_new_list(vm, line);
+        sc_list_push(vm, list.as.l, sc_ent(h3.entity), line);
+        sc_list_push(vm, list.as.l, sc_v3val(h3.point), line);
+        sc_list_push(vm, list.as.l, sc_v3val(h3.normal), line);
+        return list;
+    }
+    from = sc_need_vec(vm, &a[0], line, "raycast()");
+    to = sc_need_vec(vm, &a[1], line, "raycast()");
     if (!br_physics_raycast(vm->rt->w, from, to, mask, ignore, &hit)) return sc_nil();
     list = sc_new_list(vm, line);                         /* [entity, point, normal] */
     sc_list_push(vm, list.as.l, sc_ent(hit.entity), line);
@@ -3661,9 +3941,92 @@ static sc_value bi_raycast(ARGS) {
     return list;
 }
 static sc_value bi_entity_at(ARGS) {
-    br_entity e = br_physics_point(vm->rt->w, sc_need_vec(vm, &a[0], line, "entity_at()"),
-                                   n > 1 && a[1].t != V_NIL ? (int)NUM(1, "entity_at() mask") : -1);
+    br_entity e;
+    int mask = n > 1 && a[1].t != V_NIL ? (int)NUM(1, "entity_at() mask") : -1;
+    if (a[0].t == V_VEC3) {
+        uint32_t k = br_physics3d_overlap_sphere(vm->rt->w, sc_need_vec3(vm, &a[0], line, "entity_at()"), 1e-4f, mask, &e, 1);
+        return k ? sc_ent(e) : sc_nil();
+    }
+    e = br_physics_point(vm->rt->w, sc_need_vec(vm, &a[0], line, "entity_at()"), mask);
     return e == BR_ENTITY_NULL ? sc_nil() : sc_ent(e);
+}
+/* ---- 3D ---- */
+static sc_value bi_overlap_sphere(ARGS) {
+    br_vec3 c = sc_need_vec3(vm, &a[0], line, "overlap_sphere()");
+    double r = NUM(1, "overlap_sphere()");
+    sc_value list = sc_new_list(vm, line);
+    br_entity found[256];
+    uint32_t k, i;
+    BR_UNUSED(n);
+    k = br_physics3d_overlap_sphere(vm->rt->w, c, (float)r, -1, found, 256);
+    for (i = 0; i < k && i < 256; ++i) sc_list_push(vm, list.as.l, sc_ent(found[i]), line);
+    return list;
+}
+static sc_value bi_apply_torque(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "apply_torque()");
+    BR_UNUSED(n);
+    br_physics3d_apply_torque(vm->rt->w, e, sc_need_vec3(vm, &a[1], line, "apply_torque()"));
+    return sc_nil();
+}
+static sc_value bi_look_at(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "look_at()");
+    BR_UNUSED(n);
+    if (!sc_t3(vm->rt, e)) sc_fail(vm, line, "look_at() turns 3D entities (with a Transform3D)");
+    br_look_at3d(vm->rt->w, e, sc_need_vec3(vm, &a[1], line, "look_at()"));
+    return sc_nil();
+}
+/* move_and_slide(e, velocity): a 3D character moved by velocity * dt, sliding along
+ * what it meets; returns the velocity with the parts that went into things taken out. */
+static sc_value bi_move_and_slide(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "move_and_slide()");
+    br_vec3 v = sc_need_vec3(vm, &a[1], line, "move_and_slide()");
+    float dt = vm->rt->dt > 0 ? vm->rt->dt : 1.0f / 60.0f;
+    BR_UNUSED(n);
+    if (!sc_t3(vm->rt, e)) sc_fail(vm, line, "move_and_slide() moves 3D entities (with a Transform3D)");
+    br_physics3d_move(vm->rt->w, e, br_v3_scale(v, dt), &v, NULL);
+    return sc_v3val(v);
+}
+static sc_value sc_move_flag(sc_vm *vm, sc_value *a, int line, const char *what, int which) {
+    br_physics3d_move_info info;
+    br_entity e = sc_need_entity(vm, &a[0], line, what);
+    br_physics3d_last_move(vm->rt->w, e, &info);
+    return sc_bool(which == 0 ? info.on_floor : which == 1 ? info.on_wall : info.on_ceiling);
+}
+static sc_value bi_is_on_floor(ARGS) { BR_UNUSED(n); return sc_move_flag(vm, a, line, "is_on_floor()", 0); }
+static sc_value bi_is_on_wall(ARGS) { BR_UNUSED(n); return sc_move_flag(vm, a, line, "is_on_wall()", 1); }
+static sc_value bi_is_on_ceiling(ARGS) { BR_UNUSED(n); return sc_move_flag(vm, a, line, "is_on_ceiling()", 2); }
+/* The scene camera, and the screen it draws on (the engine's framebuffer). */
+static bool sc_camera3(sc_vm *vm, br_r3d *r3) {
+    br_engine *e = sc_engine(vm);
+    br_camera3d cam;
+    int w = e && e->renderer.target ? e->renderer.target->width : 320, h = e && e->renderer.target ? e->renderer.target->height : 180;
+    if (!br_scene_camera3d(vm->rt->w, &cam, NULL)) return false;
+    memset(r3, 0, sizeof(*r3));
+    r3->camera = cam;
+    r3->viewport = br_recti_make(0, 0, w, h);
+    r3->view = br_camera3d_view(&cam);
+    r3->proj = br_camera3d_projection(&cam, (float)w / (float)h);
+    r3->view_proj = br_m4_mul(r3->proj, r3->view);
+    return true;
+}
+static sc_value bi_world_to_screen3(sc_vm *vm, const sc_value *a, int line) {   /* (world_to_screen() with a vec3) */
+    br_r3d r3;
+    br_vec3 sp;
+    if (!sc_camera3(vm, &r3) || !br_r3d_project(&r3, sc_need_vec3(vm, &a[0], line, "world_to_screen()"), &sp)) return sc_vec(-100000, -100000);
+    return sc_vec(sp.x, sp.y);
+}
+static sc_value bi_screen_ray(ARGS) {
+    br_r3d r3;
+    br_vec3 o, d;
+    sc_value list;
+    br_vec2 p = sc_need_vec(vm, &a[0], line, "screen_ray()");
+    BR_UNUSED(n);
+    if (!sc_camera3(vm, &r3)) sc_fail(vm, line, "screen_ray() needs a scene camera (an active Camera3D with a Transform3D)");
+    br_r3d_ray(&r3, p, &o, &d);
+    list = sc_new_list(vm, line);
+    sc_list_push(vm, list.as.l, sc_v3val(o), line);
+    sc_list_push(vm, list.as.l, sc_v3val(d), line);
+    return list;
 }
 /* Tilemaps: the map entity and a world point. */
 static sc_value bi_tile_at(ARGS) {
@@ -3795,7 +4158,7 @@ static void sc_text_str(sc_text *t, const char *s) { sc_text_add(t, s, strlen(s)
 
 /* NULL when written, else why it can't be. */
 static const char *sc_write_value(sc_text *t, const sc_value *v, int depth) {
-    char num[64];
+    char num[128];
     uint32_t i;
     if (depth > SC_TEXT_DEPTH) return "lists inside lists too deeply (or a list inside itself)";
     switch (v->t) {
@@ -3809,6 +4172,11 @@ static const char *sc_write_value(sc_text *t, const sc_value *v, int depth) {
     case V_VEC:
         if (!isfinite(v->as.v.x) || !isfinite(v->as.v.y)) return "a vec2 that isn't finite";
         snprintf(num, sizeof(num), "vec2(%.17g, %.17g)", v->as.v.x, v->as.v.y);
+        sc_text_str(t, num);
+        return NULL;
+    case V_VEC3:
+        if (!isfinite(v->as.v.x) || !isfinite(v->as.v.y) || !isfinite(v->as.v.z)) return "a vec3 that isn't finite";
+        snprintf(num, sizeof(num), "vec3(%.17g, %.17g, %.17g)", v->as.v.x, v->as.v.y, v->as.v.z);
         sc_text_str(t, num);
         return NULL;
     case V_STR:
@@ -3896,7 +4264,7 @@ static bool sc_read_list(sc_runtime *rt, sc_lexer *L, sc_value *out, int depth) 
 
 /* One literal, starting with the token `t`. */
 static bool sc_read_value(sc_runtime *rt, sc_lexer *L, sc_token t, sc_value *out, int depth) {
-    double x, y;
+    double x, y, z;
     if (depth > SC_TEXT_DEPTH) return false;
     switch (t.t) {
     case T_NIL: *out = sc_nil(); return true;
@@ -3907,12 +4275,16 @@ static bool sc_read_value(sc_runtime *rt, sc_lexer *L, sc_token t, sc_value *out
         return true;
     case T_STR: return sc_heap_string(rt, t.start, (size_t)t.len, out);
     case T_LBRACKET: return sc_read_list(rt, L, out, depth);
-    case T_NAME:
-        if (t.len != 4 || strncmp(t.start, "vec2", 4) != 0 || sc_next(L).t != T_LPAREN) return false;
+    case T_NAME: {
+        bool three = t.len == 4 && strncmp(t.start, "vec3", 4) == 0;
+        if (t.len != 4 || (strncmp(t.start, "vec2", 4) != 0 && !three) || sc_next(L).t != T_LPAREN) return false;
         if (!sc_read_number(L, sc_next(L), &x) || sc_next(L).t != T_COMMA) return false;
-        if (!sc_read_number(L, sc_next(L), &y) || sc_next(L).t != T_RPAREN) return false;
-        *out = sc_vec(x, y);
+        if (!sc_read_number(L, sc_next(L), &y)) return false;
+        if (three && (sc_next(L).t != T_COMMA || !sc_read_number(L, sc_next(L), &z))) return false;
+        if (sc_next(L).t != T_RPAREN) return false;
+        *out = three ? sc_vec3(x, y, z) : sc_vec(x, y);
         return true;
+    }
     default: return false;
     }
 }
@@ -4068,6 +4440,320 @@ static sc_value bi_text_size(ARGS) {
     return sc_vec(m.x, m.y);
 }
 
+/* ---- particles (particles.h) ---- */
+static sc_value bi_emit(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "emit()");
+    int count = n > 1 && a[1].t != V_NIL ? (int)NUM(1, "emit() count") : -1;
+    if (!br_particles_emit(vm->rt->w, e, count < -1 ? 0 : count)) sc_fail(vm, line, "emit() needs an entity with Particles (and a Transform or Transform3D)");
+    return sc_nil();
+}
+static sc_value bi_particle_count(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "particle_count()");
+    BR_UNUSED(n);
+    return sc_num(br_particles_count(vm->rt->w, e));
+}
+
+/* ---- tweens: a property eased to a value over time ---- */
+static const char *const k_ease_names[] = {
+    "linear", "ease_in", "ease_out", "ease_in_out", "cubic_in", "cubic_out", "cubic_in_out",
+    "sine_in", "sine_out", "sine_in_out", "back_in", "back_out", "elastic_out", "bounce_out"
+};
+
+static double sc_bounce(double t) {
+    if (t < 1 / 2.75) return 7.5625 * t * t;
+    if (t < 2 / 2.75) { t -= 1.5 / 2.75; return 7.5625 * t * t + 0.75; }
+    if (t < 2.5 / 2.75) { t -= 2.25 / 2.75; return 7.5625 * t * t + 0.9375; }
+    t -= 2.625 / 2.75;
+    return 7.5625 * t * t + 0.984375;
+}
+
+static double sc_ease(int which, double t) {
+    const double c1 = 1.70158, c3 = c1 + 1;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    switch (which) {
+    case 1: return t * t;
+    case 2: return 1 - (1 - t) * (1 - t);
+    case 3: return t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+    case 4: return t * t * t;
+    case 5: return 1 - (1 - t) * (1 - t) * (1 - t);
+    case 6: return t < 0.5 ? 4 * t * t * t : 1 - 4 * (1 - t) * (1 - t) * (1 - t);
+    case 7: return 1 - cos(t * BR_PI / 2);
+    case 8: return sin(t * BR_PI / 2);
+    case 9: return -(cos(BR_PI * t) - 1) / 2;
+    case 10: return c3 * t * t * t - c1 * t * t;
+    case 11: return 1 + c3 * (t - 1) * (t - 1) * (t - 1) + c1 * (t - 1) * (t - 1);
+    case 12: return t <= 0 ? 0 : t >= 1 ? 1 : pow(2, -10 * t) * sin((t * 10 - 0.75) * (2 * BR_PI / 3)) + 1;
+    case 13: return sc_bounce(t);
+    default: return t;
+    }
+}
+
+static int sc_need_ease(sc_vm *vm, const sc_value *v, int line, const char *what) {
+    const char *name = sc_need_str(vm, v, line, what);
+    int i;
+    for (i = 0; i < (int)BR_ARRAY_COUNT(k_ease_names); ++i)
+        if (strcmp(name, k_ease_names[i]) == 0) return i;
+    sc_fail(vm, line, "%s: there is no ease \"%s\" (linear, ease_in, ease_out, ease_in_out, cubic_..., sine_..., back_in, back_out, elastic_out, bounce_out)", what, name);
+    return 0;
+}
+
+static bool sc_parse_colour(const char *s, double out[4]) {
+    unsigned v[4] = { 0, 0, 0, 255 };
+    size_t n = strlen(s), i;
+    if (s[0] != '#' || (n != 7 && n != 9)) return false;
+    for (i = 1; i < n; ++i) if (!isxdigit((unsigned char)s[i])) return false;
+    for (i = 0; i < (n - 1) / 2; ++i) {
+        char hex[3];
+        hex[0] = s[1 + i * 2]; hex[1] = s[2 + i * 2]; hex[2] = 0;
+        v[i] = (unsigned)strtoul(hex, NULL, 16);
+    }
+    for (i = 0; i < 4; ++i) out[i] = v[i];
+    return true;
+}
+
+/* The value now (kind -1: whatever it is, which sets *kind), as numbers. */
+static void sc_tween_read(sc_vm *vm, const sc_tween *tw, int *kind, double out[4], int line) {
+    sc_value obj = sc_ent(tw->e), v;
+    if (tw->comp[0]) obj = sc_get_member(vm, &obj, tw->comp, line);
+    if (obj.t == V_NIL) sc_fail(vm, line, "tween(): it has no %s", tw->comp);
+    v = sc_get_member(vm, &obj, tw->prop, line);
+    if (v.t == V_NUM) { *kind = 0; out[0] = v.as.n; }
+    else if (v.t == V_VEC) { *kind = 1; out[0] = v.as.v.x; out[1] = v.as.v.y; }
+    else if (v.t == V_VEC3) { *kind = 2; out[0] = v.as.v.x; out[1] = v.as.v.y; out[2] = v.as.v.z; }
+    else if (v.t == V_STR && sc_parse_colour(v.as.s->chars, out)) *kind = 3;
+    else sc_fail(vm, line, "tween(): %s is %s, which can't be eased (numbers, vec2s, vec3s and colours can)", tw->prop, sc_type_name(&v));
+}
+
+static void sc_tween_write(sc_vm *vm, const sc_tween *tw, const double v[4], int line) {
+    sc_value obj = sc_ent(tw->e), val;
+    if (tw->comp[0]) obj = sc_get_member(vm, &obj, tw->comp, line);
+    if (obj.t == V_NIL) sc_fail(vm, line, "tween(): it has no %s", tw->comp);
+    if (tw->kind == 0) val = sc_num(v[0]);
+    else if (tw->kind == 1) val = sc_vec(v[0], v[1]);
+    else if (tw->kind == 2) val = sc_vec3(v[0], v[1], v[2]);
+    else {
+        char text[16];
+        snprintf(text, sizeof(text), "#%02x%02x%02x%02x", clamp_byte(v[0]), clamp_byte(v[1]), clamp_byte(v[2]), clamp_byte(v[3]));
+        val = sc_string(vm, text, strlen(text));
+    }
+    sc_set_member(vm, &obj, tw->prop, &val, line);
+}
+
+static sc_tween *sc_tween_find(sc_runtime *rt, int id) {
+    int i;
+    for (i = 0; i < rt->tween_count; ++i)
+        if (rt->tweens[i].id == id) return &rt->tweens[i];
+    return NULL;
+}
+
+static sc_tween *sc_need_tween(sc_vm *vm, const sc_value *v, int line, const char *what) {
+    sc_tween *tw = sc_tween_find(vm->rt, (int)sc_need_num(vm, v, line, what));
+    return tw;                                                 /* (NULL: finished already; nothing to do) */
+}
+
+/* tween(e, "position", vec2(100, 50), 0.5[, "ease_out"[, delay]]) */
+static sc_value bi_tween(ARGS) {
+    sc_runtime *rt = vm->rt;
+    sc_tween tw;
+    const char *path;
+    const char *dot;
+    double now[4];
+    int i, now_kind;
+    memset(&tw, 0, sizeof(tw));
+    tw.e = sc_need_entity(vm, &a[0], line, "tween()");
+    if (!br_entity_alive(rt->w, tw.e)) sc_fail(vm, line, "tween(): that entity was destroyed");
+    path = sc_need_str(vm, &a[1], line, "tween() property");
+    if ((dot = strchr(path, '.')) != NULL) {                    /* "Shape.color": a component's field */
+        if ((size_t)(dot - path) >= sizeof(tw.comp) || strlen(dot + 1) >= sizeof(tw.prop)) sc_fail(vm, line, "tween(): \"%s\" is too long", path);
+        memcpy(tw.comp, path, (size_t)(dot - path));
+        snprintf(tw.prop, sizeof(tw.prop), "%s", dot + 1);
+        if (!isupper((unsigned char)tw.comp[0])) sc_fail(vm, line, "tween(): \"%s\": a component's name starts with a capital (\"Shape.color\")", path);
+    } else {
+        if (strlen(path) >= sizeof(tw.prop)) sc_fail(vm, line, "tween(): \"%s\" is too long", path);
+        snprintf(tw.prop, sizeof(tw.prop), "%s", path);
+    }
+    sc_tween_read(vm, &tw, &now_kind, now, line);              /* (checks it's there, and can be eased) */
+    tw.kind = now_kind;
+    if (tw.kind == 0) tw.to[0] = sc_need_num(vm, &a[2], line, "tween() target");
+    else if (tw.kind == 1) {
+        br_vec2 v;
+        if (a[2].t == V_NUM) v = br_v2((float)a[2].as.n, (float)a[2].as.n);       /* (scale: a number for both) */
+        else v = sc_need_vec(vm, &a[2], line, "tween() target");
+        tw.to[0] = v.x; tw.to[1] = v.y;
+    } else if (tw.kind == 2) {
+        br_vec3 v;
+        if (a[2].t == V_NUM) v = br_v3((float)a[2].as.n, (float)a[2].as.n, (float)a[2].as.n);
+        else v = sc_need_vec3(vm, &a[2], line, "tween() target");
+        tw.to[0] = v.x; tw.to[1] = v.y; tw.to[2] = v.z;
+    } else if (!sc_parse_colour(sc_need_str(vm, &a[2], line, "tween() target"), tw.to))
+        sc_fail(vm, line, "tween(): \"%s\" isn't a colour (use \"#rrggbb\" or rgb())", a[2].as.s->chars);
+    tw.dur = (float)NUM(3, "tween() seconds");
+    if (tw.dur < 0) tw.dur = 0;
+    tw.ease = n > 4 && a[4].t != V_NIL ? sc_need_ease(vm, &a[4], line, "tween() ease") : 0;
+    tw.delay = n > 5 && a[5].t != V_NIL ? (float)NUM(5, "tween() delay") : 0;
+    tw.owner = vm->inst ? vm->inst->e : BR_ENTITY_NULL;
+    for (i = 0; i < rt->tween_count; ++i) {                     /* a new tween of the same thing replaces the old */
+        const sc_tween *o = &rt->tweens[i];
+        if (o->e == tw.e && strcmp(o->comp, tw.comp) == 0 && strcmp(o->prop, tw.prop) == 0 && o->delay <= 0 && tw.delay <= 0) {
+            rt->tweens[i] = rt->tweens[--rt->tween_count];
+            break;
+        }
+    }
+    if (rt->tween_count == rt->tween_cap) {
+        int cap = rt->tween_cap ? rt->tween_cap * 2 : 16;
+        sc_tween *g = (sc_tween *)br_realloc(rt->tweens, (size_t)cap * sizeof(sc_tween));
+        if (!g) sc_fail(vm, line, "out of memory");
+        rt->tweens = g;
+        rt->tween_cap = cap;
+    }
+    tw.id = ++rt->next_tween;
+    rt->tweens[rt->tween_count++] = tw;
+    return sc_num(tw.id);
+}
+
+static sc_value bi_tween_repeat(ARGS) {
+    sc_tween *tw = sc_need_tween(vm, &a[0], line, "tween_repeat()");
+    int times = (int)NUM(1, "tween_repeat() times");
+    bool yoyo = n > 2 && sc_truthy(&a[2]);
+    if (tw) { tw->repeat = times < 0 ? -1 : times; tw->yoyo = yoyo; }
+    return sc_nil();
+}
+
+static sc_value bi_tween_then(ARGS) {
+    sc_tween *tw = sc_need_tween(vm, &a[0], line, "tween_then()");
+    const char *fn = sc_need_str(vm, &a[1], line, "tween_then() function");
+    int f;
+    BR_UNUSED(n);
+    if (!vm->inst || !vm->inst->prog || (f = sc_find_func(vm->inst->prog, fn)) < 0)
+        sc_fail(vm, line, "tween_then(): this script has no function %s()", fn);
+    if (vm->inst->prog->funcs[f].params != 0) sc_fail(vm, line, "tween_then(): %s() should take no arguments", fn);
+    if (strlen(fn) >= sizeof(tw->then)) sc_fail(vm, line, "tween_then(): %s is too long a name", fn);
+    if (tw) { snprintf(tw->then, sizeof(tw->then), "%s", fn); tw->owner = vm->inst->e; }
+    return sc_nil();
+}
+
+/* stop_tween(id) or stop_tween(e): it stays where it got to */
+static sc_value bi_stop_tween(ARGS) {
+    sc_runtime *rt = vm->rt;
+    int i;
+    BR_UNUSED(n);
+    if (a[0].t == V_ENT) {
+        for (i = rt->tween_count; i-- > 0;)
+            if (rt->tweens[i].e == a[0].as.e) rt->tweens[i] = rt->tweens[--rt->tween_count];
+    } else {
+        int id = (int)NUM(0, "stop_tween()");
+        for (i = 0; i < rt->tween_count; ++i)
+            if (rt->tweens[i].id == id) { rt->tweens[i] = rt->tweens[--rt->tween_count]; break; }
+    }
+    return sc_nil();
+}
+
+static sc_value bi_is_tweening(ARGS) {
+    sc_runtime *rt = vm->rt;
+    int i;
+    if (a[0].t == V_NUM) return sc_bool(sc_tween_find(rt, (int)a[0].as.n) != NULL);
+    {
+        br_entity e = sc_need_entity(vm, &a[0], line, "is_tweening()");
+        const char *path = n > 1 && a[1].t != V_NIL ? sc_need_str(vm, &a[1], line, "is_tweening() property") : NULL;
+        for (i = 0; i < rt->tween_count; ++i) {
+            const sc_tween *tw = &rt->tweens[i];
+            char full[70];
+            if (tw->e != e) continue;
+            if (!path) return sc_bool(true);
+            snprintf(full, sizeof(full), "%s%s%s", tw->comp, tw->comp[0] ? "." : "", tw->prop);
+            if (strcmp(full, path) == 0) return sc_bool(true);
+        }
+    }
+    return sc_bool(false);
+}
+
+static sc_value bi_ease(ARGS) {
+    int which = sc_need_ease(vm, &a[0], line, "ease()");
+    BR_UNUSED(n);
+    return sc_num(sc_ease(which, NUM(1, "ease() t")));
+}
+
+static bool sc_run(sc_runtime *rt, sc_instance *inst, int fn, const sc_value *args, int argc, sc_value *result);
+
+/* One tween, `step` seconds on. False: it can't go on (its entity lost the component, say). */
+static bool sc_tween_advance(sc_runtime *rt, sc_tween *tw, float step, bool *finished) {
+    sc_vm vm;
+    jmp_buf jb;
+    volatile bool ok = true;
+    memset(&vm, 0, offsetof(sc_vm, frames));
+    vm.rt = rt;
+    vm.budget = SC_BUDGET;
+    vm.fail = &jb;
+    *finished = false;
+    if (setjmp(jb) == 0) {
+        double v[4], t;
+        int k, kind;
+        if (!tw->started) {                                      /* from wherever it is when it starts */
+            sc_tween_read(&vm, tw, &kind, tw->from, 0);
+            if (kind != tw->kind) sc_fail(&vm, 0, "tween(): %s changed type", tw->prop);
+            tw->started = true;
+        }
+        tw->time += step;
+        t = tw->dur > 0 ? tw->time / tw->dur : 1;
+        if (t >= 1 - 1e-5) { t = 1; *finished = true; }       /* (sums of 1/60 fall just short) */
+        t = sc_ease(tw->ease, tw->backward ? 1 - t : t);
+        for (k = 0; k < 4; ++k) v[k] = tw->from[k] + (tw->to[k] - tw->from[k]) * t;
+        sc_tween_write(&vm, tw, v, 0);
+    } else {
+        ok = false;
+    }
+    return ok;
+}
+
+/* Each fixed step, after the scripts' updates: every tween moves on by dt. */
+static void sc_tweens_step(sc_runtime *rt, float dt) {
+    typedef struct done_call { br_entity owner; char fn[32]; } done_call;
+    done_call done[32];
+    int ndone = 0, i = 0;
+    if (!rt->tween_count) return;
+    rt->busy++;
+    while (i < rt->tween_count) {
+        sc_tween *tw = &rt->tweens[i];
+        bool finished;
+        float step = dt;
+        if (!br_entity_alive(rt->w, tw->e) ||                   /* gone, or lost the component: it just stops */
+            (tw->comp[0] && !br_has(rt->w, tw->e, br_component_find(rt->w, tw->comp)))) {
+            rt->tweens[i] = rt->tweens[--rt->tween_count];
+            continue;
+        }
+        if (tw->delay > 0) {
+            tw->delay -= step;
+            if (tw->delay > 0) { ++i; continue; }
+            step = -tw->delay;                                   /* the rest of the step, after the wait */
+            tw->delay = 0;
+        }
+        if (!sc_tween_advance(rt, tw, step, &finished)) { rt->tweens[i] = rt->tweens[--rt->tween_count]; continue; }
+        if (finished) {
+            if (tw->repeat != 0) {                               /* again (back, with yoyo) */
+                if (tw->repeat > 0) tw->repeat--;
+                tw->time = 0;
+                if (tw->yoyo) tw->backward = !tw->backward;
+            } else {
+                if (tw->then[0] && ndone < (int)BR_ARRAY_COUNT(done)) {
+                    done[ndone].owner = tw->owner;
+                    memcpy(done[ndone].fn, tw->then, sizeof(done[ndone].fn));
+                    ++ndone;
+                }
+                rt->tweens[i] = rt->tweens[--rt->tween_count];
+                continue;
+            }
+        }
+        ++i;
+    }
+    rt->busy--;
+    for (i = 0; i < ndone; ++i) {                                /* then their tween_then()s, which may start more */
+        sc_instance *inst = br_entity_alive(rt->w, done[i].owner) ? sc_instance_of(rt, done[i].owner) : NULL;
+        int f;
+        if (!inst || inst->failed || !inst->started || !inst->prog || (f = sc_find_func(inst->prog, done[i].fn)) < 0) continue;
+        sc_run(rt, inst, f, NULL, 0, NULL);
+    }
+}
+
 /* ---- cameras (the Camera component: components.h) ---- */
 static sc_value bi_camera(ARGS) {
     br_entity e = br_camera_current(vm->rt->w);
@@ -4099,8 +4785,10 @@ static sc_value bi_screen_to_world(ARGS) {
 static sc_value bi_world_to_screen(ARGS) {
     br_camera2d cam;
     br_renderer r;
-    br_vec2 p = sc_need_vec(vm, &a[0], line, "world_to_screen()");
+    br_vec2 p;
     BR_UNUSED(n);
+    if (a[0].t == V_VEC3) return bi_world_to_screen3(vm, a, line);   /* 3D: through the scene's Camera3D */
+    p = sc_need_vec(vm, &a[0], line, "world_to_screen()");
     sc_view(vm, &cam);
     memset(&r, 0, sizeof(r));
     br_begin_camera(&r, &cam);
@@ -4109,10 +4797,38 @@ static sc_value bi_world_to_screen(ARGS) {
 }
 
 /* play_animation(e, frames[, fps[, loop]]): its Animation plays these frames (from the first, unless they're playing already). */
+/* A 3D model's animation: its Animator plays the clip of that name. */
+static br_animator *sc_animator_for(sc_vm *vm, br_entity e, bool make) {
+    br_component ac = br_component_find(vm->rt->w, "Animator");
+    br_animator *am;
+    if (ac == BR_COMPONENT_INVALID) return NULL;
+    if ((am = (br_animator *)br_get(vm->rt->w, e, ac)) != NULL || !make) return am;
+    if (vm->rt->ids3.mesh == BR_COMPONENT_INVALID || !br_has(vm->rt->w, e, vm->rt->ids3.mesh) || br_has(vm->rt->w, e, vm->rt->ids.sprite)) return NULL;
+    return (br_animator *)br_add(vm->rt->w, e, ac, NULL);
+}
+
 static sc_value bi_play_animation(ARGS) {
     br_entity e = sc_need_entity(vm, &a[0], line, "play_animation()");
     const char *frames = sc_need_str(vm, &a[1], line, "play_animation() frames");
     br_animation *an;
+    br_animator *am = sc_animator_for(vm, e, true);
+    if (am) {                                                 /* 3D: (e, clip[, speed[, loop]]) */
+        if (strlen(frames) >= sizeof(am->clip)) sc_fail(vm, line, "play_animation(): \"%s\" is too long a clip name", frames);
+        if (br_animator_clip_count(vm->rt->w, e) > 0 && br_model_find_clip(br_asset_model(((const br_mesh3d *)br_get(vm->rt->w, e, vm->rt->ids3.mesh))->file), frames) < 0) {
+            int k, c = br_animator_clip_count(vm->rt->w, e);
+            char names[200] = "";
+            for (k = 0; k < c && strlen(names) < 150; ++k) {
+                strcat(names, k ? ", " : "");
+                strncat(names, br_animator_clip_name(vm->rt->w, e, k), 40);
+            }
+            sc_fail(vm, line, "play_animation(): the model has no animation \"%s\" (it has %s)", frames, names);
+        }
+        if (n > 2 && a[2].t != V_NIL) am->speed = (float)NUM(2, "play_animation() speed");
+        if (n > 3 && a[3].t != V_NIL) am->loop = sc_truthy(&a[3]);
+        if (strcmp(am->clip, frames) != 0) snprintf(am->clip, sizeof(am->clip), "%s", frames);
+        else if (!am->playing) { am->time = am->speed < 0 ? br_animator_clip_length(vm->rt->w, e, frames) : 0; am->playing = true; }
+        return sc_nil();
+    }
     if (br_animation_parse(frames, NULL, 0) <= 0) sc_fail(vm, line, "play_animation(): \"%s\" isn't a list of frames (like \"0-3\" or \"4,5,6\")", frames);
     if (strlen(frames) >= BR_ANIM_FRAMES_MAX) sc_fail(vm, line, "play_animation(): the list of frames is too long");
     if (!(an = (br_animation *)br_get(vm->rt->w, e, vm->rt->ids.animation)))
@@ -4138,6 +4854,28 @@ static br_mixer *sc_mixer(sc_vm *vm) { br_engine *e = sc_engine(vm); return e ? 
 static br_voice sc_voice(sc_vm *vm, const sc_value *v, int line, const char *what) {
     double d = sc_need_num(vm, v, line, what);
     return d > 0 ? (br_voice)d : 0;
+}
+/* stop_animation(e): holds where it is (a 3D model's Animator, or a 2D Animation). */
+static sc_value bi_stop_animation(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "stop_animation()");
+    br_animator *am = sc_animator_for(vm, e, false);
+    br_animation *an = (br_animation *)br_get(vm->rt->w, e, vm->rt->ids.animation);
+    BR_UNUSED(n);
+    if (am) am->playing = false;
+    if (an) an->playing = false;
+    return sc_nil();
+}
+/* animation_clips(e): the names of a 3D model's animations. */
+static sc_value bi_animation_clips(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "animation_clips()");
+    sc_value list = sc_new_list(vm, line);
+    int k, c = br_animator_clip_count(vm->rt->w, e);
+    BR_UNUSED(n);
+    for (k = 0; k < c; ++k) {
+        const char *name = br_animator_clip_name(vm->rt->w, e, k);
+        sc_list_push(vm, list.as.l, sc_string(vm, name, strlen(name)), line);
+    }
+    return list;
 }
 static sc_value bi_stop_sound(ARGS) { br_mixer *m = sc_mixer(vm); br_voice v = sc_voice(vm, &a[0], line, "stop_sound()"); BR_UNUSED(n); if (m && v) br_voice_stop(m, v); return sc_nil(); }
 static sc_value bi_sound_playing(ARGS) { br_mixer *m = sc_mixer(vm); br_voice v = sc_voice(vm, &a[0], line, "sound_playing()"); BR_UNUSED(n); return sc_bool(m && v && br_voice_playing(m, v)); }
@@ -4660,8 +5398,9 @@ static const sc_builtin k_builtin_table[] = {
     { "cos", 1, 1, bi_cos, "n>n" }, { "atan2", 2, 2, bi_atan2, "nn>n" }, { "pow", 2, 2, bi_pow, "nn>n" },
     { "sign", 1, 1, bi_sign, "n>i" }, { "min", 1, 16, bi_min, "n*>S" }, { "max", 1, 16, bi_max, "n*>S" },
     { "clamp", 3, 3, bi_clamp, "nnn>S" }, { "lerp", 3, 3, bi_lerp, "xxn>S" }, { "random", 0, 2, bi_random, "nn>n" },
-    { "vec2", 2, 2, bi_vec2, "nn>v" }, { "length", 1, 1, bi_length, "v>n" }, { "normalize", 1, 1, bi_normalize, "v>v" },
-    { "dot", 2, 2, bi_dot, "vv>n" }, { "distance", 2, 2, bi_distance, "vv>n" }, { "angle", 1, 1, bi_angle, "v>n" },
+    { "vec2", 2, 2, bi_vec2, "nn>v" }, { "length", 1, 1, bi_length, "V>n" }, { "normalize", 1, 1, bi_normalize, "V>S" },
+    { "dot", 2, 2, bi_dot, "VV>n" }, { "distance", 2, 2, bi_distance, "VV>n" }, { "angle", 1, 1, bi_angle, "v>n" },
+    { "vec3", 3, 3, bi_vec3, "nnn>3" }, { "cross", 2, 2, bi_cross, "33>3" },
     { "from_angle", 1, 2, bi_from_angle, "nn>v" }, { "rgb", 3, 4, bi_rgb, "nnnn>s" },
     { "len", 1, 1, bi_len, "t>i" }, { "push", 2, 2, bi_push, "la>S" }, { "pop", 1, 1, bi_pop, "l>E" },
     { "remove", 2, 2, bi_remove, "ln>E" }, { "contains", 2, 2, bi_contains, "la>b" }, { "range", 1, 3, bi_range, "nnn>R" },
@@ -4676,15 +5415,24 @@ static const sc_builtin k_builtin_table[] = {
     { "last_button", 0, 0, bi_last_button, ">s" }, { "last_input", 0, 0, bi_last_input, ">s" }, { "rumble", 2, 3, bi_rumble, "nnn>b" },
     { "touch_controls_shown", 0, 0, bi_touch_controls_shown, ">b" }, { "show_touch_controls", 1, 1, bi_show_touch_controls, "b>-" },
     { "set_touch_controls", 1, 1, bi_set_touch_controls, "s>-" },
-    { "find", 1, 1, bi_find, "s>e" }, { "find_all", 1, 1, bi_find_all, "s>L" }, { "destroy", 1, 1, bi_destroy, "e>-" },
+    { "find", 1, 1, bi_find, "s>e" }, { "find_all", 1, 1, bi_find_all, "s>L" }, { "find_with", 1, 1, bi_find_with, "s>L" }, { "destroy", 1, 1, bi_destroy, "e>-" },
     { "find_tagged", 1, 16, bi_find_tagged, "ss*>L" }, { "first_tagged", 1, 16, bi_first_tagged, "ss*>e" },
     { "has_tag", 2, 2, bi_has_tag, "es>b" }, { "add_tag", 2, 2, bi_add_tag, "es>-" },
     { "remove_tag", 2, 2, bi_remove_tag, "es>b" }, { "tags", 1, 1, bi_tags, "e>W" },
     { "spawn", 1, 3, bi_spawn, "spq>e" }, { "children", 1, 1, bi_children, "e>L" }, { "child", 2, 2, bi_child, "es>e" },
     { "has", 2, 2, bi_has, "es>b" }, { "add", 2, 2, bi_add, "es>c" },
     { "remove_component", 2, 2, bi_remove_component, "es>-" },
-    { "apply_force", 2, 3, bi_apply_force, "evv>-" }, { "apply_impulse", 2, 3, bi_apply_impulse, "evv>-" },
-    { "raycast", 2, 4, bi_raycast, "vvqn>a" }, { "entity_at", 1, 2, bi_entity_at, "vn>e" },
+    { "apply_force", 2, 3, bi_apply_force, "eVV>-" }, { "apply_impulse", 2, 3, bi_apply_impulse, "eVV>-" },
+    { "raycast", 2, 4, bi_raycast, "VVqn>a" }, { "entity_at", 1, 2, bi_entity_at, "Vn>e" },
+    { "apply_torque", 2, 2, bi_apply_torque, "e3>-" }, { "overlap_sphere", 2, 2, bi_overlap_sphere, "3n>L" },
+    { "look_at", 2, 2, bi_look_at, "e3>-" }, { "move_and_slide", 2, 2, bi_move_and_slide, "e3>3" },
+    { "is_on_floor", 1, 1, bi_is_on_floor, "e>b" }, { "is_on_wall", 1, 1, bi_is_on_wall, "e>b" },
+    { "is_on_ceiling", 1, 1, bi_is_on_ceiling, "e>b" },
+    { "emit", 1, 2, bi_emit, "en>-" }, { "particle_count", 1, 1, bi_particle_count, "e>i" },
+    { "tween", 4, 6, bi_tween, "esansn>i" }, { "tween_repeat", 2, 3, bi_tween_repeat, "inb>-" },
+    { "tween_then", 2, 2, bi_tween_then, "is>-" }, { "stop_tween", 1, 1, bi_stop_tween, "a>-" },
+    { "is_tweening", 1, 2, bi_is_tweening, "as>b" }, { "ease", 2, 2, bi_ease, "sn>n" },
+    { "screen_ray", 1, 1, bi_screen_ray, "v>l" },
     { "play_sound", 1, 4, bi_play_sound, "snnn>n" }, { "send", 2, 16, bi_send, "esa*>a" },
     { "load_scene", 1, 1, bi_load_scene, "s>-" }, { "quit", 0, 0, bi_quit, ">-" },
     { "tile_at", 2, 2, bi_tile_at, "ev>s" }, { "set_tile", 3, 3, bi_set_tile, "evs>b" },
@@ -4702,7 +5450,8 @@ static const sc_builtin k_builtin_table[] = {
     /* cameras and animation */
     { "camera", 0, 0, bi_camera, ">e" }, { "shake_camera", 2, 2, bi_shake_camera, "nn>-" },
     { "snap_camera", 0, 0, bi_snap_camera, ">-" }, { "screen_to_world", 1, 1, bi_screen_to_world, "v>v" },
-    { "world_to_screen", 1, 1, bi_world_to_screen, "v>v" }, { "play_animation", 2, 4, bi_play_animation, "esnb>-" },
+    { "world_to_screen", 1, 1, bi_world_to_screen, "V>v" }, { "play_animation", 2, 4, bi_play_animation, "esnb>-" },
+    { "stop_animation", 1, 1, bi_stop_animation, "e>-" }, { "animation_clips", 1, 1, bi_animation_clips, "e>W" },
     /* sounds */
     { "stop_sound", 1, 1, bi_stop_sound, "n>-" }, { "sound_playing", 1, 1, bi_sound_playing, "n>b" },
     { "set_sound_volume", 2, 2, bi_set_sound_volume, "nn>-" }, { "set_sound_pitch", 2, 2, bi_set_sound_pitch, "nn>-" },
@@ -4796,6 +5545,7 @@ static void sc_runtime_destroy(void *data) {
     for (i = 0; i < rt->program_count; ++i) sc_program_free(rt->programs[i]);
     br_free(rt->programs);
     br_free(rt->instances);              /* the instances themselves went with their entities */
+    br_free(rt->tweens);
     sc_heap_free(&rt->heap);
     br_free(rt);
 }
@@ -4809,6 +5559,8 @@ static sc_runtime *sc_runtime_of(br_world *w) {
     rt->script_id = br_component_find(w, "Script");
     br_builtin_ids_of(w, &rt->ids);
     rt->body_id = br_component_find(w, "RigidBody");
+    br_ids3d_of(w, &rt->ids3);
+    rt->body3_id = br_component_find(w, "RigidBody3D");
     rt->collider_id = br_component_find(w, "Collider");
     br_rng_seed(&rt->rng, 0x5C21u);
     br_rng_seed(&rt->draw_rng, 0xD2A3u);
@@ -4957,11 +5709,12 @@ static bool sc_run(sc_runtime *rt, sc_instance *inst, int fn, const sc_value *ar
     sc_vm vm;
     jmp_buf jb;
     volatile bool ok = true;
-    memset(&vm, 0, sizeof(vm));
+    memset(&vm, 0, offsetof(sc_vm, frames));                 /* (the frames fill as functions run) */
     vm.rt = rt;
     vm.inst = inst;
     vm.budget = SC_BUDGET;
     vm.fail = &jb;
+    vm.serial = ++g_debug_serial;
     rt->busy++;
     if (setjmp(jb) == 0) {
         if (fn == SC_RUN_STATICS) {
@@ -5070,6 +5823,7 @@ void br_script_step(br_world *w, float dt) {
     if (g_music.mixer == &((br_engine *)w->context)->mixer) sc_music_tick(((br_engine *)w->context)->time);   /* fades */
     count = w->pools[rt->script_id].count;              /* scripts spawned now start next step */
     arg = sc_num(dt);
+    rt->dt = dt;
     for (i = 0; i < count && i < w->pools[rt->script_id].count; ++i) {   /* every script's variables first, */
         br_component_pool *p = &w->pools[rt->script_id];                  /* so each start() can use the others' */
         br_script *s = (br_script *)(p->data + (size_t)i * p->stride);
@@ -5090,24 +5844,26 @@ void br_script_step(br_world *w, float dt) {
         if (inst->beh) { if (inst->beh->update) inst->beh->update(w, e, inst->state, dt); }
         else sc_callback(rt, inst, CB_UPDATE, &arg, 1);
     }
+    sc_tweens_step(rt, dt);
     sc_collect(rt);
 }
 
-static void sc_deliver(sc_runtime *rt, br_entity self, br_entity other, const br_contact_event *ev, bool flip) {
+/* `normal`: a vec2 (2D physics) or a vec3 (3D), pointing from self toward other. */
+static void sc_deliver(sc_runtime *rt, br_entity self, br_entity other, br_contact_kind kind, sc_value normal, float speed) {
     sc_instance *inst = sc_instance_of(rt, self);
     sc_value args[3];
     if (!inst || !inst->started || inst->failed) return;
     if (inst->beh) {
-        if ((ev->kind == BR_CONTACT_BEGIN || ev->kind == BR_CONTACT_END) && inst->beh->on_collision)
-            inst->beh->on_collision(rt->w, self, inst->state, other, ev->kind == BR_CONTACT_BEGIN);
-        if ((ev->kind == BR_TRIGGER_ENTER || ev->kind == BR_TRIGGER_EXIT) && inst->beh->on_trigger)
-            inst->beh->on_trigger(rt->w, self, inst->state, other, ev->kind == BR_TRIGGER_ENTER);
+        if ((kind == BR_CONTACT_BEGIN || kind == BR_CONTACT_END) && inst->beh->on_collision)
+            inst->beh->on_collision(rt->w, self, inst->state, other, kind == BR_CONTACT_BEGIN);
+        if ((kind == BR_TRIGGER_ENTER || kind == BR_TRIGGER_EXIT) && inst->beh->on_trigger)
+            inst->beh->on_trigger(rt->w, self, inst->state, other, kind == BR_TRIGGER_ENTER);
         return;
     }
     args[0] = sc_ent(other);
-    args[1] = flip ? sc_vec(-ev->normal.x, -ev->normal.y) : sc_vec(ev->normal.x, ev->normal.y);
-    args[2] = sc_num(ev->speed);
-    switch (ev->kind) {
+    args[1] = normal;
+    args[2] = sc_num(speed);
+    switch (kind) {
     case BR_CONTACT_BEGIN: sc_callback(rt, inst, CB_COLLISION, args, 3); break;
     case BR_CONTACT_END: sc_callback(rt, inst, CB_COLLISION_END, args, 1); break;
     case BR_TRIGGER_ENTER: sc_callback(rt, inst, CB_TRIGGER, args, 1); break;
@@ -5126,10 +5882,23 @@ void br_script_deliver_contacts(br_world *w) {
         uint32_t chunk = n - i < 256 ? n - i : 256;
         memcpy(copy, ev + i, sizeof(br_contact_event) * chunk);
         for (k = 0; k < chunk; ++k) {
-            sc_deliver(rt, copy[k].a, copy[k].b, &copy[k], false);
-            sc_deliver(rt, copy[k].b, copy[k].a, &copy[k], true);
+            sc_deliver(rt, copy[k].a, copy[k].b, copy[k].kind, sc_vec(copy[k].normal.x, copy[k].normal.y), copy[k].speed);
+            sc_deliver(rt, copy[k].b, copy[k].a, copy[k].kind, sc_vec(-copy[k].normal.x, -copy[k].normal.y), copy[k].speed);
         }
         ev = br_physics_events(w, &n);
+    }
+    {                                                   /* and 3D's */
+        const br_contact3d_event *e3 = br_physics3d_events(w, &n);
+        br_contact3d_event copy3[128];
+        for (i = 0; i < n; i += 128) {
+            uint32_t chunk = n - i < 128 ? n - i : 128;
+            memcpy(copy3, e3 + i, sizeof(br_contact3d_event) * chunk);
+            for (k = 0; k < chunk; ++k) {
+                sc_deliver(rt, copy3[k].a, copy3[k].b, copy3[k].kind, sc_v3val(copy3[k].normal), copy3[k].speed);
+                sc_deliver(rt, copy3[k].b, copy3[k].a, copy3[k].kind, sc_v3val(br_v3_neg(copy3[k].normal)), copy3[k].speed);
+            }
+            e3 = br_physics3d_events(w, &n);
+        }
     }
     sc_collect(rt);
 }
@@ -5142,6 +5911,191 @@ void br_script_register(br_world *w) {
     br_component_set_hooks(w, c, sc_script_added, sc_script_removed, NULL);
     br_system_add(w, "builtin_scripts", BR_PHASE_FIXED_UPDATE, sc_sys_scripts, NULL, -10);
     br_system_add(w, "builtin_script_events", BR_PHASE_FIXED_UPDATE, sc_sys_events, NULL, 30);
+}
+
+/* ---- the debugger ----------------------------------------------------------------------- */
+
+#define SC_MAX_BREAKPOINTS 128
+static struct {
+    br_debug_hook hook;
+    void *user;
+    struct { char file[BR_PATH_MAX]; int line; } bp[SC_MAX_BREAKPOINTS];
+    int bp_count;
+    br_debug_action mode;           /* what the last stop asked for (CONTINUE: run to a breakpoint) */
+    bool pause;                     /* stop at the next statement anywhere */
+    bool detached;                  /* (until the next attach) */
+    uint32_t stop_serial;           /* where the last stop was, for stepping */
+    int stop_depth, stop_line;
+    uint32_t prev_serial;           /* the statement before this one */
+    int prev_depth, prev_line;
+    sc_vm *vm;                      /* while stopped: the paused run */
+} g_dbg;
+
+static void sc_debug_refresh(void) {
+    g_debug_on = g_dbg.hook && !g_dbg.detached && (g_dbg.bp_count > 0 || g_dbg.pause || g_dbg.mode != BR_DEBUG_CONTINUE);
+}
+
+/* "scripts/player.bs" matches "/home/me/game/scripts/player.bs" (and the other way round). */
+static bool sc_same_file(const char *a, const char *b) {
+    size_t la = strlen(a), lb = strlen(b);
+    const char *longer = la >= lb ? a : b, *shorter = la >= lb ? b : a;
+    size_t ls = la >= lb ? lb : la, ll = la >= lb ? la : lb;
+    if (ls == 0) return false;
+    if (strcmp(longer + (ll - ls), shorter) != 0) return false;
+    return ll == ls || longer[ll - ls - 1] == '/' || longer[ll - ls - 1] == '\\';
+}
+
+static const char *sc_frame_file(const sc_vm *vm, int k) {
+    const sc_instance *inst = k >= 0 && k < vm->nframes && k <= SC_MAX_DEPTH ? vm->frames[k].inst : vm->inst;
+    return inst && inst->prog ? inst->prog->path : "";
+}
+
+static void sc_debug_statement(sc_vm *vm, int line) {
+    const char *file = sc_frame_file(vm, vm->nframes - 1), *reason = NULL;
+    int depth = vm->nframes, i;
+    bool same_line = vm->serial == g_dbg.prev_serial && depth == g_dbg.prev_depth && line == g_dbg.prev_line;
+    g_dbg.prev_serial = vm->serial;
+    g_dbg.prev_depth = depth;
+    g_dbg.prev_line = line;
+    if (g_dbg.vm || !vm->serial) return;                      /* (a stop inside a stop; or no proper run) */
+    if (g_dbg.pause) reason = "paused";
+    else if (g_dbg.mode == BR_DEBUG_STEP_INTO) { if (!same_line) reason = "step"; }
+    else if (g_dbg.mode == BR_DEBUG_STEP_OVER) {
+        if (vm->serial != g_dbg.stop_serial || depth < g_dbg.stop_depth || (depth == g_dbg.stop_depth && line != g_dbg.stop_line)) reason = "step";
+    } else if (g_dbg.mode == BR_DEBUG_STEP_OUT) {
+        if (vm->serial != g_dbg.stop_serial || depth < g_dbg.stop_depth) reason = "step";
+    }
+    if (!reason && !same_line)
+        for (i = 0; i < g_dbg.bp_count; ++i)
+            if (g_dbg.bp[i].line == line && sc_same_file(g_dbg.bp[i].file, file)) { reason = "breakpoint"; break; }
+    if (!reason) return;
+    {
+        br_debug_stop stop;
+        br_debug_action act;
+        memset(&stop, 0, sizeof(stop));
+        stop.world = vm->rt->w;
+        stop.entity = vm->inst ? vm->inst->e : BR_ENTITY_NULL;
+        stop.file = file;
+        stop.line = line;
+        stop.reason = reason;
+        g_dbg.pause = false;
+        g_dbg.vm = vm;
+        vm->rt->busy++;                                         /* (no collecting while it's looked at) */
+        act = g_dbg.hook(&stop, g_dbg.user);
+        vm->rt->busy--;
+        g_dbg.vm = NULL;
+        g_dbg.stop_serial = vm->serial;
+        g_dbg.stop_depth = depth;
+        g_dbg.stop_line = line;
+        if (act == BR_DEBUG_DETACH) { g_dbg.detached = true; act = BR_DEBUG_CONTINUE; }
+        g_dbg.mode = act;
+        sc_debug_refresh();
+    }
+}
+
+void br_script_debug_attach(br_debug_hook hook, void *user) {
+    g_dbg.hook = hook;
+    g_dbg.user = user;
+    g_dbg.mode = BR_DEBUG_CONTINUE;
+    g_dbg.pause = false;
+    g_dbg.detached = false;
+    sc_debug_refresh();
+}
+
+bool br_script_debug_set_breakpoint(const char *file, int line, bool on) {
+    int i;
+    for (i = 0; i < g_dbg.bp_count; ++i)
+        if (g_dbg.bp[i].line == line && strcmp(g_dbg.bp[i].file, file) == 0) break;
+    if (on && i == g_dbg.bp_count) {
+        if (g_dbg.bp_count == SC_MAX_BREAKPOINTS) return false;
+        snprintf(g_dbg.bp[g_dbg.bp_count].file, BR_PATH_MAX, "%s", file);
+        g_dbg.bp[g_dbg.bp_count++].line = line;
+    } else if (!on && i < g_dbg.bp_count) {
+        g_dbg.bp[i] = g_dbg.bp[--g_dbg.bp_count];
+    }
+    sc_debug_refresh();
+    return true;
+}
+
+bool br_script_debug_has_breakpoint(const char *file, int line) {
+    int i;
+    for (i = 0; i < g_dbg.bp_count; ++i)
+        if (g_dbg.bp[i].line == line && sc_same_file(g_dbg.bp[i].file, file)) return true;
+    return false;
+}
+
+int br_script_debug_breakpoint(int index, const char **file, int *line) {
+    if (index < 0 || index >= g_dbg.bp_count) return g_dbg.bp_count;
+    if (file) *file = g_dbg.bp[index].file;
+    if (line) *line = g_dbg.bp[index].line;
+    return g_dbg.bp_count;
+}
+
+void br_script_debug_clear_breakpoints(void) { g_dbg.bp_count = 0; sc_debug_refresh(); }
+void br_script_debug_pause(void) { g_dbg.pause = true; g_dbg.detached = false; sc_debug_refresh(); }
+void br_script_debug_resume(void) { g_dbg.pause = false; g_dbg.mode = BR_DEBUG_CONTINUE; g_dbg.detached = false; sc_debug_refresh(); }
+bool br_script_debug_stopped(void) { return g_dbg.vm != NULL; }
+
+int br_script_debug_frame_count(void) {
+    if (!g_dbg.vm) return 0;
+    return g_dbg.vm->nframes > SC_MAX_DEPTH + 1 ? SC_MAX_DEPTH + 1 : g_dbg.vm->nframes;
+}
+
+/* Frame 0 is the innermost (where it stopped). */
+bool br_script_debug_frame(int index, const char **function, const char **file, int *line) {
+    const sc_vm *vm = g_dbg.vm;
+    int n = br_script_debug_frame_count(), k;
+    if (index < 0 || index >= n) return false;
+    k = n - 1 - index;
+    if (function) *function = vm->frames[k].f->name;
+    if (file) *file = sc_frame_file(vm, k);
+    if (line) *line = vm->frames[k].line;
+    return true;
+}
+
+static void sc_debug_value(sc_vm *vm, const sc_value *v, char *out, size_t size) {
+    sc_value s = sc_to_string(vm, v);
+    if (v->t == V_STR) snprintf(out, size, "\"%s\"", v->as.s->chars);
+    else snprintf(out, size, "%s", s.t == V_STR ? s.as.s->chars : "?");
+}
+
+/* A frame's local variables (those whose lines it has reached). */
+int br_script_debug_locals(int index, br_debug_var *out, int max) {
+    sc_vm *vm = g_dbg.vm;
+    int n = br_script_debug_frame_count(), k, i, count = 0;
+    const sc_func *f;
+    if (index < 0 || index >= n) return 0;
+    k = n - 1 - index;
+    f = vm->frames[k].f;
+    for (i = 0; i < f->dbg_count && count < max; ++i) {
+        const sc_dbg_local *d = &f->dbg[i];
+        int j;
+        bool shadowed = false;
+        if (vm->frames[k].line < d->from || vm->frames[k].line > d->to) continue;
+        for (j = i + 1; j < f->dbg_count; ++j)                   /* a later one in the same slot, also in scope */
+            if (f->dbg[j].slot == d->slot && vm->frames[k].line >= f->dbg[j].from && vm->frames[k].line <= f->dbg[j].to) shadowed = true;
+        if (shadowed) continue;
+        snprintf(out[count].name, sizeof(out[count].name), "%s", d->name);
+        sc_debug_value(vm, &vm->stack[vm->frames[k].base + d->slot], out[count].value, sizeof(out[count].value));
+        ++count;
+    }
+    return count;
+}
+
+/* The variables of the script a frame belongs to (the ones at the top of its file). */
+int br_script_debug_globals(int index, br_debug_var *out, int max) {
+    sc_vm *vm = g_dbg.vm;
+    int n = br_script_debug_frame_count(), i, count = 0;
+    const sc_instance *inst;
+    if (!vm) return 0;
+    inst = index >= 0 && index < n ? vm->frames[n - 1 - index].inst : vm->inst;
+    if (!inst || !inst->prog || !inst->globals) return 0;
+    for (i = 0; i < inst->prog->global_count && count < max; ++i) {
+        snprintf(out[count].name, sizeof(out[count].name), "%s", inst->prog->globals[i].name);
+        sc_debug_value(vm, &inst->globals[i], out[count].value, sizeof(out[count].value));
+        ++count;
+    }
+    return count;
 }
 
 /* ---- the C API ------------------------------------------------------------------------ */
@@ -5207,7 +6161,7 @@ bool br_script_get_string(br_world *w, br_entity e, const char *var, char *out, 
     sc_vm vm;
     if (g < 0 || size == 0) return false;
     if (inst->globals[g].t == V_STR) { snprintf(out, size, "%s", inst->globals[g].as.s->chars); return true; }
-    memset(&vm, 0, sizeof(vm));
+    memset(&vm, 0, offsetof(sc_vm, frames));
     vm.rt = inst->rt;
     buf[0] = 0;
     sc_append(&vm, buf, sizeof(buf), &inst->globals[g], 0);    /* never fails: no allocation */

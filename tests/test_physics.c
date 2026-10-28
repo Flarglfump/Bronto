@@ -271,6 +271,110 @@ static void test_bodies_in_a_tree(void) {
     br_world_destroy(&W);
 }
 
+/* One-way platforms: a ball thrown up from below passes through, then lands on top;
+ * a ball dropped from above lands. */
+static void test_one_way_platforms(void) {
+    br_entity plat, up_ball, down_ball;
+    float lowest = 1e9f;
+    int i;
+    setup();
+    ground();
+    plat = box(160, 100, 120, 8, BR_BODY_STATIC);
+    col(plat)->one_way = true;
+    up_ball = ball(130, 150, 5);
+    rb(up_ball)->velocity = br_v2(0, -520);                /* thrown up through it */
+    down_ball = ball(190, 40, 5);
+    for (i = 0; i < 180; ++i) {
+        run(1.0f / 60);
+        if (xf(up_ball)->position.y < lowest) lowest = xf(up_ball)->position.y;
+    }
+    CHECK(lowest < 90);                                    /* went up past the platform */
+    CHECK_NEAR(xf(up_ball)->position.y, 100 - 4 - 5, 1.0);  /* and came down on top of it */
+    CHECK_NEAR(xf(down_ball)->position.y, 100 - 4 - 5, 1.0);
+    br_world_destroy(&W);
+}
+
+/* Joints: a pendulum on a hinge swings and keeps its length; a rod keeps two balls
+ * apart; a rope lets them come closer but not further; a spring settles at its length. */
+static br_joint *joint(br_entity e, br_entity other, int kind) {
+    br_joint *j = (br_joint *)br_add(&W, e, br_component_find(&W, "Joint"), NULL);
+    j->kind = kind;
+    j->other = other;
+    return j;
+}
+
+static void test_joints(void) {
+    br_entity bob, a, b, c, d, hang, anchor_box;
+    br_joint *j;
+    float max_x = -1e9f, len;
+    int i;
+    setup();
+    PW = br_component_find(&W, "PhysicsWorld");
+    /* a pendulum: pinned to the world 60 px to its left */
+    bob = ball(160, 50, 6);
+    j = joint(bob, BR_ENTITY_NULL, BR_JOINT_DISTANCE);
+    j->anchor = br_v2(0, 0);
+    j->kind = BR_JOINT_HINGE;
+    j->anchor = br_v2(-60, 0);                             /* the pin, 60 px to the left (in the bob's space) */
+    for (i = 0; i < 120; ++i) {
+        run(1.0f / 60);
+        if (xf(bob)->position.x > max_x) max_x = xf(bob)->position.x;
+    }
+    len = br_v2_dist(xf(bob)->position, br_v2(100, 50));
+    CHECK_NEAR(len, 60, 2.0);                              /* still on its circle */
+    CHECK(xf(bob)->position.y > 60);                       /* it swung down */
+    /* a rod between two free balls: thrown apart, they stay 40 apart */
+    a = ball(400, 50, 5); b = ball(440, 50, 5);
+    rb(a)->gravity_scale = rb(b)->gravity_scale = 0;
+    rb(a)->velocity = br_v2(-100, 0); rb(b)->velocity = br_v2(100, 30);
+    joint(a, b, BR_JOINT_DISTANCE);
+    /* a rope: pushed together, they come closer; pulled apart, no further than 50 */
+    c = ball(600, 50, 5); d = ball(650, 50, 5);
+    rb(c)->gravity_scale = rb(d)->gravity_scale = 0;
+    rb(c)->velocity = br_v2(40, 0);
+    joint(c, d, BR_JOINT_ROPE);
+    run(0.5f);
+    CHECK_NEAR(br_v2_dist(xf(a)->position, xf(b)->position), 40, 1.5);
+    CHECK(br_v2_dist(xf(c)->position, xf(d)->position) < 45);   /* slack: closer */
+    rb(c)->velocity = br_v2(-300, 0);
+    run(0.5f);
+    CHECK(br_v2_dist(xf(c)->position, xf(d)->position) < 51.5f);
+    CHECK(xf(d)->position.x < 650);                         /* pulled along */
+    /* a spring hanging from a static box: settles below its length (gravity stretches it) */
+    anchor_box = box(800, 20, 10, 10, BR_BODY_STATIC);
+    hang = ball(800, 60, 5);
+    j = joint(hang, anchor_box, BR_JOINT_SPRING);
+    j->stiffness = 3;
+    j->damping = 0.7f;
+    run(4);
+    {   /* stretch = g / omega^2 = 600 / (2 pi 3)^2 = 1.69 */
+        float stretch = br_v2_dist(xf(hang)->position, xf(anchor_box)->position) - 40;
+        CHECK(stretch > 1.0f && stretch < 2.5f);
+        if (!(stretch > 1.0f && stretch < 2.5f)) printf("      spring stretch %.2f\n", (double)stretch);
+        CHECK(fabsf(rb(hang)->velocity.y) < 2);
+    }
+    br_world_destroy(&W);
+}
+
+/* A bullet (a fast small ball) stops at a thin wall instead of passing through it;
+ * the same ball without `bullet` tunnels. */
+static void test_bullets(void) {
+    br_entity fast, plain;
+    setup();
+    box(300, 50, 4, 400, BR_BODY_STATIC);                  /* a thin wall at x = 298..302 */
+    fast = ball(100, 20, 3);
+    rb(fast)->gravity_scale = 0;
+    rb(fast)->velocity = br_v2(3000, 0);                    /* 50 px a step */
+    rb(fast)->bullet = true;
+    plain = ball(100, 80, 3);
+    rb(plain)->gravity_scale = 0;
+    rb(plain)->velocity = br_v2(3000, 0);
+    run(0.25f);
+    CHECK(xf(fast)->position.x < 300);
+    CHECK(xf(plain)->position.x > 300);                     /* (what bullet is for) */
+    br_world_destroy(&W);
+}
+
 void suite_physics(void) {
     RUN(test_bodies_in_a_tree);
     RUN(test_falls_and_rests);
@@ -283,4 +387,7 @@ void suite_physics(void) {
     RUN(test_queries);
     RUN(test_ramp_and_kinematic);
     RUN(test_deterministic);
+    RUN(test_one_way_platforms);
+    RUN(test_joints);
+    RUN(test_bullets);
 }

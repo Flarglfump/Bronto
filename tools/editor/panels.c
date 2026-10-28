@@ -60,6 +60,7 @@ void ed_toolbar(editor *ed, br_rect rect) {
     if (strip_button(&s, "Grid", 40, ed->view.grid)) ed->view.grid = !ed->view.grid;
     if (strip_button(&s, "Snap", 40, ed->view.snap)) ed->view.snap = !ed->view.snap;
     if (strip_button(&s, "Colliders", 76, ed->show_colliders)) ed->show_colliders = !ed->show_colliders;
+    if (strip_button(&s, "3D", 30, ed->view.three_d)) ed_view_set_3d(ed, !ed->view.three_d);
     s.x += 8;
     {   /* Build: a menu under the button */
         br_rect b = strip_next(&s, 56);
@@ -202,6 +203,7 @@ void ed_hierarchy(editor *ed, br_rect rect) {
     uint32_t i, n = 0;
     char name[64];
     static tree_row rows[ED_LIST_ROWS];
+    br_entity clicked = BR_ENTITY_NULL;
     br_ui_panel_begin(ui, "hierarchy", rect);
     br_ui_heading(ui, "Scene");
     br_ui_columns(ui, 2);
@@ -255,7 +257,14 @@ void ed_hierarchy(editor *ed, br_rect rect) {
                 strcat(name, tag);
             }
         }
-        if (br_ui_selectable(ui, name, e == d->selected)) d->selected = e;
+        if (br_ui_selectable(ui, name, ed_doc_is_selected(d, e))) clicked = e;   /* (handled below, with every row known) */
+        if (ed_doc_prefab_of(d, e)) {                    /* a prefab instance: a blue diamond after its name */
+            float cx = label.x + 10 + br_measure_text(name, 1).x, cy = label.y + label.h / 2;
+            br_fill_triangle(ui->r, br_v2(cx, cy - 4), br_v2(cx + 4, cy), br_v2(cx - 4, cy), br_rgb(110, 170, 255));
+            br_fill_triangle(ui->r, br_v2(cx - 4, cy), br_v2(cx + 4, cy), br_v2(cx, cy + 4), br_rgb(110, 170, 255));
+        } else if (ed_doc_instance_root(d, e) != BR_ENTITY_NULL) {   /* ... and its parts: a blue edge */
+            br_fill_rect(ui->r, br_rect_make(label.x, label.y + 3, 2, label.h - 6), br_rgba(110, 170, 255, 160));
+        }
         if (br_ui_last_flags(ui) & BR_UI_DOUBLE_CLICKED) ed_cmd_frame(ed);
         if (br_ui_last_flags(ui) & BR_UI_RIGHT_CLICKED) ed_menu_entity(ed, e);
         snprintf(handle, sizeof(handle), "%u", (unsigned)e);
@@ -267,6 +276,29 @@ void ed_hierarchy(editor *ed, br_rect rect) {
             rows[n].indent = indent;
             rows[n].open_parent = kids && !ed_collapsed(ed, e);
             ++n;
+        }
+    }
+    if (clicked != BR_ENTITY_NULL) {           /* Ctrl / Cmd: in or out; Shift: every row from the last one picked */
+        uint32_t mods = ed->engine->input.mods;
+        if (mods & BR_MOD_SHIFT) {
+            int from = -1, to = -1;
+            uint32_t k;
+            for (k = 0; k < n; ++k) {
+                if (rows[k].e == d->selected) from = (int)k;
+                if (rows[k].e == clicked) to = (int)k;
+            }
+            if (from < 0) ed_doc_select(d, clicked);
+            else {
+                int a = from < to ? from : to, b = from < to ? to : from, j;
+                br_entity anchor = d->selected;
+                if (!(mods & (BR_MOD_CONTROL | BR_MOD_SUPER))) ed_doc_select(d, anchor);
+                for (j = a; j <= b; ++j) ed_doc_select_add(d, rows[j].e);
+                ed_doc_select_add(d, clicked);
+            }
+        } else if (mods & (BR_MOD_CONTROL | BR_MOD_SUPER)) {
+            ed_doc_select_toggle(d, clicked);
+        } else {
+            ed_doc_select(d, clicked);
         }
     }
     tree_drop(ed, rect, rows, n);
@@ -291,13 +323,27 @@ static float drag_speed(const br_field *f) {
         float s = (f->max - f->min) / 300.0f;
         return s > 1.0f ? 1.0f : s;
     }
+    if (f->type == BR_FIELD_VEC3)                       /* (3D: a unit is a metre, not a pixel) */
+        return strcmp(f->name, "rotation") == 0 ? 0.5f : strcmp(f->name, "scale") == 0 ? 0.01f : 0.02f;
     return strcmp(f->name, "scale") == 0 ? 0.01f : f->type == BR_FIELD_INT ? 0.25f : 0.5f;
 }
 
 /* One widget per field, chosen by the field's type. */
-static void edit_field(editor *ed, const br_component_desc *desc, const br_field *f, void *component) {
+static void edit_field(editor *ed, const br_component_desc *desc, const br_field *f, void *component, br_entity e) {
     br_ui *ui = &ed->ui;
     void *p = (unsigned char *)component + f->offset;
+    if (strcmp(desc->name, "Animator") == 0 && strcmp(f->name, "clip") == 0 && br_animator_clip_count(&ed->doc.world, e) > 0) {
+        const char *names[65];                    /* the model's animations, to pick from */
+        int n = br_animator_clip_count(&ed->doc.world, e), k, at = -1;
+        if (n > 64) n = 64;
+        for (k = 0; k < n; ++k) {
+            names[k] = br_animator_clip_name(&ed->doc.world, e, k);
+            if (strcmp(names[k], (const char *)p) == 0) at = k;
+        }
+        if (at < 0) { names[n] = (const char *)p; at = n; }          /* (a name the model doesn't have: shown as it is) */
+        if (br_ui_combo(ui, f->name, &at, names, at == n ? n + 1 : n) && at < n) snprintf((char *)p, f->size, "%s", names[at]);
+        return;
+    }
     switch (f->type) {
     case BR_FIELD_INT:
         br_ui_drag_int(ui, f->name, (int *)p, drag_speed(f), (int)f->min, (int)f->max);
@@ -307,6 +353,7 @@ static void edit_field(editor *ed, const br_component_desc *desc, const br_field
         break;
     case BR_FIELD_BOOL:   br_ui_checkbox(ui, f->name, (bool *)p); break;
     case BR_FIELD_VEC2:   br_ui_vec2(ui, f->name, (br_vec2 *)p, drag_speed(f)); break;
+    case BR_FIELD_VEC3:   br_ui_vec3(ui, f->name, (br_vec3 *)p, drag_speed(f)); break;
     case BR_FIELD_COLOR:  br_ui_color(ui, f->name, (br_color *)p); break;
     case BR_FIELD_STRING: {
         const char *rel = br_ui_dragging(ui, ED_ASSET_DRAG), *dropped;
@@ -369,7 +416,8 @@ void ed_inspector(editor *ed, br_rect rect) {
     br_world *w = &d->world;
     br_entity e = d->selected;
     br_name *name;
-    uint32_t c;
+    uint32_t c, others, k;
+    static br_entity group[ED_SELECT_MAX];
     br_component parent_id = br_component_find(&ed->doc.world, "Parent");
     br_ui_panel_begin(ui, "inspector", rect);
     br_ui_heading(ui, "Inspector");
@@ -394,7 +442,41 @@ void ed_inspector(editor *ed, br_rect rect) {
         br_ui_label_colored(ui, line, ui->style.text_dim);
         if (br_ui_button(ui, "Unparent")) ed_cmd_unparent(ed);
     }
+    {   /* a prefab instance, or part of one */
+        br_entity root = ed_doc_instance_root(d, e);
+        if (root != BR_ENTITY_NULL) {
+            char line[200], rn[64];
+            const char *file = ed_doc_prefab_of(d, root);
+            if (root == e) snprintf(line, sizeof(line), "Instance of %s", file);
+            else snprintf(line, sizeof(line), "Part of %s (%s)", ed_doc_name(d, root, rn, sizeof(rn)), file);
+            br_ui_label_colored(ui, line, br_rgb(110, 170, 255));
+            br_ui_columns(ui, 3);
+            if (br_ui_button(ui, "Open Prefab")) {
+                snprintf(ed->path_field, sizeof(ed->path_field), "%s%s", br_assets_root(), file);
+                ed_cmd_open(ed);
+            }
+            if (br_ui_button(ui, "Apply")) {
+                if (ed_doc_apply_prefab(d, root)) ed_status(ed, "Wrote this instance to %s: every instance follows", file);
+                else ed_status(ed, "Couldn't write %s: %s", file, d->error);
+                br_ui_pop_id(ui);
+                br_ui_panel_end(ui);
+                return;                                  /* (the scene was made again: this entity is gone) */
+            }
+            if (br_ui_button(ui, "Unlink")) {
+                ed_status(ed, "%s is its own now: it no longer follows %s", ed_doc_name(d, root, rn, sizeof(rn)), file);
+                br_remove(w, root, br_component_find(w, "Prefab"));
+            }
+        }
+    }
     br_ui_spacing(ui, 4);
+    others = 0;
+    if (d->multi_count > 1 && d->selected == d->multi_primary) {     /* several selected: edits go to all of them */
+        char line[64];
+        others = ed_doc_selection(d, group, ED_SELECT_MAX, false);
+        snprintf(line, sizeof(line), "%u selected: changes apply to all", (unsigned)others);
+        br_ui_label_colored(ui, line, ui->style.accent);
+        br_ui_spacing(ui, 2);
+    }
     for (c = 0; c < br_component_type_count(w); ++c) {
         const br_component_desc *desc = br_component_get_desc(w, c);
         bool open, remove = false;
@@ -409,7 +491,18 @@ void ed_inspector(editor *ed, br_rect rect) {
             br_ui_indent(ui, 6);
             for (i = 0; i < desc->field_count; ++i) {
                 br_rect last;
-                edit_field(ed, desc, &desc->fields[i], br_get(w, e, c));
+                const br_field *f = &desc->fields[i];
+                unsigned char before[512];
+                unsigned char *at = (unsigned char *)br_get(w, e, c) + f->offset;
+                bool small = f->size <= sizeof(before);
+                if (small) memcpy(before, at, f->size);
+                edit_field(ed, desc, f, br_get(w, e, c), e);
+                at = (unsigned char *)br_get(w, e, c) + f->offset;
+                if (others > 1 && small && memcmp(before, at, f->size) != 0)   /* changed: the same value for the others */
+                    for (k = 0; k < others; ++k) {
+                        unsigned char *o = (unsigned char *)br_get(w, group[k], c);
+                        if (group[k] != e && o) memcpy(o + f->offset, at, f->size);
+                    }
                 last = br_ui_last_rect(ui);                   /* right-click anywhere on the field's row */
                 if (br_ui_context_area(ui, br_rect_make(rect.x, last.y, rect.w, last.h))) ed_menu_component(ed, c, i);
             }
@@ -419,6 +512,7 @@ void ed_inspector(editor *ed, br_rect rect) {
         ed->section_closed[c] = !open;
         br_ui_pop_id(ui);
         if (remove) {
+            for (k = 0; k < others; ++k) if (group[k] != e) br_remove(w, group[k], c);
             br_remove(w, e, c);
             ed_status(ed, "Removed %s", desc->name);
         }
@@ -438,11 +532,16 @@ void ed_statusbar(editor *ed, br_rect rect) {
     bool fresh = ed->engine->time - ed->status_time < 6.0 && ed->status[0];
     br_vec2 size;
     br_ui_panel_begin(ui, "status", rect);
-    br_draw_text(ui->r, fresh ? ed->status : "Wheel: zoom   Right-drag: pan   Right-click: menu   F5: play   F: frame selection",
+    br_draw_text(ui->r, fresh ? ed->status : ed->view.three_d ? "Right-drag: orbit   Middle-drag: pan   Wheel: zoom   W E R: move, rotate, scale   F: frame"
+                                                           : "Wheel: zoom   Right-drag: pan   Right-click: menu   F5: play   F: frame selection",
                  rect.x + 8, rect.y + (rect.h - 8) / 2, 1, fresh ? ui->style.text : ui->style.text_dim);
     snprintf(file, sizeof(file), "%s%s", ed->doc.path[0] ? ed->doc.path : "untitled", ed_doc_dirty(&ed->doc) ? " *" : "");
-    snprintf(info, sizeof(info), "%s   %u entities   %d%%   x %.0f  y %.0f   %.0f fps", file, ed->doc.count,
-             (int)(ed->view.zoom * 100 + 0.5f), (double)ed->view.mouse_world.x, (double)ed->view.mouse_world.y, ed->engine->fps);
+    if (ed->view.three_d)                         /* where the mouse meets the ground */
+        snprintf(info, sizeof(info), "%s   %u entities   x %.1f  z %.1f   %.0f fps", file, ed->doc.count,
+                 (double)ed->view.mouse_ground.x, (double)ed->view.mouse_ground.z, ed->engine->fps);
+    else
+        snprintf(info, sizeof(info), "%s   %u entities   %d%%   x %.0f  y %.0f   %.0f fps", file, ed->doc.count,
+                 (int)(ed->view.zoom * 100 + 0.5f), (double)ed->view.mouse_world.x, (double)ed->view.mouse_world.y, ed->engine->fps);
     size = br_measure_text(info, 1);
     br_draw_text(ui->r, info, rect.x + rect.w - size.x - 8, rect.y + (rect.h - 8) / 2, 1, ui->style.text_dim);
     br_ui_panel_end(ui);
@@ -453,7 +552,7 @@ void ed_statusbar(editor *ed, br_rect rect) {
 void ed_dialog(editor *ed, br_rect screen) {
     br_ui *ui = &ed->ui;
     br_rect box = br_rect_make(floorf(screen.x + (screen.w - 440) / 2), floorf(screen.y + (screen.h - 108) / 2), 440, 108);
-    char question[ED_PATH_MAX + 40];
+    char question[ED_PATH_MAX + 80];
     const char *verb = ed->pending == ED_PENDING_QUIT ? "quitting" : ed->pending == ED_PENDING_NEW ? "starting a new scene"
                      : ed->pending == ED_PENDING_PROJECT ? "switching projects" : "opening another";
     if (ed->pending == ED_PENDING_NONE) return;
@@ -461,7 +560,14 @@ void ed_dialog(editor *ed, br_rect screen) {
     br_ui_set_disabled(ui, false);
     br_ui_panel_begin(ui, "dialog", box);
     br_ui_heading(ui, "Unsaved changes");
-    snprintf(question, sizeof(question), "Save %s before %s?", ed->doc.path[0] ? ed->doc.path : "this scene", verb);
+    {
+        int scripts = ed->pending == ED_PENDING_QUIT || ed->pending == ED_PENDING_PROJECT ? ed_code_dirty_count(ed) : 0;
+        char what[ED_PATH_MAX + 20];
+        if (!ed_doc_dirty(&ed->doc)) snprintf(what, sizeof(what), "%d changed script%s", scripts, scripts == 1 ? "" : "s");
+        else if (scripts) snprintf(what, sizeof(what), "%s and %d script%s", ed->doc.path[0] ? br_path_name(ed->doc.path) : "this scene", scripts, scripts == 1 ? "" : "s");
+        else snprintf(what, sizeof(what), "%s", ed->doc.path[0] ? ed->doc.path : "this scene");
+        snprintf(question, sizeof(question), "Save %s before %s?", what, verb);
+    }
     br_ui_label(ui, question);
     br_ui_spacing(ui, 12);
     br_ui_columns(ui, 3);
@@ -551,6 +657,10 @@ void ed_bottom_tabs(editor *ed, br_rect rect) {
     }
     if (fresh && (ed->bottom_tab != ED_TAB_CONSOLE || !shown))     /* a red mark on the tab */
         br_fill_rect(ui->r, br_rect_make(s.x - 4 - 150 + 3, s.y + 3, 3, s.h - 6), br_rgb(255, 110, 100));
+    if (strip_button(&s, ed->dbg.stopped ? "Scripts (stopped)##dtab" : ed_code_dirty_count(ed) ? "Scripts *##dtab" : "Scripts##dtab", ed->dbg.stopped ? 136 : ed_code_dirty_count(ed) ? 84 : 68, shown && ed->bottom_tab == ED_TAB_DEBUG)) {
+        ed->bottom_tab = ED_TAB_DEBUG;
+        ed_panel_set_open(ed, ED_PANEL_BOTTOM, true);
+    }
     br_ui_panel_end(ui);
     if (ed->bottom_tab == ED_TAB_CONSOLE && shown) {
         ed->console_seen = ed->console.added;

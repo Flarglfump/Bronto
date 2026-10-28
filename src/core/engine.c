@@ -1,4 +1,5 @@
 #include "bronto/engine.h"
+#include "bronto/components3d.h"
 #include "bronto/log.h"
 #include "bronto/assets.h"
 #include "bronto/components.h"
@@ -293,6 +294,40 @@ static void update_rumble(br_engine *e) {
 
 /* ---- frame ------------------------------------------------------------------- */
 
+/* A frame while the game is held still (a debugger stopped inside a script, from
+ * inside br_engine_frame): input, events and window as usual, then the scenes are
+ * drawn and shown - but no fixed step, no update, no scene changes. The caller
+ * loops on it until it wants to go on. */
+bool br_engine_frame_paused(br_engine *e) {
+    double now, dt;
+    if (!e->initialized || !e->running) return false;
+    br_input_begin_frame(&e->input);
+    e->events.time = e->time;
+    e->platform->poll_events(&e->events);
+    now = e->platform->time();
+    dt = now - e->last_clock;
+    e->last_clock = now;
+    if (dt < 0) dt = 0;
+    if (dt > e->config.max_frame_time) dt = e->config.max_frame_time;
+    br_engine_sync_window(e);
+    map_mouse_events(e);
+    br_events_dispatch(&e->events);
+    br_input_end_events(&e->input);
+    if (!e->skip_render) {
+        br_end_camera(&e->renderer);
+        br_reset_clip(&e->renderer);
+        br_set_blend(&e->renderer, BR_BLEND_ALPHA);
+        if (e->config.auto_clear) br_clear(&e->renderer, e->config.clear_color);
+        br_scenes_render(&e->scenes);
+        if (e->window.viewport.rect.w > 0 && e->window.viewport.rect.h > 0)
+            e->platform->present(&e->framebuffer, e->window.viewport.rect);
+    }
+    e->time += dt;
+    pump_audio(e);
+    if (e->running) limit_frame_rate(e, now);
+    return e->running;
+}
+
 bool br_engine_frame(br_engine *e) {
     double now, dt;
     int steps = 0;
@@ -413,6 +448,8 @@ void br_engine_shutdown(br_engine *e) {
     br_assets_clear();                  /* (silences the voices playing cached sounds) */
     br_assets_set_mixer(NULL);
     br_builtin_release();
+    br_components3d_release();
+    br_r3d_destroy(&e->r3d);
     {   /* never leave a controller vibrating */
         int i;
         for (i = 0; i < BR_MAX_GAMEPADS; ++i)

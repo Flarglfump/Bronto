@@ -1,0 +1,11 @@
+@strict @3d
+# goal.bs - the flag's trigger: the course is done when the marble rolls in.
+var done: bool = false
+
+func on_trigger(other: entity) -> void {
+    if other.name == "Marble" and not done {
+        done = true
+        other.won = true
+        send(find("HUD"), "finish")
+    }
+}

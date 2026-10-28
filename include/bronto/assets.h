@@ -10,6 +10,7 @@
 #define BRONTO_ASSETS_H
 
 #include "render.h"
+#include "render3d.h"
 #include "audio.h"
 
 /* The file that marks a game's project folder. Asset paths in scenes are
@@ -32,6 +33,13 @@ const char *br_assets_root(void);
  * The image at `path` (BMP or TGA), loaded once. NULL if it can't be
  * loaded; the failure is logged once, not every frame. */
 const br_image *br_asset_image(const char *path);
+
+/* The model (Wavefront .obj) at `path`, loaded once; NULL if it can't be. */
+const br_mesh *br_asset_mesh(const char *path);
+/* A .gltf / .glb with its skeleton and animations (model.h); br_asset_mesh on
+ * the same file gives all its parts at rest, as one mesh. */
+struct br_model;
+const struct br_model *br_asset_model(const char *path);
 
 /* The WAV sound at `path`, loaded once; NULL if it can't be loaded. Stop
  * voices that use cached sounds before br_assets_clear() (the engine does). */

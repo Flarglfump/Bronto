@@ -29,14 +29,17 @@ Only these can appear at the top level of a file:
 - `var name = value` declares a variable. Each entity running the script has its own copy,
   and the value is kept between calls. **Script › vars** in the inspector overrides the
   starting values for one entity, for example `speed = 120, name = "Rex", wrap = true`
-  (only literal values: numbers, strings, `true`/`false`/`nil`, `vec2(x, y)` and lists of
-  these, such as `path = [vec2(0, 0), vec2(64, 0)]`).
+  (only literal values: numbers, strings, `true`/`false`/`nil`, `vec2(x, y)`, `vec3(x, y, z)`
+  and lists of these, such as `path = [vec2(0, 0), vec2(64, 0)]`).
 - `const name = value` declares a variable that can't be changed (see [const](#const)).
   **Script › vars** can still give it its starting value.
 - `func name(a, b) { ... }` declares a function.
 - `struct Name { ... }` and `class Name { ... }` declare your own types (see
   [Structs and classes](#structs-and-classes)).
 - `@strict`, on the first line only, makes types required (see [Types](#types)).
+- `@3d`, also at the top, says the script drives a 3D entity: `self.position` and the other
+  transform properties are `vec3`s (see [3D](#3d)). `@strict @3d` (or the two on separate
+  lines) gives both.
 
 `#` starts a comment. Statements end at the end of the line, or at a `;`. Inside `( )` or
 `[ ]` a statement can carry on over several lines:
@@ -54,7 +57,7 @@ The engine calls these functions when a script defines them:
 |---|---|
 | `start()` | once, before the entity's first update |
 | `update(dt)` | every fixed step (60 per second); `dt` is the step in seconds |
-| `on_collision(other, normal, speed)` | this entity's collider started touching `other`'s. `normal` points away from this entity, and `speed` is how fast they hit |
+| `on_collision(other, normal, speed)` | this entity's collider started touching `other`'s. `normal` points away from this entity (a `vec3` for 3D colliders), and `speed` is how fast they hit |
 | `on_collision_end(other)` | they stopped touching |
 | `on_trigger(other)` | `other` entered a trigger collider (either this entity's or `other`'s) |
 | `on_trigger_exit(other)` | ... and left it |
@@ -73,6 +76,7 @@ Every callback can declare fewer parameters than the engine passes.
 | true / false | `true`, `false` | |
 | nil | `nil` | "nothing"; variables start as nil |
 | vec2 | `vec2(3, 4)` | `.x`, `.y`, `.length`. `+ -` with another vec2; `* /` by a number |
+| vec3 | `vec3(1, 2, 3)` | `.x`, `.y`, `.z`, `.length`. The same operators as vec2 (for 3D: see [3D](#3d)) |
 | list | `[1, 2, 3]` | `list[0]`, `list[-1]` (the last item), `len(list)`, `push`, `pop`, `remove` |
 | entity | `self`, `find("Player")` | see below |
 | struct / class object | `Point(1, 2)`, `Dog("Rex")` | your own types: see [Structs and classes](#structs-and-classes) |
@@ -133,7 +137,8 @@ lerp(a, b, t)` (numbers or vec2s), `sin cos` (degrees), `atan2(y, x)` (degrees),
 `random()` (0..1), `random(n)` (0..n), `random(a, b)`.
 
 **Vectors:** `vec2(x, y) length(v) normalize(v) dot(a, b) distance(a, b) angle(v)`
-(degrees), `from_angle(degrees, length)`.
+(degrees), `from_angle(degrees, length)`. `vec3(x, y, z)` and `cross(a, b)` are for 3D;
+`length normalize dot distance lerp` take vec3s as well.
 
 **Text:** `str(v)`, `num("12")` (nil if it isn't a number), `print(...)` (to the log, and the
 editor's console and status bar), `rgb(r, g, b[, a])` (a colour string).
@@ -205,8 +210,8 @@ if key_pressed("space") or button_pressed("a") { jump() }
 - `find(name)` returns the first entity with that name, or nil. `find_all(name)` returns a list.
 - `children(e)` returns its direct children; `child(e, "Gun")` the one with that name, or nil.
 - `spawn("prefabs/bullet.scene", position[, parent])` adds a copy of a scene file's entities
-  and returns the first one. With a parent, they become its children, and position is in
-  its space. The new entities' scripts are ready at once. You can set their variables and
+  and returns the first one (position is a vec2, or a vec3 for 3D prefabs). With a parent,
+  they become its children, and position is in its space. The new entities' scripts are ready at once. You can set their variables and
   call their functions straight away (`var b = spawn(...)` then `b.speed = 200`). Their
   `start()` runs before their first update, on the next step.
 - `destroy(e)` removes an entity, and its children, at the end of the step.
@@ -328,6 +333,13 @@ that size, numbered from 0 left to right, then top to bottom; `frame` is the one
 - `play_animation(e, "4-7"[, fps[, loop]])` does that (adding an Animation if it has none)
   unless those frames are already playing, so it can be called every step:
   `if moving { play_animation(self, "1-4", 10) } else { play_animation(self, "0") }`.
+- `stop_animation(e)` holds it where it is.
+
+**3D model animations.** On a 3D entity whose Mesh is a glTF model (`.gltf` / `.glb` with a
+skeleton), `play_animation(e, "walk"[, speed[, loop]])` plays that animation (by its name
+in the file) through an Animator (added if it has none), crossfading from the last one
+over the Animator's `blend` seconds; calling it every step with the same name does
+nothing more. `animation_clips(e)` lists the names. See [3D](3d.md#animated-models).
 
 **Cameras.** A Camera on an entity makes the game show the world around that entity's
 Transform: its position at the middle of the screen, `zoom`ed, turned with its rotation.
@@ -350,6 +362,84 @@ from (0, 0) as it always has.
 
 In the editor, each camera shows what it sees as a blue frame (and its limits in orange).
 While playing, the view follows the game's camera inside the game-screen frame.
+
+## The game's own components
+
+A script can declare components of the game's own, beside the engine's:
+
+```
+component Health {
+    var hp: int = 3            # fields need types: scenes save them
+    var regen: number = 0.5
+    var shield: bool
+    var tint: color = "#ff4040"
+    var team: enum(red, blue) = blue
+    var target: entity         # starts as none
+}
+```
+
+Field types: `int`, `number`, `bool`, `string` (up to 63 bytes), `vec2`, `vec3`, `color`,
+`entity` and `enum(...)` (a choice of names; scripts see the name as a string). The editor
+reads every `.bs` file of the project for them when it opens it (and again when a script
+changes), so they appear in **Add component** and the inspector edits them; scene files
+save them like any other; built games read them from their scripts too. Scripts use them
+like the engine's: `self.Health.hp -= 1`, `has(other, "Health")`, `add(e, "Health")`,
+`remove_component(e, "Health")`, and `find_with("Health")` lists every entity with one.
+
+A component is data: what it does is up to the scripts that read it (a `damage.bs` on the
+enemies that takes `hp` off whatever `Health` it touches, say). `bscheck` checks the
+declarations too.
+
+## Particles
+
+A **Particles** component gives off sparks, smoke, fire, rain and the like, on an entity with
+a Transform (2D) or a Transform3D (3D). Right-click in the editor's view, **New Particles
+Here**, for ready-made ones (sparks, fire, smoke, explosion, rain, snow, magic). Its fields:
+`emitting`, `rate` (a second) and `burst` (at once, when it starts), `max`, `lifetime`,
+`speed` (each with a `_random` fraction), `angle` and `spread` (degrees: 2D -90 is up; 3D
+they leave along the entity's up within a cone), `area`, `gravity`, `drag`, `size_start` /
+`size_end`, `color_start` / `color_end`, `shape` (circle, square, image), `image`, `blend`
+(add makes things glow), `layer`, `local` (they move with the entity) and `auto_destroy`
+(the entity goes once its particles have).
+
+- `emit(e[, count])` gives off `count` at once (without it: the burst), for a hit or a
+  pickup: `emit(find("Sparks"), 12)`.
+- `particle_count(e)` says how many are alive.
+- Change the fields as with any component: `self.Particles.emitting = key_down("space")`.
+
+A one-off effect is a prefab with `rate` 0, a `burst` and `auto_destroy`:
+`spawn("prefabs/boom.scene", other.position)`.
+
+## Tweens
+
+`tween(e, property, target, seconds[, ease[, delay]])` moves a property smoothly from where
+it is to `target`, a step at a time, with no code in `update()`:
+
+```
+tween(self, "position", vec2(160, 40), 0.6, "ease_out")      # slide in
+tween(self, "Shape.color", "#ffffff00", 0.4)                  # fade out (a component's field)
+tween(self, "scale", 1.5, 0.15, "back_out")                   # pop (a number: both ways)
+tween(find("HUD"), "shown", 1, 0.3)                           # another script's variable
+tween(self, "rotation", 90, 0.5, "ease_in_out", 1)            # after a second's wait
+```
+
+- The property is one an entity has (`position`, `x`, `y`, `z`, `rotation`, `scale`,
+  `velocity`, `global_position`...), `"Component.field"`, or a variable of the entity's
+  script. Numbers, vec2s, vec3s and colours can be tweened.
+- Eases: `linear` (the default), `ease_in`, `ease_out`, `ease_in_out`, `cubic_in`,
+  `cubic_out`, `cubic_in_out`, `sine_in`, `sine_out`, `sine_in_out`, `back_in`, `back_out`
+  (overshoots a little), `elastic_out` (springs) and `bounce_out`.
+- A delayed tween starts from wherever the property is when its wait ends, so delays make
+  sequences: move there, then (with a delay as long as the first) fade.
+- A new tween of the same property replaces the one running (unless either has a delay).
+- `tween()` returns an id: `tween_repeat(id, times[, yoyo])` plays it again (`-1`: for ever;
+  `yoyo` goes back and forth), `tween_then(id, "func")` calls one of this script's
+  functions when it ends, `stop_tween(id)` stops it where it is (`stop_tween(e)`: all of an
+  entity's), and `is_tweening(id)` or `is_tweening(e[, property])` says whether it runs.
+- `ease(name, t)` is the curve itself, for your own animation: `ease("ease_out", 0.5)`.
+
+Tweens move in the fixed step, after the scripts' `update()`s, so they replay exactly. One
+whose entity is destroyed, or loses the component, just stops.
 
 ## Drawing
 
@@ -598,6 +688,7 @@ for i: int in 10 { ... }
 | `string` | text | `""` |
 | `bool` | `true` or `false` | `false` |
 | `vec2` | a vector | `vec2(0, 0)` |
+| `vec3` | a 3D vector | `vec3(0, 0, 0)` |
 | `list`, `list[T]` | a list (of T) | `[]` |
 | `entity` | an entity, or nil | `nil` |
 | a struct's name | that struct | one with its fields' starting values |
@@ -640,6 +731,91 @@ every script in a project strict, set **Strict typing** in the editor's **Build 
 Settings** (`strict_typing = true` in `project.bronto`); `bscheck --strict` does the same
 from the command line.
 
+## 3D
+
+Entities with a **Transform3D** live in 3D: x to the right, **y up**, and the camera looking
+down **-z** (so -z is "forward"). Distances are in units (think metres); rotation is three
+angles in degrees: `x` pitch (nose up), `y` yaw (turn left), `z` roll. See
+[3d.md](3d.md) for the components (Mesh, Camera3D, Light, RigidBody3D, Collider3D).
+
+A script for a 3D entity starts with `@3d`. Then the transform properties are vec3s:
+
+| Property | Meaning |
+|---|---|
+| `.position`, `.x`, `.y`, `.z` | Transform3D.position, relative to the parent |
+| `.rotation` | Transform3D.rotation: `vec3(pitch, yaw, roll)` in degrees |
+| `.scale` | Transform3D.scale (a vec3, or a number for all three) |
+| `.global_position`, `.global_rotation` | in the world, after its parents; setting them moves it there |
+| `.forward`, `.right`, `.up` | which way it faces (read only): its -z, +x and +y in the world |
+| `.velocity`, `.angular_velocity` | RigidBody3D's (units / second; degrees / second about x, y, z) |
+
+`on_collision(other, normal, speed)` gets a vec3 normal. Without `@3d` a file is 2D: its
+`position` is a vec2. The difference is only in the checker's types, so `@3d` scripts can
+still `find()` and message 2D entities, and the other way round. `.z`, `.forward`, `.right`
+and `.up` on an entity without a Transform3D are errors when the script runs.
+
+3D functions:
+- `vec3(x, y, z)`, `cross(a, b)`; `length normalize dot distance lerp` work on vec3s.
+- `look_at(e, point)` turns an entity to face a point (its -z towards it, +y kept up).
+- `move_and_slide(e, velocity)` moves a character (an entity with a capsule Collider3D, say)
+  by `velocity * dt`, sliding along what it meets, and returns the velocity with the parts
+  that went into things taken out: `vel = move_and_slide(self, vel)`. Then
+  `is_on_floor(e)`, `is_on_wall(e)` and `is_on_ceiling(e)` say what that move touched.
+  See [3D characters](3d.md#characters).
+- `apply_force(e, force[, point])`, `apply_impulse(e, impulse[, point])` take vec3s for
+  3D bodies, and `apply_torque(e, torque)` spins one (a vec3, about x, y and z).
+- `raycast(from, to[, ignore])` with vec3s returns `[entity, point, normal]` for the first
+  solid 3D collider on the line, or nil. `entity_at(point)` with a vec3 returns a 3D collider
+  there, and `overlap_sphere(centre, radius)` every 3D collider (triggers too) touching a
+  sphere, as a list.
+- `world_to_screen(point)` with a vec3 returns where a 3D point appears on the game's screen
+  (a vec2 in game pixels, as `mouse_position()`), through the scene's Camera3D. A point behind the camera
+  (or with no camera) gives `vec2(-100000, -100000)`.
+- `screen_ray(point)` returns `[origin, direction]` (two vec3s): the line through a screen
+  point into the scene, for clicking on 3D things:
+  `var r := screen_ray(mouse_position())` then `raycast(r[0], r[0] + r[1] * 100)`.
+
+```
+@3d
+# roller.bs - rolls a ball with the arrow keys, and follows it with the camera
+var push: number = 12
+var cam: entity
+
+func start() -> void { cam = find("Camera") }
+
+func update(dt: number) -> void {
+    var dir := vec3(0, 0, 0)
+    if key_down("left") { dir.x -= 1 }
+    if key_down("right") { dir.x += 1 }
+    if key_down("up") { dir.z -= 1 }
+    if key_down("down") { dir.z += 1 }
+    apply_force(self, dir * push)
+    cam.position = self.position + vec3(0, 4, 7)
+    look_at(cam, self.position)
+}
+```
+
+## Debugging
+
+The editor's **Scripts** tab (next to Files and Console) is a debugger for scripts as well
+as their editor:
+
+- Open a script (the scene's scripts are listed in the tab's bar) and click a line's
+  number to put a **breakpoint** on it (a red dot); click again to take it away.
+  Breakpoints move with their lines as you edit.
+- Press **Play**. When a script reaches that line, the game stops right there, in the
+  middle of its step: the line is marked, and the side shows the **call stack** (click a
+  function to see where it was called from) and the **variables**: the function's own and
+  the script's.
+- **Continue** (F5) runs on to the next breakpoint, **Over** (F10) to the next line,
+  **Into** (F11) into a function the line calls, **Out** (Shift+F11) back to whoever called
+  this one, and **Stop** (Esc) stops playing.
+- **Pause**, while playing, stops at the next line any script runs.
+
+While stopped, the scene view and the inspector show the game as it is at that moment, but
+can't be changed. With no breakpoints set, scripts run at full speed. From C, the same
+debugger is `br_script_debug_attach` and friends in `script.h`.
+
 ## Errors
 
 A mistake stops only the script that made it. The rest of the game keeps running, and
@@ -654,11 +830,15 @@ Scripts are read again when their file changes, and every time Play starts in th
 
 ## Editing scripts
 
-- **Which editor opens them:** in the Bronto editor, **Settings › Script editor** sets the
-  program that opens `.bs` files: a command line where `{file}` is the script and `{line}`
-  the line to show. There are presets for VS Code, Sublime Text, Notepad++ and Zed, and
-  empty means your system's default program. When a script has a mistake, it opens at
-  that line.
+- **In the Bronto editor:** double-click a script in Files (or a mistake in the console)
+  and it opens in the **Scripts** tab under the scene: BrontoScript in colour, undo,
+  indenting, Ctrl+/ to comment lines out, and the script checked as you type, with the
+  first mistake marked at its line. Ctrl+S saves; Play saves every changed script first.
+  See [the editor's README](../tools/editor/README.md).
+- **Another editor:** **Settings › Script editor** can open `.bs` files elsewhere instead:
+  a command line where `{file}` is the script and `{line}` the line to show (presets for
+  VS Code, Sublime Text, Notepad++ and Zed), or `system` for your system's default program.
+  When a script has a mistake, it opens at that line.
 - **VS Code:** `tools/vscode` has an extension with highlighting, completion (including the
   names that go inside strings: keys, gamepad buttons, axes, sound buses, components, and
   the project's sounds and scenes for `play_sound`, `spawn` and `load_scene`), hover

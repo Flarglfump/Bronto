@@ -285,6 +285,60 @@ static void test_doc_copy_paste(void) {
     ed_doc_destroy(&D);
 }
 
+/* Selecting several: toggling, the roots of a selection, deleting, duplicating,
+ * copying them together, and undo keeping what was selected. */
+static void test_doc_multi_select(void) {
+    br_entity a, b, c, kid, sel[8];
+    char *text;
+    int n;
+    ed_doc_init(&D);
+    a = ed_doc_create(&D, "A", br_v2(0, 0));
+    kid = ed_doc_create_child(&D, a, "Kid", br_v2(5, 0));
+    b = ed_doc_create(&D, "B", br_v2(50, 0));
+    c = ed_doc_create(&D, "C", br_v2(100, 0));
+    ed_doc_checkpoint(&D);
+    ed_doc_select(&D, a);
+    ed_doc_select_toggle(&D, c);                          /* ctrl-click C */
+    CHECK(D.selected == c && ed_doc_is_selected(&D, a) && ed_doc_is_selected(&D, c) && !ed_doc_is_selected(&D, b));
+    ed_doc_select_toggle(&D, kid);
+    CHECK_EQ_INT(ed_doc_selection_count(&D), 3);
+    CHECK_EQ_INT(ed_doc_selection(&D, sel, 8, true), 2);  /* Kid rides with A */
+    CHECK(sel[0] == a && sel[1] == c);
+    ed_doc_select_toggle(&D, kid);                        /* out again */
+    CHECK(!ed_doc_is_selected(&D, kid) && ed_doc_selection_count(&D) == 2);
+    D.selected = b;                                       /* set directly: just that one */
+    CHECK(ed_doc_selection_count(&D) == 1 && !ed_doc_is_selected(&D, a));
+    /* duplicate two: both copied, the copies selected */
+    ed_doc_select(&D, a);
+    ed_doc_select_add(&D, c);
+    CHECK_EQ_INT((int)ed_doc_duplicate_selection(&D), 2);
+    CHECK_EQ_INT(D.count, 7);
+    CHECK(ed_doc_selection_count(&D) == 2 && !ed_doc_is_selected(&D, a));   /* A's copy (its kid's comes along) and C's */
+    /* copy them as one text, paste: both come back, selected */
+    text = ed_doc_copy_selection(&D);
+    CHECK(text != NULL);
+    n = ed_doc_paste(&D, text, NULL, BR_ENTITY_NULL);
+    CHECK_EQ_INT(n, 3);
+    CHECK_EQ_INT((int)ed_doc_selection(&D, sel, 8, true), 2);
+    br_free(text);
+    CHECK_EQ_INT(D.count, 10);
+    /* delete them, undo: back, and still selected */
+    ed_doc_checkpoint(&D);
+    ed_doc_delete_selection(&D);
+    CHECK_EQ_INT(D.count, 7);
+    ed_doc_checkpoint(&D);
+    ed_doc_undo(&D);
+    CHECK_EQ_INT(D.count, 10);
+    ed_doc_select(&D, D.order[0]);
+    ed_doc_select_add(&D, D.order[3]);
+    ed_doc_checkpoint(&D);
+    xf(D.order[3])->position.x += 1;                      /* an edit, then undo: the two stay selected */
+    ed_doc_checkpoint(&D);
+    ed_doc_undo(&D);
+    CHECK(ed_doc_selection_count(&D) == 2 && ed_doc_is_selected(&D, D.order[0]) && D.selected == D.order[3]);
+    ed_doc_destroy(&D);
+}
+
 /* The console's lines (console.c). */
 static ed_console CON;
 
@@ -342,6 +396,7 @@ static void test_console_lines(void) {
 void suite_editor_doc(void) {
     RUN(test_doc_tree);
     RUN(test_doc_copy_paste);
+    RUN(test_doc_multi_select);
     RUN(test_console_lines);
     RUN(test_doc_prefabs);
     RUN(test_doc_project_root);

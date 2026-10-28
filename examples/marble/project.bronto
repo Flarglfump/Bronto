@@ -1,0 +1,11 @@
+bronto_project 1
+# Marble: a small 3D game made of scenes and scripts. Open this folder in the editor.
+name = Marble
+main_scene = main.scene
+width = 320
+height = 200
+window_scale = 3
+strict_typing = true
+# the script that made the course and its art isn't part of the game
+exclude = tools
+touch_controls = stick, a, start

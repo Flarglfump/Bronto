@@ -1,0 +1,2 @@
+# 3D models (.obj) are part of the game here, not compiler output (the top .gitignore skips *.obj)
+!*.obj

@@ -7,9 +7,9 @@
  *
  * The panels' sizes are kept too ("scene_panel = 200 shown").
  *
- * The script editor is a command line with {file} and {line} in it, for
- * example  code -g "{file}:{line}". Empty means the system's default program
- * for .bs files.
+ * The script editor is empty for the editor's own (the Scripts tab, code.c),
+ * "system" for the system's default program for .bs files, or a command line
+ * with {file} and {line} in it, for example  code -g "{file}:{line}".
  */
 #include "editor.h"
 #include <math.h>
@@ -17,7 +17,8 @@
 #include <string.h>
 
 static const struct { const char *label, *command; } k_presets[] = {
-    { "Default", "" },
+    { "Built in", "" },
+    { "System default", "system" },
     { "VS Code", "code -g \"{file}:{line}\"" },
     { "Sublime Text", "subl \"{file}:{line}\"" },
     { "Notepad++", "notepad++ -n{line} \"{file}\"" },
@@ -122,7 +123,12 @@ bool ed_open_script(editor *ed, const char *rel, int line) {
     ed_asset_path(ed, rel, full, sizeof(full));
     if (!br_fs_absolute(full, abs, sizeof(abs))) snprintf(abs, sizeof(abs), "%s", full);
     if (line < 1) line = 1;
-    if (ed->prefs.script_editor[0]) {
+    if (!ed->prefs.script_editor[0]) {                       /* the editor's own, in the Scripts tab */
+        if (ed_code_open(ed, rel, line)) { ed_status(ed, "Editing %s - Ctrl+S saves, Play saves and runs it", rel); return true; }
+        ed_status(ed, "Couldn't read %s", rel);
+        return false;
+    }
+    if (strcmp(ed->prefs.script_editor, "system") != 0) {
         ed_script_command(ed->prefs.script_editor, abs, line, cmd, sizeof(cmd));
         if (br_launch(ed->engine, cmd)) { ed_status(ed, "Opened %s (Play picks up your changes)", rel); return true; }
         ed_status(ed, "Couldn't run \"%s\" - check Settings > Script editor", cmd);
@@ -150,10 +156,10 @@ void ed_settings_dialog(editor *ed, br_rect screen) {
     br_ui_set_disabled(ui, false);
     br_ui_panel_begin(ui, "settings", box);
     br_ui_heading(ui, "Settings");
-    br_ui_label(ui, "Script editor: the program that opens .bs files");
+    br_ui_label(ui, "Script editor: where .bs files open");
     br_ui_text_field(ui, "Command", ed->settings_field, sizeof(ed->settings_field));
     br_ui_label_colored(ui, "{file} is the script's path, {line} the line to show.", ui->style.text_dim);
-    br_ui_label_colored(ui, "Empty: your system's default program for .bs files.", ui->style.text_dim);
+    br_ui_label_colored(ui, "Empty: the Scripts tab here. \"system\": your system's program for .bs files.", ui->style.text_dim);
     br_ui_spacing(ui, 4);
     br_ui_label(ui, "Presets:");
     br_ui_columns(ui, (int)BR_ARRAY_COUNT(k_presets));
@@ -164,7 +170,9 @@ void ed_settings_dialog(editor *ed, br_rect screen) {
             snprintf(ed->settings_field, sizeof(ed->settings_field), "%s", k_presets[i].command);
     }
     br_ui_spacing(ui, 4);
-    if (ed->settings_field[0]) {
+    if (!ed->settings_field[0]) {
+        snprintf(example, sizeof(example), "Opens scripts in the Scripts tab, under the scene.");
+    } else if (strcmp(ed->settings_field, "system") != 0) {
         char cmd[600];
         ed_script_command(ed->settings_field, "/path/to/player.bs", 12, cmd, sizeof(cmd));
         snprintf(example, sizeof(example), "Runs: %s", cmd);

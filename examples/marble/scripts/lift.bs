@@ -1,0 +1,28 @@
+@strict @3d
+# lift.bs - a kinematic platform that goes back and forth by `travel` (Script.vars sets
+# it: up for the lift), easing in and out and pausing at each end. Kinematic bodies move
+# by their velocity, so it sets the velocity that reaches the next point on its way in
+# one step - and whatever rides on it is carried along.
+var travel: vec3 = vec3(0, 3, 0)
+var seconds: number = 2.5      # one way
+var pause: number = 1.5        # at each end
+var from: vec3
+var t: number = 0
+
+func start() -> void { from = self.position }
+
+func update(dt: number) -> void {
+    t += dt
+    var cycle: number = (seconds + pause) * 2
+    var u: number = t % cycle
+    var k: number = 0
+    if u < seconds {
+        k = u / seconds
+    } elif u < seconds + pause {
+        k = 1
+    } elif u < seconds * 2 + pause {
+        k = 1 - (u - seconds - pause) / seconds
+    }
+    k = (1 - cos(k * 180)) / 2                 # ease in and out
+    self.velocity = (from + travel * k - self.position) / dt
+}

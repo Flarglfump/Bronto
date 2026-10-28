@@ -45,7 +45,10 @@ int main(int argc, char **argv) {
         ++files;
         if (!(text = (char *)br_file_read_all(argv[i], &size))) { printf("%s:1: can't read the file\n", argv[i]); bad = 1; continue; }
         br_script_set_strict(strict_for(argv[i], project, forced));
-        if (!br_script_check(text, argv[i], err, sizeof(err))) {
+        if (strstr(text, "component") && br_script_scan_components(text, argv[i], err, sizeof(err)) < 0) {   /* its components */
+            printf("%s\n", err);
+            bad = 1;
+        } else if (!br_script_check(text, argv[i], err, sizeof(err))) {
             /* the message starts with the file's name; print the path given instead */
             const char *rest = strchr(err, ':');
             printf("%s%s\n", argv[i], rest ? rest : err);

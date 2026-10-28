@@ -8,6 +8,9 @@
 #include "bronto/physics.h"
 #include "bronto/hierarchy.h"
 #include "bronto/script.h"
+#include "bronto/components3d.h"
+#include "bronto/physics3d.h"
+#include "bronto/particles.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -94,6 +97,9 @@ static const br_field k_tilemap_fields[] = {
 };
 static const br_tilemap k_tilemap_default = { "", 16, 16, 11, "", "", "", -10, { 255, 255, 255, 255 } };
 
+static const br_field k_prefab_fields[] = { BR_FIELD(br_prefab, file, BR_FIELD_STRING, 0, 0) };
+static const br_prefab k_prefab_default = { "" };
+
 static const br_field k_tags_fields[] = { BR_FIELD(br_tags, list, BR_FIELD_STRING, 0, 0) };
 static const br_tags k_tags_default = { "" };
 
@@ -136,10 +142,11 @@ static const br_component_desc k_descs[] = {
     DESC("Tags", br_tags, k_tags_fields, &k_tags_default),
     DESC("Animation", br_animation, k_animation_fields, &k_animation_default),
     DESC("Camera", br_camera, k_camera_fields, &k_camera_default),
+    DESC("Prefab", br_prefab, k_prefab_fields, &k_prefab_default),
 };
 static const br_component_desc *const k_desc_list[] = {
     &k_descs[0], &k_descs[1], &k_descs[2], &k_descs[3], &k_descs[4], &k_descs[5], &k_descs[6], &k_descs[7],
-    &k_descs[8], &k_descs[9], &k_descs[10], &k_descs[11],
+    &k_descs[8], &k_descs[9], &k_descs[10], &k_descs[11], &k_descs[12],
 };
 
 const br_component_desc *const *br_builtin_descs(int *count) {
@@ -468,7 +475,7 @@ bool br_builtin_hit(const br_world *w, br_entity e, br_vec2 p) {
 
 /* ---- drawing ------------------------------------------------------------------ */
 
-/* what: 0 shape, 1 sprite, 2 label, 3 tilemap, 4 a script's draw(); parents under their children */
+/* what: 0 shape, 1 sprite, 2 label, 3 tilemap, 4 a script's draw(), 5 particles; parents under their children */
 typedef struct draw_item { br_entity e; int layer; int what; uint32_t depth; } draw_item;
 
 static draw_item *g_items;
@@ -746,7 +753,7 @@ void br_builtin_draw_layers(const br_world *w, br_renderer *r, const br_camera2d
                             const br_camera2d *screen_cam, int ui_layer) {
     br_builtin_ids id;
     uint32_t n = 0, i, k;
-    br_component kinds[5];
+    br_component kinds[6];
     br_component script = br_component_find(w, "Script");
     bool had = r->camera_active, began = false;
     br_camera2d saved = r->camera;
@@ -757,7 +764,8 @@ void br_builtin_draw_layers(const br_world *w, br_renderer *r, const br_camera2d
     kinds[2] = id.label;
     kinds[3] = id.tilemap;
     kinds[4] = script;
-    for (k = 0; k < 5; ++k) {                     /* everything visible that has a Transform */
+    kinds[5] = br_component_find(w, "Particles");
+    for (k = 0; k < 6; ++k) {                     /* everything visible that has a Transform */
         const br_component_pool *p;
         if (kinds[k] == BR_COMPONENT_INVALID) continue;
         p = &w->pools[kinds[k]];
@@ -769,7 +777,8 @@ void br_builtin_draw_layers(const br_world *w, br_renderer *r, const br_camera2d
             else if (!br_has(w, e, id.transform)) continue;
             else layer = k == 0 ? ((const br_shape *)data)->layer
                        : k == 1 ? ((const br_sprite *)data)->layer
-                       : k == 2 ? ((const br_label *)data)->layer : ((const br_tilemap *)data)->layer;
+                       : k == 2 ? ((const br_label *)data)->layer
+                       : k == 3 ? ((const br_tilemap *)data)->layer : ((const br_particles *)data)->layer;
             if (n == g_item_cap) {
                 uint32_t cap = g_item_cap ? g_item_cap * 2 : 256;
                 draw_item *grown = (draw_item *)br_realloc(g_items, cap * sizeof(draw_item));
@@ -793,6 +802,7 @@ void br_builtin_draw_layers(const br_world *w, br_renderer *r, const br_camera2d
             use_camera(r, want ? screen_cam : world_cam, &began, &saved, had);
         }
         if (it->what == 4) { br_script_draw((br_world *)w, it->e, r); continue; }
+        if (it->what == 5) { br_particles_draw2d(w, it->e, r); continue; }
         {
             br_transform wt = br_world_transform(w, it->e);   /* children follow their parents */
             const br_transform *t = &wt;
@@ -1012,6 +1022,7 @@ static void camera_added(br_world *w, br_entity e, void *data, void *user) {
 
 void br_builtin_release(void) {
     br_script_release();
+    br_script_components_release();
     br_free(g_items);
     g_items = NULL;
     g_item_cap = 0;
@@ -1059,7 +1070,11 @@ void br_builtin_register(br_world *w, br_builtin_ids *ids) {
     br_component_set_hooks(w, br_component_find(w, "Camera"), camera_added, NULL, NULL);
     br_hierarchy_register(w);
     br_physics_register(w);
+    br_components3d_register(w);
+    br_physics3d_register(w);
+    br_particles_register(w);
     br_script_register(w);
+    br_script_register_components(w);              /* the game's own (declared in its scripts) */
     br_system_add(w, "builtin_draw", BR_PHASE_RENDER, sys_draw, NULL, 0);
     if (ids) br_builtin_ids_of(w, ids);
 }

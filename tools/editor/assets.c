@@ -20,6 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+static br_r3d g_thumb3d;              /* models' thumbnails (its depth buffer is freed by ed_assets_destroy) */
+static bool g_thumb3d_ready;
+
 #define TILE_W 76.0f
 #define TILE_H 70.0f
 #define ICON 44.0f
@@ -30,10 +33,11 @@
 
 ed_asset_kind ed_asset_kind_of(const char *name, bool is_dir) {
     if (is_dir) return ED_ASSET_FOLDER;
-    if (br_path_has_ext(name, ".bmp") || br_path_has_ext(name, ".tga")) return ED_ASSET_IMAGE;
+    if (br_path_has_ext(name, ".png") || br_path_has_ext(name, ".bmp") || br_path_has_ext(name, ".tga")) return ED_ASSET_IMAGE;
     if (br_path_has_ext(name, ".wav")) return ED_ASSET_SOUND;
     if (br_path_has_ext(name, ".scene")) return ED_ASSET_SCENE;
     if (br_path_has_ext(name, ".bs")) return ED_ASSET_SCRIPT;
+    if (br_path_has_ext(name, ".obj") || br_path_has_ext(name, ".gltf") || br_path_has_ext(name, ".glb")) return ED_ASSET_MODEL;
     return ED_ASSET_OTHER;
 }
 
@@ -116,6 +120,8 @@ void ed_assets_init(editor *ed, const char *root) {
 void ed_assets_destroy(editor *ed) {
     if (ed->assets.voice && ed->engine) br_voice_stop(&ed->engine->mixer, ed->assets.voice);
     br_dir_list_free(&ed->assets.list);
+    if (g_thumb3d_ready) br_r3d_destroy(&g_thumb3d);
+    g_thumb3d_ready = false;
 }
 
 void ed_assets_open_dir(editor *ed, const char *rel) {
@@ -220,9 +226,13 @@ bool ed_assets_save_prefab(editor *ed) {
     if (!ed_doc_save_entity(d, d->selected, full)) { ed_status(ed, "Couldn't save the prefab: %s", d->error); return false; }
     ed_mark_project(ed, full);
     rel_join(rel, sizeof(rel), ed->assets.dir, name);
+    if (strlen(rel) < sizeof(((br_prefab *)0)->file)) {   /* it becomes an instance of the prefab: it follows the file now */
+        br_prefab *p = (br_prefab *)br_add(&d->world, d->selected, br_component_find(&d->world, "Prefab"), NULL);
+        if (p) snprintf(p->file, sizeof(p->file), "%s", rel);
+    }
     relist(ed);
     ed_assets_select(ed, rel);
-    ed_status(ed, "Saved prefab %s - drag it into the scene to place copies", rel);
+    ed_status(ed, "Saved prefab %s - drag it into the scene for more; change the prefab and they all change", rel);
     return true;
 }
 
@@ -245,7 +255,8 @@ void ed_assets_play(editor *ed, const char *rel) {
 bool ed_field_accepts(const br_component_desc *c, const br_field *f, const char *rel) {
     ed_asset_kind k = ed_asset_kind_of(rel, false);
     if (f->type != BR_FIELD_STRING) return false;
-    if (strcmp(f->name, "image") == 0 || strcmp(f->name, "tileset") == 0) return k == ED_ASSET_IMAGE;
+    if (strcmp(f->name, "image") == 0 || strcmp(f->name, "tileset") == 0 || strcmp(f->name, "texture") == 0) return k == ED_ASSET_IMAGE;
+    if (strcmp(c->name, "Mesh") == 0 && strcmp(f->name, "file") == 0) return k == ED_ASSET_MODEL;
     if (strcmp(f->name, "file") == 0) return strcmp(c->name, "Script") == 0 ? k == ED_ASSET_SCRIPT : k == ED_ASSET_SOUND;
     return false;
 }
@@ -343,10 +354,97 @@ bool ed_assets_drop(editor *ed, const char *rel, br_vec2 world) {
     }
     case ED_ASSET_SCRIPT:
         return drop_script(ed, rel, world);
+    case ED_ASSET_MODEL:
+        ed_status(ed, "%s is a 3D model: switch the view to 3D to place it", br_path_name(rel));
+        return false;
     default:
         ed_status(ed, "%s isn't something the scene can use", br_path_name(rel));
         return false;
     }
+}
+
+/* The same in the 3D view: at a point on the ground, or onto the entity `onto`
+ * (an image becomes its Mesh's texture, a script is attached to it). */
+bool ed_assets_drop3d(editor *ed, const char *rel, br_vec3 at, br_entity onto) {
+    ed_doc *d = &ed->doc;
+    char stem[32], full[ED_PATH_MAX], name[64];
+    br_entity e;
+    br_mesh3d *mesh;
+    ed_asset_kind k = kind_of_rel(ed, rel);
+    if (d->playing) { ed_status(ed, "Stop playing to add things to the scene"); return false; }
+    if (ed->view.snap) at = br_v3(roundf(at.x * 2) / 2, roundf(at.y * 2) / 2, roundf(at.z * 2) / 2);
+    br_path_stem(stem, sizeof(stem), rel);
+    switch (k) {
+    case ED_ASSET_MODEL:
+        if (!br_asset_mesh(rel)) { ed_status(ed, "Couldn't read %s (see the console)", rel); return false; }
+        if ((e = ed_doc_create3d(d, stem, at)) == BR_ENTITY_NULL) return false;
+        mesh = (br_mesh3d *)br_add(&d->world, e, d->ids3.mesh, NULL);
+        mesh->shape = BR_MESH_MODEL;
+        snprintf(mesh->file, sizeof(mesh->file), "%s", rel);
+        {   /* standing on the ground */
+            const br_mesh *m = br_asset_mesh(rel);
+            ((br_transform3d *)br_get(&d->world, e, d->ids3.transform3d))->position.y = at.y - m->min.y;
+        }
+        {   /* animated: an Animator playing its first animation */
+            const br_model *md = br_asset_model(rel);
+            if (md && md->clip_count > 0) {
+                br_animator *an = (br_animator *)br_add(&d->world, e, br_component_find(&d->world, "Animator"), NULL);
+                if (an) snprintf(an->clip, sizeof(an->clip), "%s", md->clips[0].name);
+                ed_status(ed, "Added model %s, playing \"%s\" (its Animator's clip: %d animation%s)", stem, md->clips[0].name, md->clip_count, md->clip_count == 1 ? "" : "s");
+                return true;
+            }
+        }
+        ed_status(ed, "Added model %s", stem);
+        return true;
+    case ED_ASSET_IMAGE:
+        if (!br_entity_alive(&d->world, onto) || !(mesh = (br_mesh3d *)br_get(&d->world, onto, d->ids3.mesh))) {
+            ed_status(ed, "Drop an image onto a mesh to paint it with the image");
+            return false;
+        }
+        snprintf(mesh->texture, sizeof(mesh->texture), "%s", rel);
+        d->selected = onto;
+        ed_status(ed, "%s now wears %s", ed_doc_name(d, onto, name, sizeof(name)), rel);
+        return true;
+    case ED_ASSET_SCENE: {
+        int n;
+        ed_asset_path(ed, rel, full, sizeof(full));
+        if (d->path[0] && strcmp(full, d->path) == 0) { ed_status(ed, "A scene can't be placed inside itself"); return false; }
+        n = ed_doc_instantiate3d(d, full, at);
+        if (n < 0) { ed_status(ed, "Couldn't place %s: %s", rel, d->error); return false; }
+        ed_status(ed, "Placed %d entit%s from %s", n, n == 1 ? "y" : "ies", rel);
+        return n > 0;
+    }
+    case ED_ASSET_SCRIPT: {
+        br_component sc = br_component_find(&d->world, "Script");
+        br_script *s;
+        bool fresh = !br_entity_alive(&d->world, onto);
+        if (sc == BR_COMPONENT_INVALID) return false;
+        e = fresh ? ed_doc_create3d(d, stem, at) : onto;
+        if (e == BR_ENTITY_NULL) return false;
+        s = (br_script *)br_add(&d->world, e, sc, br_get(&d->world, e, sc));
+        snprintf(s->file, sizeof(s->file), "%s", rel);
+        d->selected = e;
+        ed_status(ed, "%s %s to %s", fresh ? "Added" : "Attached", rel, ed_doc_name(d, e, name, sizeof(name)));
+        return true;
+    }
+    case ED_ASSET_SOUND:
+        if ((e = ed_doc_create3d(d, stem, at)) == BR_ENTITY_NULL) return false;
+        snprintf(((br_sound_src *)br_add(&d->world, e, d->ids.sound, NULL))->file, sizeof(((br_sound_src *)0)->file), "%s", rel);
+        ed_status(ed, "Added sound %s (it plays when the scene starts)", stem);
+        return true;
+    default:
+        ed_status(ed, "%s isn't something the scene can use", br_path_name(rel));
+        return false;
+    }
+}
+
+/* "Add to scene" from the preview: where the view is looking, in 2D or 3D. */
+static bool add_to_scene(editor *ed, const char *rel) {
+    if (ed->view.three_d) {
+        br_entity onto = br_entity_alive(&ed->doc.world, ed->doc.selected) ? ed->doc.selected : BR_ENTITY_NULL;
+        return ed_assets_drop3d(ed, rel, ed_view3d_place(ed), onto);
+    }
+    return ed_assets_drop(ed, rel, ed->view.center);
 }
 
 void ed_assets_activate(editor *ed, const char *rel) {
@@ -359,7 +457,7 @@ void ed_assets_activate(editor *ed, const char *rel) {
         ed_cmd_open(ed);
         break;
     case ED_ASSET_SOUND: ed_assets_play(ed, rel); break;
-    case ED_ASSET_IMAGE: ed_assets_drop(ed, rel, ed->view.center); break;
+    case ED_ASSET_IMAGE: case ED_ASSET_MODEL: add_to_scene(ed, rel); break;
     case ED_ASSET_SCRIPT: ed_assets_edit(ed, rel); break;
     default: break;
     }
@@ -414,6 +512,14 @@ static void draw_icon(br_renderer *r, ed_asset_kind k, br_rect b) {
         br_draw_line(r, br_v2(cx - 4, cy + 5), br_v2(cx + 9, cy + 5), br_rgb(130, 220, 150));
         br_draw_line(r, br_v2(cx - 4, cy + 10), br_v2(cx + 5, cy + 10), br_rgb(150, 200, 255));
         break;
+    case ED_ASSET_MODEL:              /* a wireframe cube */
+        br_draw_rect(r, br_rect_make(cx - 14, cy - 8, 20, 20), br_rgb(150, 200, 255));
+        br_draw_rect(r, br_rect_make(cx - 6, cy - 16, 20, 20), br_rgb(150, 200, 255));
+        br_draw_line(r, br_v2(cx - 14, cy - 8), br_v2(cx - 6, cy - 16), br_rgb(150, 200, 255));
+        br_draw_line(r, br_v2(cx + 6, cy - 8), br_v2(cx + 14, cy - 16), br_rgb(150, 200, 255));
+        br_draw_line(r, br_v2(cx - 14, cy + 12), br_v2(cx - 6, cy + 4), br_rgb(150, 200, 255));
+        br_draw_line(r, br_v2(cx + 6, cy + 12), br_v2(cx + 14, cy + 4), br_rgb(150, 200, 255));
+        break;
     case ED_ASSET_IMAGE:              /* an image that won't load */
         br_fill_rect(r, br_rect_make(cx - 14, cy - 14, 28, 28), br_rgba(255, 0, 255, 90));
         br_draw_line(r, br_v2(cx - 14, cy - 14), br_v2(cx + 14, cy + 14), br_rgb(255, 0, 255));
@@ -429,8 +535,40 @@ static void draw_icon(br_renderer *r, ed_asset_kind k, br_rect b) {
     }
 }
 
+/* A model, lit and turned to `angle` degrees, filling the box. */
+static bool draw_model(br_renderer *r, const char *rel, br_rect box, float angle) {
+    br_r3d *r3p = &g_thumb3d;
+    const br_mesh *m = br_asset_mesh(rel);
+    br_vec3 mid, size;
+    br_camera3d cam;
+    br_material mat;
+    float radius;
+    br_recti vp = br_recti_make((int)box.x, (int)box.y, (int)box.w, (int)box.h);
+    if (!m || box.w < 4 || box.h < 4) return false;
+    if (!g_thumb3d_ready) { br_r3d_init(r3p); g_thumb3d_ready = true; }
+    mid = br_v3_scale(br_v3_add(m->min, m->max), 0.5f);
+    size = br_v3_sub(m->max, m->min);
+    radius = br_v3_len(size) * 0.5f;
+    if (radius < 1e-4f) radius = 1;
+    cam = br_camera3d_make(br_v3_add(mid, br_v3_scale(br_v3_norm(br_v3(0.9f, 0.7f, 1.2f)), radius * 2.6f)), mid);
+    if (!br_r3d_begin(r3p, r, &cam, vp)) return false;
+    {
+        br_light3d sun;
+        memset(&sun, 0, sizeof(sun));
+        sun.kind = BR_LIGHT_DIRECTIONAL;
+        sun.direction = br_v3_norm(br_v3(-0.4f, -1, -0.6f));
+        sun.color = BR_WHITE;
+        sun.intensity = 1;
+        br_r3d_add_light(r3p, &sun);
+    }
+    mat = br_material_make(br_rgb(200, 205, 220));
+    br_r3d_draw_mesh(r3p, m, br_m4_mul(br_m4_translate(mid), br_m4_mul(br_quat_to_m4(br_quat_from_euler(br_v3(0, angle, 0))), br_m4_translate(br_v3_neg(mid)))), &mat);
+    return true;
+}
+
 static void draw_thumbnail(br_renderer *r, const char *rel, ed_asset_kind k, br_rect box, float max_scale) {
     const br_image *img = k == ED_ASSET_IMAGE ? br_asset_image(rel) : NULL;
+    if (k == ED_ASSET_MODEL && draw_model(r, rel, box, 30)) return;
     if (img) {
         int x, y;                                  /* a checkerboard shows transparency */
         for (y = 0; y < (int)box.h; y += 6)
@@ -598,7 +736,7 @@ void ed_assets_preview(editor *ed, br_rect rect) {
     if (!a->selected[0]) {
         br_ui_heading(ui, "Preview");
         br_ui_label_colored(ui, "Click a file to see it here.", ui->style.text_dim);
-        br_ui_label_colored(ui, "Drag images, sounds and", ui->style.text_dim);
+        br_ui_label_colored(ui, "Drag images, sounds, models", ui->style.text_dim);
         br_ui_label_colored(ui, "scenes into the scene view.", ui->style.text_dim);
         br_ui_label_colored(ui, "Double-click: open / play.", ui->style.text_dim);
         br_ui_panel_end(ui);
@@ -611,6 +749,12 @@ void ed_assets_preview(editor *ed, br_rect rect) {
     if (br_ui_text_field(ui, "Name##asset", a->name_field, sizeof(a->name_field))) {
         if (!ed_assets_rename(ed, a->name_field)) name_of(a->selected, a->name_field, sizeof(a->name_field));
         snprintf(a->name_for, sizeof(a->name_for), "%s", a->selected);
+    }
+    if (k == ED_ASSET_MODEL) {                      /* turning slowly */
+        br_rect box = br_ui_row(ui, 96);
+        br_fill_rect(ui->r, box, ui->style.field);
+        if (!draw_model(ui->r, a->selected, br_rect_make(box.x + 2, box.y + 2, box.w - 4, box.h - 4), (float)fmod(ed->engine->time * 40.0, 360.0)))
+            draw_icon(ui->r, k, box);
     }
     if (k == ED_ASSET_IMAGE || k == ED_ASSET_SCENE) {
         br_rect box = br_ui_row(ui, 72);
@@ -626,7 +770,7 @@ void ed_assets_preview(editor *ed, br_rect rect) {
         const br_image *img = br_asset_image(a->selected);
         if (img) br_ui_labelf(ui, "Image  %d x %d", img->width, img->height);
         else br_ui_label_colored(ui, "Can't read this image", br_rgb(255, 120, 120));
-        if (br_ui_button(ui, "Add to scene")) ed_assets_drop(ed, a->selected, ed->view.center);
+        if (br_ui_button(ui, "Add to scene")) add_to_scene(ed, a->selected);
         break;
     }
     case ED_ASSET_SOUND: {
@@ -636,7 +780,7 @@ void ed_assets_preview(editor *ed, br_rect rect) {
         else br_ui_label_colored(ui, "Can't read this sound", br_rgb(255, 120, 120));
         br_ui_columns(ui, 2);
         if (br_ui_toggle(ui, playing ? "Stop" : "Play", playing)) ed_assets_play(ed, a->selected);
-        if (br_ui_button(ui, "Add to scene")) ed_assets_drop(ed, a->selected, ed->view.center);
+        if (br_ui_button(ui, "Add to scene")) add_to_scene(ed, a->selected);
         break;
     }
     case ED_ASSET_SCENE:
@@ -644,7 +788,7 @@ void ed_assets_preview(editor *ed, br_rect rect) {
         else br_ui_label_colored(ui, "Can't read this scene", br_rgb(255, 120, 120));
         br_ui_columns(ui, 2);
         if (br_ui_button(ui, "Open")) ed_assets_activate(ed, a->selected);
-        if (br_ui_button(ui, "Place")) ed_assets_drop(ed, a->selected, ed->view.center);
+        if (br_ui_button(ui, "Place")) add_to_scene(ed, a->selected);
         break;
     case ED_ASSET_SCRIPT: {
         const char *p = a->script_text;
@@ -653,7 +797,9 @@ void ed_assets_preview(editor *ed, br_rect rect) {
         br_ui_columns(ui, 2);
         if (br_ui_button(ui, "Edit")) ed_assets_edit(ed, a->selected);
         if (br_ui_button(ui, "Attach")) {
-            if (br_entity_alive(&ed->doc.world, ed->doc.selected)) {
+            if (br_entity_alive(&ed->doc.world, ed->doc.selected) && ed->view.three_d) {
+                ed_assets_drop3d(ed, a->selected, br_v3(0, 0, 0), ed->doc.selected);
+            } else if (br_entity_alive(&ed->doc.world, ed->doc.selected)) {
                 br_transform wt = br_world_transform(&ed->doc.world, ed->doc.selected);
                 ed_assets_drop(ed, a->selected, wt.position);
             } else {
@@ -670,6 +816,18 @@ void ed_assets_preview(editor *ed, br_rect rect) {
             p += len + (p[len] ? 1 : 0);
             ++shown;
         }
+        break;
+    }
+    case ED_ASSET_MODEL: {
+        const br_mesh *m = br_asset_mesh(a->selected);
+        if (m) {
+            br_vec3 s = br_v3_sub(m->max, m->min);
+            br_ui_labelf(ui, "Model  %u triangles", m->index_count / 3);
+            br_ui_labelf(ui, "%.2f x %.2f x %.2f units", (double)s.x, (double)s.y, (double)s.z);
+        } else {
+            br_ui_label_colored(ui, "Can't read this model", br_rgb(255, 120, 120));
+        }
+        if (br_ui_button(ui, "Add to scene")) add_to_scene(ed, a->selected);
         break;
     }
     default:

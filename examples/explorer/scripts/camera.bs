@@ -1,0 +1,25 @@
+@strict @3d
+# camera.bs - follows the explorer from behind and above. Q / E or the right stick turn it.
+var target: entity
+var yaw: number = 0            # degrees round the explorer
+var distance: number = 9
+var height: number = 4.5
+
+func start() -> void {
+    target = find("Explorer")
+    place(1)
+}
+
+func update(dt: number) -> void {
+    if key_down("q") { yaw += 90 * dt }
+    if key_down("e") { yaw -= 90 * dt }
+    yaw -= stick("right").x * 120 * dt
+    place(min(1, dt * 6))
+}
+
+func place(k: number) -> void {
+    if target == nil { return }
+    var want: vec3 = target.position + vec3(sin(yaw) * distance, height, cos(yaw) * distance)
+    self.position = lerp(self.position, want, k)
+    look_at(self, target.position + vec3(0, 1, 0))
+}

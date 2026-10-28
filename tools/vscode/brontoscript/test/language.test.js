@@ -44,7 +44,7 @@ test('completion after a dot: properties, components, other scripts', () => {
     for (const n of ['position', 'global_position', 'parent', 'velocity', 'Shape', 'RigidBody', 'x', 'health', 'hit']) assert.ok(labels.has(n), n);
     assert.ok(!labels.has('raycast'));
     const fields = lang.completions('func f() {\n    self.Collider.\n}\n', 1, 18, []).map(i => i.label);
-    assert.deepStrictEqual(fields, ['shape', 'size', 'radius', 'offset', 'friction', 'bounce', 'trigger', 'layer', 'mask']);
+    assert.deepStrictEqual(fields, ['shape', 'size', 'radius', 'offset', 'friction', 'bounce', 'trigger', 'layer', 'mask', 'one_way']);
 });
 
 test('completion at the top level offers the missing callbacks', () => {
@@ -58,7 +58,7 @@ test('completion at the top level offers the missing callbacks', () => {
 
 test('hover: builtins, file functions, vars, properties, components', () => {
     let p = at('raycast(');
-    assert.match(lang.hover(player, p.line, p.character + 2), /raycast\(from: vec2, to: vec2, \[ignore: entity \| nil\], \[mask: number\]\) -> any/);
+    assert.match(lang.hover(player, p.line, p.character + 2), /raycast\(from: vec2 \| vec3, to: vec2 \| vec3, \[ignore: entity \| nil\], \[mask: number\]\) -> any/);
     p = at('grounded = on_ground()', 12);
     assert.match(lang.hover(player, p.line, p.character + 2), /func on_ground\(\)[\s\S]*short ray/);
     p = at('var speed');
@@ -123,6 +123,7 @@ test('types: declarations, completion after : and ->, hover, signatures', () => 
     assert.ok(lang.completions('var bag: list[', 0, 14, []).some(i => i.label === 'number'));
     assert.ok(!lang.completions('func f() {\n    var x := ', 1, 13, []).some(i => i.label === 'int'));   /* := takes a value */
     assert.ok(lang.completions('@', 0, 1, []).some(i => i.label === '@strict'));
+    assert.ok(lang.completions('@', 0, 1, []).some(i => i.label === '@3d'));
     assert.match(lang.hover(src, 2, 5), /var hp: int = 3/);
     assert.match(lang.hover(src, 5, 7), /func hit\(amount: int, from: entity\) -> bool/);
     assert.match(lang.hover(src, 2, 9), /\*\*int\*\* \(a type\)/);
@@ -133,6 +134,51 @@ test('types: declarations, completion after : and ->, hover, signatures', () => 
     assert.strictEqual(s.active, 1);
     const cb = lang.completions('', 0, 0, []).find(i => i.label === 'func update');
     assert.strictEqual(cb.snippet, 'func update(dt: number) -> void {\n\t$0\n}');
+});
+
+test('3D: @3d, vec3 and the 3D functions', () => {
+    const src = '@strict @3d\nvar spin: vec3 = vec3(0, 90, 0)\n' +
+        'func update(dt: number) -> void {\n    self.rotation += spin * dt\n    look_at(self, vec3(0, 0, 0))\n    var hits := overlap_sphere(self.position, 2)\n}\n';
+    assert.deepStrictEqual(lang.quickCheck(src), []);
+    assert.deepStrictEqual(lang.quickCheck('@3d\nfunc f() {\n    var r := screen_ray(mouse_position())\n    raycast(r[0], r[0] + r[1] * 100)\n    apply_torque(self, cross(vec3(1, 0, 0), vec3(0, 1, 0)))\n}\n'), []);
+    assert.match(lang.hover(src, 0, 10), /@3d/);
+    assert.ok(lang.completions('var x: ', 0, 7, []).some(i => i.label === 'vec3'));
+    const dot = lang.completions('func f() {\n    self.', 1, 9, []).map(i => i.label);
+    assert.ok(dot.includes('z') && dot.includes('forward') && dot.includes('Transform3D') && dot.includes('Camera3D') && dot.includes('RigidBody3D'));
+    assert.ok(lang.completions('func f() {\n    self.Mesh.', 1, 14, []).some(i => i.label === 'texture'));
+    assert.match(lang.builtinSignature(lang.data.builtins.find(b => b.name === 'world_to_screen')), /world_to_screen\(point: vec2 \| vec3\) -> vec2/);
+});
+
+test('3D characters, joints and the new fields', () => {
+    const src = '@strict @3d\nvar vel: vec3\nfunc update(dt: number) -> void {\n    vel.y -= 20 * dt\n' +
+        '    if is_on_floor(self) and not is_on_ceiling(self) { vel.y = 7 }\n    if is_on_wall(self) { vel.x = 0 }\n    vel = move_and_slide(self, vel)\n}\n';
+    assert.deepStrictEqual(lang.quickCheck(src), []);
+    assert.match(lang.builtinSignature(lang.data.builtins.find(b => b.name === 'move_and_slide')), /move_and_slide\(entity: entity, velocity: vec3\) -> vec3/);
+    assert.ok(lang.completions('func f() {\n    self.Camera3D.', 1, 18, []).some(i => i.label === 'fog_end'));
+    assert.ok(lang.completions('func f() {\n    self.Collider.', 1, 18, []).some(i => i.label === 'one_way'));
+    assert.ok(lang.completions('func f() {\n    self.Joint.', 1, 15, []).some(i => i.label === 'stiffness'));
+    assert.ok(lang.completions('func f() {\n    has(self, "', 1, 15, []).some(i => i.label === 'Joint'));
+});
+
+test('tweens, eases and particles', () => {
+    const src = '@strict\nfunc start() -> void {\n    var id: int = tween(self, "position", vec2(10, 0), 0.5, "ease_out")\n' +
+        '    tween_repeat(id, -1, true)\n    tween_then(id, "done")\n    emit(self, 5)\n    var k: number = ease("bounce_out", 0.5)\n}\nfunc done() -> void {\n}\n';
+    assert.deepStrictEqual(lang.quickCheck(src), []);
+    const eases = lang.completions('func f() {\n    tween(self, "x", 1, 1, "', 1, 28, []).map(i => i.label);
+    assert.ok(eases.includes('back_out') && eases.includes('linear'));
+    assert.match(lang.builtinSignature(lang.data.builtins.find(b => b.name === 'tween')), /tween\(entity: entity, property: string/);
+});
+
+test("the game's own components", () => {
+    const decl = 'component Health {\n    var hp: int = 3    # how much\n    var team: enum(red, blue) = red\n}\nfunc start() {\n    for e in find_with("Health") { e.Health.hp += 1 }\n}\n';
+    assert.deepStrictEqual(lang.quickCheck(decl), []);
+    const doc = lang.parseDocument(decl);
+    assert.deepStrictEqual(doc.components.map(c => [c.name, c.fields.map(f => f.name + ':' + f.type)]), [['Health', ['hp:int', 'team:enum(red, blue)']]]);
+    const other = [{ name: 'parts.bs', vars: [], funcs: [], classes: [], components: doc.components }];
+    const fields = lang.completions('func f() {\n    self.Health.', 1, 16, other).map(i => i.label);
+    assert.deepStrictEqual(fields, ['hp', 'team']);
+    assert.ok(lang.completions('func f() {\n    self.', 1, 9, other).some(i => i.label === 'Health'));
+    assert.ok(lang.completions('', 0, 0, []).some(i => i.label === 'component'));
 });
 
 test('checker output is read into problems', () => {

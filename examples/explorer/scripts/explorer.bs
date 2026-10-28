@@ -1,0 +1,53 @@
+@strict @3d
+# explorer.bs - the one you play: walks where the camera faces, jumps, falls.
+# move_and_slide() does the colliding: it slides along trees and rocks, walks up
+# the hills, and says (is_on_floor) when there's ground underfoot. Its model has
+# a skeleton, and play_animation() picks what it does: idle, walk, jump, cheer.
+var speed: number = 6          # units / second
+var jump: number = 7.5         # the jump's upward speed
+var gravity: number = 20       # units / second^2
+var vel: vec3
+var cam: entity
+var start_at: vec3
+var done: bool = false         # (the HUD says so when every crystal is found)
+
+func start() -> void {
+    cam = find("Camera")
+    start_at = self.position
+}
+
+func update(dt: number) -> void {
+    var input := vec2(0, 0)
+    if key_down("left") or key_down("a") { input.x -= 1 }
+    if key_down("right") or key_down("d") { input.x += 1 }
+    if key_down("up") or key_down("w") { input.y -= 1 }
+    if key_down("down") or key_down("s") { input.y += 1 }
+    input += stick("left")
+    if length(input) > 1 { input = normalize(input) }
+    var ahead: vec3 = cam.forward              # the way the camera looks, along the ground
+    ahead.y = 0
+    ahead = normalize(ahead)
+    var side := vec3(-ahead.z, 0, ahead.x)
+    var move: vec3 = side * input.x - ahead * input.y
+    vel.x = move.x * speed
+    vel.z = move.z * speed
+    vel.y -= gravity * dt
+    if is_on_floor(self) and (key_pressed("space") or button_pressed("a")) { vel.y = jump }
+    vel = move_and_slide(self, vel)
+    if length(move) > 0.1 {                     # face the way it walks
+        self.rotation = vec3(0, atan2(-move.x, -move.z), 0)
+    }
+    if done {                                   # (all found: it cheers)
+        play_animation(self, "cheer")
+    } elif not is_on_floor(self) {              # its model's animations (models/explorer.glb)
+        play_animation(self, "jump")
+    } elif length(move) > 0.1 {
+        play_animation(self, "walk", 0.6 + length(move) * 0.6)
+    } else {
+        play_animation(self, "idle", 1)
+    }
+    if self.y < -30 {                           # (off the world: back to the start)
+        self.position = start_at
+        vel = vec3(0, 0, 0)
+    }
+}

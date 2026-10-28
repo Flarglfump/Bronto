@@ -5,9 +5,13 @@
  *   right / middle drag    pan (or hold Space and drag)
  *   right click            the menu for what's under the cursor (menus.c)
  *   click                  select what's under the cursor
- *   drag                   move it (snaps to the grid when Snap is on)
+ *   Shift / Ctrl + click   add it to the selection, or take it out
+ *   drag on empty space    a box: selects what's inside (with Shift / Ctrl: adds it)
+ *   drag                   move it, and everything selected with it (snaps to the grid when Snap is on)
  *   round handle           rotate (15 degree steps with Snap)
  *   square handle          scale
+ *
+ * Scenes with 3D entities are shown in 3D instead (viewport3d.c).
  *
  * The scene is drawn by the engine's own br_builtin_draw through a camera,
  * so it looks exactly as it will in a game. The grid, the game-screen
@@ -28,7 +32,12 @@ void ed_view_init(ed_view *v) {
     v->grid_size = 8;
     v->game_size = br_v2(320, 180);
     v->center = br_v2(160, 90);
+    v->hot_axis = -1;
+    ed_view3d_reset(v);
+    br_r3d_init(&v->r3);
 }
+
+void ed_view_destroy(ed_view *v) { br_r3d_destroy(&v->r3); }
 
 static br_vec2 view_mid(const ed_view *v) { return br_v2(v->rect.x + v->rect.w / 2, v->rect.y + v->rect.h / 2); }
 
@@ -69,7 +78,7 @@ static float snapped(float v, float step) { return roundf(v / step) * step; }
 
 /* ---- the selected entity's handles ----------------------------------------- */
 
-typedef struct handles { bool ok; br_vec2 corner[4], center, rotate, scale, top; } handles;
+typedef struct handles { bool ok, multi; br_vec2 corner[4], center, rotate, scale, top; } handles;
 
 static handles selection_handles(const editor *ed) {
     handles h;
@@ -78,6 +87,7 @@ static handles selection_handles(const editor *ed) {
     const br_transform *t = (const br_transform *)br_get(&ed->doc.world, ed->doc.selected, ed->doc.ids.transform);
     memset(&h, 0, sizeof(h));
     if (!t || !br_builtin_box(&ed->doc.world, ed->doc.selected, c)) return h;
+    h.multi = ed->doc.multi_count > 1 && ed->doc.selected == ed->doc.multi_primary;   /* several: no rotate / scale handles */
     for (i = 0; i < 4; ++i) h.corner[i] = ed_view_to_screen(&ed->view, c[i]);
     h.center = ed_view_to_screen(&ed->view, br_world_transform(&ed->doc.world, ed->doc.selected).position);
     h.top = br_v2_scale(br_v2_add(h.corner[0], h.corner[1]), 0.5f);
@@ -93,9 +103,26 @@ static float angle_deg(br_vec2 from, br_vec2 to) { return atan2f(to.y - from.y, 
 
 /* ---- input --------------------------------------------------------------------- */
 
+/* Remembers where every selected root is, for a drag that moves them together. */
+void ed_view_grab_group(editor *ed) {
+    ed_view *v = &ed->view;
+    uint32_t i;
+    v->group_count = ed_doc_selection(&ed->doc, v->group, ED_SELECT_MAX, true);
+    for (i = 0; i < v->group_count; ++i) {
+        br_entity e = v->group[i];
+        if (br_has(&ed->doc.world, e, ed->doc.ids.transform)) v->group_from[i] = br_world_transform(&ed->doc.world, e).position;
+        if (br_has(&ed->doc.world, e, ed->doc.ids3.transform3d)) {   /* (3D: world place and turn; its own, local, scale) */
+            br_world_transform3d(&ed->doc.world, e, &v->group_from3[i], &v->group_rot3[i], NULL);
+            v->group_scale3[i] = ((const br_transform3d *)br_get(&ed->doc.world, e, ed->doc.ids3.transform3d))->scale;
+        }
+    }
+}
+
 static void start_drag(editor *ed, ed_drag kind, br_transform *t) {
     ed_view *v = &ed->view;
     br_vec2 wp = br_world_transform(&ed->doc.world, ed->doc.selected).position;   /* gizmos work on screen */
+    ed_view_grab_group(ed);
+    v->drag_from2 = wp;
     v->drag = kind;
     v->drag_start = *t;
     v->drag_offset = br_v2_sub(wp, v->mouse_world);
@@ -132,12 +159,24 @@ static void handle_input(editor *ed) {
             v->pan_button = br_mouse_pressed(in, BR_MOUSE_RIGHT) ? BR_MOUSE_RIGHT : BR_MOUSE_MIDDLE;
         } else if (br_mouse_pressed(in, BR_MOUSE_LEFT)) {
             handles h = selection_handles(ed);
-            if (h.ok && br_v2_dist(m, h.rotate) <= HANDLE_REACH) start_drag(ed, ED_DRAG_ROTATE, t);
-            else if (h.ok && br_v2_dist(m, h.scale) <= HANDLE_REACH) start_drag(ed, ED_DRAG_SCALE, t);
+            bool add = (in->mods & (BR_MOD_SHIFT | BR_MOD_CONTROL | BR_MOD_SUPER)) != 0;
+            if (h.ok && !h.multi && !add && br_v2_dist(m, h.rotate) <= HANDLE_REACH) start_drag(ed, ED_DRAG_ROTATE, t);
+            else if (h.ok && !h.multi && !add && br_v2_dist(m, h.scale) <= HANDLE_REACH) start_drag(ed, ED_DRAG_SCALE, t);
             else {
-                ed->doc.selected = ed_doc_pick(&ed->doc, v->mouse_world);
-                t = (br_transform *)br_get(&ed->doc.world, ed->doc.selected, ed->doc.ids.transform);
-                if (t) start_drag(ed, ED_DRAG_MOVE, t);
+                br_entity hit = ed_doc_pick(&ed->doc, v->mouse_world);
+                if (hit == BR_ENTITY_NULL) {                     /* empty space: a box to select with */
+                    if (!add) ed_doc_select(&ed->doc, BR_ENTITY_NULL);
+                    v->drag = ED_DRAG_BOX;
+                    v->press_at = m;
+                    v->box_add = add;
+                } else if (add) {
+                    ed_doc_select_toggle(&ed->doc, hit);
+                } else {
+                    if (ed_doc_is_selected(&ed->doc, hit)) ed_doc_select_add(&ed->doc, hit);   /* (keeps the others) */
+                    else ed_doc_select(&ed->doc, hit);
+                    t = (br_transform *)br_get(&ed->doc.world, ed->doc.selected, ed->doc.ids.transform);
+                    if (t) start_drag(ed, ED_DRAG_MOVE, t);
+                }
             }
         }
     }
@@ -152,13 +191,32 @@ static void handle_input(editor *ed) {
             if (v->pan_button == BR_MOUSE_RIGHT && !v->pan_moved)   /* a click, not a drag */
                 ed_menu_view(ed, ed_view_to_world(v, m));
         }
+    } else if (v->drag == ED_DRAG_BOX) {
+        if (!br_mouse_down(in, BR_MOUSE_LEFT)) {                /* select what's inside */
+            br_rect box = br_rect_make(BR_MIN(v->press_at.x, m.x), BR_MIN(v->press_at.y, m.y), br_absf(m.x - v->press_at.x), br_absf(m.y - v->press_at.y));
+            uint32_t i;
+            v->drag = ED_DRAG_NONE;
+            if (box.w > 2 || box.h > 2) {
+                for (i = 0; i < ed->doc.count; ++i) {
+                    br_entity e = ed->doc.order[i];
+                    if (!br_has(&ed->doc.world, e, ed->doc.ids.transform)) continue;
+                    if (in_rect(box, ed_view_to_screen(v, br_world_transform(&ed->doc.world, e).position)))
+                        ed_doc_select_add(&ed->doc, e);
+                }
+                if (ed_doc_selection_count(&ed->doc) > 1) ed_status(ed, "%u selected", (unsigned)ed_doc_selection_count(&ed->doc));
+            }
+        }
     } else if (v->drag != ED_DRAG_NONE) {
         if (!t || !br_mouse_down(in, BR_MOUSE_LEFT)) {
             v->drag = ED_DRAG_NONE;
         } else if (v->drag == ED_DRAG_MOVE) {
-            br_vec2 to = br_v2_add(v->mouse_world, v->drag_offset);
+            br_vec2 to = br_v2_add(v->mouse_world, v->drag_offset), delta;
+            uint32_t i;
             if (v->snap) to = br_v2(snapped(to.x, v->grid_size), snapped(to.y, v->grid_size));
-            br_set_world_position(&ed->doc.world, ed->doc.selected, to);   /* a child: into its parent's space */
+            delta = br_v2_sub(to, v->drag_from2);
+            for (i = 0; i < v->group_count; ++i)           /* every selected root by as much (children follow) */
+                if (br_has(&ed->doc.world, v->group[i], ed->doc.ids.transform))
+                    br_set_world_position(&ed->doc.world, v->group[i], br_v2_add(v->group_from[i], delta));   /* a child: into its parent's space */
         } else if (v->drag == ED_DRAG_ROTATE) {
             br_vec2 wp = br_world_transform(&ed->doc.world, ed->doc.selected).position;
             float a = v->drag_start.rotation + angle_deg(wp, v->mouse_world) - v->drag_angle;
@@ -261,7 +319,23 @@ static void draw_overlays(editor *ed) {
         br_draw_line(r, br_v2(p.x, p.y - 5), br_v2(p.x, p.y + 5), br_rgb(255, 200, 80));
     }
 
-    if (v->hover != BR_ENTITY_NULL && v->hover != d->selected) {
+    if (d->multi_count > 1 && d->selected == d->multi_primary) {   /* the rest of a multiple selection */
+        uint32_t k;
+        for (k = 0; k < d->multi_count; ++k) {
+            br_vec2 c[4];
+            int j;
+            if (d->multi[k] == d->selected || !br_builtin_box(&d->world, d->multi[k], c)) continue;
+            for (j = 0; j < 4; ++j) c[j] = ed_view_to_screen(v, c[j]);
+            outline(r, c, br_rgba(ed->ui.style.accent.r, ed->ui.style.accent.g, ed->ui.style.accent.b, 170));
+        }
+    }
+    if (v->drag == ED_DRAG_BOX) {                                  /* the box being drawn */
+        br_vec2 m = br_v2(ed->engine->input.mouse_x, ed->engine->input.mouse_y);
+        br_rect box = br_rect_make(BR_MIN(v->press_at.x, m.x), BR_MIN(v->press_at.y, m.y), br_absf(m.x - v->press_at.x), br_absf(m.y - v->press_at.y));
+        br_fill_rect(r, box, br_rgba(ed->ui.style.accent.r, ed->ui.style.accent.g, ed->ui.style.accent.b, 40));
+        br_draw_rect(r, box, ed->ui.style.accent);
+    }
+    if (v->hover != BR_ENTITY_NULL && !ed_doc_is_selected(d, v->hover)) {
         br_vec2 c[4];
         int k;
         if (br_builtin_box(&d->world, v->hover, c)) {
@@ -274,9 +348,11 @@ static void draw_overlays(editor *ed) {
         if (h.ok) {
             br_color accent = ed->ui.style.accent;
             outline(r, h.corner, accent);
-            br_draw_line(r, h.top, h.rotate, accent);
-            br_fill_circle(r, h.rotate, 4, v->drag == ED_DRAG_ROTATE ? BR_WHITE : accent);
-            br_fill_rect(r, br_rect_make(h.scale.x - 3, h.scale.y - 3, 7, 7), v->drag == ED_DRAG_SCALE ? BR_WHITE : accent);
+            if (!h.multi) {
+                br_draw_line(r, h.top, h.rotate, accent);
+                br_fill_circle(r, h.rotate, 4, v->drag == ED_DRAG_ROTATE ? BR_WHITE : accent);
+                br_fill_rect(r, br_rect_make(h.scale.x - 3, h.scale.y - 3, 7, 7), v->drag == ED_DRAG_SCALE ? BR_WHITE : accent);
+            }
             br_fill_circle(r, h.center, 1.5f, accent);
         }
     }
@@ -313,8 +389,9 @@ void ed_view_frame(editor *ed, br_rect rect) {
     br_renderer *r = &ed->engine->renderer;
     br_camera2d cam;
     br_recti clip = br_recti_make((int)rect.x, (int)rect.y, (int)rect.w, (int)rect.h);
+    if (v->three_d) { ed_view3d_frame(ed, rect); return; }
     v->rect = rect;
-    handle_input(ed);
+    if (!ed->dbg.stopped) handle_input(ed);          /* (a script held by the debugger: look only) */
 
     br_set_clip(r, clip);
     br_fill_rect(r, rect, br_rgb(22, 25, 30));
@@ -356,6 +433,6 @@ void ed_view_frame(editor *ed, br_rect rect) {
         }
     }
     draw_overlays(ed);
-    accept_drops(ed);
+    if (!ed->dbg.stopped) accept_drops(ed);
     br_reset_clip(r);
 }

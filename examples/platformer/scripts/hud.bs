@@ -9,6 +9,8 @@ func start() {
 
 func collect() {
     coins += 1
+    self.Label.size = 1.6                       # a little pop (a tween takes it back)
+    tween(self, "Label.size", 1, 0.3, "back_out")
     show()
 }
 

@@ -63,7 +63,8 @@ static void test_builtin_register(void) {
     int count;
     const br_component_desc *const *descs = br_builtin_descs(&count);
     setup();
-    CHECK_EQ_INT(count, 12);
+    CHECK_EQ_INT(count, 13);
+    CHECK(strcmp(descs[12]->name, "Prefab") == 0);
     CHECK(strcmp(descs[9]->name, "Tags") == 0 && ID.tags != BR_COMPONENT_INVALID);
     CHECK(strcmp(descs[10]->name, "Animation") == 0 && ID.animation != BR_COMPONENT_INVALID);
     CHECK(strcmp(descs[11]->name, "Camera") == 0 && ID.camera != BR_COMPONENT_INVALID);

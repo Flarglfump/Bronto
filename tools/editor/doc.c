@@ -63,16 +63,29 @@ static void push(char **stack, int *count, char *text) {
 
 /* Replace the world's contents with `text`; keeps the selection by position. */
 static bool restore(ed_doc *d, const char *text, int select_index) {
-    const char *p = text;
-    uint32_t guess = 1;
+    br_entity *made = NULL;
     int n;
-    while ((p = strstr(p, "entity")) != NULL) { guess++; p += 6; }   /* at most this many */
-    if (!reserve(d, guess)) return false;
+    static int keep[ED_SELECT_MAX];                /* the other selected entities, by place in the list */
+    uint32_t kept = 0, k;
+    if (select_index >= 0 && d->multi_count > 0 && d->selected == d->multi_primary)
+        for (k = 0; k < d->multi_count; ++k) {
+            int at = ed_doc_index(d, d->multi[k]);
+            if (at >= 0 && at != select_index) keep[kept++] = at;
+        }
+    d->multi_count = 0;
     br_world_clear(&d->world);
-    n = br_world_from_text(&d->world, text, d->order, d->cap, d->error, sizeof(d->error));
+    n = br_world_from_text_list(&d->world, text, &made, d->error, sizeof(d->error));   /* (prefab instances: all their parts) */
+    if (n > 0 && !reserve(d, (uint32_t)n)) n = 0;
+    if (n > 0) memcpy(d->order, made, sizeof(br_entity) * (size_t)n);
+    br_free(made);
     d->count = n > 0 ? (uint32_t)n : 0;
     ed_doc_normalize(d);
     d->selected = select_index >= 0 && (uint32_t)select_index < d->count ? d->order[select_index] : BR_ENTITY_NULL;
+    if (kept && d->selected != BR_ENTITY_NULL) {
+        br_entity primary = d->selected;
+        for (k = 0; k < kept; ++k) if ((uint32_t)keep[k] < d->count) ed_doc_select_add(d, d->order[keep[k]]);
+        ed_doc_select_add(d, primary);
+    }
     return n >= 0;
 }
 
@@ -82,6 +95,7 @@ void ed_doc_init(ed_doc *d) {
     memset(d, 0, sizeof(*d));
     br_world_init(&d->world);
     br_builtin_register(&d->world, &d->ids);
+    br_ids3d_of(&d->world, &d->ids3);
     ed_doc_new(d);
 }
 
@@ -90,6 +104,7 @@ static void forget_history(ed_doc *d) {
     clear_stack(d->redo, &d->redo_count);
     set_text(&d->play_snapshot, NULL);
     d->playing = false;
+    br_particles_clear(&d->world, BR_ENTITY_NULL);
 }
 
 void ed_doc_destroy(ed_doc *d) {
@@ -100,6 +115,27 @@ void ed_doc_destroy(ed_doc *d) {
     br_free(d->order);
     br_world_destroy(&d->world);
     memset(d, 0, sizeof(*d));
+}
+
+/* Makes the world again with the components as they are declared now (a script
+ * declared a new one, or changed one), keeping the scene: it goes through text. */
+bool ed_doc_rebuild_world(ed_doc *d) {
+    char *text;
+    void *context = d->world.context;
+    int sel;
+    bool ok;
+    if (d->playing) return false;
+    if (!(text = snapshot(d))) return false;
+    sel = ed_doc_index(d, d->selected);
+    br_world_destroy(&d->world);
+    br_world_init(&d->world);
+    br_builtin_register(&d->world, &d->ids);
+    br_ids3d_of(&d->world, &d->ids3);
+    d->world.context = context;
+    d->count = 0;
+    ok = restore(d, text, sel);
+    br_free(text);
+    return ok;
 }
 
 void ed_doc_new(ed_doc *d) {
@@ -234,6 +270,16 @@ br_entity ed_doc_create(ed_doc *d, const char *name, br_vec2 pos) {
     return e;
 }
 
+br_entity ed_doc_create3d(ed_doc *d, const char *name, br_vec3 pos) {
+    br_entity e = br_entity_create(&d->world);
+    if (e == BR_ENTITY_NULL) return e;
+    snprintf(((br_name *)br_add(&d->world, e, d->ids.name, NULL))->text, sizeof(((br_name *)0)->text), "%s", name);
+    ((br_transform3d *)br_add(&d->world, e, d->ids3.transform3d, NULL))->position = pos;
+    insert_at(d, d->count, e);
+    d->selected = e;
+    return e;
+}
+
 br_entity ed_doc_create_child(ed_doc *d, br_entity parent, const char *name, br_vec2 local) {
     br_entity e;
     if (!br_entity_alive(&d->world, parent)) return ed_doc_create(d, name, local);
@@ -249,6 +295,7 @@ br_entity ed_doc_duplicate(ed_doc *d, br_entity e) {
     br_entity *src, *dst;
     br_name *nm;
     br_transform *t;
+    br_transform3d *t3;
     if (at < 0) return BR_ENTITY_NULL;
     n = block_len(d, (uint32_t)at);
     src = (br_entity *)br_alloc(sizeof(br_entity) * n);
@@ -267,6 +314,11 @@ br_entity ed_doc_duplicate(ed_doc *d, br_entity e) {
     }
     if ((t = (br_transform *)br_get(&d->world, dst[0], d->ids.transform)) != NULL)
         t->position = br_v2_add(t->position, br_world_to_parent_vector(&d->world, dst[0], br_v2(8, 8)));   /* visibly not on top */
+    if ((t3 = (br_transform3d *)br_get(&d->world, dst[0], d->ids3.transform3d)) != NULL) {   /* (in 3D: a unit along x, in the world) */
+        br_vec3 p;
+        br_world_transform3d(&d->world, dst[0], &p, NULL, NULL);
+        br_set_world_position3d(&d->world, dst[0], br_v3_add(p, br_v3(1, 0, 0)));
+    }
     memmove(d->order + at + n + n, d->order + at + n, (d->count - (uint32_t)at - n) * sizeof(br_entity));
     memcpy(d->order + at + n, dst, sizeof(br_entity) * n);   /* right after the original's subtree */
     d->count += n;
@@ -408,24 +460,34 @@ int ed_doc_count_entities(const char *path) {
     return n;
 }
 
-int ed_doc_paste(ed_doc *d, const char *text, const br_vec2 *at, br_entity parent) {
+static int paste(ed_doc *d, const char *text, const br_vec2 *at, const br_vec3 *at3, br_entity parent) {
     br_entity *made;
     br_vec2 sum = br_v2(0, 0);
-    int n, i, placed = 0;
+    br_vec3 sum3 = br_v3(0, 0, 0);
+    int n, i, placed = 0, placed3 = 0;
     if (d->playing) { snprintf(d->error, sizeof(d->error), "stop playing first"); return -1; }
     if (parent != BR_ENTITY_NULL && !br_entity_alive(&d->world, parent)) parent = BR_ENTITY_NULL;
-    {   /* room for every entity the text could hold */
-        const char *p = text;
-        uint32_t guess = 1;
-        while ((p = strstr(p, "entity")) != NULL) { guess++; p += 6; }
-        made = (br_entity *)br_alloc(guess * sizeof(br_entity));
-        n = made && reserve(d, d->count + guess)
-          ? br_world_from_text(&d->world, text, made, guess, d->error, sizeof(d->error)) : -1;
+    n = br_world_from_text_list(&d->world, text, &made, d->error, sizeof(d->error));   /* (every entity: prefabs' parts too) */
+    if (n >= 0 && !reserve(d, d->count + (uint32_t)n)) {
+        int k;
+        for (k = 0; k < n; ++k) br_entity_destroy(&d->world, made[k]);
+        snprintf(d->error, sizeof(d->error), "out of memory");
+        n = -1;
     }
     if (n < 0) { br_free(made); return -1; }
     for (i = 0; i < n; ++i) {                         /* the roots; children ride along */
         const br_transform *t = (const br_transform *)br_get(&d->world, made[i], d->ids.transform);
+        const br_transform3d *t3 = (const br_transform3d *)br_get(&d->world, made[i], d->ids3.transform3d);
         if (t && br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL) { sum = br_v2_add(sum, t->position); ++placed; }
+        if (t3 && br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL) { sum3 = br_v3_add(sum3, t3->position); ++placed3; }
+    }
+    if (placed3 && at3) {                             /* 3D: the average lands on `at3` across the ground (heights kept) */
+        br_vec3 shift = br_v3_sub(*at3, br_v3_scale(sum3, 1.0f / (float)placed3));
+        shift.y = 0;
+        for (i = 0; i < n; ++i) {
+            br_transform3d *t3 = (br_transform3d *)br_get(&d->world, made[i], d->ids3.transform3d);
+            if (t3 && br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL) t3->position = br_v3_add(t3->position, shift);
+        }
     }
     if (placed && at) {                               /* their average position lands on `at` */
         br_vec2 shift = br_v2_sub(*at, br_v2_scale(sum, 1.0f / (float)placed));
@@ -439,39 +501,132 @@ int ed_doc_paste(ed_doc *d, const char *text, const br_vec2 *at, br_entity paren
             if (br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL) br_set_parent(&d->world, made[i], parent, true);
     for (i = 0; i < n; ++i) insert_at(d, d->count, made[i]);
     ed_doc_normalize(d);
-    if (n > 0) d->selected = made[0];
+    if (n > 0) {                                      /* the pasted roots become the selection */
+        ed_doc_select(d, made[0]);
+        for (i = 1; i < n; ++i)
+            if (br_parent_of(&d->world, made[i]) == BR_ENTITY_NULL || br_parent_of(&d->world, made[i]) == parent) ed_doc_select_add(d, made[i]);
+        if (d->selected != made[0]) {             /* (the first stays the primary) */
+            d->selected = d->multi_primary = made[0];
+        }
+    }
     br_free(made);
     return n;
 }
 
-int ed_doc_instantiate(ed_doc *d, const char *path, br_vec2 at) {
-    size_t size;
+int ed_doc_paste(ed_doc *d, const char *text, const br_vec2 *at, br_entity parent) { return paste(d, text, at, NULL, parent); }
+
+/* A prefab placed in the scene: an instance of it (it follows the file from then on)
+ * when the file has one root and is inside the project, else a copy of its entities. */
+static int instantiate(ed_doc *d, const char *path, const br_vec2 *at, const br_vec3 *at3) {
+    size_t size, root_len = strlen(br_assets_root());
     char *text;
-    int n;
+    int n, roots = 0;
     if (d->playing) { snprintf(d->error, sizeof(d->error), "stop playing first"); return -1; }
     if (!(text = (char *)br_file_read_all(path, &size))) {
         snprintf(d->error, sizeof(d->error), "can't read '%s'", path);
         return -1;
     }
-    n = ed_doc_paste(d, text, &at, BR_ENTITY_NULL);
+    {   /* how many roots? (made in a world of its own to see) */
+        br_world probe;
+        br_entity *made = NULL;
+        int k, m;
+        br_world_init(&probe);
+        br_builtin_register(&probe, NULL);
+        m = br_world_from_text_list(&probe, text, &made, NULL, 0);
+        for (k = 0; k < m; ++k) if (br_parent_of(&probe, made[k]) == BR_ENTITY_NULL) ++roots;
+        br_free(made);
+        br_world_destroy(&probe);
+    }
+    if (roots == 1 && root_len && strncmp(path, br_assets_root(), root_len) == 0 && strlen(path + root_len) < sizeof(((br_prefab *)0)->file)) {
+        char inst[400];
+        snprintf(inst, sizeof(inst), "bronto_scene 1\nentity\n  Prefab\n    file = \"%s\"\n", path + root_len);
+        n = paste(d, inst, at, at3, BR_ENTITY_NULL);
+    } else {
+        n = paste(d, text, at, at3, BR_ENTITY_NULL);
+    }
     br_free(text);
     return n;
 }
+
+/* ---- prefab instances ------------------------------------------------------------------ */
+
+const char *ed_doc_prefab_of(const ed_doc *d, br_entity e) {
+    const br_prefab *p = (const br_prefab *)br_get(&d->world, e, br_component_find(&d->world, "Prefab"));
+    return p && p->file[0] ? p->file : NULL;
+}
+
+br_entity ed_doc_instance_root(const ed_doc *d, br_entity e) {
+    br_entity found = BR_ENTITY_NULL;
+    int guard = 0;
+    while (e != BR_ENTITY_NULL && guard++ < 1024) {               /* the outermost instance it is in */
+        if (ed_doc_prefab_of(d, e)) found = e;
+        e = br_parent_of(&d->world, e);
+    }
+    return found;
+}
+
+/* Makes every instance again from its prefab file (after one changes), keeping this
+ * scene's changes. Those are what the last checkpoint said they were: worked out
+ * against the prefab as it was (a snapshot now would count the prefab's own change
+ * as the scene's). */
+static bool remake(ed_doc *d, const char *text) {
+    int sel = ed_doc_index(d, d->selected);
+    return restore(d, text, sel);
+}
+
+bool ed_doc_refresh_prefabs(ed_doc *d) {
+    char *text;
+    bool ok;
+    if (d->playing) return false;
+    if (d->state) return remake(d, d->state);
+    if (!(text = snapshot(d))) return false;
+    ok = remake(d, text);
+    br_free(text);
+    return ok;
+}
+
+/* Writes an instance's entities (as they are here) to its prefab file: they become the prefab, for every instance. */
+bool ed_doc_apply_prefab(ed_doc *d, br_entity root) {
+    br_component pc = br_component_find(&d->world, "Prefab");
+    br_prefab keep;
+    char full[ED_PATH_MAX * 2];
+    bool ok;
+    const char *file = ed_doc_prefab_of(d, root);
+    if (!file || d->playing) return false;
+    char *before;
+    keep = *(const br_prefab *)br_get(&d->world, root, pc);
+    snprintf(full, sizeof(full), "%s%s", br_assets_root(), keep.file);
+    if (!(before = snapshot(d))) return false;          /* the scene's changes, against the prefab as it is now */
+    br_remove(&d->world, root, pc);                     /* (written as itself, not as an instance of itself) */
+    ok = ed_doc_save_entity(d, root, full);
+    *(br_prefab *)br_add(&d->world, root, pc, NULL) = keep;
+    if (ok) ok = remake(d, before);                     /* every instance, from the prefab as it is now */
+    br_free(before);
+    return ok;
+}
+
+int ed_doc_instantiate3d(ed_doc *d, const char *path, br_vec3 at) { return instantiate(d, path, NULL, &at); }
+
+int ed_doc_instantiate(ed_doc *d, const char *path, br_vec2 at) { return instantiate(d, path, &at, NULL); }
 
 /* The entity and its subtree as scene text, the entity saved as a root where it is. */
 char *ed_doc_copy(ed_doc *d, br_entity e) {
     int at = ed_doc_index(d, e);
     br_entity parent;
     br_transform *t, local;
+    br_transform3d *t3, local3;
     char *text;
     if (at < 0) { snprintf(d->error, sizeof(d->error), "nothing selected"); return NULL; }
     parent = br_parent_of(&d->world, e);
     t = (br_transform *)br_get(&d->world, e, d->ids.transform);
+    t3 = (br_transform3d *)br_get(&d->world, e, d->ids3.transform3d);
     if (t) local = *t;
+    if (t3) local3 = *t3;
     if (parent != BR_ENTITY_NULL) br_set_parent(&d->world, e, BR_ENTITY_NULL, true);
     text = br_world_to_text(&d->world, d->order + at, block_len(d, (uint32_t)at), NULL);
     if (parent != BR_ENTITY_NULL) br_set_parent(&d->world, e, parent, false);
     if (t) *(br_transform *)br_get(&d->world, e, d->ids.transform) = local;
+    if (t3) *(br_transform3d *)br_get(&d->world, e, d->ids3.transform3d) = local3;
     if (!text) snprintf(d->error, sizeof(d->error), "out of memory");
     return text;
 }
@@ -523,6 +678,7 @@ void ed_doc_play(ed_doc *d) {
     d->play_selected = ed_doc_index(d, d->selected);
     br_script_reload(&d->world);                     /* pick up scripts edited since the last run */
     d->playing = d->play_snapshot != NULL;
+    br_particles_clear(&d->world, BR_ENTITY_NULL);   /* the game's own particles, from its first frame */
     if (d->playing) br_camera_snap(&d->world);       /* cameras start where they look */
 }
 
@@ -603,9 +759,134 @@ void ed_doc_clear_overlays(ed_doc *d) {
 
 void ed_doc_step(ed_doc *d, float dt) {
     int top, i;
-    if (!d->playing) return;
+    if (!d->playing) {                                /* (particles and animations show while editing too) */
+        br_particles_preview(&d->world, dt);
+        br_animator_step(&d->world, dt);
+        return;
+    }
     top = d->overlay_count;                           /* the top scene, and those under it it lets run */
     i = top;
     while (i > 0 && d->overlays[i - 1]->update_below) --i;
     for (; i <= top; ++i) br_world_run_phase(ed_doc_stack_world(d, i), BR_PHASE_FIXED_UPDATE, dt);
+}
+
+/* ---- the selection -------------------------------------------------------------------- */
+
+static bool multi_valid(const ed_doc *d) {
+    return d->multi_count > 0 && d->selected != BR_ENTITY_NULL && d->selected == d->multi_primary;
+}
+
+void ed_doc_select(ed_doc *d, br_entity e) {
+    d->selected = br_entity_alive(&d->world, e) ? e : BR_ENTITY_NULL;
+    d->multi_count = 0;
+}
+
+bool ed_doc_is_selected(const ed_doc *d, br_entity e) {
+    uint32_t i;
+    if (e == BR_ENTITY_NULL) return false;
+    if (e == d->selected) return true;
+    if (!multi_valid(d)) return false;
+    for (i = 0; i < d->multi_count; ++i) if (d->multi[i] == e) return true;
+    return false;
+}
+
+static void multi_begin(ed_doc *d) {          /* the set, starting from what's selected now */
+    if (!multi_valid(d)) {
+        d->multi_count = 0;
+        if (br_entity_alive(&d->world, d->selected)) d->multi[d->multi_count++] = d->selected;
+        d->multi_primary = d->selected;
+    }
+}
+
+void ed_doc_select_add(ed_doc *d, br_entity e) {
+    if (!br_entity_alive(&d->world, e)) return;
+    multi_begin(d);
+    if (!ed_doc_is_selected(d, e) && d->multi_count < ED_SELECT_MAX) d->multi[d->multi_count++] = e;
+    d->selected = d->multi_primary = e;
+}
+
+void ed_doc_select_toggle(ed_doc *d, br_entity e) {
+    uint32_t i;
+    if (!br_entity_alive(&d->world, e)) return;
+    multi_begin(d);
+    for (i = 0; i < d->multi_count; ++i)
+        if (d->multi[i] == e) {                 /* out; the primary moves to the last one left */
+            d->multi[i] = d->multi[--d->multi_count];
+            d->selected = d->multi_primary = d->multi_count ? d->multi[d->multi_count - 1] : BR_ENTITY_NULL;
+            return;
+        }
+    ed_doc_select_add(d, e);
+}
+
+uint32_t ed_doc_selection(ed_doc *d, br_entity *out, uint32_t max, bool roots) {
+    uint32_t i, n = 0;
+    for (i = 0; i < d->count && n < max; ++i) {
+        br_entity e = d->order[i], p;
+        bool skip = false;
+        if (!ed_doc_is_selected(d, e)) continue;
+        if (roots)
+            for (p = br_parent_of(&d->world, e); p != BR_ENTITY_NULL && !skip; p = br_parent_of(&d->world, p)) skip = ed_doc_is_selected(d, p);
+        if (!skip) out[n++] = e;
+    }
+    return n;
+}
+
+uint32_t ed_doc_selection_count(ed_doc *d) {
+    static br_entity all[ED_SELECT_MAX];
+    return ed_doc_selection(d, all, ED_SELECT_MAX, false);
+}
+
+void ed_doc_delete_selection(ed_doc *d) {
+    br_entity roots[ED_SELECT_MAX];
+    uint32_t n = ed_doc_selection(d, roots, ED_SELECT_MAX, true), i;
+    int first = n ? ed_doc_index(d, roots[0]) : -1;
+    if (n <= 1) { if (d->selected != BR_ENTITY_NULL) ed_doc_delete(d, d->selected); return; }
+    for (i = 0; i < n; ++i) br_entity_destroy(&d->world, roots[i]);
+    ed_doc_normalize(d);
+    d->multi_count = 0;
+    d->selected = d->count && first >= 0 ? d->order[(uint32_t)first < d->count ? (uint32_t)first : d->count - 1] : BR_ENTITY_NULL;
+}
+
+uint32_t ed_doc_duplicate_selection(ed_doc *d) {
+    br_entity roots[ED_SELECT_MAX], made[ED_SELECT_MAX];
+    uint32_t n = ed_doc_selection(d, roots, ED_SELECT_MAX, true), i, m = 0;
+    for (i = 0; i < n; ++i) {
+        br_entity c = ed_doc_duplicate(d, roots[i]);
+        if (c != BR_ENTITY_NULL) made[m++] = c;
+    }
+    ed_doc_select(d, m ? made[0] : BR_ENTITY_NULL);
+    for (i = 1; i < m; ++i) ed_doc_select_add(d, made[i]);
+    return m;
+}
+
+char *ed_doc_copy_selection(ed_doc *d) {
+    static br_entity roots[ED_SELECT_MAX], parents[ED_SELECT_MAX];
+    static br_transform local[ED_SELECT_MAX];
+    static br_transform3d local3[ED_SELECT_MAX];
+    br_entity *list;
+    uint32_t n = ed_doc_selection(d, roots, ED_SELECT_MAX, true), i, count = 0;
+    char *text;
+    if (n == 0) { snprintf(d->error, sizeof(d->error), "nothing selected"); return NULL; }
+    if (n == 1) return ed_doc_copy(d, roots[0]);
+    if (!(list = (br_entity *)br_alloc(sizeof(br_entity) * d->count))) return NULL;
+    for (i = 0; i < n; ++i) {                     /* each root's subtree, in hierarchy order */
+        int at = ed_doc_index(d, roots[i]);
+        uint32_t len = block_len(d, (uint32_t)at);
+        memcpy(list + count, d->order + at, sizeof(br_entity) * len);
+        count += len;
+        parents[i] = br_parent_of(&d->world, roots[i]);   /* saved as roots, where they are in the world */
+        if (br_has(&d->world, roots[i], d->ids.transform)) local[i] = *(br_transform *)br_get(&d->world, roots[i], d->ids.transform);
+        if (br_has(&d->world, roots[i], d->ids3.transform3d)) local3[i] = *(br_transform3d *)br_get(&d->world, roots[i], d->ids3.transform3d);
+        if (parents[i] != BR_ENTITY_NULL) br_set_parent(&d->world, roots[i], BR_ENTITY_NULL, true);
+    }
+    text = br_world_to_text(&d->world, list, count, NULL);
+    for (i = 0; i < n; ++i) {                     /* back exactly as they were */
+        if (parents[i] == BR_ENTITY_NULL) continue;
+        br_set_parent(&d->world, roots[i], parents[i], false);
+        if (br_has(&d->world, roots[i], d->ids.transform)) *(br_transform *)br_get(&d->world, roots[i], d->ids.transform) = local[i];
+        if (br_has(&d->world, roots[i], d->ids3.transform3d)) *(br_transform3d *)br_get(&d->world, roots[i], d->ids3.transform3d) = local3[i];
+    }
+    br_free(list);
+    if (!text) snprintf(d->error, sizeof(d->error), "out of memory");
+    return text;
 }

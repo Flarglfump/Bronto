@@ -93,6 +93,7 @@
     function say(text, bad) { status.textContent = text; status.className = bad ? 'bad' : ''; }
     function payload(id) {
         var text = document.getElementById(id).textContent.trim();
+        if (text.indexOf('deflate:') === 0) return Bronto.inflate(Bronto.fromBase64(text.slice(8)));   /* (packed small) */
         return text ? Bronto.fromBase64(text) : null;
     }
     if (typeof WebAssembly !== 'object') {

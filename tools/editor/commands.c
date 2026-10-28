@@ -41,6 +41,7 @@ static void do_open(editor *ed) {
     if (!ed->path_field[0]) { ed_status(ed, "Type the scene's file name in the box, then Open"); return; }
     if (ed_doc_load(&ed->doc, ed->path_field)) {
         ed_status(ed, "Opened %s (%u entities)", file_name(ed->path_field), ed->doc.count);
+        ed_view_set_3d(ed, br_world_has_3d(&ed->doc.world));     /* a 3D scene opens in 3D */
         ed_cmd_frame(ed);
     } else {
         ed_status(ed, "Couldn't open %s: %s", file_name(ed->path_field), ed->doc.error);
@@ -88,8 +89,10 @@ bool ed_open_project(editor *ed, const char *folder) {
         return false;
     }
     stop_if_playing(ed);
+    ed_code_close_all(ed);                      /* (the old project's scripts) */
     ed_assets_destroy(ed);
     ed_assets_init(ed, abs);
+    ed_components_reload(ed, true);             /* the game's own components, before its scenes */
     br_path_join(marker, sizeof(marker), abs, BR_PROJECT_FILE);
     if (!br_fs_exists(marker)) {                  /* mark it, so games resolve paths the same way */
         const char text[] = "bronto_project 1\n# Asset paths in this project's scenes are relative to this folder.\n";
@@ -98,6 +101,7 @@ bool ed_open_project(editor *ed, const char *folder) {
     br_path_join(main_scene, sizeof(main_scene), abs, "main.scene");
     if (br_fs_exists(main_scene) && ed_doc_load(&ed->doc, main_scene)) {
         snprintf(ed->path_field, sizeof(ed->path_field), "%s", main_scene);
+        ed_view_set_3d(ed, br_world_has_3d(&ed->doc.world));
         ed_cmd_frame(ed);
         ed_status(ed, "Opened project %s (main.scene)", br_path_name(abs));
     } else {
@@ -111,7 +115,7 @@ bool ed_open_project(editor *ed, const char *folder) {
 void ed_choose_project(editor *ed, const char *folder) {
     stop_if_playing(ed);
     snprintf(ed->pending_project, sizeof(ed->pending_project), "%s", folder);
-    if (ed_doc_dirty(&ed->doc)) ed->pending = ED_PENDING_PROJECT;
+    if (ed_doc_dirty(&ed->doc) || ed_code_dirty_count(ed)) ed->pending = ED_PENDING_PROJECT;
     else ed_open_project(ed, folder);
 }
 
@@ -146,7 +150,7 @@ void ed_cmd_save(editor *ed) { do_save(ed); }
 
 bool ed_cmd_quit(editor *ed) {
     stop_if_playing(ed);
-    if (ed_doc_dirty(&ed->doc) && !ed->headless) {
+    if ((ed_doc_dirty(&ed->doc) || ed_code_dirty_count(ed)) && !ed->headless) {
         ed->pending = ED_PENDING_QUIT;
         return false;
     }
@@ -161,8 +165,12 @@ void ed_cmd_answer(editor *ed, int choice) {
     if (choice == 0) {
         char wanted[ED_PATH_MAX];
         snprintf(wanted, sizeof(wanted), "%s", ed->path_field);   /* Open names a new file: save the old one */
+        if (what == ED_PENDING_QUIT || what == ED_PENDING_PROJECT) {               /* the scripts too */
+            ed_code_save_all(ed);
+            if (ed_code_dirty_count(ed)) { ed->pending = ED_PENDING_NONE; return; }
+        }
         if (what == ED_PENDING_OPEN || what == ED_PENDING_PROJECT) snprintf(ed->path_field, sizeof(ed->path_field), "%s", ed->doc.path);
-        if (!do_save(ed)) { snprintf(ed->path_field, sizeof(ed->path_field), "%s", wanted); ed->pending = ED_PENDING_NONE; return; }
+        if (ed_doc_dirty(&ed->doc) && !do_save(ed)) { snprintf(ed->path_field, sizeof(ed->path_field), "%s", wanted); ed->pending = ED_PENDING_NONE; return; }
         snprintf(ed->path_field, sizeof(ed->path_field), "%s", wanted);
     }
     ed->pending = ED_PENDING_NONE;
@@ -191,9 +199,12 @@ void ed_cmd_play(editor *ed) {
         ed_doc_stop(&ed->doc);
         ed_status(ed, "Stopped: the scene is back as it was");
     } else {
+        int saved = ed_code_save_all(ed);             /* the game runs the scripts as they are here */
         if (ed->console_clear_on_play) ed_console_clear(&ed->console);
+        ed->code.focused = false;
         ed_doc_play(&ed->doc);
-        ed_status(ed, "Playing. Changes made now are undone by Stop (F5)");
+        if (saved) ed_status(ed, "Saved %d script%s and playing. Changes made now are undone by Stop (F5)", saved, saved == 1 ? "" : "s");
+        else ed_status(ed, "Playing. Changes made now are undone by Stop (F5)");
     }
 }
 
@@ -206,6 +217,7 @@ static br_transform *selected_transform(editor *ed) {
 void ed_cmd_add_entity(editor *ed) {
     br_vec2 at = ed->view.center;
     br_entity e;
+    if (ed->view.three_d) { ed_new3d_at(ed, ED_NEW_CUBE, ed_view3d_place(ed)); return; }
     if (ed->view.snap) at = br_v2(roundf(at.x / ed->view.grid_size) * ed->view.grid_size, roundf(at.y / ed->view.grid_size) * ed->view.grid_size);
     e = ed_doc_create(&ed->doc, "Entity", at);
     br_add(&ed->doc.world, e, ed->doc.ids.shape, NULL);          /* something to see and grab */
@@ -216,25 +228,48 @@ void ed_cmd_add_child(editor *ed) {
     br_entity parent = ed->doc.selected, e;
     char name[64];
     if (!br_entity_alive(&ed->doc.world, parent)) { ed_cmd_add_entity(ed); return; }
-    e = ed_doc_create_child(&ed->doc, parent, "Child", br_v2(16, 16));
-    br_add(&ed->doc.world, e, ed->doc.ids.shape, NULL);
+    if (br_has(&ed->doc.world, parent, ed->doc.ids3.transform3d)) {      /* a 3D child: a small cube beside it */
+        br_vec3 p;
+        br_world_transform3d(&ed->doc.world, parent, &p, NULL, NULL);
+        e = ed_new3d_at(ed, ED_NEW_CUBE, br_v3_add(p, br_v3(1.5f, 0, 0)));
+        if (e == BR_ENTITY_NULL) return;
+        snprintf(((br_name *)br_get(&ed->doc.world, e, ed->doc.ids.name))->text, sizeof(((br_name *)0)->text), "Child");
+        ed_doc_place(&ed->doc, e, parent, BR_ENTITY_NULL);
+        ed->doc.selected = e;
+    } else {
+        e = ed_doc_create_child(&ed->doc, parent, "Child", br_v2(16, 16));
+        br_add(&ed->doc.world, e, ed->doc.ids.shape, NULL);
+    }
     ed_set_collapsed(ed, parent, false);
     ed_status(ed, "Added a child of %s. It moves with its parent", ed_doc_name(&ed->doc, parent, name, sizeof(name)));
 }
 
 void ed_cmd_duplicate(editor *ed) {
     char name[64];
+    uint32_t n;
     if (ed->doc.selected == BR_ENTITY_NULL) return;
-    if (ed_doc_duplicate(&ed->doc, ed->doc.selected) != BR_ENTITY_NULL)
-        ed_status(ed, "Duplicated as %s", ed_doc_name(&ed->doc, ed->doc.selected, name, sizeof(name)));
+    n = ed_doc_duplicate_selection(&ed->doc);
+    if (n == 1) ed_status(ed, "Duplicated as %s", ed_doc_name(&ed->doc, ed->doc.selected, name, sizeof(name)));
+    else if (n > 1) ed_status(ed, "Duplicated %u entities", (unsigned)n);
+}
+
+void ed_cmd_select_all(editor *ed) {
+    uint32_t i;
+    ed_doc_select(&ed->doc, BR_ENTITY_NULL);
+    for (i = 0; i < ed->doc.count && i < ED_SELECT_MAX; ++i) ed_doc_select_add(&ed->doc, ed->doc.order[i]);
+    if (ed->doc.count) ed_doc_select_add(&ed->doc, ed->doc.order[0]);
+    ed_status(ed, "%u selected", (unsigned)ed_doc_selection_count(&ed->doc));
 }
 
 void ed_cmd_delete(editor *ed) {
     char name[64];
+    uint32_t n;
     if (ed->doc.selected == BR_ENTITY_NULL) return;
+    n = ed_doc_selection_count(&ed->doc);
     ed_doc_name(&ed->doc, ed->doc.selected, name, sizeof(name));
-    ed_doc_delete(&ed->doc, ed->doc.selected);
-    ed_status(ed, "Deleted %s (Ctrl+Z brings it back)", name);
+    ed_doc_delete_selection(&ed->doc);
+    if (n > 1) ed_status(ed, "Deleted %u entities (Ctrl+Z brings them back)", (unsigned)n);
+    else ed_status(ed, "Deleted %s (Ctrl+Z brings it back)", name);
 }
 
 /* Scene text on the system clipboard (copied here or in another editor)
@@ -252,21 +287,24 @@ void ed_clipboard_refresh(editor *ed) {
 
 void ed_cmd_copy(editor *ed) {
     char name[64], *text;
+    uint32_t n;
     if (!br_entity_alive(&ed->doc.world, ed->doc.selected)) { ed_status(ed, "Select an entity to copy"); return; }
-    if (!(text = ed_doc_copy(&ed->doc, ed->doc.selected))) { ed_status(ed, "Couldn't copy: %s", ed->doc.error); return; }
+    n = ed_doc_selection_count(&ed->doc);
+    if (!(text = ed_doc_copy_selection(&ed->doc))) { ed_status(ed, "Couldn't copy: %s", ed->doc.error); return; }
     br_free(ed->clipboard);
     ed->clipboard = text;
     br_clipboard_set(ed->engine, text);               /* as text: pastes into another editor, or a text file */
-    ed_status(ed, "Copied %s", ed_doc_name(&ed->doc, ed->doc.selected, name, sizeof(name)));
+    if (n > 1) ed_status(ed, "Copied %u entities", (unsigned)n);
+    else ed_status(ed, "Copied %s", ed_doc_name(&ed->doc, ed->doc.selected, name, sizeof(name)));
 }
 
 void ed_cmd_cut(editor *ed) {
-    char name[64];
+    uint32_t n;
     if (!br_entity_alive(&ed->doc.world, ed->doc.selected) || ed->doc.playing) return;
+    n = ed_doc_selection_count(&ed->doc);
     ed_cmd_copy(ed);
-    ed_doc_name(&ed->doc, ed->doc.selected, name, sizeof(name));
-    ed_doc_delete(&ed->doc, ed->doc.selected);
-    ed_status(ed, "Cut %s - paste it with Ctrl+V", name);
+    ed_doc_delete_selection(&ed->doc);
+    ed_status(ed, "Cut %u entit%s - paste with Ctrl+V", (unsigned)n, n == 1 ? "y" : "ies");
 }
 
 void ed_cmd_paste(editor *ed, const br_vec2 *at, br_entity parent) {
@@ -276,9 +314,19 @@ void ed_cmd_paste(editor *ed, const br_vec2 *at, br_entity parent) {
     if (ed->doc.playing) { ed_status(ed, "Stop playing to paste"); return; }
     n = ed_doc_paste(&ed->doc, ed->clipboard, at, parent);
     if (n < 0) { ed_status(ed, "Couldn't paste: %s", ed->doc.error); return; }
-    if (!at && n > 0) {                               /* next to the original, so both show */
-        br_vec2 p = br_world_transform(&ed->doc.world, ed->doc.selected).position;
-        br_set_world_position(&ed->doc.world, ed->doc.selected, br_v2_add(p, br_v2(8, 8)));
+    if (!at && n > 0) {                               /* next to the originals, so both show */
+        br_entity roots[ED_SELECT_MAX];
+        uint32_t k, m = ed_doc_selection(&ed->doc, roots, ED_SELECT_MAX, true);
+        for (k = 0; k < m; ++k) {
+            if (br_has(&ed->doc.world, roots[k], ed->doc.ids3.transform3d)) {
+                br_vec3 p;
+                br_world_transform3d(&ed->doc.world, roots[k], &p, NULL, NULL);
+                br_set_world_position3d(&ed->doc.world, roots[k], br_v3_add(p, br_v3(1, 0, 0)));
+            } else if (br_has(&ed->doc.world, roots[k], ed->doc.ids.transform)) {
+                br_vec2 p = br_world_transform(&ed->doc.world, roots[k]).position;
+                br_set_world_position(&ed->doc.world, roots[k], br_v2_add(p, br_v2(8, 8)));
+            }
+        }
     }
     if (parent != BR_ENTITY_NULL) ed_set_collapsed(ed, parent, false);
     ed_status(ed, "Pasted %d entit%s", n, n == 1 ? "y" : "ies");
@@ -295,13 +343,29 @@ void ed_cmd_unparent(editor *ed) {
     ed_status(ed, "Made it a root");
 }
 
+static void nudge_one(editor *ed, br_entity e, br_vec2 delta) {
+    br_transform *t = (br_transform *)br_get(&ed->doc.world, e, ed->doc.ids.transform);
+    if (br_has(&ed->doc.world, e, ed->doc.ids3.transform3d)) {   /* 3D: across the ground, as the view faces */
+        float yaw = ed->view.orbit_yaw * BR_DEG2RAD, k = 0.1f;
+        br_vec3 right = br_v3(cosf(yaw), 0, -sinf(yaw)), toward = br_v3(sinf(yaw), 0, cosf(yaw)), p;
+        br_world_transform3d(&ed->doc.world, e, &p, NULL, NULL);
+        p = br_v3_add(p, br_v3_add(br_v3_scale(right, delta.x * k), br_v3_scale(toward, delta.y * k)));
+        br_set_world_position3d(&ed->doc.world, e, br_v3(roundf(p.x * 1000) / 1000, p.y, roundf(p.z * 1000) / 1000));
+        return;
+    }
+    /* delta is on screen: turn it into the parent's space */
+    if (t) t->position = br_v2_add(t->position, br_world_to_parent_vector(&ed->doc.world, e, delta));
+}
+
 void ed_cmd_nudge(editor *ed, br_vec2 delta) {
-    br_transform *t = selected_transform(ed);   /* delta is on screen: turn it into the parent's space */
-    if (t) t->position = br_v2_add(t->position, br_world_to_parent_vector(&ed->doc.world, ed->doc.selected, delta));
+    br_entity roots[ED_SELECT_MAX];
+    uint32_t k, n = ed_doc_selection(&ed->doc, roots, ED_SELECT_MAX, true);
+    for (k = 0; k < n; ++k) nudge_one(ed, roots[k], delta);
 }
 
 void ed_cmd_frame(editor *ed) {
     br_transform *t = selected_transform(ed);
+    if (ed->view.three_d) { ed_view3d_focus(ed); return; }
     ed->view.center = t ? br_world_transform(&ed->doc.world, ed->doc.selected).position : br_v2_scale(ed->view.game_size, 0.5f);
 }
 

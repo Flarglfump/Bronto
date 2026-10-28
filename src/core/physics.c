@@ -50,8 +50,9 @@ static const br_field k_rigidbody_fields[] = {
     BR_FIELD(br_rigidbody, linear_damping, BR_FIELD_FLOAT, 0, 100),
     BR_FIELD(br_rigidbody, angular_damping, BR_FIELD_FLOAT, 0, 100),
     BR_FIELD(br_rigidbody, fixed_rotation, BR_FIELD_BOOL, 0, 0),
+    BR_FIELD(br_rigidbody, bullet, BR_FIELD_BOOL, 0, 0),
 };
-static const br_rigidbody k_rigidbody_default = { BR_BODY_DYNAMIC, 1, 1, { 0, 0 }, 0, 0, 0.05f, false, { 0, 0 }, 0 };
+static const br_rigidbody k_rigidbody_default = { BR_BODY_DYNAMIC, 1, 1, { 0, 0 }, 0, 0, 0.05f, false, false, { 0, 0 }, 0 };
 
 static const char *const k_collider_shapes[] = { "box", "circle" };
 static const br_field k_collider_fields[] = {
@@ -64,8 +65,22 @@ static const br_field k_collider_fields[] = {
     BR_FIELD(br_collider, trigger, BR_FIELD_BOOL, 0, 0),
     BR_FIELD(br_collider, layer, BR_FIELD_INT, 0, 31),
     BR_FIELD(br_collider, mask, BR_FIELD_INT, 0, 0),
+    BR_FIELD(br_collider, one_way, BR_FIELD_BOOL, 0, 0),
 };
-static const br_collider k_collider_default = { BR_COLLIDER_BOX, { 16, 16 }, 8, { 0, 0 }, 0.5f, 0, false, 0, -1 };
+static const br_collider k_collider_default = { BR_COLLIDER_BOX, { 16, 16 }, 8, { 0, 0 }, 0.5f, 0, false, 0, -1, false };
+
+static const char *const k_joint_kinds[] = { "hinge", "distance", "rope", "spring" };
+static const br_field k_joint_fields[] = {
+    BR_FIELD_ENUM_OF(br_joint, kind, k_joint_kinds),
+    BR_FIELD(br_joint, other, BR_FIELD_ENTITY, 0, 0),
+    BR_FIELD(br_joint, anchor, BR_FIELD_VEC2, 0, 0),
+    BR_FIELD(br_joint, other_anchor, BR_FIELD_VEC2, 0, 0),
+    BR_FIELD(br_joint, length, BR_FIELD_FLOAT, 0, 100000),
+    BR_FIELD(br_joint, stiffness, BR_FIELD_FLOAT, 0, 60),
+    BR_FIELD(br_joint, damping, BR_FIELD_FLOAT, 0, 2),
+    BR_FIELD(br_joint, collide, BR_FIELD_BOOL, 0, 0),
+};
+static const br_joint k_joint_default = { BR_JOINT_HINGE, BR_ENTITY_NULL, { 0, 0 }, { 0, 0 }, 0, 4, 0.5f, false, false, { 0, 0 }, 0, { 0, 0 } };
 
 static const br_field k_world_fields[] = {
     BR_FIELD(br_physics_world, gravity, BR_FIELD_VEC2, 0, 0),
@@ -78,21 +93,23 @@ static const br_component_desc k_phys_descs[] = {
     DESC("RigidBody", br_rigidbody, k_rigidbody_fields, &k_rigidbody_default),
     DESC("Collider", br_collider, k_collider_fields, &k_collider_default),
     DESC("PhysicsWorld", br_physics_world, k_world_fields, &k_world_default),
+    DESC("Joint", br_joint, k_joint_fields, &k_joint_default),
 };
-static const br_component_desc *const k_phys_desc_list[] = { &k_phys_descs[0], &k_phys_descs[1], &k_phys_descs[2] };
+static const br_component_desc *const k_phys_desc_list[] = { &k_phys_descs[0], &k_phys_descs[1], &k_phys_descs[2], &k_phys_descs[3] };
 
 const br_component_desc *const *br_physics_descs(int *count) {
     *count = (int)BR_ARRAY_COUNT(k_phys_desc_list);
     return k_phys_desc_list;
 }
 
-typedef struct phys_ids { br_component transform, body, collider, world; } phys_ids;
+typedef struct phys_ids { br_component transform, body, collider, world, joint; } phys_ids;
 
 static bool ph_ids_of(const br_world *w, phys_ids *id) {
     id->transform = br_component_find(w, "Transform");
     id->body = br_component_find(w, "RigidBody");
     id->collider = br_component_find(w, "Collider");
     id->world = br_component_find(w, "PhysicsWorld");
+    id->joint = br_component_find(w, "Joint");
     return id->transform != BR_COMPONENT_INVALID && id->body != BR_COMPONENT_INVALID &&
            id->collider != BR_COMPONENT_INVALID && id->world != BR_COMPONENT_INVALID;
 }
@@ -170,6 +187,11 @@ typedef struct phys_state {
     int cur;
     br_contact_event *events;
     uint32_t event_count, event_cap;
+    float dt;
+    uint64_t *passing[2];          /* one-way platforms: pairs passing through, this step and last */
+    uint32_t passing_count[2], passing_cap[2];
+    uint64_t *joined;              /* pairs tied by a Joint that doesn't collide (sorted) */
+    uint32_t joined_count, joined_cap;
 } phys_state;
 
 static const char ph_state_key = 0;
@@ -181,6 +203,9 @@ static void ph_state_destroy(void *data) {
     br_free(s->arb[0]);
     br_free(s->arb[1]);
     br_free(s->events);
+    br_free(s->passing[0]);
+    br_free(s->passing[1]);
+    br_free(s->joined);
     br_free(s);
 }
 
@@ -493,10 +518,46 @@ static int ph_compare_lo(const void *x, const void *y) {
     return *(const int *)x - *(const int *)y;
 }
 
+/* Pairs a Joint ties together without collision. */
+static int ph_compare_keys(const void *x, const void *y) {
+    uint64_t a = *(const uint64_t *)x, b = *(const uint64_t *)y;
+    return a < b ? -1 : a > b ? 1 : 0;
+}
+static bool ph_has_key(const uint64_t *list, uint32_t count, uint64_t key) {
+    uint32_t lo = 0, hi = count;
+    while (lo < hi) {
+        uint32_t mid = (lo + hi) / 2;
+        if (list[mid] < key) lo = mid + 1;
+        else hi = mid;
+    }
+    return lo < count && list[lo] == key;
+}
+static bool ph_joined(const phys_state *s, uint64_t key) { return ph_has_key(s->joined, s->joined_count, key); }
+
+/* A one-way platform and something touching it: does it collide (landing on
+ * its top side), or pass through (from below or the side: then it keeps
+ * passing until they come apart)? */
+static bool ph_one_way_ok(phys_state *s, const pbody *p, const pbody *q, const contact *c, int count) {
+    const pbody *plat = p->col->one_way ? p : q, *other = plat == p ? q : p;
+    uint64_t key = ph_pair_key(p->e, q->e);
+    int cur = s->cur, prev = 1 - cur, k;
+    br_vec2 up = ph_rot_apply(plat->q, br_v2(0, -1)), n = plat == p ? c[0].normal : ph_mul2(c[0].normal, -1);
+    float rel = ph_dot2(ph_sub2(other->v, plat->v), up), depth = 0;
+    bool was_touching = ph_find_arbiter(s->arb[prev], s->arb_count[prev], key) != NULL;
+    for (k = 0; k < count; ++k) depth = BR_MAX(depth, -c[k].separation);
+    if (!ph_has_key(s->passing[prev], s->passing_count[prev], key) && ph_dot2(n, up) > 0.6f &&
+        (was_touching || (rel <= 1.0f && depth <= SLOP + 1.0f + BR_MAX(0.0f, -rel) * s->dt * 1.5f)))
+        return true;                                    /* landing on it */
+    if (ph_grow((void **)&s->passing[cur], &s->passing_cap[cur], s->passing_count[cur] + 1, sizeof(uint64_t)))
+        s->passing[cur][s->passing_count[cur]++] = key;
+    return false;
+}
+
 static void ph_find_pairs(phys_state *s) {
     uint32_t i, j, n = s->body_count;
     int cur = s->cur;
     s->arb_count[cur] = 0;
+    s->passing_count[cur] = 0;
     if (!ph_grow((void **)&s->order, &s->order_cap, n, sizeof(int))) return;
     for (i = 0; i < n; ++i) s->order[i] = (int)i;
     ph_sort_bodies = s->bodies;
@@ -519,8 +580,11 @@ static void ph_find_pairs(phys_state *s) {
             memset(c, 0, sizeof(c));                            /* impulses start at zero */
             p = BR_ENTITY_INDEX(A->e) < BR_ENTITY_INDEX(B->e) ? A : B;   /* a stable order for the pair */
             q = p == A ? B : A;
+            if (s->joined_count && ph_joined(s, ph_pair_key(p->e, q->e))) continue;
             count = ph_collide(c, p, q);
             if (!count) continue;
+            if ((p->col->one_way != q->col->one_way) && !p->col->trigger && !q->col->trigger &&
+                !ph_one_way_ok(s, p, q, c, count)) continue;
             trigger = p->col->trigger || q->col->trigger;
             if (!ph_grow((void **)&s->arb[cur], &s->arb_cap[cur], s->arb_count[cur] + 1, sizeof(arbiter))) return;
             arb = &s->arb[cur][s->arb_count[cur]++];
@@ -537,6 +601,7 @@ static void ph_find_pairs(phys_state *s) {
         }
     }
     if (s->arb_count[cur] > 1) qsort(s->arb[cur], s->arb_count[cur], sizeof(arbiter), ph_compare_arbiters);
+    if (s->passing_count[cur] > 1) qsort(s->passing[cur], s->passing_count[cur], sizeof(uint64_t), ph_compare_keys);
 }
 
 /* Carry impulses over from last step (warm starting) and report what changed. */
@@ -629,6 +694,175 @@ static void ph_apply_impulses(phys_state *s, arbiter *arb) {
     }
 }
 
+/* ---- joints ------------------------------------------------------------------------------ */
+
+typedef struct pjoint {
+    br_joint *j;
+    int a, b;                      /* body indices (-1: the world) */
+    br_vec2 r1, r2;                /* anchors from each body's position, in the world */
+    br_vec2 p1, p2;                /* the anchors in the world */
+    float m11, m12, m22;           /* hinge: the 2x2 effective mass (inverse of K) */
+    float mass, bias, gamma;       /* distance, rope, spring: along u */
+    br_vec2 u;
+    bool slack;                    /* rope: not taut this step */
+} pjoint;
+
+static int ph_body_index(const phys_state *s, br_entity e) {
+    uint32_t i;
+    if (e == BR_ENTITY_NULL) return -1;
+    for (i = 0; i < s->body_count; ++i) if (s->bodies[i].e == e) return (int)i;
+    return -2;                                         /* (not a body: the joint does nothing) */
+}
+
+static br_vec2 ph_anchor_world(const pbody *b, br_vec2 local) {
+    return ph_add2(b->pos, ph_rot_apply(b->q, br_v2(local.x * b->scale.x, local.y * b->scale.y)));
+}
+
+static const pbody k_world_body;                       /* (the world: immovable, at the origin) */
+
+static void ph_joint_apply(phys_state *s, pjoint *pj, br_vec2 P) {
+    pbody *A = pj->a >= 0 ? &s->bodies[pj->a] : NULL, *B = pj->b >= 0 ? &s->bodies[pj->b] : NULL;
+    if (A) { A->v = ph_sub2(A->v, ph_mul2(P, A->inv_mass)); A->w -= A->inv_i * ph_cross2(pj->r1, P); }
+    if (B) { B->v = ph_add2(B->v, ph_mul2(P, B->inv_mass)); B->w += B->inv_i * ph_cross2(pj->r2, P); }
+}
+
+static br_vec2 ph_joint_dv(const phys_state *s, const pjoint *pj) {
+    const pbody *A = pj->a >= 0 ? &s->bodies[pj->a] : &k_world_body, *B = pj->b >= 0 ? &s->bodies[pj->b] : &k_world_body;
+    return ph_sub2(ph_add2(B->v, ph_cross_sv(B->w, pj->r2)), ph_add2(A->v, ph_cross_sv(A->w, pj->r1)));
+}
+
+/* Gathers the joints, sets up each one's masses and bias, and warm-starts it. */
+static uint32_t ph_joints_pre(br_world *w, const phys_ids *id, phys_state *s, pjoint *out, uint32_t max, float dt) {
+    const br_component_pool *pool = &w->pools[id->joint];
+    uint32_t i, n = 0;
+    float inv_dt = 1.0f / dt;
+    for (i = 0; i < pool->count && n < max; ++i) {
+        br_joint *j = (br_joint *)(pool->data + (size_t)i * pool->stride);
+        pjoint *pj = &out[n];
+        const pbody *A, *B;
+        float ia, ib, ma, mb;
+        memset(pj, 0, sizeof *pj);
+        pj->j = j;
+        pj->a = ph_body_index(s, pool->entities[i]);
+        pj->b = j->other == pool->entities[i] ? -2 : ph_body_index(s, j->other);
+        if (pj->a < 0 || pj->b == -2) continue;
+        A = &s->bodies[pj->a];
+        B = pj->b >= 0 ? &s->bodies[pj->b] : &k_world_body;
+        if (!j->started) {                             /* the first step: where it's pinned, how long it is */
+            br_vec2 pa = ph_anchor_world(A, j->anchor), pb = pj->b >= 0 ? ph_anchor_world(B, j->other_anchor) : pa;
+            j->world_point = pa;
+            j->rest = j->length > 0 ? j->length : sqrtf(ph_dot2(ph_sub2(pb, pa), ph_sub2(pb, pa)));
+            j->impulse = br_v2(0, 0);
+            j->started = true;
+        }
+        if (j->length > 0) j->rest = j->length;
+        pj->p1 = ph_anchor_world(A, j->anchor);
+        pj->p2 = pj->b >= 0 ? ph_anchor_world(B, j->other_anchor) : j->world_point;
+        pj->r1 = ph_sub2(pj->p1, A->pos);
+        pj->r2 = pj->b >= 0 ? ph_sub2(pj->p2, B->pos) : br_v2(0, 0);
+        ma = A->inv_mass; ia = A->inv_i;
+        mb = pj->b >= 0 ? B->inv_mass : 0; ib = pj->b >= 0 ? B->inv_i : 0;
+        if (ma + mb + ia + ib <= 0) continue;          /* two immovable things */
+        if (j->kind == BR_JOINT_HINGE) {
+            float k11 = ma + mb + ia * pj->r1.y * pj->r1.y + ib * pj->r2.y * pj->r2.y;
+            float k12 = -ia * pj->r1.x * pj->r1.y - ib * pj->r2.x * pj->r2.y;
+            float k22 = ma + mb + ia * pj->r1.x * pj->r1.x + ib * pj->r2.x * pj->r2.x;
+            float det = k11 * k22 - k12 * k12;
+            if (det == 0) continue;
+            det = 1.0f / det;
+            pj->m11 = det * k22; pj->m12 = -det * k12; pj->m22 = det * k11;
+        } else {
+            br_vec2 d = ph_sub2(pj->p2, pj->p1);
+            float len = sqrtf(ph_dot2(d, d)), cr1, cr2, k, C;
+            pj->u = len > 1e-4f ? ph_mul2(d, 1.0f / len) : br_v2(0, 1);
+            cr1 = ph_cross2(pj->r1, pj->u); cr2 = ph_cross2(pj->r2, pj->u);
+            k = ma + mb + ia * cr1 * cr1 + ib * cr2 * cr2;
+            C = len - j->rest;
+            pj->slack = j->kind == BR_JOINT_ROPE && C < 0;
+            pj->gamma = 0;
+            if (j->kind == BR_JOINT_SPRING && j->stiffness > 0) {   /* soft: a mass-spring-damper (as in Box2D) */
+                float m = k > 0 ? 1.0f / k : 0, omega = 2 * BR_PI * j->stiffness;
+                float dmp = 2 * m * j->damping * omega, ks = m * omega * omega;
+                pj->gamma = dt * (dmp + dt * ks);
+                pj->gamma = pj->gamma > 0 ? 1.0f / pj->gamma : 0;
+                pj->bias = C * dt * ks * pj->gamma;
+                k += pj->gamma;
+            } else {
+                pj->bias = BIAS_FACTOR * inv_dt * C;
+            }
+            pj->mass = k > 0 ? 1.0f / k : 0;
+        }
+        if (pj->slack) j->impulse = br_v2(0, 0);
+        ph_joint_apply(s, pj, j->kind == BR_JOINT_HINGE ? j->impulse : ph_mul2(pj->u, j->impulse.x));   /* warm start */
+        ++n;
+    }
+    return n;
+}
+
+static void ph_joint_solve(phys_state *s, pjoint *pj, float inv_dt) {
+    br_joint *j = pj->j;
+    br_vec2 dv = ph_joint_dv(s, pj);
+    if (j->kind == BR_JOINT_HINGE) {
+        br_vec2 bias = ph_mul2(ph_sub2(pj->p2, pj->p1), -BIAS_FACTOR * inv_dt), rhs = ph_sub2(bias, dv), P;   /* (pulls the anchors together) */
+        P = br_v2(pj->m11 * rhs.x + pj->m12 * rhs.y, pj->m12 * rhs.x + pj->m22 * rhs.y);
+        j->impulse = ph_add2(j->impulse, P);
+        ph_joint_apply(s, pj, P);
+    } else {
+        float cdot = ph_dot2(dv, pj->u), lambda, old = j->impulse.x;
+        if (pj->slack) return;
+        lambda = -pj->mass * (cdot + pj->bias + pj->gamma * old);
+        j->impulse.x = old + lambda;
+        if (j->kind == BR_JOINT_ROPE && j->impulse.x > 0) j->impulse.x = 0;   /* a rope only pulls */
+        ph_joint_apply(s, pj, ph_mul2(pj->u, j->impulse.x - old));
+    }
+}
+
+/* The pairs whose joint says they don't collide (looked up while finding pairs). */
+static void ph_joined_pairs(br_world *w, const phys_ids *id, phys_state *s) {
+    const br_component_pool *pool = &w->pools[id->joint];
+    uint32_t i;
+    s->joined_count = 0;
+    for (i = 0; i < pool->count; ++i) {
+        const br_joint *j = (const br_joint *)(pool->data + (size_t)i * pool->stride);
+        br_entity a = pool->entities[i], b = j->other;
+        if (j->collide || b == BR_ENTITY_NULL) continue;
+        if (!ph_grow((void **)&s->joined, &s->joined_cap, s->joined_count + 1, sizeof(uint64_t))) return;
+        s->joined[s->joined_count++] = BR_ENTITY_INDEX(a) < BR_ENTITY_INDEX(b) ? ph_pair_key(a, b) : ph_pair_key(b, a);
+    }
+    if (s->joined_count > 1) qsort(s->joined, s->joined_count, sizeof(uint64_t), ph_compare_keys);
+}
+
+static bool ph_ray_shape(const pbody *b, br_vec2 from, br_vec2 to, float *t_out, br_vec2 *n_out);
+
+/* A fast body's path from `from` (its collider's centre at the step's start): if it
+ * would pass into a solid collider on the way, it stops just short of it. */
+static void ph_sweep(phys_state *s, pbody *b, br_vec2 from) {
+    br_vec2 to, delta;
+    float best = 2, reach;
+    br_vec2 best_n = br_v2(0, 0);
+    uint32_t i;
+    ph_update_shape(b);
+    to = b->center;
+    delta = ph_sub2(to, from);
+    reach = b->col->shape == BR_COLLIDER_CIRCLE ? b->radius : BR_MIN(b->half.x, b->half.y);
+    if (ph_dot2(delta, delta) <= reach * reach * 0.25f) return;   /* (slow enough: the contacts will do) */
+    for (i = 0; i < s->body_count; ++i) {
+        pbody o = s->bodies[i];
+        float t;
+        br_vec2 n;
+        if (o.e == b->e || !o.col || o.col->trigger || o.col->one_way || o.type == BR_BODY_DYNAMIC || !ph_layers_match(b->col, o.col)) continue;
+        if (o.col->shape == BR_COLLIDER_CIRCLE) o.radius += reach;    /* grown by the mover's size: its centre's path */
+        else { o.half.x += reach; o.half.y += reach; }
+        if (ph_ray_shape(&o, from, to, &t, &n) && t < best) { best = t; best_n = n; }
+    }
+    if (best <= 1) {
+        br_vec2 stop = ph_add2(from, ph_mul2(delta, best));
+        stop = ph_add2(stop, ph_mul2(best_n, 0.05f));
+        b->pos = ph_add2(b->pos, ph_sub2(stop, to));
+        ph_update_shape(b);
+    }
+}
+
 /* ---- the step ------------------------------------------------------------------------- */
 
 br_vec2 br_physics_gravity(const br_world *w) {
@@ -651,7 +885,9 @@ void br_physics_step(br_world *w, float dt) {
         iterations = pw->iterations > 0 ? pw->iterations : 1;
     }
     inv_dt = 1.0f / dt;
+    s->dt = dt;
     ph_gather(w, &id, s);
+    if (id.joint != BR_COMPONENT_INVALID) ph_joined_pairs(w, &id, s);
 
     for (i = 0; i < s->body_count; ++i) {                  /* forces -> velocities */
         pbody *b = &s->bodies[i];
@@ -667,6 +903,20 @@ void br_physics_step(br_world *w, float dt) {
     ph_match_and_report(s);
     for (i = 0; i < s->arb_count[s->cur]; ++i)
         if (!s->arb[s->cur][i].trigger) ph_pre_step(s, &s->arb[s->cur][i], inv_dt);
+    if (id.joint != BR_COMPONENT_INVALID && w->pools[id.joint].count > 0) {   /* with joints */
+        uint32_t nj = w->pools[id.joint].count, j;
+        pjoint *pj = (pjoint *)br_alloc(sizeof(pjoint) * nj);
+        if (pj) {
+            nj = ph_joints_pre(w, &id, s, pj, nj, dt);
+            for (it = 0; it < iterations; ++it) {
+                for (i = 0; i < s->arb_count[s->cur]; ++i)
+                    if (!s->arb[s->cur][i].trigger) ph_apply_impulses(s, &s->arb[s->cur][i]);
+                for (j = 0; j < nj; ++j) ph_joint_solve(s, &pj[j], inv_dt);
+            }
+            br_free(pj);
+            iterations = 0;
+        }
+    }
     for (it = 0; it < iterations; ++it)
         for (i = 0; i < s->arb_count[s->cur]; ++i)
             if (!s->arb[s->cur][i].trigger) ph_apply_impulses(s, &s->arb[s->cur][i]);
@@ -676,8 +926,10 @@ void br_physics_step(br_world *w, float dt) {
         pbody *b = &s->bodies[i];
         if (!b->rb || b->depth != d) continue;
         if (b->type != BR_BODY_STATIC) {
+            br_vec2 from = b->center;
             b->pos = ph_add2(b->pos, ph_mul2(b->v, dt));
             b->angle += b->w * dt;
+            if (b->rb->bullet && b->col && !b->col->trigger && b->type == BR_BODY_DYNAMIC) ph_sweep(s, b, from);
             if (b->parented) {                                /* back into the parent's space */
                 br_transform wt;
                 wt.position = b->pos;
@@ -841,6 +1093,24 @@ void br_physics_debug_draw(const br_world *w, br_renderer *r, br_color solid, br
     phys_ids id;
     uint32_t i;
     if (!ph_ids_of(w, &id)) return;
+    for (i = 0; id.joint != BR_COMPONENT_INVALID && i < w->pools[id.joint].count; ++i) {   /* joints: a line between the anchors */
+        const br_joint *j = (const br_joint *)(w->pools[id.joint].data + (size_t)i * w->pools[id.joint].stride);
+        br_entity e = w->pools[id.joint].entities[i];
+        br_transform ta = br_world_transform(w, e);
+        br_vec2 pa, pb;
+        rot qa = ph_rot_of(ta.rotation * DEG2RAD);
+        if (!br_has(w, e, id.transform)) continue;
+        pa = ph_add2(ta.position, ph_rot_apply(qa, br_v2(j->anchor.x * ta.scale.x, j->anchor.y * ta.scale.y)));
+        if (j->other != BR_ENTITY_NULL && br_has(w, j->other, id.transform)) {
+            br_transform tb = br_world_transform(w, j->other);
+            pb = ph_add2(tb.position, ph_rot_apply(ph_rot_of(tb.rotation * DEG2RAD), br_v2(j->other_anchor.x * tb.scale.x, j->other_anchor.y * tb.scale.y)));
+        } else {
+            pb = j->started ? j->world_point : pa;
+        }
+        br_draw_line(r, pa, pb, br_rgba(120, 200, 255, 220));
+        br_fill_circle(r, pa, 2, br_rgba(120, 200, 255, 220));
+        br_fill_circle(r, pb, 2, br_rgba(120, 200, 255, 220));
+    }
     for (i = 0; i < w->pools[id.collider].count; ++i) {
         pbody b;
         br_color c;

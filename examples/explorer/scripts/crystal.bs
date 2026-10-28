@@ -1,0 +1,23 @@
+@strict @3d
+# crystal.bs - turns and floats; the explorer picks it up by walking into it.
+var t: number = 0
+var base: number = 0
+
+func start() -> void {
+    base = self.y
+    t = self.x * 0.3 + self.z * 0.7
+}
+
+func update(dt: number) -> void {
+    t += dt
+    self.rotation = vec3(0, t * 90, 0)
+    self.y = base + sin(t * 150) * 0.15
+}
+
+func on_trigger(other: entity) -> void {
+    if other.name == "Explorer" {
+        send(find("HUD"), "found")
+        spawn("prefabs/sparkle.scene", self.position)   # a burst of light (it goes by itself)
+        destroy(self)
+    }
+}

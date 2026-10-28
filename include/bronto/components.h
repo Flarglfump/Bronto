@@ -148,6 +148,10 @@ typedef struct br_sound_src {
     bool started;
 } br_sound_src;
 
+/* Prefab: this entity is an instance of another scene file (serialize.h):
+ * made from it when the scene loads, with this scene's changes on top. */
+typedef struct br_prefab { char file[128]; } br_prefab;
+
 typedef struct br_builtin_ids {
     br_component name, transform, shape, sprite, label, motion, bounds, sound, tilemap, tags, animation, camera;
 } br_builtin_ids;

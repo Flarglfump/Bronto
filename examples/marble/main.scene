@@ -1,0 +1,647 @@
+# Marble - a 3D example made of scenes and scripts. Open this folder in the editor.
+# Made by tools/make_marble.py; edit it in the editor from here on.
+bronto_scene 1
+
+entity
+  Name
+    text = "Sun"
+  Transform3D
+    position = 0 10 0
+    rotation = -55 35 0
+    scale = 1 1 1
+  Light
+    kind = directional
+    color = #fff4e0ff
+    intensity = 1
+
+entity
+  Name
+    text = "Sky Light"
+  Transform3D
+    position = 0 10 0
+    rotation = 0 0 0
+    scale = 1 1 1
+  Light
+    kind = ambient
+    color = #8090b0ff
+    intensity = 0.45
+
+entity
+  Name
+    text = "Camera"
+  Transform3D
+    position = 0 4.5 7
+    rotation = -28 0 0
+    scale = 1 1 1
+  Camera3D
+    fov = 60
+    near_clip = 0.1
+    far_clip = 200
+    clear_color = #7cb4e8ff
+    fog = true
+    fog_color = #7cb4e8ff
+    fog_start = 18
+    fog_end = 60
+  Script
+    file = "scripts/camera.bs"
+
+entity
+  Name
+    text = "Start"
+  Transform3D
+    position = 0 -0.5 0
+    rotation = 0 0 0
+    scale = 7 1 7
+  Mesh
+    shape = cube
+    texture = "art/grass.png"
+    color = #ffffffff
+    uv_scale = 7 7
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Walkway"
+  Transform3D
+    position = 0 -0.5 -8.5
+    rotation = 0 0 0
+    scale = 2.5 1 10
+  Mesh
+    shape = cube
+    texture = "art/tiles.png"
+    color = #ffffffff
+    uv_scale = 2.5 10
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Rail"
+  Transform3D
+    position = -1.5 0.15 -8.5
+    rotation = 0 0 0
+    scale = 0.5 0.3 10
+  Mesh
+    shape = cube
+    texture = "art/wood.png"
+    color = #ffffffff
+    uv_scale = 0.5 10
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Rail"
+  Transform3D
+    position = 1.5 0.15 -8.5
+    rotation = 0 0 0
+    scale = 0.5 0.3 10
+  Mesh
+    shape = cube
+    texture = "art/wood.png"
+    color = #ffffffff
+    uv_scale = 0.5 10
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Ramp"
+  Transform3D
+    position = 0 0.7628 -16.5791
+    rotation = 18.4349 0 0
+    scale = 2.5 0.5 6.3246
+  Mesh
+    shape = cube
+    texture = "art/tiles.png"
+    color = #ffffffff
+    uv_scale = 2.5 6.3246
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Upper Deck"
+  Transform3D
+    position = 0 1.5 -23.5
+    rotation = 0 0 0
+    scale = 7 1 8
+  Mesh
+    shape = cube
+    texture = "art/tiles.png"
+    color = #ffffffff
+    uv_scale = 7 8
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Crate"
+  Transform3D
+    position = -1.8 2.5 -24
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = cube
+    texture = "art/wood.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Crate"
+  Transform3D
+    position = 1.6 2.5 -21.5
+    rotation = 0 30 0
+    scale = 1 1 1
+  Mesh
+    shape = cube
+    texture = "art/wood.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Lift"
+  Transform3D
+    position = 0 1.75 -29
+    rotation = 0 0 0
+    scale = 3 0.5 3
+  Mesh
+    shape = cube
+    texture = "art/wood.png"
+    color = #ffffffff
+    uv_scale = 3 3
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+  RigidBody3D
+    type = kinematic
+  Script
+    file = "scripts/lift.bs"
+    vars = "travel = vec3(0, 3, 0)"
+
+entity
+  Name
+    text = "High Deck"
+  Transform3D
+    position = 0 2.5 -35.5
+    rotation = 0 0 0
+    scale = 7 5 10
+  Mesh
+    shape = cube
+    texture = "art/tiles.png"
+    color = #ffffffff
+    uv_scale = 7 10
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Pole"
+  Transform3D
+    position = 0 6.5 -39
+    rotation = 0 0 0
+    scale = 0.15 3 0.15
+  Mesh
+    shape = cylinder
+    color = #e8e8f0ff
+    uv_scale = 1 1
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Flag"
+  Transform3D
+    position = 0.45 7.6 -39
+    rotation = 0 0 -90
+    scale = 0.6 0.8 0.12
+  Mesh
+    shape = cone
+    color = #ff5a4aff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Goal"
+  Transform3D
+    position = 0 5.75 -38.5
+    rotation = 0 0 0
+    scale = 1 1 1
+  Collider3D
+    shape = box
+    size = 3 1.5 3
+    friction = 0.8
+    bounce = 0
+    trigger = true
+  Script
+    file = "scripts/goal.bs"
+
+entity
+  Name
+    text = "Checkpoint"
+  Transform3D
+    position = 0 2.5 -21
+    rotation = 0 0 0
+    scale = 1 1 1
+  Collider3D
+    shape = box
+    size = 7 1 2
+    friction = 0.8
+    bounce = 0
+    trigger = true
+  Tags
+    list = "checkpoint"
+
+entity
+  Name
+    text = "Checkpoint"
+  Transform3D
+    position = 0 5.5 -33
+    rotation = 0 0 0
+    scale = 1 1 1
+  Collider3D
+    shape = box
+    size = 7 1 2
+    friction = 0.8
+    bounce = 0
+    trigger = true
+  Tags
+    list = "checkpoint"
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = -2.6 0.6 2.2
+    rotation = 0 0 0
+    scale = 0.35 1.2 0.35
+  Mesh
+    shape = cylinder
+    color = #7a5236ff
+    uv_scale = 1 1
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = -2.6 1.9 2.2
+    rotation = 0 0 0
+    scale = 1.4 1.8 1.4
+  Mesh
+    shape = cone
+    color = #3f9a4cff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = 2.7 0.6 1.6
+    rotation = 0 0 0
+    scale = 0.35 1.2 0.35
+  Mesh
+    shape = cylinder
+    color = #7a5236ff
+    uv_scale = 1 1
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = 2.7 1.9 1.6
+    rotation = 0 40 0
+    scale = 1.4 1.8 1.4
+  Mesh
+    shape = cone
+    color = #3f9a4cff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Trunk"
+  Transform3D
+    position = -2.4 0.6 -2.5
+    rotation = 0 0 0
+    scale = 0.35 1.2 0.35
+  Mesh
+    shape = cylinder
+    color = #7a5236ff
+    uv_scale = 1 1
+  Collider3D
+    shape = box
+    size = 1 1 1
+    friction = 0.8
+    bounce = 0
+
+entity
+  Name
+    text = "Leaves"
+  Transform3D
+    position = -2.4 1.9 -2.5
+    rotation = 0 80 0
+    scale = 1.4 1.8 1.4
+  Mesh
+    shape = cone
+    color = #3f9a4cff
+    uv_scale = 1 1
+
+entity
+  Name
+    text = "Bumper"
+  Transform3D
+    position = 2.2 0.4 -2
+    rotation = 0 0 0
+    scale = 0.8 0.8 0.8
+  Mesh
+    shape = sphere
+    color = #4cc3ffff
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    radius = 0.5
+    bounce = 1
+    friction = 0.2
+
+entity
+  Name
+    text = "Gem"
+  Transform3D
+    position = 1.5 0.6 -1.5
+    rotation = 0 0 0
+    scale = 1.4 1.4 1.4
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/gem.obj"
+    color = #5ff2ffd0
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    radius = 0.35
+    trigger = true
+  Tags
+    list = "gem"
+  Script
+    file = "scripts/gem.bs"
+
+entity
+  Name
+    text = "Gem"
+  Transform3D
+    position = 0 0.6 -6
+    rotation = 0 0 0
+    scale = 1.4 1.4 1.4
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/gem.obj"
+    color = #5ff2ffd0
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    radius = 0.35
+    trigger = true
+  Tags
+    list = "gem"
+  Script
+    file = "scripts/gem.bs"
+
+entity
+  Name
+    text = "Gem"
+  Transform3D
+    position = 0 0.6 -10.5
+    rotation = 0 0 0
+    scale = 1.4 1.4 1.4
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/gem.obj"
+    color = #5ff2ffd0
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    radius = 0.35
+    trigger = true
+  Tags
+    list = "gem"
+  Script
+    file = "scripts/gem.bs"
+
+entity
+  Name
+    text = "Gem"
+  Transform3D
+    position = 0 1.6 -16.5
+    rotation = 0 0 0
+    scale = 1.4 1.4 1.4
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/gem.obj"
+    color = #5ff2ffd0
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    radius = 0.35
+    trigger = true
+  Tags
+    list = "gem"
+  Script
+    file = "scripts/gem.bs"
+
+entity
+  Name
+    text = "Gem"
+  Transform3D
+    position = -2.2 2.6 -21.5
+    rotation = 0 0 0
+    scale = 1.4 1.4 1.4
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/gem.obj"
+    color = #5ff2ffd0
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    radius = 0.35
+    trigger = true
+  Tags
+    list = "gem"
+  Script
+    file = "scripts/gem.bs"
+
+entity
+  Name
+    text = "Gem"
+  Transform3D
+    position = 2.2 2.6 -25.5
+    rotation = 0 0 0
+    scale = 1.4 1.4 1.4
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/gem.obj"
+    color = #5ff2ffd0
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    radius = 0.35
+    trigger = true
+  Tags
+    list = "gem"
+  Script
+    file = "scripts/gem.bs"
+
+entity
+  Name
+    text = "Gem"
+  Transform3D
+    position = 0 4.2 -29
+    rotation = 0 0 0
+    scale = 1.4 1.4 1.4
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/gem.obj"
+    color = #5ff2ffd0
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    radius = 0.35
+    trigger = true
+  Tags
+    list = "gem"
+  Script
+    file = "scripts/gem.bs"
+
+entity
+  Name
+    text = "Gem"
+  Transform3D
+    position = -2.2 5.6 -36
+    rotation = 0 0 0
+    scale = 1.4 1.4 1.4
+  Mesh
+    shape = model
+    shadow = true
+    file = "models/gem.obj"
+    color = #5ff2ffd0
+    uv_scale = 1 1
+  Collider3D
+    shape = sphere
+    radius = 0.35
+    trigger = true
+  Tags
+    list = "gem"
+  Script
+    file = "scripts/gem.bs"
+
+entity
+  Name
+    text = "Marble"
+  Transform3D
+    position = 0 0.8 1.5
+    rotation = 0 0 0
+    scale = 1 1 1
+  Mesh
+    shape = sphere
+    shadow = true
+    texture = "art/marble.png"
+    color = #ffffffff
+    uv_scale = 1 1
+  RigidBody3D
+    mass = 1
+    linear_damping = 0.15
+    angular_damping = 0.4
+  Collider3D
+    shape = sphere
+    radius = 0.5
+    friction = 0.9
+  Script
+    file = "scripts/marble.bs"
+
+entity
+  Name
+    text = "HUD"
+  Transform
+    position = 160 10
+  Label
+    text = "Gems 0/8"
+    size = 1
+    color = #ffffffff
+    layer = 5
+  Script
+    file = "scripts/hud.bs"
+
+entity
+  Name
+    text = "Message"
+  Transform
+    position = 160 34
+  Label
+    text = "Roll to the flag!"
+    size = 1
+    color = #ffe88aff
+    layer = 5
+
+entity
+  Name
+    text = "Help"
+  Transform
+    position = 160 190
+  Label
+    text = "arrows / stick: roll   space / A: jump"
+    size = 1
+    color = #e0e8f4c0
+    layer = 5

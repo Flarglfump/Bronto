@@ -2,8 +2,13 @@
  * Bronto Engine - math library.
  *
  * Vectors (2/3/4), 4x4 matrices (column-major, right-handed, OpenGL-style
- * clip space) and quaternions. 2D games use vec2 + br_mat4 with z = 0, so
- * the same transform pipeline extends naturally to 3D later.
+ * clip space) and quaternions. 2D games use vec2; 3D (components3d.h,
+ * render3d.h, physics3d.h) uses vec3, quaternions and mat4: right-handed,
+ * +Y up, cameras looking down -Z.
+ *
+ * Euler angles (a 3D Transform's `rotation`, in degrees): x = pitch (about
+ * X), y = yaw (about Y), z = roll (about Z), applied roll first, then
+ * pitch, then yaw: R = Ry * Rx * Rz.
  *
  * Named bmath.h (not math.h) so it can never shadow the C library header.
  */
@@ -78,6 +83,12 @@ BR_INLINE br_vec3 br_v3_norm(br_vec3 a) {
 BR_INLINE br_vec3 br_v3_lerp(br_vec3 a, br_vec3 b, float t) {
     return br_v3(br_lerpf(a.x, b.x, t), br_lerpf(a.y, b.y, t), br_lerpf(a.z, b.z, t));
 }
+BR_INLINE float   br_v3_len2(br_vec3 a) { return br_v3_dot(a, a); }
+BR_INLINE float   br_v3_dist(br_vec3 a, br_vec3 b) { return br_v3_len(br_v3_sub(a, b)); }
+BR_INLINE br_vec3 br_v3_neg(br_vec3 a) { return br_v3(-a.x, -a.y, -a.z); }
+BR_INLINE br_vec3 br_v3_min(br_vec3 a, br_vec3 b) { return br_v3(a.x < b.x ? a.x : b.x, a.y < b.y ? a.y : b.y, a.z < b.z ? a.z : b.z); }
+BR_INLINE br_vec3 br_v3_max(br_vec3 a, br_vec3 b) { return br_v3(a.x > b.x ? a.x : b.x, a.y > b.y ? a.y : b.y, a.z > b.z ? a.z : b.z); }
+BR_INLINE br_vec3 br_v3_add_scaled(br_vec3 a, br_vec3 b, float s) { return br_v3(a.x + b.x * s, a.y + b.y * s, a.z + b.z * s); }
 
 /* ---- vec4 ------------------------------------------------------------ */
 BR_INLINE br_vec4 br_v4(float x, float y, float z, float w) {
@@ -199,6 +210,27 @@ BR_INLINE br_quat br_quat_mul(br_quat a, br_quat b) {
     return r;
 }
 br_mat4 br_quat_to_m4(br_quat q);
+BR_INLINE br_quat br_quat_conj(br_quat q) { br_quat r; r.x = -q.x; r.y = -q.y; r.z = -q.z; r.w = q.w; return r; }
+br_quat br_quat_norm(br_quat q);
+br_vec3 br_quat_rotate(br_quat q, br_vec3 v);          /* v turned by q */
+br_quat br_quat_slerp(br_quat a, br_quat b, float t);
+/* Euler angles in degrees (see the top of this file) to and from a quaternion. */
+br_quat br_quat_from_euler(br_vec3 degrees);
+br_vec3 br_quat_to_euler(br_quat q);
+br_quat br_quat_from_m4(br_mat4 m);                     /* the rotation part (unscaled columns) */
+/* A rotation that turns -Z (forward) toward `dir`, keeping `up` up. */
+br_quat br_quat_look(br_vec3 dir, br_vec3 up);
+
+/* ---- 3D transforms ------------------------------------------------------ */
+/* translate * rotate * scale */
+br_mat4 br_m4_trs(br_vec3 t, br_quat r, br_vec3 s);
+/* Splits a TRS matrix (no shear) back into its parts. */
+void    br_m4_decompose(br_mat4 m, br_vec3 *t, br_quat *r, br_vec3 *s);
+BR_INLINE br_vec3 br_m4_mul_dir(br_mat4 a, br_vec3 v) {      /* no translation */
+    return br_v3(a.m[0] * v.x + a.m[4] * v.y + a.m[8] * v.z,
+                 a.m[1] * v.x + a.m[5] * v.y + a.m[9] * v.z,
+                 a.m[2] * v.x + a.m[6] * v.y + a.m[10] * v.z);
+}
 
 /* ---- rect ------------------------------------------------------------ */
 BR_INLINE br_rect br_rect_make(float x, float y, float w, float h) { br_rect r; r.x = x; r.y = y; r.w = w; r.h = h; return r; }

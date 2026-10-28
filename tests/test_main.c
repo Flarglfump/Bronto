@@ -57,6 +57,10 @@ int main(int argc, char **argv) {
     printf("[ecs]\n");    suite_ecs(); suite_serialize(); suite_components();
     printf("[hierarchy]\n"); suite_hierarchy();
     printf("[physics]\n"); suite_physics();
+    printf("[3d]\n"); suite_3d();
+    printf("[png]\n"); suite_png();
+    printf("[particles]\n"); suite_particles();
+    printf("[prefabs]\n"); suite_prefabs();
     printf("[script]\n");  suite_script();
     printf("[scene]\n");  suite_scene();
     printf("[render]\n"); suite_render(); suite_ui();

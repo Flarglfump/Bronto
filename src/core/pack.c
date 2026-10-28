@@ -5,13 +5,17 @@
 #include "bronto/fs.h"
 #include "bronto/memory.h"
 #include "bronto/log.h"
+#include "bronto/inflate.h"
 
 #include <stdio.h>
 #include <string.h>
 
 #define PK_TRAILER 32u                    /* magic 8, version 4, count 4, index offset 8, pack size 8 */
 
-typedef struct pk_entry { char *name; uint64_t offset, size; } pk_entry;
+typedef struct pk_entry { char *name; uint64_t offset, size, stored; int method; } pk_entry;   /* method 1: DEFLATE */
+
+static bool g_pk_compress = true;
+void br_pack_set_compression(bool on) { g_pk_compress = on; }
 
 static struct {
     bool mounted;
@@ -37,8 +41,10 @@ typedef struct pk_writer {
     FILE *f;
     uint64_t start, at;
     char **names;
-    uint64_t *offsets, *sizes;
+    uint64_t *offsets, *sizes, *stored;
+    uint8_t *methods;
     uint32_t count, cap;
+    uint64_t unpacked;
     br_pack_filter filter;
     void *user;
     char *err;
@@ -51,6 +57,14 @@ static void pk_fail(pk_writer *w, const char *fmt, const char *what) {
     w->failed = true;
 }
 
+/* Files that are compressed already: packing them again gains nothing. */
+static bool pk_compressed_already(const char *rel) {
+    static const char *const ext[] = { ".png", ".jpg", ".jpeg", ".gif", ".zip", ".gz", ".ogg", ".mp3", ".brpak", ".wasm.gz" };
+    size_t i;
+    for (i = 0; i < sizeof(ext) / sizeof(ext[0]); ++i) if (br_path_has_ext(rel, ext[i])) return true;
+    return false;
+}
+
 static void pk_add_file(pk_writer *w, const char *full, const char *rel) {
     size_t size, n;
     void *data;
@@ -60,10 +74,14 @@ static void pk_add_file(pk_writer *w, const char *full, const char *rel) {
         char **names = (char **)br_realloc(w->names, sizeof(char *) * cap);
         uint64_t *offs = names ? (uint64_t *)br_realloc(w->offsets, sizeof(uint64_t) * cap) : NULL;
         uint64_t *sizes = offs ? (uint64_t *)br_realloc(w->sizes, sizeof(uint64_t) * cap) : NULL;
+        uint64_t *stored = sizes ? (uint64_t *)br_realloc(w->stored, sizeof(uint64_t) * cap) : NULL;
+        uint8_t *methods = stored ? (uint8_t *)br_realloc(w->methods, cap) : NULL;
         if (names) w->names = names;
         if (offs) w->offsets = offs;
-        if (!sizes) { pk_fail(w, "out of memory (%s)", rel); return; }
-        w->sizes = sizes;
+        if (sizes) w->sizes = sizes;
+        if (stored) w->stored = stored;
+        if (!methods) { pk_fail(w, "out of memory (%s)", rel); return; }
+        w->methods = methods;
         w->cap = cap;
     }
     if (!(data = br_file_read_all(full, &size))) { pk_fail(w, "can't read %s", full); return; }
@@ -72,6 +90,22 @@ static void pk_add_file(pk_writer *w, const char *full, const char *rel) {
     memcpy(w->names[w->count], rel, n + 1);
     w->offsets[w->count] = w->at - w->start;
     w->sizes[w->count] = size;
+    w->stored[w->count] = size;
+    w->methods[w->count] = 0;
+    w->unpacked += size;
+    if (g_pk_compress && size >= 64 && !pk_compressed_already(rel)) {   /* smaller, if it gets much smaller */
+        size_t packed = 0;
+        void *z = br_deflate(data, size, &packed, 6);
+        if (z && packed < size - size / 10) {
+            br_free(data);
+            data = z;
+            w->stored[w->count] = packed;
+            w->methods[w->count] = 1;
+            size = packed;
+        } else {
+            br_free(z);
+        }
+    }
     w->count++;
     if (size && fwrite(data, 1, size, w->f) != size) pk_fail(w, "can't write %s", rel);
     w->at += size;
@@ -98,7 +132,7 @@ static void pk_walk(pk_writer *w, const char *dir, const char *rel_dir, int dept
 bool br_pack_create(const char *folder, const char *out_path, bool append, br_pack_filter filter, void *user,
                     br_pack_stats *stats, char *err, size_t err_size) {
     pk_writer w;
-    unsigned char trailer[PK_TRAILER], head[18];
+    unsigned char trailer[PK_TRAILER], head[25];
     uint64_t index_at;
     uint32_t i;
     memset(&w, 0, sizeof(w));
@@ -116,14 +150,16 @@ bool br_pack_create(const char *folder, const char *out_path, bool append, br_pa
     }
     pk_walk(&w, folder, "", 0);
     index_at = w.at - w.start;
-    for (i = 0; i < w.count && !w.failed; ++i) {        /* the index: name length, name, offset, size */
+    for (i = 0; i < w.count && !w.failed; ++i) {        /* the index: name length, name, offset, size, stored size, method */
         size_t n = strlen(w.names[i]);
         pk_put(head, n, 2);
         if (fwrite(head, 1, 2, w.f) != 2 || fwrite(w.names[i], 1, n, w.f) != n) pk_fail(&w, "can't write %s", out_path);
         pk_put(head, w.offsets[i], 8);
         pk_put(head + 8, w.sizes[i], 8);
-        if (fwrite(head, 1, 16, w.f) != 16) pk_fail(&w, "can't write %s", out_path);
-        w.at += 2 + n + 16;
+        pk_put(head + 16, w.stored[i], 8);
+        head[24] = w.methods[i];
+        if (fwrite(head, 1, 25, w.f) != 25) pk_fail(&w, "can't write %s", out_path);
+        w.at += 2 + n + 25;
     }
     memcpy(trailer, BR_PACK_MAGIC, 8);
     pk_put(trailer + 8, BR_PACK_VERSION, 4);
@@ -132,11 +168,13 @@ bool br_pack_create(const char *folder, const char *out_path, bool append, br_pa
     pk_put(trailer + 24, w.at + PK_TRAILER - w.start, 8);
     if (!w.failed && fwrite(trailer, 1, PK_TRAILER, w.f) != PK_TRAILER) pk_fail(&w, "can't write %s", out_path);
     if (fclose(w.f) != 0) pk_fail(&w, "can't write %s", out_path);
-    if (stats) { stats->files = w.count; stats->bytes = index_at; }
+    if (stats) { stats->files = w.count; stats->bytes = index_at; stats->unpacked = w.unpacked; }
     for (i = 0; i < w.count; ++i) br_free(w.names[i]);
     br_free(w.names);
     br_free(w.offsets);
     br_free(w.sizes);
+    br_free(w.stored);
+    br_free(w.methods);
     return !w.failed;
 }
 
@@ -171,7 +209,7 @@ bool br_pack_mount(const char *path) {
     unsigned char trailer[PK_TRAILER];
     unsigned char *index = NULL;
     uint64_t pack_size, index_at, index_size, p = 0;
-    uint32_t count, i;
+    uint32_t count, i, version, tail;
     br_pack_unmount();
     if (!(f = fopen(path, "rb"))) return false;
     if (fseek(f, 0, SEEK_END) != 0 || (end = ftell(f)) < (long)PK_TRAILER ||
@@ -183,7 +221,8 @@ bool br_pack_mount(const char *path) {
     count = (uint32_t)pk_get(trailer + 12, 4);
     index_at = pk_get(trailer + 16, 8);
     pack_size = pk_get(trailer + 24, 8);
-    if (pk_get(trailer + 8, 4) != BR_PACK_VERSION || pack_size > (uint64_t)end || index_at + PK_TRAILER > pack_size) {
+    version = (uint32_t)pk_get(trailer + 8, 4);
+    if ((version != 1 && version != BR_PACK_VERSION) || pack_size > (uint64_t)end || index_at + PK_TRAILER > pack_size) {
         fclose(f);
         BR_WARN("%s: a pack this version can't read", path);
         return false;
@@ -200,16 +239,19 @@ bool br_pack_mount(const char *path) {
         return false;
     }
     fclose(f);
+    tail = version == 1 ? 16 : 25;                        /* (version 1: no stored size or method) */
     for (i = 0; i < count; ++i) {
         uint64_t n;
-        if (p + 2 > index_size || (n = pk_get(index + p, 2), p + 2 + n + 16 > index_size)) break;
+        if (p + 2 > index_size || (n = pk_get(index + p, 2), p + 2 + n + tail > index_size)) break;
         if (!(PK.entries[i].name = (char *)br_alloc((size_t)n + 1))) break;
         memcpy(PK.entries[i].name, index + p + 2, (size_t)n);
         PK.entries[i].name[n] = 0;
         PK.entries[i].offset = pk_get(index + p + 2 + n, 8);
         PK.entries[i].size = pk_get(index + p + 2 + n + 8, 8);
+        PK.entries[i].stored = version == 1 ? PK.entries[i].size : pk_get(index + p + 2 + n + 16, 8);
+        PK.entries[i].method = version == 1 ? 0 : index[p + 2 + n + 24];
         PK.count = i + 1;
-        p += 2 + n + 16;
+        p += 2 + n + tail;
     }
     br_free(index);
     if (PK.count != count) { br_pack_unmount(); BR_WARN("%s: the pack's index is damaged", path); return false; }
@@ -231,14 +273,27 @@ void *br_pack_read(const char *rel, size_t *size) {
     if (size) *size = 0;
     if (!PK.mounted || !rel || !(e = pk_find(rel))) return NULL;
     if (!(f = fopen(PK.path, "rb"))) return NULL;
-    buf = (char *)br_alloc((size_t)e->size + 1);
+    buf = (char *)br_alloc((size_t)e->stored + 1);
     if (!buf || fseek(f, (long)(PK.start + e->offset), SEEK_SET) != 0 ||
-        (e->size && fread(buf, 1, (size_t)e->size, f) != (size_t)e->size)) {
+        (e->stored && fread(buf, 1, (size_t)e->stored, f) != (size_t)e->stored)) {
         br_free(buf);
         fclose(f);
         return NULL;
     }
     fclose(f);
+    if (e->method == 1) {                                 /* compressed: inflate it */
+        size_t n = 0;
+        char *raw = (char *)br_inflate(buf, (size_t)e->stored, &n, (size_t)e->size);
+        char *out = raw && n == e->size ? (char *)br_alloc((size_t)e->size + 1) : NULL;
+        br_free(buf);
+        if (!out) { br_free(raw); BR_WARN("pack: %s is damaged", rel); return NULL; }
+        if (n) memcpy(out, raw, n);
+        br_free(raw);
+        buf = out;
+    } else if (e->method != 0) {
+        br_free(buf);
+        return NULL;
+    }
     buf[e->size] = 0;
     if (size) *size = (size_t)e->size;
     return buf;

@@ -121,6 +121,7 @@ void br_set_clip(br_renderer *r, br_recti clip) {
 }
 
 void br_set_blend(br_renderer *r, br_blend_mode mode) { r->blend = mode; }
+void br_blend_color(br_color *dst, br_color src, br_blend_mode mode) { blend_px(dst, src, mode); }
 
 br_camera2d br_camera2d_make(br_vec2 target, br_vec2 offset) {
     br_camera2d c;

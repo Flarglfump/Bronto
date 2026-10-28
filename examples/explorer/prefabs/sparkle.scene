@@ -1,0 +1,27 @@
+# A burst of light where a crystal was picked up. Made by tools/make_explorer.py.
+bronto_scene 1
+
+entity
+  Name
+    text = "Sparkle"
+  Transform3D
+    position = 0 0 0
+    rotation = 0 0 0
+    scale = 1 1 1
+  Particles
+    rate = 0
+    burst = 40
+    max = 60
+    lifetime = 0.8
+    lifetime_random = 0.5
+    speed = 4
+    speed_random = 0.6
+    spread = 180
+    gravity = 4
+    drag = 1.5
+    size_start = 0.18
+    size_end = 0.02
+    color_start = #fff4c0ff
+    color_end = #a080ff00
+    blend = add
+    auto_destroy = true

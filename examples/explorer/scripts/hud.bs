@@ -1,0 +1,43 @@
+@strict
+# hud.bs - the crystal count, the clock, and messages (2D Labels over the 3D view).
+# The messages pop in and fade out with tweens.
+var found_count: int = 0
+var total: int = 0
+var time: number = 0
+var done: bool = false
+var message: entity
+
+func start() -> void {
+    total = len(find_tagged("crystal"))
+    message = find("Message")
+    tween(message, "Label.color", "#fff0a000", 0.8, "linear", 3.5)   # the first message fades after a while
+    show()
+}
+
+func update(dt: number) -> void {
+    if not done { time += dt }
+    if done and (key_pressed("r") or button_pressed("start")) { load_scene("main.scene") }
+    show()
+}
+
+func found() -> void {
+    found_count += 1
+    stop_tween(message)                                  # (the last message's fade)
+    message.Label.color = "#fff0a0ff"
+    message.Label.size = 1.8
+    tween(message, "Label.size", 1, 0.4, "back_out")     # pop in
+    tween(self, "Label.size", 1, 0.3, "ease_out")
+    self.Label.size = 1.3
+    if found_count == total {
+        done = true
+        find("Explorer").done = true
+        message.Label.text = "All " + total + " crystals in " + floor(time) + "s!\nR or Start: again"
+    } else {
+        message.Label.text = "Crystal " + found_count + " of " + total
+        tween(message, "Label.color", "#fff0a000", 0.6, "linear", 2)   # then fade
+    }
+}
+
+func show() -> void {
+    self.Label.text = "Crystals " + found_count + "/" + total + "     " + floor(time) + "s"
+}

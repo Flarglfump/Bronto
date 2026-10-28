@@ -1,0 +1,15 @@
+@strict @3d
+# camera.bs - follows the marble from behind and above, smoothly, always looking at it.
+var target: entity
+var offset: vec3 = vec3(0, 4.5, 7)
+
+func start() -> void {
+    target = find("Marble")
+    if target != nil { self.position = target.position + offset }
+}
+
+func update(dt: number) -> void {
+    if target == nil { return }
+    self.position = lerp(self.position, target.position + offset, min(1, dt * 4))
+    look_at(self, target.position + vec3(0, 0.5, 0))
+}

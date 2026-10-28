@@ -223,7 +223,7 @@
   {
    "name": "lerp",
    "signature": "lerp(a, b, t)",
-   "doc": "From a (t = 0) to b (t = 1). Numbers or vec2s.",
+   "doc": "From a (t = 0) to b (t = 1). Numbers, vec2s or vec3s.",
    "params": [
     "a",
     "b",
@@ -231,8 +231,8 @@
    ],
    "min": 3,
    "param_types": [
-    "number | vec2",
-    "number | vec2",
+    "number | vec2 | vec3",
+    "number | vec2 | vec3",
     "number"
    ],
    "returns": "(like its arguments)"
@@ -270,56 +270,56 @@
   {
    "name": "length",
    "signature": "length(v)",
-   "doc": "How long a vec2 is.",
+   "doc": "How long a vec2 or vec3 is.",
    "params": [
     "v"
    ],
    "min": 1,
    "param_types": [
-    "vec2"
+    "vec2 | vec3"
    ],
    "returns": "number"
   },
   {
    "name": "normalize",
    "signature": "normalize(v)",
-   "doc": "v scaled to length 1 (or (0, 0)).",
+   "doc": "v scaled to length 1 (or zero). A vec2 or a vec3.",
    "params": [
     "v"
    ],
    "min": 1,
    "param_types": [
-    "vec2"
+    "vec2 | vec3"
    ],
-   "returns": "vec2"
+   "returns": "(like v)"
   },
   {
    "name": "dot",
    "signature": "dot(a, b)",
-   "doc": "The dot product of two vec2s.",
+   "doc": "The dot product of two vec2s (or two vec3s).",
    "params": [
     "a",
     "b"
    ],
    "min": 2,
    "param_types": [
-    "vec2",
-    "vec2"
+    "vec2 | vec3",
+    "vec2 | vec3"
    ],
    "returns": "number"
   },
   {
    "name": "distance",
    "signature": "distance(a, b)",
-   "doc": "The distance between two points.",
+   "doc": "The distance between two points (vec2s, or vec3s).",
    "params": [
     "a",
     "b"
    ],
    "min": 2,
    "param_types": [
-    "vec2",
-    "vec2"
+    "vec2 | vec3",
+    "vec2 | vec3"
    ],
    "returns": "number"
   },
@@ -941,7 +941,7 @@
   {
    "name": "apply_force",
    "signature": "apply_force(entity, force, point)",
-   "doc": "Pushes a RigidBody over the next step. With a world point, also spins it.",
+   "doc": "Pushes a RigidBody (or RigidBody3D, with vec3s) over the next step. With a world point, also spins it.",
    "params": [
     "entity",
     "force",
@@ -950,15 +950,15 @@
    "min": 2,
    "param_types": [
     "entity",
-    "vec2",
-    "vec2"
+    "vec2 | vec3",
+    "vec2 | vec3"
    ],
    "returns": "void"
   },
   {
    "name": "apply_impulse",
    "signature": "apply_impulse(entity, impulse, point)",
-   "doc": "Changes a RigidBody's velocity at once.",
+   "doc": "Changes a RigidBody's velocity at once (vec3s for a RigidBody3D).",
    "params": [
     "entity",
     "impulse",
@@ -967,15 +967,15 @@
    "min": 2,
    "param_types": [
     "entity",
-    "vec2",
-    "vec2"
+    "vec2 | vec3",
+    "vec2 | vec3"
    ],
    "returns": "void"
   },
   {
    "name": "raycast",
    "signature": "raycast(from, to, ignore, mask = -1)",
-   "doc": "The first solid collider on the line: [entity, point, normal], or nil. mask: the collision layers to look at (bits; -1 all).",
+   "doc": "The first solid collider on the line: [entity, point, normal], or nil. With vec3s: 3D colliders. mask: the collision layers to look at (bits; -1 all).",
    "params": [
     "from",
     "to",
@@ -984,8 +984,8 @@
    ],
    "min": 2,
    "param_types": [
-    "vec2",
-    "vec2",
+    "vec2 | vec3",
+    "vec2 | vec3",
     "entity | nil",
     "number"
    ],
@@ -994,14 +994,14 @@
   {
    "name": "entity_at",
    "signature": "entity_at(point, mask = -1)",
-   "doc": "The collider at a world point, or nil. mask: the collision layers to look at (bits; -1 all).",
+   "doc": "The collider at a world point (a vec3: a 3D collider), or nil. mask: the collision layers to look at (bits; -1 all).",
    "params": [
     "point",
     "mask"
    ],
    "min": 1,
    "param_types": [
-    "vec2",
+    "vec2 | vec3",
     "number"
    ],
    "returns": "entity"
@@ -1404,20 +1404,20 @@
   {
    "name": "world_to_screen",
    "signature": "world_to_screen(point)",
-   "doc": "A point in the world as a point on the screen (game pixels), through the current camera.",
+   "doc": "A point in the world as a point on the screen (game pixels), through the current camera. With a vec3: where a 3D point appears, through the scene's Camera3D (behind the camera, or with none: vec2(-100000, -100000)).",
    "params": [
     "point"
    ],
    "min": 1,
    "param_types": [
-    "vec2"
+    "vec2 | vec3"
    ],
    "returns": "vec2"
   },
   {
    "name": "play_animation",
    "signature": "play_animation(entity, frames, fps, loop)",
-   "doc": "Plays frames of its Sprite sheet (\"0-3\", \"4,5,6\") with an Animation component (added if needed), from the first frame unless they are playing already.",
+   "doc": "Plays frames of its Sprite sheet (\"0-3\", \"4,5,6\") with an Animation component (added if needed), from the first frame unless they are playing already. On a 3D model (a Mesh with a .gltf/.glb file): play_animation(e, clip[, speed[, loop]]) plays that animation through its Animator, crossfading from the last.",
    "params": [
     "entity",
     "frames",
@@ -2100,6 +2100,315 @@
     "string"
    ],
    "returns": "vec2"
+  },
+  {
+   "name": "vec3",
+   "signature": "vec3(x, y, z)",
+   "doc": "A 3D vector. Has .x, .y, .z and .length; + - with vec3s, * / by numbers.",
+   "params": [
+    "x",
+    "y",
+    "z"
+   ],
+   "min": 3,
+   "param_types": [
+    "number",
+    "number",
+    "number"
+   ],
+   "returns": "vec3"
+  },
+  {
+   "name": "cross",
+   "signature": "cross(a, b)",
+   "doc": "The cross product of two vec3s: at right angles to both.",
+   "params": [
+    "a",
+    "b"
+   ],
+   "min": 2,
+   "param_types": [
+    "vec3",
+    "vec3"
+   ],
+   "returns": "vec3"
+  },
+  {
+   "name": "apply_torque",
+   "signature": "apply_torque(entity, torque)",
+   "doc": "Spins a RigidBody3D over the next step (a vec3: about x, y and z).",
+   "params": [
+    "entity",
+    "torque"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "vec3"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "overlap_sphere",
+   "signature": "overlap_sphere(centre, radius)",
+   "doc": "Every 3D collider (triggers too) touching a sphere, as a list of entities.",
+   "params": [
+    "centre",
+    "radius"
+   ],
+   "min": 2,
+   "param_types": [
+    "vec3",
+    "number"
+   ],
+   "returns": "list[entity]"
+  },
+  {
+   "name": "look_at",
+   "signature": "look_at(entity, point)",
+   "doc": "Turns a 3D entity to face a point (its forward, -z, towards it; +y kept up).",
+   "params": [
+    "entity",
+    "point"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "vec3"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "screen_ray",
+   "signature": "screen_ray(point)",
+   "doc": "[origin, direction] (two vec3s): the line through a screen point into the 3D scene, for clicking on 3D things.",
+   "params": [
+    "point"
+   ],
+   "min": 1,
+   "param_types": [
+    "vec2"
+   ],
+   "returns": "list"
+  },
+  {
+   "name": "move_and_slide",
+   "signature": "move_and_slide(entity, velocity)",
+   "doc": "Moves a 3D entity by velocity * dt, sliding along what it bumps into; returns the velocity with the parts that went into things taken out (keep it for the next frame). For characters: a capsule Collider3D with no dynamic RigidBody3D.",
+   "params": [
+    "entity",
+    "velocity"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "vec3"
+   ],
+   "returns": "vec3"
+  },
+  {
+   "name": "is_on_floor",
+   "signature": "is_on_floor(entity)",
+   "doc": "True if the last move_and_slide() of this entity ended against the ground.",
+   "params": [
+    "entity"
+   ],
+   "min": 1,
+   "param_types": [
+    "entity"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "is_on_wall",
+   "signature": "is_on_wall(entity)",
+   "doc": "True if the last move_and_slide() of this entity ended against a wall.",
+   "params": [
+    "entity"
+   ],
+   "min": 1,
+   "param_types": [
+    "entity"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "is_on_ceiling",
+   "signature": "is_on_ceiling(entity)",
+   "doc": "True if the last move_and_slide() of this entity ended against a ceiling.",
+   "params": [
+    "entity"
+   ],
+   "min": 1,
+   "param_types": [
+    "entity"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "emit",
+   "signature": "emit(entity, count)",
+   "doc": "Gives off count particles at once from an entity's Particles (without a count: its burst).",
+   "params": [
+    "entity",
+    "count"
+   ],
+   "min": 1,
+   "param_types": [
+    "entity",
+    "number"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "particle_count",
+   "signature": "particle_count(entity)",
+   "doc": "How many of an entity's particles are alive.",
+   "params": [
+    "entity"
+   ],
+   "min": 1,
+   "param_types": [
+    "entity"
+   ],
+   "returns": "int"
+  },
+  {
+   "name": "tween",
+   "signature": "tween(entity, property, target, seconds, ease, delay)",
+   "doc": "Eases a property from where it is to target over seconds: \"position\", \"x\", \"rotation\", \"scale\", \"Shape.color\", a script variable... Numbers, vec2s, vec3s and colours. Ease: linear (default), ease_in, ease_out, ease_in_out, cubic_in/out/in_out, sine_in/out/in_out, back_in, back_out, elastic_out, bounce_out. With a delay it starts later, from wherever the property is then. Returns its id.",
+   "params": [
+    "entity",
+    "property",
+    "target",
+    "seconds",
+    "ease",
+    "delay"
+   ],
+   "min": 4,
+   "param_types": [
+    "entity",
+    "string",
+    "any",
+    "number",
+    "string",
+    "number"
+   ],
+   "returns": "int"
+  },
+  {
+   "name": "tween_repeat",
+   "signature": "tween_repeat(id, times, yoyo)",
+   "doc": "Plays a tween again times more times (-1: for ever); yoyo goes back and forth.",
+   "params": [
+    "id",
+    "times",
+    "yoyo"
+   ],
+   "min": 2,
+   "param_types": [
+    "int",
+    "number",
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "tween_then",
+   "signature": "tween_then(id, function)",
+   "doc": "Calls one of this script's functions (taking no arguments) when the tween ends.",
+   "params": [
+    "id",
+    "function"
+   ],
+   "min": 2,
+   "param_types": [
+    "int",
+    "string"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "stop_tween",
+   "signature": "stop_tween(id_or_entity)",
+   "doc": "Stops a tween, or every tween of an entity; what it changed stays where it got to.",
+   "params": [
+    "id_or_entity"
+   ],
+   "min": 1,
+   "param_types": [
+    "any"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "is_tweening",
+   "signature": "is_tweening(id_or_entity, property)",
+   "doc": "True while that tween runs; or while any (or that property's) tween of an entity runs.",
+   "params": [
+    "id_or_entity",
+    "property"
+   ],
+   "min": 1,
+   "param_types": [
+    "any",
+    "string"
+   ],
+   "returns": "bool"
+  },
+  {
+   "name": "ease",
+   "signature": "ease(name, t)",
+   "doc": "An easing curve at t (0 to 1), as tween() uses: ease(\"ease_out\", 0.5).",
+   "params": [
+    "name",
+    "t"
+   ],
+   "min": 2,
+   "param_types": [
+    "string",
+    "number"
+   ],
+   "returns": "number"
+  },
+  {
+   "name": "stop_animation",
+   "signature": "stop_animation(entity)",
+   "doc": "Holds an entity's animation where it is (a 3D model's Animator, or a 2D Animation).",
+   "params": [
+    "entity"
+   ],
+   "min": 1,
+   "param_types": [
+    "entity"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "animation_clips",
+   "signature": "animation_clips(entity)",
+   "doc": "The names of the animations in an entity's 3D model (a .gltf / .glb).",
+   "params": [
+    "entity"
+   ],
+   "min": 1,
+   "param_types": [
+    "entity"
+   ],
+   "returns": "list[string]"
+  },
+  {
+   "name": "find_with",
+   "signature": "find_with(component)",
+   "doc": "Every entity with that component (one of the engine's, or the game's own): `for e in find_with(\"Health\") { ... }`.",
+   "params": [
+    "component"
+   ],
+   "min": 1,
+   "param_types": [
+    "string"
+   ],
+   "returns": "list[entity]"
   }
  ],
  "properties": [
@@ -2111,7 +2420,7 @@
   {
    "name": "position",
    "type": "vec2",
-   "doc": "Transform.position, in the parent's space"
+   "doc": "Transform.position, in the parent's space (a vec3 in @3d files: Transform3D.position)"
   },
   {
    "name": "x",
@@ -2126,22 +2435,22 @@
   {
    "name": "rotation",
    "type": "number",
-   "doc": "Transform.rotation (degrees, clockwise), relative to the parent"
+   "doc": "Transform.rotation (degrees, clockwise), relative to the parent. In @3d files a vec3: Transform3D.rotation (pitch, yaw, roll in degrees)"
   },
   {
    "name": "scale",
    "type": "vec2",
-   "doc": "Transform.scale (set a number or a vec2)"
+   "doc": "Transform.scale (set a number or a vec2) (a vec3 in @3d files)"
   },
   {
    "name": "global_position",
    "type": "vec2",
-   "doc": "Where it is in the world, after its parents"
+   "doc": "Where it is in the world, after its parents (a vec3 in @3d files)"
   },
   {
    "name": "global_rotation",
    "type": "number",
-   "doc": "Rotation in the world, after its parents"
+   "doc": "Rotation in the world, after its parents (a vec3 in @3d files)"
   },
   {
    "name": "parent",
@@ -2151,12 +2460,12 @@
   {
    "name": "velocity",
    "type": "vec2",
-   "doc": "RigidBody.velocity, or Motion.velocity"
+   "doc": "RigidBody.velocity, or Motion.velocity (in @3d files: RigidBody3D.velocity, a vec3)"
   },
   {
    "name": "angular_velocity",
    "type": "number",
-   "doc": "RigidBody.angular_velocity (degrees / second)"
+   "doc": "RigidBody.angular_velocity (degrees / second) (in @3d files a vec3 about x, y, z)"
   },
   {
    "name": "alive",
@@ -2167,6 +2476,26 @@
    "name": "id",
    "type": "number",
    "doc": "A number unique to the entity"
+  },
+  {
+   "name": "z",
+   "type": "number",
+   "doc": "Transform3D.position.z (3D entities)"
+  },
+  {
+   "name": "forward",
+   "type": "vec3",
+   "doc": "Which way a 3D entity faces: its -z in the world (read only)"
+  },
+  {
+   "name": "right",
+   "type": "vec3",
+   "doc": "A 3D entity's +x in the world (read only)"
+  },
+  {
+   "name": "up",
+   "type": "vec3",
+   "doc": "A 3D entity's +y in the world (read only)"
   }
  ],
  "vec2": [
@@ -2240,7 +2569,8 @@
    "angular_velocity",
    "linear_damping",
    "angular_damping",
-   "fixed_rotation"
+   "fixed_rotation",
+   "bullet"
   ],
   "Collider": [
    "shape",
@@ -2251,7 +2581,8 @@
    "bounce",
    "trigger",
    "layer",
-   "mask"
+   "mask",
+   "one_way"
   ],
   "PhysicsWorld": [
    "gravity",
@@ -2296,6 +2627,116 @@
    "limit_max",
    "ui_layer",
    "pixel_snap"
+  ],
+  "Transform3D": [
+   "position",
+   "rotation",
+   "scale"
+  ],
+  "Mesh": [
+   "shape",
+   "file",
+   "texture",
+   "color",
+   "lit",
+   "cull",
+   "visible",
+   "uv_scale",
+   "shadow",
+   "cast_shadow"
+  ],
+  "Camera3D": [
+   "projection",
+   "fov",
+   "size",
+   "near_clip",
+   "far_clip",
+   "active",
+   "priority",
+   "clear",
+   "clear_color",
+   "fog",
+   "fog_color",
+   "fog_start",
+   "fog_end"
+  ],
+  "Light": [
+   "kind",
+   "color",
+   "intensity",
+   "range",
+   "shadows",
+   "shadow_range"
+  ],
+  "RigidBody3D": [
+   "type",
+   "mass",
+   "gravity_scale",
+   "velocity",
+   "angular_velocity",
+   "linear_damping",
+   "angular_damping",
+   "lock_rotation"
+  ],
+  "Collider3D": [
+   "shape",
+   "size",
+   "radius",
+   "offset",
+   "friction",
+   "bounce",
+   "trigger",
+   "layer",
+   "mask"
+  ],
+  "PhysicsWorld3D": [
+   "gravity",
+   "iterations"
+  ],
+  "Joint": [
+   "kind",
+   "other",
+   "anchor",
+   "other_anchor",
+   "length",
+   "stiffness",
+   "damping",
+   "collide"
+  ],
+  "Particles": [
+   "emitting",
+   "rate",
+   "burst",
+   "max",
+   "lifetime",
+   "lifetime_random",
+   "speed",
+   "speed_random",
+   "angle",
+   "spread",
+   "area",
+   "gravity",
+   "drag",
+   "size_start",
+   "size_end",
+   "color_start",
+   "color_end",
+   "shape",
+   "image",
+   "blend",
+   "layer",
+   "local",
+   "auto_destroy"
+  ],
+  "Animator": [
+   "clip",
+   "speed",
+   "loop",
+   "playing",
+   "blend"
+  ],
+  "Prefab": [
+   "file"
   ]
  },
  "callbacks": [
@@ -2314,7 +2755,7 @@
   {
    "name": "on_collision",
    "signature": "on_collision(other: entity, normal: vec2, speed: number) -> void",
-   "doc": "This collider started touching other's.",
+   "doc": "This collider started touching other's. In @3d files the normal is a vec3 (normal: vec3).",
    "snippet": "func on_collision(other: entity, normal: vec2, speed: number) -> void {\n\t$0\n}"
   },
   {
@@ -2384,7 +2825,9 @@
   "false": "false",
   "nil": "Nothing. nil, false and 0 count as false.",
   "self": "The entity running this script.",
-  "@strict": "At the top of a file: every var, parameter and function result must have a type (`var hp: int = 3`, `var hp := 3`, `func f(a: vec2) -> bool`)."
+  "@strict": "At the top of a file: every var, parameter and function result must have a type (`var hp: int = 3`, `var hp := 3`, `func f(a: vec2) -> bool`).",
+  "@3d": "At the top of a file: the script drives a 3D entity, so self.position, rotation, scale, velocity... are vec3s, and z, forward, right and up exist. Combine with @strict.",
+  "component": "Declares one of the game's own components: `component Health { var hp: int = 3 }`. Its fields need types (int, number, bool, string, vec2, vec3, color, entity, enum(a, b)); scenes save it, the editor's inspector edits it, and scripts use it as `self.Health.hp`."
  },
  "types": [
   {
@@ -2410,6 +2853,10 @@
   {
    "name": "vec2",
    "doc": "A 2D vector: `.x`, `.y`, `.length`."
+  },
+  {
+   "name": "vec3",
+   "doc": "A 3D vector: `.x`, `.y`, `.z`, `.length`."
   },
   {
    "name": "list",
@@ -2596,7 +3043,18 @@
     "Tilemap",
     "Tags",
     "Animation",
-    "Camera"
+    "Camera",
+    "Transform3D",
+    "Mesh",
+    "Camera3D",
+    "Light",
+    "RigidBody3D",
+    "Collider3D",
+    "PhysicsWorld3D",
+    "Joint",
+    "Particles",
+    "Animator",
+    "Prefab"
    ],
    "waves": [
     "sine",
@@ -2604,6 +3062,22 @@
     "triangle",
     "saw",
     "noise"
+   ],
+   "eases": [
+    "linear",
+    "ease_in",
+    "ease_out",
+    "ease_in_out",
+    "cubic_in",
+    "cubic_out",
+    "cubic_in_out",
+    "sine_in",
+    "sine_out",
+    "sine_in_out",
+    "back_in",
+    "back_out",
+    "elastic_out",
+    "bounce_out"
    ]
   },
   "args": {
@@ -2669,7 +3143,34 @@
    },
    "push_scene": {
     "0": ".scene"
+   },
+   "tween": {
+    "4": "eases"
+   },
+   "ease": {
+    "0": "eases"
+   },
+   "find_with": {
+    "0": "components"
    }
   }
- }
+ },
+ "vec3": [
+  {
+   "name": "x",
+   "doc": "x"
+  },
+  {
+   "name": "y",
+   "doc": "y"
+  },
+  {
+   "name": "z",
+   "doc": "z"
+  },
+  {
+   "name": "length",
+   "doc": "length (read only)"
+  }
+ ]
 }
