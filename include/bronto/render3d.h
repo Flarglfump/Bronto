@@ -102,7 +102,7 @@ br_material br_material_make(br_color color);
 
 /* ---- the 3D pass ------------------------------------------------------------------ */
 #define BR_R3D_MAX_LIGHTS 8
-typedef struct br_r3d_stats { uint32_t meshes, triangles, culled, pixels; } br_r3d_stats;
+typedef struct br_r3d_stats { uint32_t meshes, triangles, culled, pixels, culled_meshes; } br_r3d_stats;   /* culled_meshes: skipped whole (wholly out of view) */
 
 typedef struct br_r3d {
     br_renderer *r;

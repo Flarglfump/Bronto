@@ -659,12 +659,27 @@ bool br_r3d_shadow_begin(br_r3d *r3, int light, br_vec3 centre, float radius, in
     return true;
 }
 
+/* Whether a mesh's bounding box is wholly off the shadow map (to a side, or past its far
+ * end); things between the light and the map still cast their shadows on to it. */
+static bool mesh_off_shadow_map(const br_mesh *m, br_mat4 mvp) {
+    int k, out_l = 0, out_r = 0, out_b = 0, out_t = 0, out_f = 0;
+    for (k = 0; k < 8; ++k) {
+        br_vec3 p = br_v3((k & 1) ? m->max.x : m->min.x, (k & 2) ? m->max.y : m->min.y, (k & 4) ? m->max.z : m->min.z);
+        br_vec3 c = br_m4_mul_point(mvp, p);
+        out_l += c.x < -1; out_r += c.x > 1;
+        out_b += c.y < -1; out_t += c.y > 1;
+        out_f += c.z > 1;
+    }
+    return out_l == 8 || out_r == 8 || out_b == 8 || out_t == 8 || out_f == 8;
+}
+
 void br_r3d_shadow_mesh(br_r3d *r3, const br_mesh *m, br_mat4 model) {
     br_mat4 mvp;
     uint32_t i;
     int size = r3->shadow_size;
     if (!r3->shadow_depth || !m || !m->index_count) return;
     mvp = br_m4_mul(r3->shadow_vp, model);
+    if (mesh_off_shadow_map(m, mvp)) return;
     for (i = 0; i + 2 < m->index_count; i += 3) {
         float sx[3], sy[3], sz[3], minx, maxx, miny, maxy, area, inv;
         int k, x0, x1, y0, y1, x, y;
@@ -842,6 +857,21 @@ static void raster(br_r3d *r3, svert v0, svert v1, svert v2, const br_material *
     }
 }
 
+/* Whether a mesh's bounding box is wholly outside the view (beyond one side of the
+ * frustum, near and far planes included): then none of its triangles need to be
+ * looked at. */
+static bool mesh_outside_view(const br_mesh *m, br_mat4 mvp) {
+    int k, out_l = 0, out_r = 0, out_b = 0, out_t = 0, out_n = 0, out_f = 0;
+    for (k = 0; k < 8; ++k) {
+        br_vec3 p = br_v3((k & 1) ? m->max.x : m->min.x, (k & 2) ? m->max.y : m->min.y, (k & 4) ? m->max.z : m->min.z);
+        br_vec4 c = br_m4_mul_v4(mvp, br_v4(p.x, p.y, p.z, 1));
+        out_l += c.x < -c.w; out_r += c.x > c.w;
+        out_b += c.y < -c.w; out_t += c.y > c.w;
+        out_n += c.z < -c.w; out_f += c.z > c.w;
+    }
+    return out_l == 8 || out_r == 8 || out_b == 8 || out_t == 8 || out_n == 8 || out_f == 8;
+}
+
 void br_r3d_draw_mesh(br_r3d *r3, const br_mesh *m, br_mat4 model, const br_material *mat) {
     br_mat4 mvp, nm;
     uint32_t i;
@@ -849,6 +879,7 @@ void br_r3d_draw_mesh(br_r3d *r3, const br_mesh *m, br_mat4 model, const br_mate
     int na = shadowed ? NA : NA_PLAIN;
     if (!r3->r || !m || !m->index_count || !r3->depth) return;
     mvp = br_m4_mul(r3->view_proj, model);
+    if (mesh_outside_view(m, mvp)) { r3->stats.culled_meshes++; return; }
     nm = br_m4_transpose(br_m4_inverse(model));        /* normals: the inverse transpose */
     mirrored = br_v3_dot(br_v3_cross(br_m4_mul_dir(model, br_v3(1, 0, 0)), br_m4_mul_dir(model, br_v3(0, 1, 0))),
                          br_m4_mul_dir(model, br_v3(0, 0, 1))) < 0;

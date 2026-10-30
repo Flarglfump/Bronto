@@ -762,7 +762,11 @@ static int mesh_vs(const p3body *a, const p3body *b, br_vec3 *n, p3contact *c) {
                 float dist = br_v3_len(d), side = br_v3_dot(br_v3_sub(pts[k], p0), tn);
                 if (dist >= r) continue;
                 if (side < 0 && dist < 1e-6f) continue;
-                if (side < -1e-6f) {                             /* behind the face: pushed out the front way */
+                if (side < -1e-6f) {                             /* behind the face (straight behind it, not off past an edge): */
+                    br_vec3 on = br_v3_add_scaled(pts[k], tn, -side);
+                    if (br_v3_dist(tri_closest(on, p0, p1, p2), on) > 1e-4f) side = 0;   /* (past an edge: touching that edge) */
+                }
+                if (side < -1e-6f) {                             /* ... pushed out the front way */
                     cand[count].n = tn;
                     cand[count].c.depth = r + dist;
                 } else {
@@ -1413,6 +1417,14 @@ bool br_physics3d_move(br_world *w, br_entity e, br_vec3 motion, br_vec3 *veloci
                     if (!got.on_floor || out.y > got.floor_normal.y) got.floor_normal = out;
                     got.on_floor = true;
                 } else {
+                    if (out.y > 0 && out.y < P3_FLOOR) {             /* too steep to stand on: a wall, so sliding */
+                        br_vec3 flat = br_v3(out.x, 0, out.z);        /* along it never carries the mover up it */
+                        float fl = br_v3_len(flat);
+                        if (fl > 1e-4f) {
+                            depth /= fl;
+                            out = br_v3_scale(flat, 1.0f / fl);
+                        }
+                    }
                     me.x = br_v3_add_scaled(me.x, out, depth + P3_SKIN);
                     if (out.y <= -P3_FLOOR) got.on_ceiling = true;
                     else got.on_wall = true;
