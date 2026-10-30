@@ -2232,7 +2232,7 @@ struct sc_runtime {
     br_rng rng;
     br_rng draw_rng;                  /* random() inside draw(), which may not run every frame */
     br_renderer *draw_r;              /* while a draw() runs: what draw_rect() and the rest draw on */
-    uint64_t text_frame, wheel_frame; /* the engine frame whose typed text / wheel a script last took */
+    uint64_t text_frame, wheel_frame, motion_frame; /* the engine frame whose typed text / wheel / mouse motion a script last took */
     int busy;                       /* calls in progress: no collecting */
 };
 
@@ -4622,7 +4622,7 @@ static sc_value bi_tween_repeat(ARGS) {
 static sc_value bi_tween_then(ARGS) {
     sc_tween *tw = sc_need_tween(vm, &a[0], line, "tween_then()");
     const char *fn = sc_need_str(vm, &a[1], line, "tween_then() function");
-    int f;
+    int f = -1;
     BR_UNUSED(n);
     if (!vm->inst || !vm->inst->prog || (f = sc_find_func(vm->inst->prog, fn)) < 0)
         sc_fail(vm, line, "tween_then(): this script has no function %s()", fn);
@@ -5143,6 +5143,26 @@ static sc_value bi_mouse_released(ARGS) {
     return sc_bool(e && br_mouse_released(&e->input, (br_mouse_button)b));
 }
 /* mouse_wheel(): how far the wheel turned since the last frame (+y: towards the player), once a frame. */
+/* How far the mouse moved since the last frame, in game pixels - also while it's
+ * locked for mouse-look, when its position stays put. Taken once a frame. */
+static sc_value bi_mouse_motion(ARGS) {
+    br_engine *e = sc_engine(vm);
+    UNUSED_ARGS;
+    if (!e || vm->rt->motion_frame == e->frame + 1) return sc_vec(0, 0);
+    vm->rt->motion_frame = e->frame + 1;
+    return sc_vec(e->input.motion_x, e->input.motion_y);
+}
+static sc_value bi_lock_mouse(ARGS) {
+    br_engine *e = sc_engine(vm);
+    BR_UNUSED(n); BR_UNUSED(line);
+    if (e) br_window_set_mouse_locked(e, sc_truthy(&a[0]));
+    return sc_nil();
+}
+static sc_value bi_mouse_locked(ARGS) {
+    br_engine *e = sc_engine(vm);
+    UNUSED_ARGS;
+    return sc_bool(e && e->window.mouse_locked);
+}
 static sc_value bi_mouse_wheel(ARGS) {
     br_engine *e = sc_engine(vm);
     UNUSED_ARGS;
@@ -5470,6 +5490,7 @@ static const sc_builtin k_builtin_table[] = {
     { "screen_size", 0, 0, bi_screen_size, ">v" },
     /* more input */
     { "mouse_released", 0, 1, bi_mouse_released, "n>b" }, { "mouse_wheel", 0, 0, bi_mouse_wheel, ">v" },
+    { "mouse_motion", 0, 0, bi_mouse_motion, ">v" }, { "lock_mouse", 1, 1, bi_lock_mouse, "b>-" }, { "mouse_locked", 0, 0, bi_mouse_locked, ">b" },
     { "text_typed", 0, 0, bi_text_typed, ">s" }, { "touches", 0, 0, bi_touches, ">l" },
     { "bind", 2, 7, bi_bind, "sssssss>-" }, { "unbind", 1, 1, bi_unbind, "s>-" },
     { "action_down", 1, 1, bi_action_down, "s>b" }, { "action_pressed", 1, 1, bi_action_pressed, "s>b" },

@@ -1780,6 +1780,37 @@
    "returns": "vec2"
   },
   {
+   "name": "mouse_motion",
+   "signature": "mouse_motion()",
+   "doc": "How far the mouse moved since the last frame, in game pixels (once a frame). Keeps coming while the mouse is locked, for mouse-look.",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "vec2"
+  },
+  {
+   "name": "lock_mouse",
+   "signature": "lock_mouse(on)",
+   "doc": "Capture the mouse for mouse-look: the pointer is hidden and held in the window, and mouse_motion() reports its movement. Let go while the window is in the background; on the web, it waits for the next click.",
+   "params": [
+    "on"
+   ],
+   "min": 1,
+   "param_types": [
+    "bool"
+   ],
+   "returns": "void"
+  },
+  {
+   "name": "mouse_locked",
+   "signature": "mouse_locked()",
+   "doc": "Whether the game has asked for the mouse to be locked (lock_mouse).",
+   "params": [],
+   "min": 0,
+   "param_types": [],
+   "returns": "bool"
+  },
+  {
    "name": "text_typed",
    "signature": "text_typed()",
    "doc": "The characters typed since the last frame (once a frame): for entering names.",

@@ -136,6 +136,7 @@ static struct {
     br_event pending[512];      /* events raised by delegates outside poll */
     int pending_count;
     bool fullscreen, minimized, cursor_hidden, cursor_hidden_now, mouse_inside, initialized;
+    bool lock_wanted, locked, unfocused;  /* mouse-look: asked for / in force (only while key) */
     float last_mx, last_my;
     mach_timebase_info_data_t timebase;
     CGColorSpaceRef colorspace;
@@ -187,8 +188,9 @@ static void win_did_deminiaturize(id self, SEL s, id n) {
     M.minimized = false;
     mac_post_simple(BR_EVENT_WINDOW_RESTORED);
 }
-static void win_did_become_key(id self, SEL s, id n) { BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(n); mac_post_simple(BR_EVENT_WINDOW_FOCUS_GAINED); }
-static void win_did_resign_key(id self, SEL s, id n) { BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(n); mac_post_simple(BR_EVENT_WINDOW_FOCUS_LOST); }
+static void apply_lock(void);
+static void win_did_become_key(id self, SEL s, id n) { BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(n); M.unfocused = false; apply_lock(); mac_post_simple(BR_EVENT_WINDOW_FOCUS_GAINED); }
+static void win_did_resign_key(id self, SEL s, id n) { BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(n); M.unfocused = true; apply_lock(); mac_post_simple(BR_EVENT_WINDOW_FOCUS_LOST); }
 static void win_did_move(id self, SEL s, id n) {
     CGRect f = msg_rect(M.window, "frame");
     br_event e = br_event_make(BR_EVENT_WINDOW_MOVED);
@@ -219,7 +221,7 @@ static BOOL view_yes_id(id self, SEL s, id e) { BR_UNUSED(self); BR_UNUSED(s); B
 /* Keys are translated in poll; these stop AppKit from beeping. */
 static void view_ignore_event(id self, SEL s, id e) { BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(e); }
 static void apply_cursor(void) {
-    bool want_hidden = M.cursor_hidden && M.mouse_inside;
+    bool want_hidden = (M.cursor_hidden && M.mouse_inside) || M.locked;
     if (want_hidden && !M.cursor_hidden_now) msg_v(cls("NSCursor"), "hide");
     if (!want_hidden && M.cursor_hidden_now) msg_v(cls("NSCursor"), "unhide");
     M.cursor_hidden_now = want_hidden;
@@ -397,8 +399,20 @@ static void translate_event(id ev) {
         break;
     }
     case NS_MOUSE_MOVED: case NS_LEFT_MOUSE_DRAGGED: case NS_RIGHT_MOUSE_DRAGGED: case NS_OTHER_MOUSE_DRAGGED: {
-        CGPoint p = event_pixel_pos(ev);
-        br_event e = br_event_mouse_move((float)p.x, (float)p.y, (float)p.x - M.last_mx, (float)p.y - M.last_my);
+        CGPoint p;
+        br_event e;
+        if (M.locked) {                        /* mouse-look: the mouse's own motion; the pointer stays put */
+            int32_t dx, dy;
+            double s = mac_scale();
+            CGGetLastMouseDelta(&dx, &dy);
+            if (dx || dy) {
+                e = br_event_mouse_move(M.last_mx, M.last_my, (float)(dx * s), (float)(dy * s));
+                mac_post(&e);
+            }
+            break;
+        }
+        p = event_pixel_pos(ev);
+        e = br_event_mouse_move((float)p.x, (float)p.y, (float)p.x - M.last_mx, (float)p.y - M.last_my);
         M.last_mx = (float)p.x;
         M.last_my = (float)p.y;
         mac_post(&e);
@@ -551,6 +565,27 @@ static void mac_set_fullscreen(bool fs) {
     msg_v_id(M.window, "toggleFullScreen:", (id)0);   /* the delegate reports the result */
 }
 
+/* Mouse-look: the pointer hidden and cut loose from the mouse (it stays where it
+ * is); mouse moves report the mouse's own motion (CGGetLastMouseDelta). */
+static void apply_lock(void) {
+    bool want = M.lock_wanted && !M.unfocused;
+    if (want == M.locked) return;
+    if (want) {
+        int32_t dx, dy;
+        CGAssociateMouseAndMouseCursorPosition(0);
+        CGGetLastMouseDelta(&dx, &dy);        /* (forget what came before) */
+    } else {
+        CGAssociateMouseAndMouseCursorPosition(1);
+    }
+    M.locked = want;
+    apply_cursor();
+}
+
+static void mac_set_mouse_locked(bool locked) {
+    M.lock_wanted = locked;
+    apply_lock();
+}
+
 static void mac_set_cursor_visible(bool visible) {
     M.cursor_hidden = !visible;
     apply_cursor();
@@ -635,6 +670,7 @@ static bool mac_init(const br_platform_config *cfg) {
 
 static void mac_shutdown(void) {
     void *pool;
+    if (M.locked) CGAssociateMouseAndMouseCursorPosition(1);
     ca_close();
     gc_shutdown();
     if (!M.initialized) return;
@@ -767,7 +803,8 @@ static const br_platform k_macos = {
     mac_clipboard_set, mac_clipboard_get,
     mac_set_gamepad_rumble,
     NULL,
-    NULL                                          /* present_overlay: the engine draws into the framebuffer */
+    NULL,                                         /* present_overlay: the engine draws into the framebuffer */
+    mac_set_mouse_locked
 };
 
 const br_platform *br_platform_native(void) { return &k_macos; }

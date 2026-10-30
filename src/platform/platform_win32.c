@@ -63,6 +63,7 @@ static struct {
     int width, height;          /* client area, pixels */
     UINT dpi;
     bool fullscreen, minimized, maximized, cursor_hidden, mouse_tracked;
+    bool lock_wanted, locked, unfocused;   /* mouse-look: asked for / in force (only while focused) */
     WINDOWPLACEMENT saved_placement;
     LONG saved_style;
     br_event pending[W32_PENDING_MAX];
@@ -228,6 +229,38 @@ static void w32_mouse_button(br_mouse_button b, bool down, LPARAM lp) {
     w32_push(&e);
 }
 
+/* Mouse-look: the pointer hidden (WM_SETCURSOR), clipped to the client area and
+ * put back in its middle after every move; the moves become motion. Called
+ * again whenever the window moves, resizes or changes focus. */
+static void w32_apply_lock(void) {
+    bool want = W.lock_wanted && !W.unfocused && !W.minimized && W.hwnd;
+    if (want) {
+        RECT r;
+        POINT c;
+        GetClientRect(W.hwnd, &r);
+        MapWindowPoints(W.hwnd, NULL, (POINT *)&r, 2);
+        ClipCursor(&r);
+        c.x = W.width / 2;
+        c.y = W.height / 2;
+        ClientToScreen(W.hwnd, &c);
+        if (!W.locked) {
+            SetCursorPos(c.x, c.y);
+            SetCursor(NULL);
+            W.last_mx = (float)(W.width / 2);
+            W.last_my = (float)(W.height / 2);
+        }
+    } else if (W.locked) {
+        ClipCursor(NULL);
+        if (!W.cursor_hidden) SetCursor(LoadCursor(NULL, IDC_ARROW));
+    }
+    W.locked = want;
+}
+
+static void w32_set_mouse_locked(bool locked) {
+    W.lock_wanted = locked;
+    w32_apply_lock();
+}
+
 static LRESULT CALLBACK w32_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CLOSE:
@@ -250,17 +283,19 @@ static LRESULT CALLBACK w32_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             e.u.resize.height = h;
             w32_push(&e);
         }
+        w32_apply_lock();
         return 0;
     }
     case WM_MOVE: {
         br_event e = br_event_make(BR_EVENT_WINDOW_MOVED);
+        w32_apply_lock();
         e.u.window.x = (short)LOWORD(lp);
         e.u.window.y = (short)HIWORD(lp);
         w32_push(&e);
         return 0;
     }
-    case WM_SETFOCUS:  w32_push_simple(BR_EVENT_WINDOW_FOCUS_GAINED); return 0;
-    case WM_KILLFOCUS: w32_push_simple(BR_EVENT_WINDOW_FOCUS_LOST); return 0;
+    case WM_SETFOCUS:  W.unfocused = false; w32_apply_lock(); w32_push_simple(BR_EVENT_WINDOW_FOCUS_GAINED); return 0;
+    case WM_KILLFOCUS: W.unfocused = true; w32_apply_lock(); w32_push_simple(BR_EVENT_WINDOW_FOCUS_LOST); return 0;
     case WM_DPICHANGED: {
         const RECT *r = (const RECT *)lp;
         br_event e = br_event_make(BR_EVENT_WINDOW_SCALE_CHANGED);
@@ -318,7 +353,19 @@ static LRESULT CALLBACK w32_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;   /* no beep for Alt+key without a menu */
     case WM_MOUSEMOVE: {
         float x = (float)(short)LOWORD(lp), y = (float)(short)HIWORD(lp);
-        br_event e = br_event_mouse_move(x, y, x - W.last_mx, y - W.last_my);
+        br_event e;
+        if (W.locked) {                        /* mouse-look: motion from the middle, then back there */
+            POINT c;
+            c.x = W.width / 2;
+            c.y = W.height / 2;
+            if ((int)x == c.x && (int)y == c.y) return 0;       /* (our own SetCursorPos) */
+            e = br_event_mouse_move(W.last_mx, W.last_my, x - (float)c.x, y - (float)c.y);
+            ClientToScreen(hwnd, &c);
+            SetCursorPos(c.x, c.y);
+            w32_push(&e);
+            return 0;
+        }
+        e = br_event_mouse_move(x, y, x - W.last_mx, y - W.last_my);
         if (!W.mouse_tracked) {
             TRACKMOUSEEVENT t;
             memset(&t, 0, sizeof(t));
@@ -357,7 +404,7 @@ static LRESULT CALLBACK w32_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
     }
     case WM_SETCURSOR:
-        if (W.cursor_hidden && LOWORD(lp) == HTCLIENT) { SetCursor(NULL); return TRUE; }
+        if ((W.cursor_hidden || W.locked) && LOWORD(lp) == HTCLIENT) { SetCursor(NULL); return TRUE; }
         break;
     case WM_SYSCOMMAND: {
         WPARAM cmd = wp & 0xFFF0;
@@ -582,6 +629,7 @@ static void w32_set_icon(const br_image *icon) {
 }
 
 static void w32_shutdown(void) {
+    if (W.locked) ClipCursor(NULL);               /* (a clip outlives the window otherwise) */
     wo_close();
     xi_shutdown();
     if (!W.hwnd) return;
@@ -774,7 +822,8 @@ static const br_platform k_win32 = {
     w32_clipboard_set, w32_clipboard_get,
     w32_set_gamepad_rumble,
     NULL,
-    NULL                                          /* present_overlay: the engine draws into the framebuffer */
+    NULL,                                         /* present_overlay: the engine draws into the framebuffer */
+    w32_set_mouse_locked
 };
 
 const br_platform *br_platform_native(void) { return &k_win32; }

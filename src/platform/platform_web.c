@@ -42,6 +42,7 @@ BW_IMPORT(poll_gamepads)  void   bw_js_poll_gamepads(void);          /* calls br
 BW_IMPORT(rumble)         int    bw_js_rumble(int pad, double low, double high);
 BW_IMPORT(run_loop)       void   bw_js_run_loop(void);               /* starts calling bronto_web_frame */
 BW_IMPORT(overlay)        void   bw_js_overlay(const void *items, int count);   /* br_overlay_item[count], over the canvas */
+BW_IMPORT(set_mouse_lock) void   bw_js_set_mouse_lock(int on);       /* pointer lock: now if allowed, else on the next click */
 
 static struct {
     bool open;
@@ -113,6 +114,7 @@ static void web_present(const br_image *fb, br_recti vp) {
 typedef char bw_overlay_layout[(sizeof(br_overlay_item) == 40 && offsetof(br_overlay_item, fill) == 20 &&
                                 offsetof(br_overlay_item, text) == 32) ? 1 : -1];
 static void web_present_overlay(const br_overlay_item *items, int count) { bw_js_overlay(items, count); }
+static void web_set_mouse_locked(bool locked) { bw_js_set_mouse_lock(locked ? 1 : 0); }
 
 static void web_sleep(double seconds) { if (seconds > 0) W.wake = web_time() + seconds; }
 
@@ -179,7 +181,8 @@ static const br_platform k_web = {
     web_clipboard_set, web_clipboard_get,
     web_rumble,
     web_run_loop,
-    web_present_overlay
+    web_present_overlay,
+    web_set_mouse_locked
 };
 
 const br_platform *br_platform_native(void) { return &k_web; }
@@ -189,6 +192,7 @@ BW_EXPORT(bronto_web_frame) int bronto_web_frame(void);
 BW_EXPORT(bronto_web_key) void bronto_web_key(int key, int scancode, int mods, int down, int repeat);
 BW_EXPORT(bronto_web_text) void bronto_web_text(uint32_t codepoint);
 BW_EXPORT(bronto_web_mouse_move) void bronto_web_mouse_move(float x, float y);
+BW_EXPORT(bronto_web_mouse_motion) void bronto_web_mouse_motion(float dx, float dy);
 BW_EXPORT(bronto_web_mouse_button) void bronto_web_mouse_button(int button, int down, float x, float y);
 BW_EXPORT(bronto_web_wheel) void bronto_web_wheel(float dx, float dy);
 BW_EXPORT(bronto_web_touch) void bronto_web_touch(int phase, int id, float x, float y);
@@ -232,6 +236,12 @@ void bronto_web_mouse_move(float x, float y) {
     br_event e = br_event_mouse_move(x, y, x - W.mouse_x, y - W.mouse_y);
     W.mouse_x = x;
     W.mouse_y = y;
+    web_queue(&e);
+}
+
+/* Pointer locked (mouse-look): the mouse's own motion, in device pixels; the pointer stays put. */
+void bronto_web_mouse_motion(float dx, float dy) {
+    br_event e = br_event_mouse_move(W.mouse_x, W.mouse_y, dx, dy);
     web_queue(&e);
 }
 

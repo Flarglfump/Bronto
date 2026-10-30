@@ -236,7 +236,10 @@ typedef struct { int type; Display *display; XID resourceid; unsigned long seria
     F(Window, XGetSelectionOwner, (Display *, Atom)) \
     F(int, XConvertSelection, (Display *, Atom, Atom, Atom, Window, Time)) \
     F(Bool, XCheckTypedWindowEvent, (Display *, Window, int, XEvent *)) \
-    F(int, XDeleteProperty, (Display *, Window, Atom))
+    F(int, XDeleteProperty, (Display *, Window, Atom)) \
+    F(int, XWarpPointer, (Display *, Window, Window, int, int, unsigned int, unsigned int, int, int)) \
+    F(int, XGrabPointer, (Display *, Window, Bool, unsigned int, int, int, Window, Cursor, Time)) \
+    F(int, XUngrabPointer, (Display *, Time))
 
 #define X11_DECLARE(ret, name, args) typedef ret (*name##_fn) args; static name##_fn p##name;
 X11_FUNCS(X11_DECLARE)
@@ -266,6 +269,7 @@ static struct {
     bool fullscreen, minimized, maximized, mapped, hidden;
     bool cursor_hidden;
     Cursor blank_cursor;
+    bool lock_wanted, locked, focused;   /* mouse-look: asked for / in force (only while focused) */
     float last_mx, last_my;
     bool key_down[256];
     br_events *events;
@@ -585,12 +589,39 @@ static void x11_set_cursor_visible(bool visible) {
     pXFlush(X.dpy);
 }
 
+/* Mouse-look: hide the pointer, keep it in the window (a grab confined to it)
+ * and put it back in the middle after every move; the moves become motion. */
+static void x11_apply_lock(void) {
+    bool want = X.lock_wanted && X.focused && X.mapped;
+    if (want == X.locked) return;
+    if (want) {
+        bool was_hidden = X.cursor_hidden;
+        x11_set_cursor_visible(false);
+        X.cursor_hidden = was_hidden;          /* (show_cursor's own setting comes back on unlock) */
+        pXGrabPointer(X.dpy, X.win, 1, (1L << 2) | (1L << 3) | (1L << 6), 1, 1, X.win, X.blank_cursor, 0);
+        pXWarpPointer(X.dpy, 0, X.win, 0, 0, 0, 0, X.width / 2, X.height / 2);
+        X.last_mx = (float)(X.width / 2);
+        X.last_my = (float)(X.height / 2);
+    } else {
+        pXUngrabPointer(X.dpy, 0);
+        if (X.cursor_hidden) pXDefineCursor(X.dpy, X.win, X.blank_cursor); else pXUndefineCursor(X.dpy, X.win);
+    }
+    X.locked = want;
+    pXFlush(X.dpy);
+}
+
+static void x11_set_mouse_locked(bool locked) {
+    X.lock_wanted = locked;
+    x11_apply_lock();
+}
+
 /* ==== lifecycle ============================================================== */
 static bool x11_init(const br_platform_config *cfg) {
     Atom protocols[1];
     static const char wm_class[] = "bronto\0Bronto";
     memset(&X, 0, sizeof(X));
     X.cfg = *cfg;
+    X.focused = true;                         /* (until told otherwise: not every setup sends FocusIn) */
     if (!load_x11()) return false;
     X.dpy = pXOpenDisplay(NULL);
     if (!X.dpy) { BR_ERROR("X11: cannot open display (is DISPLAY set?)"); return false; }
@@ -813,7 +844,16 @@ static void x11_poll(br_events *events) {
         }
         case X_MotionNotify: {
             float mx = (float)ev.xmotion.x, my = (float)ev.xmotion.y;
-            br_event e = br_event_mouse_move(mx, my, mx - X.last_mx, my - X.last_my);
+            br_event e;
+            if (X.locked) {                    /* mouse-look: motion from the middle, then back there */
+                int cx = X.width / 2, cy = X.height / 2;
+                if (ev.xmotion.x == cx && ev.xmotion.y == cy) break;    /* (our own warp) */
+                e = br_event_mouse_move(X.last_mx, X.last_my, mx - (float)cx, my - (float)cy);
+                pXWarpPointer(X.dpy, 0, X.win, 0, 0, 0, 0, cx, cy);
+                x11_post(&e);
+                break;
+            }
+            e = br_event_mouse_move(mx, my, mx - X.last_mx, my - X.last_my);
             X.last_mx = mx;
             X.last_my = my;
             x11_post(&e);
@@ -822,10 +862,16 @@ static void x11_poll(br_events *events) {
         case X_EnterNotify: x11_post_simple(BR_EVENT_MOUSE_ENTER); break;
         case X_LeaveNotify: x11_post_simple(BR_EVENT_MOUSE_LEAVE); break;
         case X_FocusIn:
-            if (ev.xfocus.mode == 0 || ev.xfocus.mode == 3) x11_post_simple(BR_EVENT_WINDOW_FOCUS_GAINED);
+            if (ev.xfocus.mode == 0 || ev.xfocus.mode == 3) {
+                X.focused = true;
+                x11_apply_lock();
+                x11_post_simple(BR_EVENT_WINDOW_FOCUS_GAINED);
+            }
             break;
         case X_FocusOut:
             if (ev.xfocus.mode == 0 || ev.xfocus.mode == 3) {
+                X.focused = false;
+                x11_apply_lock();
                 memset(X.key_down, 0, sizeof(X.key_down));
                 x11_post_simple(BR_EVENT_WINDOW_FOCUS_LOST);
             }
@@ -842,10 +888,12 @@ static void x11_poll(br_events *events) {
             break;
         case X_UnmapNotify:
             X.mapped = false;
+            x11_apply_lock();
             if (!X.hidden && !X.minimized) { X.minimized = true; x11_post_simple(BR_EVENT_WINDOW_MINIMIZED); }
             break;
         case X_MapNotify:
             X.mapped = true;
+            x11_apply_lock();
             if (X.minimized) { X.minimized = false; x11_post_simple(BR_EVENT_WINDOW_RESTORED); }
             break;
         case X_PropertyNotify:
@@ -913,7 +961,8 @@ static const br_platform k_x11 = {
     x11_clipboard_set, x11_clipboard_get,
     x11_set_gamepad_rumble,
     NULL,
-    NULL                                          /* present_overlay: the engine draws into the framebuffer */
+    NULL,                                         /* present_overlay: the engine draws into the framebuffer */
+    x11_set_mouse_locked
 };
 
 const br_platform *br_platform_native(void) { return &k_x11; }

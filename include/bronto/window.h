@@ -67,6 +67,7 @@ typedef struct br_window_state {
     bool fullscreen;
     bool mouse_inside;
     bool cursor_visible;
+    bool mouse_locked;        /* mouse-look asked for (br_window_set_mouse_locked) */
     br_scale_mode scale_mode;
     int pixel_scale;          /* BR_SCALE_RESIZE: window pixels per fb pixel */
     br_viewport viewport;
@@ -83,6 +84,9 @@ void  br_window_set_fullscreen(struct br_engine *e, bool fullscreen);
 void  br_window_toggle_fullscreen(struct br_engine *e);
 bool  br_window_is_fullscreen(const struct br_engine *e);
 void  br_window_set_cursor_visible(struct br_engine *e, bool visible);
+/* Mouse-look: hide the pointer and keep it in the window, with mouse moves
+ * reporting relative motion (input: mouse motion). Platforms without it ignore it. */
+void  br_window_set_mouse_locked(struct br_engine *e, bool locked);
 /* The app's icon: any size (square, 64x64 or larger looks best); copied,
  * so the image can be freed afterwards. NULL restores the default. */
 void  br_window_set_icon(struct br_engine *e, const br_image *icon);

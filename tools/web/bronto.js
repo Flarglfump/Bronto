@@ -284,6 +284,19 @@ async function start(opts) {
         canvas.height = h;
         return true;
     }
+    /* ---- pointer lock (mouse-look): browsers grant it only from a click, so a refusal
+       just waits for the next pointerdown on the canvas ---- */
+    let lockWanted = false;
+    function pointerLocked() { return !!(doc && canvas && doc.pointerLockElement === canvas); }
+    function tryLock() {
+        if (!lockWanted || !canvas || !canvas.requestPointerLock || pointerLocked()) return;
+        try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* not now */ }
+    }
+    function canvasScale() {
+        const r = canvas.getBoundingClientRect();
+        return [canvas.width / (r.width || 1), canvas.height / (r.height || 1)];
+    }
+
     function canvasPoint(e) {
         const r = canvas.getBoundingClientRect();
         return [(e.clientX - r.left) * (canvas.width / (r.width || 1)), (e.clientY - r.top) * (canvas.height / (r.height || 1))];
@@ -383,6 +396,11 @@ async function start(opts) {
             } catch (e) { /* not allowed now */ }
         },
         set_cursor(visible) { if (canvas) canvas.style.cursor = visible ? '' : 'none'; },
+        set_mouse_lock(on) {
+            lockWanted = !!on;
+            if (lockWanted) tryLock();
+            else if (pointerLocked() && doc.exitPointerLock) doc.exitPointerLock();
+        },
         set_icon(p, w, h) {
             if (!doc || opts.setIcon === false) return;
             const c = doc.createElement('canvas');
@@ -595,6 +613,11 @@ async function start(opts) {
             syncModifiers(e, 0);
             const [x, y] = canvasPoint(e);
             if (isTouch(e)) { if (fingers.has(e.pointerId)) call(exports.bronto_web_touch, 1, e.pointerId, x, y); e.preventDefault(); return; }
+            if (pointerLocked()) {
+                const [sx, sy] = canvasScale();
+                if (e.movementX || e.movementY) call(exports.bronto_web_mouse_motion, (e.movementX || 0) * sx, (e.movementY || 0) * sy);
+                return;
+            }
             call(exports.bronto_web_mouse_move, x, y);
         });
         on(canvas, 'pointerdown', (e) => {
@@ -607,7 +630,8 @@ async function start(opts) {
                 fingers.add(e.pointerId);
                 call(exports.bronto_web_touch, 0, e.pointerId, x, y);
             } else {
-                call(exports.bronto_web_mouse_move, x, y);
+                tryLock();
+                if (!pointerLocked()) call(exports.bronto_web_mouse_move, x, y);
                 if (BUTTONS[e.button] !== undefined) call(exports.bronto_web_mouse_button, BUTTONS[e.button], 1, x, y);
             }
             e.preventDefault();
