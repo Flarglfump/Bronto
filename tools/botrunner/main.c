@@ -240,6 +240,25 @@ int main(int argc, char **argv) {
             int k = 0, d = 0;
             sscanf(rest, "%d %d", &k, &d);
             if (k > 0 && k < BR_KEY_COUNT) br_replay_key((br_key)k, d != 0);
+        } else if (strcmp(cmd, "mouse") == 0) {
+            /* mouse move <dx> <dy> (window pixels) | mouse button <0-2> <down>: straight to the
+             * engine (not recorded), for trying mouse controls */
+            char what[16] = "";
+            float p1 = 0, p2 = 0;
+            br_event ev;
+            sscanf(rest, "%15s %f %f", what, &p1, &p2);
+            if (strcmp(what, "move") == 0) {
+                ev = br_event_mouse_move(100, 100, p1, p2);
+                br_events_post(&g_e->events, &ev);
+            } else if (strcmp(what, "button") == 0) {
+                ev = br_event_make(p2 != 0 ? BR_EVENT_MOUSE_BUTTON_DOWN : BR_EVENT_MOUSE_BUTTON_UP);
+                ev.u.mouse_button.button = (br_mouse_button)(int)p1;
+                ev.u.mouse_button.x = ev.u.mouse_button.wx = 100;
+                ev.u.mouse_button.y = ev.u.mouse_button.wy = 100;
+                ev.u.mouse_button.clicks = 1;
+                br_events_post(&g_e->events, &ev);
+            }
+            printf("locked %d\n", br_headless_mouse_locked() ? 1 : 0);
         } else if (strcmp(cmd, "frame") == 0) {
             long n = atol(rest);
             while (n-- > 0 && !g_ended) {
