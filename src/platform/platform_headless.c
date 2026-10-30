@@ -30,7 +30,7 @@ static struct {
     int win_w, win_h;    /* pixels */
     int saved_w, saved_h;
     float scale;
-    bool fullscreen, cursor_visible;
+    bool fullscreen, cursor_visible, mouse_locked;
     char title[256];
     br_gamepad_raw pads[BR_MAX_GAMEPADS];
     br_gamepad_tracker pad_tracker;
@@ -188,6 +188,7 @@ static void hl_set_fullscreen(bool fs) {
 }
 
 static void hl_set_cursor_visible(bool v) { g_hl.cursor_visible = v; }
+static void hl_set_mouse_locked(bool v) { g_hl.mouse_locked = v; }
 
 static bool hl_set_gamepad_rumble(int pad, float lo, float hi) {
     if (pad < 0 || pad >= BR_MAX_GAMEPADS || !g_hl.pads[pad].connected) return false;
@@ -204,7 +205,8 @@ static const br_platform k_headless = {
     NULL, NULL,                                   /* clipboard: the engine keeps a private one */
     hl_set_gamepad_rumble,
     NULL,
-    NULL                                          /* present_overlay: the engine draws into the framebuffer */
+    NULL,                                         /* present_overlay: the engine draws into the framebuffer */
+    hl_set_mouse_locked                           /* (just remembered: injected moves carry their own dx, dy) */
 };
 
 const br_platform *br_platform_headless(void) { return &k_headless; }
@@ -217,6 +219,7 @@ br_recti br_headless_last_viewport(void) { return g_hl.last_viewport; }
 uint64_t br_headless_present_count(void) { return g_hl.presents; }
 double br_headless_slept(void) { return g_hl.slept; }
 bool br_headless_cursor_visible(void) { return g_hl.cursor_visible; }
+bool br_headless_mouse_locked(void) { return g_hl.mouse_locked; }
 const char *br_headless_title(void) { return g_hl.title; }
 
 void br_headless_set_gamepad(int pad, const br_gamepad_raw *state) {

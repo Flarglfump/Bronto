@@ -23,6 +23,7 @@ void br_input_begin_frame(br_input *in) {
         memset(in->pads[i].trigger_released, 0, sizeof(in->pads[i].trigger_released));
     }
     in->mouse_dx = in->mouse_dy = 0;
+    in->motion_x = in->motion_y = 0;
     in->wheel_x = in->wheel_y = 0;
     in->text_count = 0;
     for (i = 0; i < in->action_count; ++i) in->actions[i].prev_down = in->actions[i].down;
@@ -72,6 +73,10 @@ void br_input_handle_event(br_input *in, const br_event *e) {
         if (in->text_count < BR_TEXT_INPUT_MAX) in->text[in->text_count++] = e->u.text.codepoint;
         break;
     case BR_EVENT_MOUSE_MOVE:
+        if (!e->u.mouse_move.touch) {
+            in->motion_x += e->u.mouse_move.dx;
+            in->motion_y += e->u.mouse_move.dy;
+        }
         in->mouse_dx += e->u.mouse_move.x - in->mouse_x;
         in->mouse_dy += e->u.mouse_move.y - in->mouse_y;
         in->mouse_x = e->u.mouse_move.x;

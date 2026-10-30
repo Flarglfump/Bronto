@@ -131,6 +131,12 @@ void br_window_set_fullscreen(br_engine *e, bool fullscreen) {
 void br_window_toggle_fullscreen(br_engine *e) { br_window_set_fullscreen(e, !e->window.fullscreen); }
 bool br_window_is_fullscreen(const br_engine *e) { return e->window.fullscreen; }
 
+void br_window_set_mouse_locked(br_engine *e, bool locked) {
+    if (e->window.mouse_locked == locked) return;
+    e->window.mouse_locked = locked;
+    if (e->platform && e->platform->set_mouse_locked) e->platform->set_mouse_locked(locked);
+}
+
 void br_window_set_cursor_visible(br_engine *e, bool visible) {
     e->window.cursor_visible = visible;
     if (e->platform && e->platform->set_cursor_visible) e->platform->set_cursor_visible(visible);

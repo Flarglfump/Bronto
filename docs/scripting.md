@@ -545,6 +545,13 @@ the last frame), `text_typed()` (the characters typed since the last frame, for 
 entry) and `touches()` (where each finger is, leaving out those on the on-screen
 controls).
 
+**Mouse-look:** `lock_mouse(true)` captures the mouse: the pointer is hidden and held in the
+window, and `mouse_motion()` (how far the mouse moved since the last frame, in game pixels)
+keeps reporting movement however far it goes. `lock_mouse(false)` lets it go, and
+`mouse_locked()` says whether a lock was asked for. The lock lapses while the window is in
+the background and comes back with it; on the web, browsers allow it only from a click, so
+it takes hold on the next click on the game.
+
 ## Odds and ends
 
 `random_seed(n)` (the same seed gives the same numbers from then on), `clipboard()` and

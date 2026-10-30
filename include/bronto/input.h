@@ -153,6 +153,7 @@ typedef struct br_input {
 
     float mouse_x, mouse_y;
     float mouse_dx, mouse_dy;
+    float motion_x, motion_y;         /* how far the mouse itself moved this frame (also while locked for mouse-look) */
     float wheel_x, wheel_y;
     bool mouse[BR_MOUSE_BUTTON_COUNT];
     bool mouse_pressed[BR_MOUSE_BUTTON_COUNT];

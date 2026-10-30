@@ -115,6 +115,12 @@ typedef struct br_platform {
      * window's resolution, in the bars around the game too). NULL: the engine
      * draws them into the framebuffer instead, over the game. */
     void   (*present_overlay)(const br_overlay_item *items, int count);
+
+    /* Optional: capture the mouse for mouse-look - the pointer hidden and held
+     * in the window, and BR_EVENT_MOUSE_MOVE reporting how far it moved (dx, dy)
+     * while x, y stay put. Backends let go while the window is unfocused and take
+     * it back on return (the web: on the next click, as browsers insist). */
+    void   (*set_mouse_locked)(bool locked);
 } br_platform;
 
 const br_platform *br_platform_headless(void);
@@ -137,6 +143,7 @@ void br_headless_set_scale(float scale);
 /* Total seconds the engine asked to sleep (frame limiter checks). */
 double br_headless_slept(void);
 bool br_headless_cursor_visible(void);
+bool br_headless_mouse_locked(void);
 const char *br_headless_title(void);
 const br_image *br_headless_icon(void);       /* the last icon set (NULL: none) */
 /* Scripted folder dialog: what the next pick_folder answers (path, or NULL
