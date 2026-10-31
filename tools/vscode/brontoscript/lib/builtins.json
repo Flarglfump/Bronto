@@ -2427,7 +2427,45 @@
     "entity"
    ],
    "returns": "list[string]"
+  },  {
+   "name": "bone_position",
+   "signature": "bone_position(e, bone, offset = vec3(0, 0, 0))",
+   "doc": "Where a bone of e's glTF model is now, as its animation has it (a point offset from it, in the bone's own space), in the world; nil if the model has no such bone.",
+   "params": [
+    "e",
+    "bone",
+    "offset"
+   ],
+   "min": 2,
+   "param_types": [
+    "entity",
+    "string",
+    "vec3"
+   ],
+   "returns": "any"
   },
+  {
+   "name": "place_on_bone",
+   "signature": "place_on_bone(thing, e, bone, offset = vec3(0, 0, 0), rotation = vec3(0, 0, 0))",
+   "doc": "Puts thing in a bone's hand: where the bone of e's model is now, moved by offset and turned by rotation (degrees) in the bone's own space, keeping thing's scale. Call it every step to keep it there. False if there's no such bone.",
+   "params": [
+    "thing",
+    "e",
+    "bone",
+    "offset",
+    "rotation"
+   ],
+   "min": 3,
+   "param_types": [
+    "entity",
+    "entity",
+    "string",
+    "vec3",
+    "vec3"
+   ],
+   "returns": "bool"
+  },
+
   {
    "name": "find_with",
    "signature": "find_with(component)",

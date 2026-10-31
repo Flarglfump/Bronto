@@ -264,6 +264,26 @@ int main(int argc, char **argv) {
                 br_events_post(&g_e->events, &ev);
             }
             printf("locked %d\n", br_headless_mouse_locked() ? 1 : 0);
+        } else if (strcmp(cmd, "pad") == 0) {
+            /* pad button <0-14> <down> | pad axis <0-5> <value>: gamepad 0, straight to the engine
+             * (not recorded), for trying gamepad controls. Buttons and axes are br_gamepad_button
+             * and br_gamepad_axis (axis 4 is the left trigger, 5 the right). */
+            char what[16] = "";
+            float p1 = 0, p2 = 0;
+            br_event ev;
+            sscanf(rest, "%15s %f %f", what, &p1, &p2);
+            if (strcmp(what, "button") == 0) {
+                ev = br_event_make(p2 != 0 ? BR_EVENT_GAMEPAD_BUTTON_DOWN : BR_EVENT_GAMEPAD_BUTTON_UP);
+                ev.u.gamepad.pad = 0;
+                ev.u.gamepad.button = (int)p1;
+                br_events_post(&g_e->events, &ev);
+            } else if (strcmp(what, "axis") == 0) {
+                ev = br_event_make(BR_EVENT_GAMEPAD_AXIS);
+                ev.u.gamepad.pad = 0;
+                ev.u.gamepad.axis = (int)p1;
+                ev.u.gamepad.value = p2;
+                br_events_post(&g_e->events, &ev);
+            }
         } else if (strcmp(cmd, "frame") == 0) {
             long n = atol(rest);
             while (n-- > 0 && !g_ended) {

@@ -817,6 +817,23 @@ static void test_gltf_models(void) {
         br_world_run_phase(&W, BR_PHASE_FIXED_UPDATE, 0.5f);
         an = (br_animator *)br_get(&W, e, ac);
         CHECK(!an->from[0] && !an->playing && fabsf(an->time - br_animator_clip_length(&W, e, "jump")) < 1e-5f);   /* done, held */
+        {   /* a bone, where the animation has it, in the world: the entity moved and turned */
+            br_mat4 hand, still;
+            br_transform3d *t = (br_transform3d *)br_get(&W, e, I3.transform3d);
+            t->position = br_v3(10, 0, 0);
+            t->rotation = br_v3(0, 90, 0);
+            CHECK(br_model_bone_matrix(&W, e, "hand_r", &hand) && !br_model_bone_matrix(&W, e, "tail", &still));
+            CHECK(fabsf(hand.m[12] - 10) < 1.0f && hand.m[13] > 0.2f);                /* (by him, off the ground) */
+            snprintf(an->clip, sizeof(an->clip), "walk");                              /* (the jump ended arms up) arms down: the hand lower */
+            an->loop = true;
+            an->playing = true;
+            br_world_run_phase(&W, BR_PHASE_FIXED_UPDATE, 0.6f);
+            br_world_run_phase(&W, BR_PHASE_FIXED_UPDATE, 0.6f);
+            CHECK(br_model_bone_matrix(&W, e, "hand_r", &still));
+            CHECK(still.m[13] < hand.m[13] - 0.3f);
+            t->position = br_v3(0, 0, 0);
+            t->rotation = br_v3(0, 0, 0);
+        }
         {
             br_image img;
             br_renderer r;

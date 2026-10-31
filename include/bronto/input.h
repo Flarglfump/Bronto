@@ -101,6 +101,10 @@ typedef struct br_binding {
     br_binding_kind kind;
     int code;     /* key / button / axis */
     int pad;      /* gamepad index, -1 = any; for a key, BR_KEY_EITHER_SIDE or -1 */
+    /* (scripts: a stick pushed past half way has no edges of its own; these keep its state
+     * as of the fixed step it was last looked at, so a push is seen once, in one step) */
+    uint64_t step_seen;
+    bool step_was, step_now;
 } br_binding;
 
 /* br_binding.pad for a key binding: a left Shift, Ctrl, Alt or Super key also answers to

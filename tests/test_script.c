@@ -55,7 +55,7 @@ static br_entity scripted(const char *name, const char *file, const char *vars, 
     return e;
 }
 
-static void steps(int n) { while (n-- > 0) br_world_run_phase(&W, BR_PHASE_FIXED_UPDATE, 1.0f / 60.0f); }
+static void steps(int n) { while (n-- > 0) { ++g_engine.fixed_steps; br_world_run_phase(&W, BR_PHASE_FIXED_UPDATE, 1.0f / 60.0f); } }
 
 static double num(br_entity e, const char *var) {
     double v = -12345;
@@ -2754,7 +2754,50 @@ static void test_script_3d(void) {
     teardown();
 }
 
+/* A trigger or a stick bound to an action: pressed in exactly one fixed step, whether the frame
+ * it came in ran one step, two, or none (a fast display). */
+static void test_action_triggers_and_sticks(void) {
+    br_entity e;
+    br_gamepad_state *pad;
+    setup();
+    write_script("trig.bs",
+        "var focus := 0\nvar up := 0\nvar held := 0\n"
+        "func start() {\n    bind(\"focus\", \"pad:lt\")\n    bind(\"m_up\", \"pad:left_y-\")\n}\n"
+        "func update(dt) {\n"
+        "    if action_pressed(\"focus\") { focus += 1 }\n"
+        "    if action_down(\"focus\") { held += 1 }\n"
+        "    if action_pressed(\"m_up\") { up += 1 }\n"
+        "}\n");
+    e = scripted("Trig", "trig.bs", NULL, br_v2(0, 0));
+    steps(1);
+    pad = &g_engine.input.pads[0];
+    pad->connected = true;
+    /* a frame: the trigger pulled (its edge kept for the step), the stick pushed */
+    pad->axes[BR_PAD_AXIS_LEFT_TRIGGER] = 1;
+    pad->triggers[0] = pad->trigger_pressed[0] = true;
+    pad->axes[BR_PAD_AXIS_LEFT_Y] = -1;
+    steps(1);
+    pad->trigger_pressed[0] = false;                  /* (the edge is used up) */
+    steps(2);
+    CHECK(num(e, "focus") == 1 && num(e, "held") == 3 && num(e, "up") == 1);
+    /* let go, and pushed again */
+    pad->axes[BR_PAD_AXIS_LEFT_TRIGGER] = 0;
+    pad->triggers[0] = false;
+    pad->trigger_released[0] = true;
+    pad->axes[BR_PAD_AXIS_LEFT_Y] = 0;
+    steps(1);
+    pad->trigger_released[0] = false;
+    pad->axes[BR_PAD_AXIS_LEFT_Y] = -0.9f;
+    pad->axes[BR_PAD_AXIS_LEFT_TRIGGER] = 0.8f;
+    pad->triggers[0] = pad->trigger_pressed[0] = true;
+    steps(1);
+    CHECK(num(e, "focus") == 2 && num(e, "up") == 2);
+    memset(pad, 0, sizeof(*pad));
+    teardown();
+}
+
 void suite_script(void) {
+    RUN(test_action_triggers_and_sticks);
     RUN(test_extension_knows_builtins);
     RUN(test_tree_from_scripts);
     RUN(test_platformer_example);

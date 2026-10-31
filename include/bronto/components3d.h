@@ -137,6 +137,11 @@ int br_animator_clip_count(const br_world *w, br_entity e);
 const char *br_animator_clip_name(const br_world *w, br_entity e, int index);
 float br_animator_clip_length(const br_world *w, br_entity e, const char *clip);
 
+/* Where a bone (a node of an entity's glTF model, by name) is as its Animator has the model
+ * posed now, in the world: out = the entity's world matrix * the bone's. False if the entity
+ * has no model or the model no such bone. For holding things in a hand. */
+bool br_model_bone_matrix(const br_world *w, br_entity e, const char *bone, br_mat4 *out);
+
 /* Frees the shared primitive meshes (the engine calls this at shutdown). */
 void br_components3d_release(void);
 

@@ -4807,6 +4807,34 @@ static br_animator *sc_animator_for(sc_vm *vm, br_entity e, bool make) {
     return (br_animator *)br_add(vm->rt->w, e, ac, NULL);
 }
 
+/* bone_position(e, bone[, offset]): where a bone of e's model is now (a point `offset` from it,
+ * in the bone's own space), in the world; nil if there's no such bone. */
+static sc_value bi_bone_position(ARGS) {
+    br_entity e = sc_need_entity(vm, &a[0], line, "bone_position()");
+    const char *bone = sc_need_str(vm, &a[1], line, "bone_position() bone");
+    br_vec3 off = n > 2 && a[2].t != V_NIL ? sc_need_vec3(vm, &a[2], line, "bone_position() offset") : br_v3(0, 0, 0);
+    br_mat4 m;
+    if (!br_model_bone_matrix(vm->rt->w, e, bone, &m)) return sc_nil();
+    return sc_v3val(br_m4_mul_point(m, off));
+}
+/* place_on_bone(thing, e, bone[, offset[, rotation]]): puts `thing` in a bone's hand - where
+ * the bone of e's model is now, moved by `offset` and turned by `rotation` (degrees) in the
+ * bone's own space, keeping thing's own scale. Call it every step to keep it there. False if
+ * there's no such bone. */
+static sc_value bi_place_on_bone(ARGS) {
+    br_entity thing = sc_need_entity(vm, &a[0], line, "place_on_bone()");
+    br_entity e = sc_need_entity(vm, &a[1], line, "place_on_bone()");
+    const char *bone = sc_need_str(vm, &a[2], line, "place_on_bone() bone");
+    br_vec3 off = n > 3 && a[3].t != V_NIL ? sc_need_vec3(vm, &a[3], line, "place_on_bone() offset") : br_v3(0, 0, 0);
+    br_vec3 turn = n > 4 && a[4].t != V_NIL ? sc_need_vec3(vm, &a[4], line, "place_on_bone() rotation") : br_v3(0, 0, 0);
+    const br_transform3d *t = vm->rt->ids3.transform3d != BR_COMPONENT_INVALID ? (const br_transform3d *)br_get(vm->rt->w, thing, vm->rt->ids3.transform3d) : NULL;
+    br_mat4 m;
+    if (!t) sc_fail(vm, line, "place_on_bone(): the thing to place has no Transform3D");
+    if (!br_model_bone_matrix(vm->rt->w, e, bone, &m)) return sc_bool(false);
+    br_set_world_matrix3d(vm->rt->w, thing, br_m4_mul(m, br_m4_trs(off, br_quat_from_euler(turn), t->scale)));
+    return sc_bool(true);
+}
+
 static sc_value bi_play_animation(ARGS) {
     br_entity e = sc_need_entity(vm, &a[0], line, "play_animation()");
     const char *frames = sc_need_str(vm, &a[1], line, "play_animation() frames");
@@ -5287,16 +5315,32 @@ static bool sc_action_state(sc_vm *vm, const sc_value *v, int line, int which, c
                 down |= e->input.pads[p].buttons[b->code]; pressed |= e->input.pads[p].pressed[b->code]; released |= e->input.pads[p].released[b->code];
             }
             break;
-        case BR_BIND_PAD_AXIS_POS: case BR_BIND_PAD_AXIS_NEG:
+        case BR_BIND_PAD_AXIS_POS: case BR_BIND_PAD_AXIS_NEG: {
+            br_binding *mb = &e->input.actions[act].bindings[i];
+            int trig = b->kind != BR_BIND_PAD_AXIS_POS ? -1 : b->code == BR_PAD_AXIS_LEFT_TRIGGER ? 0 : b->code == BR_PAD_AXIS_RIGHT_TRIGGER ? 1 : -1;
             for (p = 0; p < BR_MAX_GAMEPADS; ++p) {
                 float x;
                 if (b->pad >= 0 && b->pad != p) continue;
+                if (trig >= 0) {                          /* a trigger: its own edges, kept for the fixed steps like a button's */
+                    down |= e->input.pads[p].triggers[trig];
+                    pressed |= e->input.pads[p].trigger_pressed[trig];
+                    released |= e->input.pads[p].trigger_released[trig];
+                    continue;
+                }
                 x = br_pad_axis(&e->input, p, (br_gamepad_axis)b->code);
                 down |= b->kind == BR_BIND_PAD_AXIS_POS ? x > 0.5f : x < -0.5f;
             }
-            pressed = down && !d->prev_down;              /* (a stick has no edges of its own) */
-            released = !down && d->prev_down;
+            if (trig < 0) {                               /* a stick has no edges of its own: since the step it was last looked at */
+                if (mb->step_seen != e->fixed_steps + 1) {
+                    mb->step_was = mb->step_now;
+                    mb->step_seen = e->fixed_steps + 1;
+                }
+                mb->step_now = down;
+                pressed = down && !mb->step_was;
+                released = !down && mb->step_was;
+            }
             break;
+        }
         default: break;
         }
         any_down |= down;
@@ -5445,7 +5489,8 @@ static const sc_builtin k_builtin_table[] = {
     { "apply_force", 2, 3, bi_apply_force, "eVV>-" }, { "apply_impulse", 2, 3, bi_apply_impulse, "eVV>-" },
     { "raycast", 2, 4, bi_raycast, "VVqn>a" }, { "entity_at", 1, 2, bi_entity_at, "Vn>e" },
     { "apply_torque", 2, 2, bi_apply_torque, "e3>-" }, { "overlap_sphere", 2, 2, bi_overlap_sphere, "3n>L" },
-    { "look_at", 2, 2, bi_look_at, "e3>-" }, { "move_and_slide", 2, 2, bi_move_and_slide, "e3>3" },
+    { "look_at", 2, 2, bi_look_at, "e3>-" }, { "bone_position", 2, 3, bi_bone_position, "es3>a" },
+    { "place_on_bone", 3, 5, bi_place_on_bone, "ees33>b" }, { "move_and_slide", 2, 2, bi_move_and_slide, "e3>3" },
     { "is_on_floor", 1, 1, bi_is_on_floor, "e>b" }, { "is_on_wall", 1, 1, bi_is_on_wall, "e>b" },
     { "is_on_ceiling", 1, 1, bi_is_on_ceiling, "e>b" },
     { "emit", 1, 2, bi_emit, "en>-" }, { "particle_count", 1, 1, bi_particle_count, "e>i" },

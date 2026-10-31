@@ -340,6 +340,10 @@ skeleton), `play_animation(e, "walk"[, speed[, loop]])` plays that animation (by
 in the file) through an Animator (added if it has none), crossfading from the last one
 over the Animator's `blend` seconds; calling it every step with the same name does
 nothing more. `animation_clips(e)` lists the names. See [3D](3d.md#animated-models).
+`bone_position(e, "hand_r"[, offset])` is where one of the model's bones is now, in the world
+(nil if there's no such bone), and `place_on_bone(thing, e, "hand_r"[, offset[, rotation]])`
+puts another entity there - in a hand, say - moved and turned in the bone's own space;
+call it every step to keep it there.
 
 **Cameras.** A Camera on an entity makes the game show the world around that entity's
 Transform: its position at the middle of the screen, `zoom`ed, turned with its rotation.

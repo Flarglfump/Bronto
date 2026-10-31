@@ -598,6 +598,17 @@ const char *br_animator_clip_name(const br_world *w, br_entity e, int i) {
     return md && i >= 0 && i < md->clip_count ? md->clips[i].name : NULL;
 }
 
+bool br_model_bone_matrix(const br_world *w, br_entity e, const char *bone, br_mat4 *out) {
+    const br_model *md = entity_model(w, e);
+    const br_mat4 *nodes;
+    int i;
+    if (!md || !bone) return false;
+    for (i = 0; i < md->node_count; ++i) if (strcmp(md->nodes[i].name, bone) == 0) break;
+    if (i == md->node_count || (nodes = model_nodes(w, e, md)) == NULL) return false;
+    *out = br_m4_mul(br_world_matrix3d(w, e), nodes[i]);
+    return true;
+}
+
 void br_animator_step(br_world *w, float dt) {
     br_component c = br_component_find(w, "Animator");
     br_component_pool *pool;
