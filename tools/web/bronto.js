@@ -596,6 +596,22 @@ async function start(opts) {
         });
         on(win, 'focus', () => call(exports.bronto_web_focus, 1));
         const BUTTONS = [0, 2, 1, 3, 4];               /* DOM button -> br_mouse_button */
+        const BUTTON_BITS = [1, 4, 2, 8, 16];          /* DOM button -> its bit in e.buttons */
+        /* With one button held, pressing or letting go of another sends no pointerdown or
+           pointerup of its own (only a pointermove with e.buttons changed): so the buttons
+           are followed by the bits in e.buttons on every pointer event, each change sent once. */
+        let buttonsHeld = 0;
+        const syncButtons = (e, x, y) => {
+            let now = typeof e.buttons === 'number' ? e.buttons : buttonsHeld;
+            if (e.type === 'pointerdown' && BUTTON_BITS[e.button]) now |= BUTTON_BITS[e.button];
+            if (e.type === 'pointerup' && BUTTON_BITS[e.button]) now &= ~BUTTON_BITS[e.button];
+            for (let b = 0; b < BUTTONS.length; ++b) {
+                const bit = BUTTON_BITS[b];
+                if ((now & bit) !== (buttonsHeld & bit)) call(exports.bronto_web_mouse_button, BUTTONS[b], (now & bit) ? 1 : 0, x, y);
+            }
+            buttonsHeld = now;
+        };
+        const releaseButtons = () => syncButtons({ type: 'release', buttons: 0 }, 0, 0);
         /* Fingers (and pens) are touches: the engine's on-screen controls take
          * them, or turn them into the mouse. The page mustn't scroll or zoom. */
         const fingers = new Set();
@@ -616,9 +632,10 @@ async function start(opts) {
             if (pointerLocked()) {
                 const [sx, sy] = canvasScale();
                 if (e.movementX || e.movementY) call(exports.bronto_web_mouse_motion, (e.movementX || 0) * sx, (e.movementY || 0) * sy);
-                return;
+            } else {
+                call(exports.bronto_web_mouse_move, x, y);
             }
-            call(exports.bronto_web_mouse_move, x, y);
+            syncButtons(e, x, y);
         });
         on(canvas, 'pointerdown', (e) => {
             resumeAudio();
@@ -632,17 +649,18 @@ async function start(opts) {
             } else {
                 tryLock();
                 if (!pointerLocked()) call(exports.bronto_web_mouse_move, x, y);
-                if (BUTTONS[e.button] !== undefined) call(exports.bronto_web_mouse_button, BUTTONS[e.button], 1, x, y);
+                syncButtons(e, x, y);
             }
             e.preventDefault();
         });
         on(canvas, 'pointerup', (e) => {
             if (isTouch(e)) { touchEnd(e); return; }
             const [x, y] = canvasPoint(e);
-            if (BUTTONS[e.button] !== undefined) call(exports.bronto_web_mouse_button, BUTTONS[e.button], 0, x, y);
+            syncButtons(e, x, y);
             e.preventDefault();
         });
-        on(canvas, 'pointercancel', (e) => { if (isTouch(e)) touchEnd(e); });
+        on(canvas, 'pointercancel', (e) => { if (isTouch(e)) touchEnd(e); else releaseButtons(); });
+        if (win) on(win, 'blur', releaseButtons);           /* (a button let go of somewhere else) */
         on(canvas, 'touchstart', (e) => e.preventDefault(), { passive: false });    /* (no double-tap zoom, no long-press menu) */
         on(canvas, 'touchmove', (e) => e.preventDefault(), { passive: false });
         on(canvas, 'pointerenter', (e) => { if (!isTouch(e)) call(exports.bronto_web_mouse_inside, 1); });
