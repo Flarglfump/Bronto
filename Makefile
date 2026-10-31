@@ -138,6 +138,9 @@ sanitize:
 examples: $(EXAMPLES)
 
 .SECONDEXPANSION:
+# Every file under a folder, in make itself (not the shell's find, which on Windows is
+# a different program).
+rwildcard = $(foreach d,$(wildcard $(1)/*),$(call rwildcard,$(d)) $(d))
 $(BUILD)/examples/%: $$(wildcard examples/%/*.c) $$(wildcard examples/%/*.h) $(LIB)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(filter %.c,$^) $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
@@ -182,8 +185,12 @@ GAMES  := $(BUILD)/games
 
 GAME_TARGET := $(if $(filter host,$(TARGET)),$(if $(filter bsd,$(PLATFORM)),linux,$(PLATFORM)),$(TARGET))
 
+# The game's folder name, from the end of its path: make splits words at spaces, so
+# (for paths like C:/Users/Jo Smith/...) only the last word of the full path is used.
+GAME_NAME := $(notdir $(lastword $(abspath $(GAME))))
+
 game: $(EDITOR) $(PLAYER) $(if $(filter web,$(GAME_TARGET)),web)
-	$(EDITOR) --build $(GAME_TARGET) $(GAME) --out $(GAMES)/$(notdir $(abspath $(GAME)))/$(GAME_TARGET)
+	$(EDITOR) --build $(GAME_TARGET) "$(GAME)" --out "$(GAMES)/$(GAME_NAME)/$(GAME_TARGET)"
 
 pantryquest:
 	@$(MAKE) --no-print-directory game GAME=examples/pantryquest TARGET=$(TARGET)
@@ -338,7 +345,7 @@ $(WEB)/%/index.html: $(WEB)/%.wasm $(WEB_RUNTIME) $(WEB_TOOL)
 	$(WEB_TOOL) --wasm $< --title "$(or $(WEB_TITLE_$*),$*)" --runtime $(WEB) -o $@
 
 # Projects made with the editor: the web player with the project packed in.
-$(WEB_PROJECT_PAGES): $(WEB)/%/index.html: $(WEB_PLAYER) $(WEB_RUNTIME) $(WEB_TOOL) $$(shell find examples/$$* -type f)
+$(WEB_PROJECT_PAGES): $(WEB)/%/index.html: $(WEB_PLAYER) $(WEB_RUNTIME) $(WEB_TOOL) $$(call rwildcard,examples/$$*)
 	$(WEB_TOOL) examples/$* --runtime $(WEB) -o $@
 
 # The test suite as WebAssembly, run by Node; then the web C library is
