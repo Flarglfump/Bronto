@@ -158,7 +158,7 @@ bool br_events_post(br_events *ev, const br_event *e) {
 bool br_events_post_data(br_events *ev, uint32_t type, const void *data, size_t size) {
     br_event e = br_event_make(type);
     if (size > BR_EVENT_USER_DATA_SIZE) {
-        BR_ERROR("event payload too large (%zu > %d)", size, BR_EVENT_USER_DATA_SIZE);
+        BR_ERROR("event payload too large (%llu > %d)", (unsigned long long)size, BR_EVENT_USER_DATA_SIZE);
         return false;
     }
     if (data && size) memcpy(e.u.user.data, data, size);
@@ -203,8 +203,8 @@ size_t br_events_dispatch(br_events *ev) {
     while (br_events_poll(ev, &e)) {
         br_events_emit(ev, &e);
         if (++delivered >= BR_DISPATCH_SAFETY_LIMIT) {
-            BR_WARN("event dispatch hit safety limit; %zu events deferred (feedback loop?)",
-                    ev->count);
+            BR_WARN("event dispatch hit safety limit; %llu events deferred (feedback loop?)",
+                    (unsigned long long)ev->count);
             break;
         }
     }

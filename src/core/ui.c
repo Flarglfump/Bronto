@@ -221,7 +221,7 @@ static bool commit_edit(br_ui *ui) {
     } else {
         char *end;
         double v = strtod(ui->edit, &end);
-        if (end != ui->edit && isfinite(v)) {
+        if (end != ui->edit && br_finite(v)) {
             write_num(ui->edit_ptr, ui->edit_kind, v, ui->edit_min, ui->edit_max);
             ok = true;
         }

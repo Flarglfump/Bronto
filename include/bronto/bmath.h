@@ -40,6 +40,13 @@ BR_INLINE float br_clampf(float x, float lo, float hi) { return x < lo ? lo : (x
 BR_INLINE float br_absf(float x) { return x < 0 ? -x : x; }
 BR_INLINE bool  br_nearf(float a, float b, float eps) { return br_absf(a - b) <= eps; }
 BR_INLINE float br_signf(float x) { return (float)((x > 0) - (x < 0)); }
+/* Neither infinite nor NaN. (Not isfinite(): MinGW's macro converts the
+ * argument to float on one of its branches, which -Wconversion reports.) */
+#if defined(__GNUC__) || defined(__clang__)
+BR_INLINE bool  br_finite(double x) { return __builtin_isfinite(x) != 0; }
+#else
+BR_INLINE bool  br_finite(double x) { return isfinite(x) != 0; }
+#endif
 
 /* ---- vec2 ------------------------------------------------------------ */
 BR_INLINE br_vec2 br_v2(float x, float y) { br_vec2 r; r.x = x; r.y = y; return r; }

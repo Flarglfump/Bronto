@@ -59,7 +59,7 @@ void *br_alloc(size_t size) {
     br_alloc_header *h;
     if (size == 0) size = 1;
     raw = (uint8_t *)g_alloc.alloc(g_alloc.user, size + BR_HEADER_SIZE);
-    if (!raw) { BR_ERROR("br_alloc: out of memory (%zu bytes)", size); return NULL; }
+    if (!raw) { BR_ERROR("br_alloc: out of memory (%llu bytes)", (unsigned long long)size); return NULL; }
     h = (br_alloc_header *)raw;
     h->size = size;
     h->magic = BR_ALLOC_MAGIC;
@@ -93,7 +93,7 @@ void *br_realloc(void *ptr, size_t new_size) {
     old_size = h->size;
     raw = (uint8_t *)g_alloc.realloc(g_alloc.user, h, old_size + BR_HEADER_SIZE,
                                      new_size + BR_HEADER_SIZE);
-    if (!raw) { BR_ERROR("br_realloc: out of memory (%zu bytes)", new_size); return NULL; }
+    if (!raw) { BR_ERROR("br_realloc: out of memory (%llu bytes)", (unsigned long long)new_size); return NULL; }
     h = (br_alloc_header *)raw;
     h->size = new_size;
     g_stats.live_bytes = g_stats.live_bytes - old_size + new_size;

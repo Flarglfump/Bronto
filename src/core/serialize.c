@@ -114,7 +114,7 @@ static bool at_end(const char *s) { return *skip_space(s) == 0; }
 static bool parse_float(const char **s, float *out) {
     char *end;
     double v = strtod(*s, &end);
-    if (end == *s || !isfinite(v)) return false;
+    if (end == *s || !br_finite(v)) return false;
     *out = (float)v;
     *s = end;
     return true;

@@ -266,14 +266,30 @@ WEB_TITLE_bounce := Bounce
 web: $(WEB_PLAYER) $(WEB_RUNTIME) $(WEB_TOOL) $(WEB_PAGES) $(WASM_OBJ)/unity.stamp
 	@echo "Web pages: $(WEB_PAGES)"
 
-# A clear message, rather than a pile of errors, when the compiler can't make WebAssembly.
-$(WASM_OBJ)/toolchain.ok:
+# A clear message, rather than a pile of errors, when the compiler can't make WebAssembly:
+# it has to have the wasm32 target, link with wasm-ld, and turn setjmp/longjmp into
+# WebAssembly exceptions (-mllvm -wasm-enable-sjlj: clang 14 or later; tested with clang 18).
+# (Checked again whenever this Makefile changes; make web-check runs it on its own.)
+$(WASM_OBJ)/toolchain.ok: Makefile
 	@mkdir -p $(dir $@)
+	@rm -f $@
 	@printf 'int x;\n' > $(WASM_OBJ)/check.c
-	@if $(WASM_CC) --target=wasm32 -nostdlib -Wl,--no-entry -Wl,--export=x $(WASM_OBJ)/check.c -o $(WASM_OBJ)/check.wasm 2>/dev/null; then touch $@; \
-	 else echo "make web: $(WASM_CC) can't build WebAssembly. It needs clang's wasm32 target and wasm-ld:"; \
-	      echo "  Linux: install clang and lld.  macOS: brew install llvm lld.  Windows: the LLVM installer."; \
-	      echo "  Or point WASM_CC at such a clang:  make web WASM_CC=/path/to/clang"; exit 1; fi
+	@printf '#include <setjmp.h>\nstatic jmp_buf j;\nint y(int n);\nint y(int n) { if (setjmp(j)) return 1; if (n) longjmp(j, 1); return 0; }\n' > $(WASM_OBJ)/check_sjlj.c
+	@if ! $(WASM_CC) --target=wasm32 -nostdlib -Wl,--no-entry -Wl,--export=x $(WASM_OBJ)/check.c -o $(WASM_OBJ)/check.wasm 2>$(WASM_OBJ)/check.log; then \
+	      echo "make web: $(WASM_CC) can't build WebAssembly. It needs clang's wasm32 target and wasm-ld:"; \
+	      echo "  Linux: install clang and lld.  macOS: brew install llvm lld.  Windows: the LLVM installer (llvm.org)."; \
+	      echo "  Or point WASM_CC at such a clang:  make web WASM_CC=/path/to/clang"; \
+	      echo "  ($(WASM_CC) is: `$(WASM_CC) --version 2>&1 | head -n 1`)"; \
+	      echo "  What it said:"; sed 's/^/    /' $(WASM_OBJ)/check.log | head -n 8; exit 1; fi
+	@if ! $(WASM_CC) $(WASM_CFLAGS) -c $(WASM_OBJ)/check_sjlj.c -o $(WASM_OBJ)/check_sjlj.o 2>$(WASM_OBJ)/check.log; then \
+	      echo "make web: $(WASM_CC) makes WebAssembly, but can't compile setjmp/longjmp into it"; \
+	      echo "  (-mllvm -wasm-enable-sjlj), which the scripting language needs. That takes clang 14 or later"; \
+	      echo "  (Bronto is tested with clang 18) built with its WebAssembly target."; \
+	      echo "  ($(WASM_CC) is: `$(WASM_CC) --version 2>&1 | head -n 1`)"; \
+	      echo "  On Windows, the clang that comes with Visual Studio or an older LLVM may be first on the PATH:"; \
+	      echo "  install the current LLVM from llvm.org, or name its clang:  WASM_CC=C:/PROGRA~1/LLVM/bin/clang.exe"; \
+	      echo "  What it said:"; sed 's/^/    /' $(WASM_OBJ)/check.log | head -n 8; exit 1; fi
+	@echo "$(WASM_CC)" > $@
 
 web-check: $(WASM_OBJ)/toolchain.ok
 	@echo "$(WASM_CC) builds WebAssembly."

@@ -4165,17 +4165,17 @@ static const char *sc_write_value(sc_text *t, const sc_value *v, int depth) {
     case V_NIL: sc_text_str(t, "nil"); return NULL;
     case V_BOOL: sc_text_str(t, v->as.b ? "true" : "false"); return NULL;
     case V_NUM:
-        if (!isfinite(v->as.n)) return "a number that isn't finite";
+        if (!br_finite(v->as.n)) return "a number that isn't finite";
         snprintf(num, sizeof(num), "%.17g", v->as.n);
         sc_text_str(t, num);
         return NULL;
     case V_VEC:
-        if (!isfinite(v->as.v.x) || !isfinite(v->as.v.y)) return "a vec2 that isn't finite";
+        if (!br_finite(v->as.v.x) || !br_finite(v->as.v.y)) return "a vec2 that isn't finite";
         snprintf(num, sizeof(num), "vec2(%.17g, %.17g)", v->as.v.x, v->as.v.y);
         sc_text_str(t, num);
         return NULL;
     case V_VEC3:
-        if (!isfinite(v->as.v.x) || !isfinite(v->as.v.y) || !isfinite(v->as.v.z)) return "a vec3 that isn't finite";
+        if (!br_finite(v->as.v.x) || !br_finite(v->as.v.y) || !br_finite(v->as.v.z)) return "a vec3 that isn't finite";
         snprintf(num, sizeof(num), "vec3(%.17g, %.17g, %.17g)", v->as.v.x, v->as.v.y, v->as.v.z);
         sc_text_str(t, num);
         return NULL;
