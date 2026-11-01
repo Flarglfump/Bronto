@@ -33,6 +33,9 @@ const char *br_assets_root(void);
  * The image at `path` (BMP or TGA), loaded once. NULL if it can't be
  * loaded; the failure is logged once, not every frame. */
 const br_image *br_asset_image(const char *path);
+/* Whether that image has see-through pixels (alpha between 0 and 255): things textured with it
+ * are drawn with the see-through things, after the solid ones, far to near. */
+bool br_asset_image_translucent(const char *path);
 
 /* The model (Wavefront .obj) at `path`, loaded once; NULL if it can't be. */
 const br_mesh *br_asset_mesh(const char *path);

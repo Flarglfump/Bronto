@@ -497,7 +497,7 @@ bool br_draw3d(const br_world *w, br_r3d *r3, br_renderer *r, const br_camera3d 
         const br_mesh3d *m = (const br_mesh3d *)(pool->data + (size_t)i * pool->stride);
         br_entity e = pool->entities[i];
         if (!br_has(w, e, ids.transform3d) || !m->visible) continue;
-        if (m->color.a < 255) {
+        if (m->color.a < 255 || (m->texture[0] && br_asset_image_translucent(m->texture))) {
             if (!see_through) see_through = (draw3_item *)br_alloc(sizeof(draw3_item) * pool->count);
             if (see_through) {
                 br_vec3 p;

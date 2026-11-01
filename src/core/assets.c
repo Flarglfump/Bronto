@@ -24,6 +24,7 @@ typedef struct asset_entry {
     br_mesh mesh;
     br_model *model;     /* a .gltf / .glb (its `merged` stands in for `mesh`) */
     bool ok;
+    signed char translucent;   /* an image with see-through pixels: -1 not looked yet, 0, 1 */
 } asset_entry;
 
 static struct {
@@ -84,6 +85,7 @@ static asset_entry *find_or_load(const char *path, asset_kind kind) {
     S.entries[S.count++] = e;
     e->path = br_strdup(path);
     e->kind = kind;
+    e->translucent = -1;
     snprintf(full, sizeof(full), "%s%s", is_absolute(path) ? "" : S.root, path);
     if (kind == ASSET_IMAGE) {
         e->ok = br_image_load(&e->image, full);
@@ -107,6 +109,21 @@ static asset_entry *find_or_load(const char *path, asset_kind kind) {
 const br_image *br_asset_image(const char *path) {
     asset_entry *e = find_or_load(path, ASSET_IMAGE);
     return e && e->ok ? &e->image : NULL;
+}
+
+bool br_asset_image_translucent(const char *path) {
+    asset_entry *e = find_or_load(path, ASSET_IMAGE);
+    size_t i, n;
+    if (!e || !e->ok || e->kind != ASSET_IMAGE) return false;
+    if (e->translucent < 0) {
+        e->translucent = 0;
+        n = (size_t)e->image.width * (size_t)e->image.height;
+        for (i = 0; i < n; ++i) {
+            uint8_t a = e->image.pixels[i].a;
+            if (a > 0 && a < 255) { e->translucent = 1; break; }
+        }
+    }
+    return e->translucent == 1;
 }
 
 const br_mesh *br_asset_mesh(const char *path) {
