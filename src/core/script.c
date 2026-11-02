@@ -2185,6 +2185,7 @@ typedef struct sc_instance {
     sc_value *globals;
     bool ready, started, failed;    /* ready: its variables are set (others can use it); started: start() ran */
     int slot;                       /* in rt->instances */
+    uint64_t wheel_frame, motion_frame;   /* the engine frame whose wheel / mouse motion this script last took */
 } sc_instance;
 
 typedef struct sc_behaviour_entry { char name[96]; const br_behaviour *b; } sc_behaviour_entry;
@@ -5172,12 +5173,19 @@ static sc_value bi_mouse_released(ARGS) {
 }
 /* mouse_wheel(): how far the wheel turned since the last frame (+y: towards the player), once a frame. */
 /* How far the mouse moved since the last frame, in game pixels - also while it's
- * locked for mouse-look, when its position stays put. Taken once a frame. */
+ * locked for mouse-look, when its position stays put. Once a frame for each script
+ * (a second update() in one frame gets nothing: no turning twice), but every script
+ * gets it: the camera taking it doesn't leave the player's script without. */
+static uint64_t *taken_frame(sc_vm *vm, bool wheel) {
+    if (vm->inst) return wheel ? &vm->inst->wheel_frame : &vm->inst->motion_frame;
+    return wheel ? &vm->rt->wheel_frame : &vm->rt->motion_frame;
+}
 static sc_value bi_mouse_motion(ARGS) {
     br_engine *e = sc_engine(vm);
     UNUSED_ARGS;
-    if (!e || vm->rt->motion_frame == e->frame + 1) return sc_vec(0, 0);
-    vm->rt->motion_frame = e->frame + 1;
+    uint64_t *taken = taken_frame(vm, false);
+    if (!e || *taken == e->frame + 1) return sc_vec(0, 0);
+    *taken = e->frame + 1;
     return sc_vec(e->input.motion_x, e->input.motion_y);
 }
 static sc_value bi_lock_mouse(ARGS) {
@@ -5194,8 +5202,9 @@ static sc_value bi_mouse_locked(ARGS) {
 static sc_value bi_mouse_wheel(ARGS) {
     br_engine *e = sc_engine(vm);
     UNUSED_ARGS;
-    if (!e || vm->rt->wheel_frame == e->frame + 1) return sc_vec(0, 0);
-    vm->rt->wheel_frame = e->frame + 1;
+    uint64_t *taken = taken_frame(vm, true);
+    if (!e || *taken == e->frame + 1) return sc_vec(0, 0);
+    *taken = e->frame + 1;
     return sc_vec(e->input.wheel_x, e->input.wheel_y);
 }
 /* text_typed(): the characters typed since the last frame (once a frame), for name entry and the like. */

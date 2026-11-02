@@ -280,9 +280,24 @@ async function start(opts) {
         const w = Math.max(1, Math.round((r.width || sizeWanted[0] || 640) * ratio));
         const h = Math.max(1, Math.round((r.height || sizeWanted[1] || 480) * ratio));
         if (canvas.width === w && canvas.height === h) return false;
-        canvas.width = w;
+        canvas.width = w;                     /* (which clears it: ... */
         canvas.height = h;
+        redrawLast();                         /* ... so the last frame goes straight back, fitted: no blank flashes while resizing) */
         return true;
+    }
+    /* The last frame presented, and how it sat on the canvas then (vx, vy, vw, vh, canvas w, h). */
+    let lastShown = null;
+    function redrawLast() {
+        if (!ctx || !off || !lastShown) return;
+        const [, , vw, vh, cw, ch] = lastShown;
+        const fit = Math.min(canvas.width / vw, canvas.height / vh) * Math.min(vw / off.width, vh / off.height);
+        const whole = Math.abs(vw / off.width - Math.round(vw / off.width)) < 1e-6;    /* (whole-pixel scaling: keep to it) */
+        const k = whole && fit >= 1 ? Math.floor(fit) : fit;
+        const w = Math.round(off.width * k), h = Math.round(off.height * k);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(off, Math.floor((canvas.width - w) / 2), Math.floor((canvas.height - h) / 2), w, h);
     }
     /* ---- pointer lock (mouse-look): browsers grant it only from a click, so a refusal
        just waits for the next pointerdown on the canvas ---- */
@@ -347,6 +362,7 @@ async function start(opts) {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(off, vx, vy, vw, vh);
+            lastShown = [vx, vy, vw, vh, canvas.width, canvas.height];
             if (opts.onFrame) opts.onFrame();
         },
         /* The on-screen touch controls, over the frame just drawn: br_overlay_item[n] (platform.h), 40 bytes each. */
