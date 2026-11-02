@@ -63,6 +63,8 @@ typedef struct pt_emitter {
     float wait;                 /* preview: time since a burst-only pt_emitter went quiet */
     br_rng rng;
     bool was_emitting, gave_any, seen;
+    br_vec3 last;               /* where it was at the last step it gave off particles (has_last) */
+    bool has_last;
 } pt_emitter;
 
 typedef struct pt_state {
@@ -188,10 +190,12 @@ static bool pt_where_of(const br_world *w, br_entity e, br_component t2, br_comp
     return false;
 }
 
-static void pt_spawn(pt_emitter *em, const br_particles *P, const pt_where *at, int n) {
+static void pt_spawn(pt_emitter *em, const br_particles *P, const pt_where *at, int n, float dt) {
+    int i = 0, total;
     int limit = P->max < 0 ? 0 : P->max;
     if (n > limit - em->count) n = limit - em->count;
     if (n <= 0) return;
+    total = n;
     if (em->count + n > em->cap) {
         int cap = em->cap ? em->cap : 16;
         pt_particle *g;
@@ -220,8 +224,14 @@ static void pt_spawn(pt_emitter *em, const br_particles *P, const pt_where *at, 
             dir = br_v3(cosf(a), sinf(a), 0);
             off = br_v3(o.x, o.y, 0);
         }
+        ++i;
         if (q->life <= 0) continue;
         q->p = P->local ? off : br_v3_add(at->origin, off);
+        if (!P->local && em->has_last && dt > 0) {        /* moving fast: spread along the way it came (a trail, not dots) */
+            float t = (float)i / (float)total;
+            q->p = br_v3_add(br_v3_add(em->last, br_v3_scale(br_v3_sub(at->origin, em->last), t)), off);
+            q->age = (1 - t) * dt;                          /* (the earlier ones a little older) */
+        }
         q->v = br_v3_scale(dir, speed);
         ++em->count;
         em->gave_any = true;
@@ -264,7 +274,7 @@ static void pt_step(br_world *w, float dt, bool preview) {
         em->seen = true;
         if (!pt_where_of(w, e, t2, t3, &at)) continue;
         pt_move(em, P, at.is3d, dt);
-        if (P->emitting && !em->was_emitting) pt_spawn(em, P, &at, P->burst);   /* switched on: the burst */
+        if (P->emitting && !em->was_emitting) pt_spawn(em, P, &at, P->burst, 0);   /* switched on: the burst */
         em->was_emitting = P->emitting;
         if (P->emitting && P->rate > 0) {
             int n;
@@ -272,12 +282,14 @@ static void pt_step(br_world *w, float dt, bool preview) {
             n = (int)em->accum;
             em->accum -= (float)n;
             if (n > P->max) n = P->max;
-            pt_spawn(em, P, &at, n);
+            pt_spawn(em, P, &at, n, dt);
         }
+        em->has_last = P->emitting && P->rate > 0;
+        em->last = at.origin;
         if (!P->emitting || P->rate <= 0) {
             if (em->count == 0 && preview) {                   /* the editor: puff again now and then */
                 em->wait += dt;
-                if (em->wait > 0.6f) { em->wait = 0; pt_spawn(em, P, &at, P->burst > 0 ? P->burst : 0); }
+                if (em->wait > 0.6f) { em->wait = 0; pt_spawn(em, P, &at, P->burst > 0 ? P->burst : 0, 0); }
             } else if (em->count == 0 && P->auto_destroy && em->gave_any) {
                 br_entity_destroy_deferred(w, e);
             }
@@ -302,7 +314,7 @@ bool br_particles_emit(br_world *w, br_entity e, int count) {
     if (!(s = pt_state_of(w, true)) || !(em = pt_find_or_make(s, e))) return false;
     if (!em->seen && em->count == 0) em->was_emitting = P->emitting;   /* new: emit() isn't also "switched on" */
     em->seen = true;
-    pt_spawn(em, P, &at, count < 0 ? P->burst : count);
+    pt_spawn(em, P, &at, count < 0 ? P->burst : count, 0);
     return true;
 }
 
