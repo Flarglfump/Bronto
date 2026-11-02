@@ -6282,9 +6282,13 @@ bool br_script_pop_request(br_world *w) {
     return p;
 }
 
-int br_script_notify(br_world *w, const char *function) {
+int br_script_notify(br_world *w, const char *function) { return br_script_notify_dt(w, function, -1.0f); }
+
+/* The same with a number to pass (dt: a paused scene's paused_update(dt)); dt < 0: none. */
+int br_script_notify_dt(br_world *w, const char *function, float dt) {
     sc_runtime *rt = (sc_runtime *)br_world_attached(w, &k_runtime_key);
     br_entity *targets;
+    sc_value arg = sc_num(dt);
     int count = 0, i, called = 0;
     if (!rt || !rt->instance_count || !(targets = (br_entity *)br_alloc(sizeof(br_entity) * (size_t)rt->instance_count))) return 0;
     for (i = 0; i < rt->instance_count; ++i) targets[count++] = rt->instances[i]->e;
@@ -6292,7 +6296,7 @@ int br_script_notify(br_world *w, const char *function) {
         sc_instance *inst = sc_instance_of(rt, targets[i]);
         int fn;
         if (!inst || !inst->prog || inst->failed || !inst->started || (fn = sc_find_func(inst->prog, function)) < 0) continue;
-        sc_run(rt, inst, fn, NULL, 0, NULL);
+        sc_run(rt, inst, fn, dt >= 0 ? &arg : NULL, dt >= 0 ? 1 : 0, NULL);
         ++called;
     }
     br_free(targets);

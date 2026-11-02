@@ -37,6 +37,7 @@ typedef struct br_scene_desc {
     void (*update)(br_scene *s, float dt);
     void (*render)(br_scene *s);          /* after ECS render systems      */
     bool (*on_event)(br_scene *s, const br_event *e); /* true = consumed  */
+    void (*paused_update)(br_scene *s, float dt);   /* each frame while covered by a scene that doesn't update it */
 } br_scene_desc;
 
 struct br_scene {

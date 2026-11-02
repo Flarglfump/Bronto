@@ -126,6 +126,8 @@ bool br_script_pop_request(br_world *w);
 /* Calls a function with no arguments (such as "on_pause" or "on_resume") in
  * every script of the world that has it. Returns how many did. */
 int br_script_notify(br_world *w, const char *function);
+/* br_script_notify, passing dt (>= 0) as the function's one argument. */
+int br_script_notify_dt(br_world *w, const char *function, float dt);
 
 /* ---- drawing from scripts --------------------------------------------------
  * A script with a draw() function is drawn among the scene's sprites, in the

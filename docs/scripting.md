@@ -63,6 +63,7 @@ The engine calls these functions when a script defines them:
 | `on_trigger_exit(other)` | ... and left it |
 | `draw()` | when the scene is drawn: see [Drawing](#drawing) |
 | `on_pause()` | another scene was pushed over this one (`push_scene`) |
+| `paused_update(dt)` | each frame while covered by a scene that doesn't let this one update (a text box, a menu): a camera turning to a speaker, say |
 | `on_resume()` | this scene is the top one again (the one over it was popped) |
 
 Every callback can declare fewer parameters than the engine passes.

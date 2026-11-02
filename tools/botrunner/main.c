@@ -62,6 +62,7 @@ static bool game_enter(br_scene *s) {
 }
 static void game_pause(br_scene *s) { br_script_notify(&s->world, "on_pause"); }
 static void game_resume(br_scene *s) { br_script_notify(&s->world, "on_resume"); }
+static void game_paused(br_scene *s, float dt) { br_script_notify_dt(&s->world, "paused_update", dt); }   /* (as the player's) */
 static const br_scene_desc *game_desc(bool transparent, bool update_below);
 static void game_update(br_scene *s, float dt) {
     char next[BR_PATH_MAX];
@@ -81,10 +82,10 @@ static void game_update(br_scene *s, float dt) {
     }
 }
 static const br_scene_desc k_game[4] = {
-    { "game", BR_PATH_MAX, false, false, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL },
-    { "game (transparent)", BR_PATH_MAX, true, false, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL },
-    { "game (updates below)", BR_PATH_MAX, false, true, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL },
-    { "game (transparent, updates below)", BR_PATH_MAX, true, true, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL },
+    { "game", BR_PATH_MAX, false, false, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL, game_paused },
+    { "game (transparent)", BR_PATH_MAX, true, false, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL, game_paused },
+    { "game (updates below)", BR_PATH_MAX, false, true, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL, game_paused },
+    { "game (transparent, updates below)", BR_PATH_MAX, true, true, game_enter, NULL, game_pause, game_resume, NULL, game_update, NULL, NULL, game_paused },
 };
 static const br_scene_desc *game_desc(bool transparent, bool update_below) {
     return &k_game[(transparent ? 1 : 0) + (update_below ? 2 : 0)];

@@ -149,9 +149,12 @@ void br_scenes_fixed_update(br_scene_manager *m, float dt) {
 }
 
 void br_scenes_update(br_scene_manager *m, float dt) {
-    int i;
+    int i, low;
     if (!m->depth) return;
-    for (i = lowest_updating(m); i < m->depth; ++i) {
+    low = lowest_updating(m);
+    for (i = 0; i < low; ++i)                         /* the scenes waiting under another: just their paused_update */
+        if (m->stack[i]->desc->paused_update) m->stack[i]->desc->paused_update(m->stack[i], dt);
+    for (i = low; i < m->depth; ++i) {
         br_scene *s = m->stack[i];
         if (s->desc->update) s->desc->update(s, dt);
         br_world_run_phase(&s->world, BR_PHASE_UPDATE, dt);
