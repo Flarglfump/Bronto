@@ -309,7 +309,7 @@ static void play_render(br_scene *s) {
 
 static const br_scene_desc k_play = {
     "play", sizeof(play_data), false, false,
-    play_enter, NULL, NULL, NULL, play_fixed, play_update, play_render, play_event
+    play_enter, NULL, NULL, NULL, play_fixed, play_update, play_render, play_event, NULL
 };
 
 /* ======================= overlays ============================================= */
@@ -340,7 +340,7 @@ static void pause_render(br_scene *s) {
 
 /* transparent: the frozen game shows through; update_below = false: it stays frozen */
 static const br_scene_desc k_pause = {
-    "pause", 0, true, false, NULL, NULL, NULL, NULL, NULL, pause_update, pause_render, NULL
+    "pause", 0, true, false, NULL, NULL, NULL, NULL, NULL, pause_update, pause_render, NULL, NULL
 };
 
 static void end_update(br_scene *s, float dt) {
@@ -380,7 +380,7 @@ static void end_render(br_scene *s) {
 
 /* update_below: effects keep playing under the overlay (the rules have stopped) */
 static const br_scene_desc k_end = {
-    "end", 0, true, true, NULL, NULL, NULL, NULL, NULL, end_update, end_render, NULL
+    "end", 0, true, true, NULL, NULL, NULL, NULL, NULL, end_update, end_render, NULL, NULL
 };
 
 /* ======================= title ================================================== */
@@ -450,7 +450,7 @@ static void title_render(br_scene *s) {
 
 static const br_scene_desc k_title = {
     "title", sizeof(title_data), false, false,
-    title_enter, NULL, NULL, NULL, title_fixed, title_update, title_render, NULL
+    title_enter, NULL, NULL, NULL, title_fixed, title_update, title_render, NULL, NULL
 };
 
 /* ======================= engine hooks =========================================== */

@@ -42,7 +42,7 @@ static void game_update(br_scene *s, float dt) {
     }
 }
 static const br_scene_desc k_game = {
-    "game", 0, false, false, game_enter, NULL, NULL, NULL, NULL, game_update, NULL, NULL
+    "game", 0, false, false, game_enter, NULL, NULL, NULL, NULL, game_update, NULL, NULL, NULL
 };
 static const br_scene_desc *game_desc(void) { return &k_game; }
 

@@ -97,7 +97,7 @@ static bool play_event(br_scene *s, const br_event *e) {
 
 static const br_scene_desc k_play = {
     "play", sizeof(play_data), false, false,
-    play_enter, play_exit, NULL, NULL, play_fixed, play_update, NULL, play_event
+    play_enter, play_exit, NULL, NULL, play_fixed, play_update, NULL, play_event, NULL
 };
 
 static br_engine_config headless_config(void) {
@@ -279,7 +279,7 @@ static void switch_update(br_scene *s, float dt) {
     BR_UNUSED(dt);
     if (s->frames == 2) br_scene_pop(&s->engine->scenes);  /* pops itself */
 }
-static const br_scene_desc k_short = { "short", 0, false, false, switch_enter, NULL, NULL, NULL, NULL, switch_update, NULL, NULL };
+static const br_scene_desc k_short = { "short", 0, false, false, switch_enter, NULL, NULL, NULL, NULL, switch_update, NULL, NULL, NULL };
 
 static void test_quit_when_no_scenes(void) {
     br_engine *e = BR_NEW(br_engine);

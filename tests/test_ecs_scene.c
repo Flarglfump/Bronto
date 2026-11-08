@@ -262,7 +262,7 @@ static bool game_event(br_scene *s, const br_event *e) { BR_UNUSED(s); BR_UNUSED
 
 static const br_scene_desc k_game = {
     "game", sizeof(game_data), false, false,
-    game_enter, game_exit, game_pause, game_resume, game_fixed, game_update, game_render, game_event
+    game_enter, game_exit, game_pause, game_resume, game_fixed, game_update, game_render, game_event, NULL
 };
 
 static bool menu_enter(br_scene *s) { BR_UNUSED(s); trace("M", "enter"); return true; }
@@ -272,15 +272,15 @@ static bool menu_event(br_scene *s, const br_event *e) { BR_UNUSED(s); trace("M"
 
 /* Transparent pause overlay that lets updates/events through. */
 static const br_scene_desc k_overlay = {
-    "overlay", 0, true, true, menu_enter, menu_exit, NULL, NULL, NULL, NULL, menu_render, menu_event
+    "overlay", 0, true, true, menu_enter, menu_exit, NULL, NULL, NULL, NULL, menu_render, menu_event, NULL
 };
 /* Opaque modal menu. */
 static const br_scene_desc k_modal = {
-    "modal", 0, false, false, menu_enter, menu_exit, NULL, NULL, NULL, NULL, menu_render, menu_event
+    "modal", 0, false, false, menu_enter, menu_exit, NULL, NULL, NULL, NULL, menu_render, menu_event, NULL
 };
 
 static bool refuse_enter(br_scene *s) { BR_UNUSED(s); trace("R", "refuse"); return false; }
-static const br_scene_desc k_refuse = { "refuse", 64, false, false, refuse_enter, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+static const br_scene_desc k_refuse = { "refuse", 64, false, false, refuse_enter, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 
 static void test_scene_stack_lifecycle(void) {
     br_scene_manager m;

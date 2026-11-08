@@ -47,7 +47,7 @@ static bool on_event(br_scene *s, const br_event *e) {
     if (e->type == BR_EVENT_TEXT_INPUT) { S.texts++; S.last_text = e->u.text.codepoint; }
     return false;
 }
-static const br_scene_desc k_scene = { "x11test", 0, false, false, NULL, NULL, NULL, NULL, NULL, NULL, render, on_event };
+static const br_scene_desc k_scene = { "x11test", 0, false, false, NULL, NULL, NULL, NULL, NULL, NULL, render, on_event, NULL };
 
 /* ---- driver helpers ------------------------------------------------------------ */
 static void pump(br_engine *e, int frames) {
@@ -203,7 +203,7 @@ static void test_clipboard(br_engine *e) {
     br_free(text);
 
     /* copied in another program, pasted in the engine */
-    if (pipe(fds) != 0) { CHECK(!"pipe"); return; }
+    if (pipe(fds) != 0) { CHECK(false && "pipe"); return; }
     child = fork();
     if (child == 0) { close(fds[0]); other_program(fds[1]); }
     close(fds[1]);
@@ -220,7 +220,7 @@ static void test_clipboard(br_engine *e) {
         struct timespec ts = { 0, 10000000 };
         nanosleep(&ts, NULL);
     }
-    if (i == 200) { kill(child, SIGKILL); waitpid(child, &status, 0); CHECK(!"the other program didn't see the copy"); }
+    if (i == 200) { kill(child, SIGKILL); waitpid(child, &status, 0); CHECK(false && "the other program didn't see the copy"); }
     text = br_clipboard_get(e);
     CHECK(text && strcmp(text, "mine again") == 0);
     br_free(text);

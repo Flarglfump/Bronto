@@ -50,7 +50,7 @@ static bool ws_event(br_scene *s, const br_event *e) {
     if (e->type == BR_EVENT_WINDOW_CLOSE_REQUESTED) { d->closes++; return d->veto_close; }
     return false;
 }
-static const br_scene_desc k_ws = { "win", sizeof(win_scene), false, false, ws_enter, NULL, NULL, NULL, NULL, ws_update, NULL, ws_event };
+static const br_scene_desc k_ws = { "win", sizeof(win_scene), false, false, ws_enter, NULL, NULL, NULL, NULL, ws_update, NULL, ws_event, NULL };
 
 static br_engine *start(br_engine_config *c) {
     br_engine *e = BR_NEW(br_engine);

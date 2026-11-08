@@ -529,7 +529,7 @@ static bool editor_event(br_scene *s, const br_event *ev) {
 
 static const br_scene_desc k_editor = {
     "editor", 0, false, false,
-    editor_enter, editor_exit, NULL, NULL, editor_fixed, editor_update, editor_render, editor_event
+    editor_enter, editor_exit, NULL, NULL, editor_fixed, editor_update, editor_render, editor_event, NULL
 };
 
 /* ---- headless self-test ---------------------------------------------------------- */
@@ -1816,12 +1816,39 @@ static bool on_init(br_engine *e) {
     return true;
 }
 
+static void usage(FILE *out) {
+    fprintf(out,
+            "usage: editor [project folder | file.scene]\n"
+            "       editor --build <target> [project folder] [--out folder]\n"
+            "       editor --headless\n"
+            "       editor --write-icon <file.png> [size]\n"
+            "\n"
+            "  (no arguments)        start with a sample scene\n"
+            "  project folder        open a project (its main.scene, if it has one)\n"
+            "  file.scene            open a scene, in the project it belongs to\n"
+            "  --build <target>      build the game with no window, like the Build menu:\n"
+            "                        host (this computer), linux, macos, windows or web.\n"
+            "                        The project is the current folder if none is given\n"
+            "  --out <folder>        with --build: put the game here, not in builds/<target>/\n"
+            "  --headless            run the editor's self-test, with no window\n"
+            "  --write-icon <file>   save the app icon as a PNG, size 16 to 1024 (256)\n"
+            "  -h, --help            show this and stop\n"
+            "\n"
+            "--build exits with 0 when the game was built, 1 when the build failed and\n"
+            "2 when the command was wrong. See docs/editor-cli.md.\n");
+}
+
 int main(int argc, char **argv) {
-    br_engine *e = BR_NEW(br_engine);
-    br_engine_config cfg = br_engine_default_config();
+    br_engine *e;
+    br_engine_config cfg;
     int i, rc = 0;
     bool build = false;
     ed_target target = ED_TARGET_LINUX;
+    for (i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) { usage(stdout); return 0; }
+    }
+    e = BR_NEW(br_engine);
+    cfg = br_engine_default_config();
     if (argc >= 3 && strcmp(argv[1], "--write-icon") == 0) {    /* the icon as a PNG, then done */
         br_image icon;
         int size = argc > 3 ? atoi(argv[3]) : 256;
@@ -1837,7 +1864,8 @@ int main(int argc, char **argv) {
         if (strcmp(argv[i], "--headless") == 0) ED.headless = true;
         else if (strcmp(argv[i], "--build") == 0) {
             if (i + 1 >= argc || !ed_target_from_name(argv[i + 1], &target)) {
-                fprintf(stderr, "usage: editor --build linux|macos|windows|web|host [project folder] [--out folder]\n");
+                fprintf(stderr, "usage: editor --build linux|macos|windows|web|host [project folder] [--out folder]\n"
+                                "(editor --help lists every option)\n");
                 br_free(e);
                 return 2;
             }
@@ -1845,6 +1873,11 @@ int main(int argc, char **argv) {
             ++i;
         } else if (strcmp(argv[i], "--out") == 0 && i + 1 < argc) {
             snprintf(ED.build_out, sizeof(ED.build_out), "%s", argv[++i]);
+        } else if (argv[i][0] == '-' && argv[i][1] != 0) {   /* a mistyped option, not a file to open */
+            fprintf(stderr, "editor: unknown option %s\n\n", argv[i]);
+            usage(stderr);
+            br_free(e);
+            return 2;
         } else g_open_path = argv[i];
     }
     if (build) {
