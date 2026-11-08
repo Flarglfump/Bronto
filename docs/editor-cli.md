@@ -13,6 +13,7 @@ editor --build host examples/platformer  # build the game for this computer, no 
 editor --build web my_game --out site    # build a web page into site/
 editor --headless                        # the editor's self-test
 editor --write-icon icon.png 256         # save the app icon as a PNG
+editor --help                            # list the options (or -h)
 ```
 
 From the Makefile, `make editor SCENE=<path>` starts it with a path, and
@@ -32,8 +33,11 @@ editor [path]
 | a `.scene` file | opens that scene. The project is the nearest folder above it holding `project.bronto`, else the scene's own folder |
 
 If the scene can't be loaded, the editor says why in the status bar and starts with the
-sample scene instead. Anything on the command line that isn't one of the options below is
-taken as the path, and if there are several, the last one is used.
+sample scene instead. If more than one path is given, the last one is used.
+
+An argument that starts with `-` but isn't one of the options below (a typo such as
+`--biuld`) is not taken as a path: the editor says it doesn't know it, prints the list
+of options and exits with status 2.
 
 ## Building a game: `--build`
 
@@ -108,7 +112,7 @@ first in each case.
 |---|---|
 | 0 | the game was built |
 | 1 | the build failed: a script mistake, no main scene, no player for the target, or a folder or file that couldn't be written |
-| 2 | the command was wrong: no target or one it doesn't know (it prints the usage line), or the project folder isn't a folder |
+| 2 | the command was wrong: no target or one it doesn't know (it prints the usage line), an option it doesn't know, or the project folder isn't a folder |
 
 So a script or CI job can stop on a broken project:
 
@@ -157,6 +161,16 @@ editor --write-icon <file.png> [size]
 Draws the editor's app icon at `size` pixels square (16 to 1024; 256 if left out or out of
 range), saves it as a PNG and exits: status 0 if it was written, 1 if not. This has to be
 the first argument. `make vscode-icon` uses it to make the VS Code extension's icon.
+
+## Help: `--help`, `-h`
+
+```
+editor --help
+```
+
+Prints the forms the command takes and what each option does, then exits with status 0
+without starting the editor. It works anywhere on the command line, so
+`editor --build web --help` shows the help rather than building.
 
 ## See also
 
