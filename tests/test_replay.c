@@ -22,7 +22,7 @@ static void rp_update(br_scene *s, float dt) {
         br_scene_switch(&s->engine->scenes, rp_desc());
     }
 }
-static const br_scene_desc k_rp_scene = { "game", 0, false, false, rp_enter, NULL, NULL, NULL, NULL, rp_update, NULL, NULL };
+static const br_scene_desc k_rp_scene = { "game", 0, false, false, rp_enter, NULL, NULL, NULL, NULL, rp_update, NULL, NULL, NULL };
 static const br_scene_desc *rp_desc(void) { return &k_rp_scene; }
 
 static void rp_restart(br_engine *e) { BR_UNUSED(e); snprintf(g_scene, sizeof(g_scene), "title.scene"); }

@@ -3,7 +3,7 @@
 #include <string.h>
 
 static void idle_render(br_scene *s) { BR_UNUSED(s); }
-static const br_scene_desc k_idle = { "idle", 0, false, false, NULL, NULL, NULL, NULL, NULL, NULL, idle_render, NULL };
+static const br_scene_desc k_idle = { "idle", 0, false, false, NULL, NULL, NULL, NULL, NULL, NULL, idle_render, NULL, NULL };
 
 /* An engine in a phone-sized window: 844 x 390 points (landscape), or turned. */
 static br_engine *phone(const char *controls, int w, int h, float scale) {

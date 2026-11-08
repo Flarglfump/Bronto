@@ -146,7 +146,7 @@ static void game_render(br_scene *s) {
 
 static const br_scene_desc k_game_scene = {
     "game", sizeof(game_scene), false, false,
-    game_enter, NULL, NULL, NULL, NULL, game_update, game_render, NULL
+    game_enter, NULL, NULL, NULL, NULL, game_update, game_render, NULL, NULL
 };
 
 static void pause_update(br_scene *s, float dt) {
@@ -162,7 +162,7 @@ static void pause_render(br_scene *s) {
 }
 /* transparent: game still draws underneath; update_below=false freezes it */
 static const br_scene_desc k_pause_scene = {
-    "pause", 0, true, false, NULL, NULL, NULL, NULL, NULL, pause_update, pause_render, NULL
+    "pause", 0, true, false, NULL, NULL, NULL, NULL, NULL, pause_update, pause_render, NULL, NULL
 };
 
 static void title_update(br_scene *s, float dt) {
@@ -184,7 +184,7 @@ static void title_render(br_scene *s) {
     br_draw_text(r, "press ENTER", 116, 130, 1, BR_WHITE);
 }
 static const br_scene_desc k_title_scene = {
-    "title", 0, false, false, NULL, NULL, NULL, NULL, NULL, title_update, title_render, NULL
+    "title", 0, false, false, NULL, NULL, NULL, NULL, NULL, title_update, title_render, NULL, NULL
 };
 
 /* ---- message subscriber ------------------------------------------------------ */

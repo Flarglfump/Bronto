@@ -30,7 +30,7 @@ static bool on_init(br_engine *e) {
 }
 
 static bool idle(br_scene *s) { BR_UNUSED(s); return true; }
-static const br_scene_desc k_scene = { "audio", 0, false, false, idle, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+static const br_scene_desc k_scene = { "audio", 0, false, false, idle, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 
 static double now(void) {
     struct timespec ts;
