@@ -137,7 +137,8 @@ the rules.
 - **Build menu:** a game for this computer (or others, given their players) in one file,
   after checking every script; **Project Settings** for the game's name, first scene, screen
   size and strict typing. See [Building games](#building-games). The same build runs
-  without a window: `editor --build <target> <project> [--out folder]` (or `make game`).
+  without a window: `editor --build <target> <project> [--out folder]` (or `make game`); see
+  [docs/editor-cli.md](docs/editor-cli.md).
 - **Physics and scripts** run when you press Play. **Colliders** outlines every collider,
   and script errors appear in the status bar and the console.
 - **Right-click menus** everywhere: hierarchy rows and empty space, objects and empty
@@ -383,6 +384,7 @@ tools/web/           the web runtime (bronto.js), the page template, bronto_web 
 tools/pantrybot/     a bot that plays Pantry Quest through and records it
 docs/scripting.md    the BrontoScript reference
 docs/3d.md           3D: coordinates, components, the editor's 3D view, the C API
+docs/editor-cli.md   the editor's command line: opening projects, --build, the self-test
 docs/web.md          web builds
 docs/replay.md       recording and replaying runs, and the Pantry Quest bot
 ```

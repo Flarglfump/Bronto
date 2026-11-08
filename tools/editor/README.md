@@ -11,6 +11,8 @@ build/editor --headless              # scripted self-test, writes screenshots
 build/editor --write-icon icon.png 256   # save the app icon as a PNG (make vscode-icon uses it)
 ```
 
+Every command-line option, `--build` included, is in [docs/editor-cli.md](../../docs/editor-cli.md).
+
 ## Using it
 
 | | |
