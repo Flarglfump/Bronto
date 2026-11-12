@@ -61,6 +61,7 @@ void suite_features(void);
 void suite_audio(void);
 void suite_engine(void);
 void suite_window(void);
+void suite_terminal(void);
 void suite_snake(void);
 void suite_audio_ring(void);
 void suite_gamepad(void);

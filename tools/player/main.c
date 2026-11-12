@@ -16,6 +16,13 @@
  *                       window with playback keys, or with --headless as fast as it
  *                       goes, checking every recorded frame (exit status 1 if one differs)
  *   --segment N         (with --replay) start at segment N (1 = the start)
+ *   --terminal[=blocks|text]  draw in this terminal instead of a window: coloured half
+ *                       blocks (the default) or coloured ASCII text (docs/terminal.md)
+ *   --window            draw in a window, whatever the project's renderer setting says
+ *
+ * The project's `renderer` setting (Build > Project Settings in the editor)
+ * chooses between a window and the terminal for built games. A terminal game
+ * started without a terminal (from a desktop icon, say) opens a window instead.
  *
  * The game is the project's scenes, scripts and assets: the engine's
  * built-in components and systems do the rest, exactly as in the editor's
@@ -117,6 +124,15 @@ static void replay_after_frame(br_engine *e) {
 
 static bool has_ext(const char *p, const char *ext) { return br_path_has_ext(p, ext); }
 
+/* The window, or the terminal if the project (or --terminal) asks for it and there is one. */
+static const br_platform *choose_platform(int renderer) {
+    const br_platform *p = NULL;
+    if (renderer == BR_RENDERER_TERMINAL_BLOCKS) p = br_platform_terminal(BR_TERMINAL_BLOCKS);
+    else if (renderer == BR_RENDERER_TERMINAL_TEXT) p = br_platform_terminal(BR_TERMINAL_TEXT);
+    if (renderer != BR_RENDERER_WINDOW && !p) BR_INFO("no terminal to draw in: opening a window instead");
+    return p ? p : br_platform_native();
+}
+
 /* Finds the game: an argument, the pack in this program, or one beside it. */
 static bool find_game(const char *arg) {
     char exe[BR_PATH_MAX], dir[BR_PATH_MAX], candidate[BR_PATH_MAX + 64], stem[128];
@@ -158,7 +174,7 @@ int main(int argc, char **argv) {
     br_engine_config cfg = br_engine_default_config();
     const char *arg = NULL, *shot = NULL, *replay = NULL;
     char save_name[160];
-    int segment = 1;
+    int segment = 1, renderer = -1;
     bool headless = false, frames_given = false, touch = false;
     long frames = 120;
     int i, rc = 0;
@@ -169,6 +185,9 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--replay") == 0 && i + 1 < argc) replay = argv[++i];
         else if (strcmp(argv[i], "--segment") == 0 && i + 1 < argc) segment = atoi(argv[++i]);
         else if (strcmp(argv[i], "--touch") == 0) touch = true;
+        else if (strcmp(argv[i], "--window") == 0) renderer = BR_RENDERER_WINDOW;
+        else if (strcmp(argv[i], "--terminal") == 0 || strcmp(argv[i], "--terminal=blocks") == 0) renderer = BR_RENDERER_TERMINAL_BLOCKS;
+        else if (strcmp(argv[i], "--terminal=text") == 0) renderer = BR_RENDERER_TERMINAL_TEXT;
         else if (argv[i][0] == '-' && argv[i][1] == 'p' && strncmp(argv[i], "-psn_", 5) == 0) { /* macOS Finder's process id: ignore */ }
         else arg = argv[i];
     }
@@ -177,6 +196,7 @@ int main(int argc, char **argv) {
         fprintf(stderr,
                 "bronto_player: no game to play.\n"
                 "  bronto_player <project folder> | <file.scene> | <game.brpak> [--touch] [--headless [--frames N] [--screenshot f.bmp]]\n"
+                "                [--terminal[=blocks|text] | --window]\n"
                 "  bronto_player <game> --replay run.brec [--segment N] [--headless]\n"
                 "Games built by the editor (Build menu) have their project packed in and need no arguments.\n");
         return 1;
@@ -197,7 +217,9 @@ int main(int argc, char **argv) {
     cfg.on_init = on_init;
     cfg.touch_controls = replay ? NULL : g_project.touch_controls;   /* (a replay is keys only) */
     cfg.touch_mouse = touch && !replay;                               /* --touch: try them with the mouse */
+    if (renderer < 0) renderer = g_project.renderer;
     if (headless) { cfg.platform = br_platform_headless(); cfg.audio_sample_rate = 0; }
+    else cfg.platform = choose_platform(renderer);
     if (replay) {
         /* Its own saved data, starting empty, as the recorded run's did. */
         snprintf(save_name, sizeof(save_name), "%s (replay)", g_project.name);
@@ -205,7 +227,7 @@ int main(int argc, char **argv) {
         br_save_set_game(save_name);
         br_replay_clear_saves();
         cfg.pause_when_minimized = false;
-        cfg.platform = br_replay_platform(headless ? br_platform_headless() : br_platform_native(), !headless);
+        cfg.platform = br_replay_platform(headless ? br_platform_headless() : choose_platform(renderer), !headless);
         br_replay_set_restart_hook(replay_restart);
         if (segment > 1) br_replay_start_at_segment(segment - 1);
     }

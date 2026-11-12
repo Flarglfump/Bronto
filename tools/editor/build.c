@@ -342,8 +342,26 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
     return true;
 }
 
+/* Runs a built terminal game in a terminal window of its own: Windows' console
+ * (start), macOS's Terminal, or the first terminal found on Linux. */
+static void terminal_command(ed_target t, const char *out, char *cmd, size_t size) {
+    if (t == ED_TARGET_WINDOWS) { snprintf(cmd, size, "start \"\" \"%s\"", out); return; }
+    if (t == ED_TARGET_MACOS) {                             /* the program inside Name.app */
+        char stem[160];
+        br_path_stem(stem, sizeof(stem), out);
+        snprintf(cmd, size, "open -a Terminal \"%s/Contents/MacOS/%s\"", out, stem);
+        return;
+    }
+    snprintf(cmd, size,
+             "g=\"%s\"; for t in x-terminal-emulator gnome-terminal konsole xfce4-terminal kitty alacritty wezterm foot xterm; do "
+             "command -v $t >/dev/null 2>&1 && break; t=; done; "
+             "case \"$t\" in gnome-terminal) exec $t -- \"$g\";; kitty|foot) exec $t \"$g\";; "
+             "wezterm) exec $t start -- \"$g\";; '') exit 1;; *) exec $t -e \"$g\";; esac",
+             out);
+}
+
 void ed_cmd_build(editor *ed, ed_target t, bool run) {
-    char out[BP], cmd[BP + 32];
+    char out[BP], cmd[BP + 400];
     if (!ed_build(ed, t, out, sizeof(out)) || !run) return;
     if (t == ED_TARGET_WEB) {                               /* the page, in the browser */
         if (br_open_path(ed->engine, out)) ed_status(ed, "Opened %s in the browser", br_path_name(out));
@@ -351,7 +369,9 @@ void ed_cmd_build(editor *ed, ed_target t, bool run) {
         return;
     }
     if (t != ed_host_target()) { ed_status(ed, "Built for %s - it runs there, not here", ed_target_name(t)); return; }
-    if (t == ED_TARGET_MACOS) snprintf(cmd, sizeof(cmd), "open \"%s\"", out);
+    if (ed->project.renderer != BR_RENDERER_WINDOW) {      /* a terminal game: in a new terminal */
+        terminal_command(t, out, cmd, sizeof(cmd));
+    } else if (t == ED_TARGET_MACOS) snprintf(cmd, sizeof(cmd), "open \"%s\"", out);
     else snprintf(cmd, sizeof(cmd), "\"%s\"", out);
     if (br_launch(ed->engine, cmd)) ed_status(ed, "Running %s", br_path_name(out));
     else ed_status(ed, "Built, but couldn't start %s", out);
@@ -385,7 +405,8 @@ void ed_project_settings_open(editor *ed) {
 void ed_project_dialog(editor *ed, br_rect screen) {
     br_ui *ui = &ed->ui;
     br_project *p = &ed->project_edit;
-    br_rect box = br_rect_make(floorf(screen.x + (screen.w - 520) / 2), floorf(screen.y + (screen.h - 324) / 2), 520, 324);
+    static const char *const renderers[BR_RENDERER_COUNT] = { "Window", "Terminal: colour blocks", "Terminal: text" };
+    br_rect box = br_rect_make(floorf(screen.x + (screen.w - 520) / 2), floorf(screen.y + (screen.h - 372) / 2), 520, 372);
     if (!ed->project_visible) return;
     br_fill_rect(ui->r, screen, br_rgba(0, 0, 0, 140));
     br_ui_set_disabled(ui, false);
@@ -411,6 +432,9 @@ void ed_project_dialog(editor *ed, br_rect screen) {
     br_ui_text_field(ui, "Leave out", p->exclude, sizeof(p->exclude));
     br_ui_text_field(ui, "Touch controls", p->touch_controls, sizeof(p->touch_controls));
     br_ui_label_colored(ui, "For phones: stick, a, b, x, y, lb, rb, back, start ...", ui->style.text_dim);
+    if (p->renderer < 0 || p->renderer >= BR_RENDERER_COUNT) p->renderer = BR_RENDERER_WINDOW;
+    br_ui_combo(ui, "Renderer", &p->renderer, renderers, BR_RENDERER_COUNT);
+    br_ui_label_colored(ui, "Built desktop games draw in a window, or in the terminal they're started from.", ui->style.text_dim);
     br_ui_spacing(ui, 8);
     br_ui_columns(ui, 2);
     if (br_ui_button(ui, "Save##project")) {

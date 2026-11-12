@@ -195,6 +195,23 @@ static void pj_trim(char *s) {
     if (i) memmove(s, s + i, n - i + 1);
 }
 
+const char *br_project_renderer_name(int renderer) {
+    switch (renderer) {
+    case BR_RENDERER_TERMINAL_BLOCKS: return "terminal_blocks";
+    case BR_RENDERER_TERMINAL_TEXT: return "terminal_text";
+    default: return "window";
+    }
+}
+
+bool br_project_renderer_parse(const char *name, int *renderer) {
+    if (strcmp(name, "window") == 0) *renderer = BR_RENDERER_WINDOW;
+    else if (strcmp(name, "terminal_blocks") == 0 || strcmp(name, "terminal") == 0 || strcmp(name, "blocks") == 0)
+        *renderer = BR_RENDERER_TERMINAL_BLOCKS;
+    else if (strcmp(name, "terminal_text") == 0 || strcmp(name, "text") == 0) *renderer = BR_RENDERER_TERMINAL_TEXT;
+    else return false;
+    return true;
+}
+
 bool br_project_parse(const char *text, br_project *p) {
     const char *line = text;
     bool header = false;
@@ -225,6 +242,8 @@ bool br_project_parse(const char *text, br_project *p) {
             else if (strcmp(key, "build_dir") == 0) snprintf(p->build_dir, sizeof(p->build_dir), "%s", v[0] ? v : "builds");
             else if (strcmp(key, "exclude") == 0) snprintf(p->exclude, sizeof(p->exclude), "%s", v);
             else if (strcmp(key, "touch_controls") == 0) snprintf(p->touch_controls, sizeof(p->touch_controls), "%s", v);
+            else if (strcmp(key, "renderer") == 0 && !br_project_renderer_parse(v, &p->renderer))
+                BR_WARN("%s: unknown renderer '%s' (window, terminal_blocks or terminal_text)", BR_PROJECT_FILE, v);
         }
     }
     return header;
@@ -270,9 +289,10 @@ bool br_project_save(const char *folder, const br_project *p) {
         "# Asset paths in this project's scenes are relative to this folder.\n"
         "# Project settings (the editor's Build > Project Settings):\n"
         "name = %s\nmain_scene = %s\nwidth = %d\nheight = %d\nwindow_scale = %d\nstrict_typing = %s\nicon = %s\nbuild_dir = %s\n"
-        "exclude = %s\n%s%s%s",
+        "exclude = %s\n%s%s%s%s%s%s",
         p->name, p->main_scene, p->width, p->height, p->window_scale, p->strict_typing ? "true" : "false", p->icon, p->build_dir,
-        p->exclude, p->touch_controls[0] ? "touch_controls = " : "", p->touch_controls, p->touch_controls[0] ? "\n" : "");
+        p->exclude, p->touch_controls[0] ? "touch_controls = " : "", p->touch_controls, p->touch_controls[0] ? "\n" : "",
+        p->renderer ? "renderer = " : "", p->renderer ? br_project_renderer_name(p->renderer) : "", p->renderer ? "\n" : "");
     br_path_join(path, sizeof(path), folder ? folder : "", BR_PROJECT_FILE);
     return n > 0 && (size_t)n < sizeof(text) && br_file_write_all(path, text, (size_t)n);
 }

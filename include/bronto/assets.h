@@ -64,6 +64,14 @@ uint32_t br_assets_count(void);
  * The project file holds `key = value` lines after its first line
  * ("bronto_project 1"); '#' starts a comment. The editor's Project
  * Settings edit them, and the player reads them to run the game. */
+/* How a built game draws (the player picks the backend; web builds always use the page). */
+typedef enum br_project_renderer {
+    BR_RENDERER_WINDOW = 0,              /* a window (the default) */
+    BR_RENDERER_TERMINAL_BLOCKS,         /* the terminal it's started from, in coloured half blocks */
+    BR_RENDERER_TERMINAL_TEXT,           /* the terminal, as coloured ASCII art */
+    BR_RENDERER_COUNT
+} br_project_renderer;
+
 typedef struct br_project {
     char name[64];                 /* the game's name: window title, built program's name */
     char main_scene[256];          /* the scene the game starts with (default main.scene) */
@@ -74,7 +82,12 @@ typedef struct br_project {
     char build_dir[256];           /* where Build puts games, in the project (default builds) */
     char exclude[256];             /* left out of built games: names in the project, comma-separated ("tools, notes.txt") */
     char touch_controls[160];      /* on-screen controls for touch screens ("stick, a, b, start"; "" = none; touch.h) */
+    int renderer;                  /* br_project_renderer: renderer = window | terminal_blocks | terminal_text */
 } br_project;
+
+/* "window", "terminal_blocks", "terminal_text"; and back (false: not one of them). */
+const char *br_project_renderer_name(int renderer);
+bool br_project_renderer_parse(const char *name, int *renderer);
 
 void br_project_defaults(br_project *p, const char *name);
 /* Reads settings from the file's text over what *p already holds. */

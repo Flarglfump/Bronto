@@ -13,7 +13,8 @@ Status (v0.1):
   macOS and Linux; web builds (WebAssembly, with no Emscripten), playable on phones and tablets with on-screen touch controls; two sample games, Snake
   and Pop Defense; a visual scene editor; recording and replaying runs frame for
   frame, with a bot that plays Pantry Quest through; and 3D (rendering, physics, the
-  editor's 3D view and @3d scripts), with two 3D samples, Marble and Explorer.
+  editor's 3D view and @3d scripts), with two 3D samples, Marble and Explorer; and
+  games that draw in the terminal, in coloured half blocks or as ASCII text.
 - **Next:** see the roadmap below.
 
 ## Quick start
@@ -245,12 +246,18 @@ The editor's **Build** menu turns a project into a game that runs without the ed
 - **Project Settings** (saved in `project.bronto`): the game's name, the scene it starts
   with, its screen size and window scale, strict typing, an icon, the builds folder, and what to leave out of builds
   (`exclude = tools, notes.txt`: folders and files the pack skips).
+- **Renderer** (in Project Settings): whether built desktop games draw in a window, or in
+  the terminal they are started from, as coloured half blocks or as coloured ASCII text
+  (`renderer = terminal_blocks` / `terminal_text`). **Build and Run** opens a terminal for
+  them. See [Playing in the terminal](docs/terminal.md).
 
 - **Open Save Folder** shows where the game keeps its [saved data](#saved-data). The editor's
   Play uses the same folder as the built game.
 
 `bronto_player <project folder>` also runs a project straight from its files, and
-`--headless --frames N` runs it with no window (for tests). Scripts move between scenes
+`--headless --frames N` runs it with no window (for tests). `--terminal` (or
+`--terminal=text`) draws it in the terminal instead of a window, and `--window` in a window,
+whatever the project's renderer setting says. Scripts move between scenes
 with `load_scene("levels/2.scene")` and end the game with `quit()`; in the editor's Play,
 those swap the scene until Stop and stop playing.
 
@@ -320,6 +327,7 @@ br_save_exists("slot1.sav");  br_save_delete("slot1.sav");  br_save_list(&files)
 | Windows | Win32 + GDI, per-monitor DPI aware | waveOut (winmm, loaded at run time) | XInput, with rumble | Links user32 + gdi32 | Compiles and links against mingw-w64 headers |
 | macOS | Cocoa from plain C through the Objective-C runtime, presented with Core Animation | Core Audio (AudioQueue) | GameController framework (Xbox, PlayStation, Switch Pro, MFi); no rumble yet | `-framework Cocoa -framework QuartzCore -framework AudioToolbox -framework GameController` | Compiles and links for arm64 and x86_64 against the macOS 14.5 SDK; constants, key codes and GameController selectors checked against the SDK |
 | Any | Headless | Captured in memory | Simulated (`br_headless_set_gamepad`) | Built in | Unit tests and CI |
+| Windows, macOS, Linux | The terminal: coloured half blocks or ASCII text ([docs/terminal.md](docs/terminal.md)) | The system's, as above | The system's, as above | Built in (`br_platform_terminal`); the console API on Windows, termios elsewhere | Unit tests through pipes; played in a pseudo-terminal on Linux. Not yet run on Windows or macOS (the Windows code is type-checked only) |
 | Web | `<canvas>` (WebAssembly, built with plain clang, with Bronto's own small C library) | WebAudio | Gamepad API, with rumble where the browser has it; on phones and tablets, on-screen touch controls that act as a gamepad | `make web` / `build.bat web`: clang `--target=wasm32` and wasm-ld; no Emscripten ([docs/web.md](docs/web.md)) | The whole test suite runs as WebAssembly in Node; the C library's output is compared with glibc's; the examples give picture- and sample-identical results to the desktop builds; the pages are played in Chromium with keyboard, mouse and gamepad, and on emulated phones and tablets with touch |
 
 On Windows, games built as above are console-subsystem programs, so log output shows up
@@ -387,6 +395,7 @@ docs/3d.md           3D: coordinates, components, the editor's 3D view, the C AP
 docs/editor-cli.md   the editor's command line: opening projects, --build, the self-test
 docs/web.md          web builds
 docs/replay.md       recording and replaying runs, and the Pantry Quest bot
+docs/terminal.md     drawing games in the terminal
 ```
 
 ## Architecture

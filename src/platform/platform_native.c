@@ -6,6 +6,9 @@
  *   Linux / BSD    platform_x11.c    X11, loaded at run time with dlopen
  *   Web            platform_web.c    a <canvas> in the page, with tools/web/bronto.js
  *
+ * and the terminal backend (platform_terminal.c), which draws in the terminal
+ * and borrows the OS backend's sound and gamepad code, so it comes after it.
+ *
  * Define BR_NO_NATIVE_PLATFORM to build without any (headless only).
  */
 #if !defined(_WIN32) && !defined(__wasm__)
@@ -32,3 +35,5 @@ const br_platform *br_platform_native(void) { return NULL; }
 #else
 const br_platform *br_platform_native(void) { return NULL; }
 #endif
+
+#include "platform_terminal.c"

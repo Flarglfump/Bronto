@@ -20,6 +20,9 @@
  *   native   - Win32+GDI (Windows), Cocoa (macOS), X11 (Linux, loaded at
  *              run time so no X11 headers or -lX11 are needed to build),
  *              or a <canvas> in a web page (WebAssembly; docs/web.md).
+ *   terminal - the terminal the program was started from, drawn in coloured
+ *              half blocks or as coloured ASCII art (docs/terminal.md), with
+ *              the native backend's sound and gamepads. Windows, macOS, Linux.
  */
 #ifndef BRONTO_PLATFORM_H
 #define BRONTO_PLATFORM_H
@@ -125,6 +128,20 @@ typedef struct br_platform {
 
 const br_platform *br_platform_headless(void);
 const br_platform *br_platform_native(void);   /* NULL if no native backend built */
+
+/* ---- terminal ---------------------------------------------------------------
+ * BLOCKS: two pixels per character cell, one above the other, in the upper
+ * half block's colour and its background's (the most detail a terminal shows).
+ * TEXT: one character per cell from a ramp of densities, " .:-=+*#%@", in the
+ * cell's hue: ASCII art. NULL when there is no terminal to draw in (started
+ * from a desktop icon rather than a terminal, Windows games linked without a
+ * console, the web) - use the native backend then. */
+typedef enum br_terminal_style { BR_TERMINAL_BLOCKS = 1, BR_TERMINAL_TEXT = 2 } br_terminal_style;
+const br_platform *br_platform_terminal(br_terminal_style style);
+/* Test hook (POSIX): the terminal backend reads `in_fd` and writes `out_fd`
+ * (pipes, say) instead of /dev/tty, and is cols x rows cells, until it shuts
+ * down. Call before br_platform_terminal. false where unsupported (Windows). */
+bool br_terminal_attach_fds(int in_fd, int out_fd, int cols, int rows);
 
 /* ---- headless controls (tests / tools) ------------------------------------ */
 /* Virtual seconds advanced per poll_events call (default 1/60). */
