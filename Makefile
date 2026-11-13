@@ -7,6 +7,8 @@
 #   make towerdefense  build and play the Pop Defense sample
 #   make editor     build and run the scene editor (tools/editor)
 #   make tools      build the editor, bscheck (checks .bs scripts) and bronto_player (runs games)
+#   make install    install them as this system's programs usually are (rebuilt first if out
+#                   of date) and set BRONTO_EDITOR for scripts; make uninstall removes them
 #   make game GAME=examples/pantryquest [TARGET=host|linux|macos|windows|web]
 #                   pack a project into a game people can run (the editor's Build menu,
 #                   as editor --build): build/games/<project>/<target>/ (host: this computer)
@@ -91,11 +93,13 @@ TEST_BIN := $(BUILD)/bronto_tests
 # Each examples/<name>/ directory becomes $(BUILD)/examples/<name>, built
 # from every .c file in it.
 EXAMPLES := $(patsubst examples/%/main.c,$(BUILD)/examples/%,$(wildcard examples/*/main.c))
-EDITOR   := $(BUILD)/editor
-BSCHECK  := $(BUILD)/bscheck
-PLAYER   := $(BUILD)/bronto_player
+# (gcc adds .exe on Windows, and make has to know, or it rebuilds them every time)
+EXE      := $(if $(filter windows,$(PLATFORM)),.exe)
+EDITOR   := $(BUILD)/editor$(EXE)
+BSCHECK  := $(BUILD)/bscheck$(EXE)
+PLAYER   := $(BUILD)/bronto_player$(EXE)
 
-.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player audio-test evdev-test vscode vscode-test vscode-icon web web-test web-check game pantryquest marble explorer
+.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player install uninstall audio-test evdev-test vscode vscode-test vscode-icon web web-test web-check game pantryquest marble explorer
 
 all: lib
 
@@ -174,6 +178,36 @@ $(EDITOR): $(wildcard tools/editor/*.c) $(wildcard tools/editor/*.h) tools/web/w
 
 editor: $(EDITOR)
 	$(EDITOR) $(SCENE)
+
+# Installing the editor (with bronto_player and bscheck, and players/ and the web player if
+# they're in build/), the way this system's programs usually are. The tools are rebuilt
+# first if they're out of date, and nothing is copied if what's installed is the same.
+#   macOS:     /Applications/Bronto Editor.app (~/Applications if /Applications can't be
+#              written to)                                       tools/install_editor_macos.sh
+#   Linux/BSD: PREFIX (/usr/local as root or if it can be written to, otherwise ~/.local):
+#              bin/bronto-editor, lib/bronto/, the app menu entry and its icon;
+#              DESTDIR=<folder> stages it there (for packages)  tools/install_editor_linux.sh
+#   Windows:   %LOCALAPPDATA%\Programs\Bronto Editor, a Start menu shortcut and an
+#              Installed apps entry                              tools/install_editor_windows.ps1
+#              (with MSVC: build.bat install)
+# Each sets BRONTO_EDITOR to the installed editor, for scripts: "$$BRONTO_EDITOR" --build ...
+install: tools
+ifeq ($(PLATFORM),macos)
+	BUILD="$(abspath $(BUILD))" tools/install_editor_macos.sh --no-build
+else ifeq ($(PLATFORM),windows)
+	powershell -NoProfile -ExecutionPolicy Bypass -File tools/install_editor_windows.ps1 -NoBuild -BuildDir "$(BUILD)"
+else
+	BUILD="$(abspath $(BUILD))" $(if $(PREFIX),PREFIX="$(PREFIX)") DESTDIR="$(DESTDIR)" tools/install_editor_linux.sh
+endif
+
+uninstall:
+ifeq ($(PLATFORM),macos)
+	tools/install_editor_macos.sh --uninstall
+else ifeq ($(PLATFORM),windows)
+	powershell -NoProfile -ExecutionPolicy Bypass -File tools/install_editor_windows.ps1 -Uninstall
+else
+	$(if $(PREFIX),PREFIX="$(PREFIX)") DESTDIR="$(DESTDIR)" tools/install_editor_linux.sh --uninstall
+endif
 
 # A project packed into a game (the editor's Build menu, from the command line):
 # the player for this computer is built here; for macos / windows, the player built

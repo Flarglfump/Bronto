@@ -24,6 +24,7 @@ make snake         # build and play Snake
 make towerdefense  # build and play Pop Defense (tower defense)
 make editor        # build and run the scene editor (make editor SCENE=level.scene)
 make tools         # the editor, bscheck and bronto_player (which the editor's Build menu needs)
+make install       # install the editor as an app and set BRONTO_EDITOR (make uninstall removes it)
 make game GAME=examples/pantryquest   # pack a project into a game: build/games/pantryquest/<system>/
                    #   (TARGET=web|linux|macos|windows; default: this computer)
 make pantryquest   # the same for Pantry Quest
@@ -42,7 +43,35 @@ make evdev-test    # Linux: feeds kernel gamepad events through the evdev backen
 
 On Windows with MSVC, run `build.bat` from a Developer Command Prompt; it builds
 `build\snake.exe`, `build\towerdefense.exe` and `build\editor.exe`. With MinGW, use `make`.
-`build.bat web` makes the web builds (it needs LLVM's clang as well).
+`build.bat web` makes the web builds (it needs LLVM's clang as well), `build.bat tools` just
+the editor, bscheck and bronto_player, and `build.bat install` installs the editor (see below).
+
+### Installing the editor
+
+`make install` (or `build.bat install` with MSVC) installs the editor the way programs are
+usually installed on each system, rebuilding the tools first if they're out of date. It copies
+nothing when what's installed is already the same, so it's safe to run after every build.
+
+| System | Where | BRONTO_EDITOR set in |
+|---|---|---|
+| macOS | `/Applications/Bronto Editor.app` (`~/Applications` if `/Applications` can't be written to) | `~/.zshrc` (and `~/.bash_profile`) |
+| Linux, BSD | `PREFIX/lib/bronto/`, with `PREFIX/bin/bronto-editor`, an app menu entry and an icon. `PREFIX` is `/usr/local` with `sudo make install` (or if you can write to it), otherwise `~/.local`, unless you give one (`make install PREFIX=/opt/bronto`); `DESTDIR=folder` stages it for a package | `/etc/profile.d/bronto-editor.sh` (system-wide) or `~/.profile` |
+| Windows | `%LOCALAPPDATA%\Programs\Bronto Editor`, with a Start menu shortcut and an Installed apps entry (`build.bat install -AllUsers`, as administrator: `%ProgramFiles%`) | the user's environment variables (the system's for `-AllUsers`) |
+
+`bronto_player`, `bscheck`, and the other systems' players and the web player (if they're in
+`build/`) go in beside the editor, so its Build menu works the same from the installed copy.
+`BRONTO_EDITOR` is the installed editor's path, for scripts:
+
+```sh
+"$BRONTO_EDITOR" --build macos path/to/project     # sh / zsh / bash
+```
+```powershell
+& $env:BRONTO_EDITOR --build windows path\to\project   # PowerShell
+```
+
+`make uninstall` (`build.bat uninstall`) removes it all again. The scripts that do the work are
+`tools/install_editor_macos.sh`, `tools/install_editor_linux.sh` and
+`tools/install_editor_windows.ps1`; each has `--help` (`Get-Help` for the PowerShell one).
 
 With no build system at all, the unity build compiles everything from one file:
 

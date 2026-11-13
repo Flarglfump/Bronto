@@ -12,7 +12,8 @@
 # (other systems' players) and web/ (the web player from "make web"), so the Build menu
 # works from the app just as it does from build/.
 #
-# The files are copied, so run this again after rebuilding the editor.
+# The files are copied, so run this again after rebuilding the editor ("make install"
+# does both, and copies nothing if the app already has the same files).
 #
 # BRONTO_EDITOR is the editor program inside the app, set in ~/.zshrc (and ~/.bash_profile
 # if you have one), so shell scripts can do:
@@ -46,7 +47,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD="$ROOT/build"
+BUILD="${BUILD:-$ROOT/build}"
 
 # The shell startup files BRONTO_EDITOR goes in: zsh's (macOS's default shell) always,
 # and bash's if it's there or bash is the login shell.
@@ -141,24 +142,36 @@ for webdir in "$BUILD/web" "$BUILD/players/web"; do    # the web player (make we
 done
 [ "$web_found" = 1 ] || echo "note: no web player in build/ (make web), so Build > Web won't be available"
 
-# The icon: the editor draws its own (--write-icon), and sips and iconutil (part of
-# macOS) turn it into an .icns. If any of that fails, the app just has no Finder icon.
-icon_key=""
-if command -v sips >/dev/null && command -v iconutil >/dev/null &&
-   "$BUILD/editor" --write-icon "$STAGE/icon.png" 1024 >/dev/null 2>&1; then
-    ICONSET="$STAGE/AppIcon.iconset"
-    mkdir -p "$ICONSET"
-    for size in 16 32 128 256 512; do
-        sips -z $size $size "$STAGE/icon.png" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
-        double=$((size * 2))
-        sips -z $double $double "$STAGE/icon.png" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
-    done
-    if iconutil -c icns "$ICONSET" -o "$RES/AppIcon.icns" 2>/dev/null; then
-        icon_key="  <key>CFBundleIconFile</key><string>AppIcon</string>"
-    fi
+# What's going in, to compare with the app that's there (signing changes the programs
+# inside it, so the app keeps this list of what they were built as).
+(cd "$MACOS" && find . -type f | LC_ALL=C sort | xargs cksum) > "$STAGE/manifest"
+up_to_date=0
+if [ -f "$APP/Contents/Resources/manifest" ] && cmp -s "$STAGE/manifest" "$APP/Contents/Resources/manifest"; then
+    up_to_date=1
+    echo "$APP is already up to date."
 fi
 
-cat > "$NEW/Contents/Info.plist" <<EOF
+if [ "$up_to_date" = 0 ]; then
+    cp "$STAGE/manifest" "$RES/manifest"
+
+    # The icon: the editor draws its own (--write-icon), and sips and iconutil (part of
+    # macOS) turn it into an .icns. If any of that fails, the app just has no Finder icon.
+    icon_key=""
+    if command -v sips >/dev/null && command -v iconutil >/dev/null &&
+       "$BUILD/editor" --write-icon "$STAGE/icon.png" 1024 >/dev/null 2>&1; then
+        ICONSET="$STAGE/AppIcon.iconset"
+        mkdir -p "$ICONSET"
+        for size in 16 32 128 256 512; do
+            sips -z $size $size "$STAGE/icon.png" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
+            double=$((size * 2))
+            sips -z $double $double "$STAGE/icon.png" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
+        done
+        if iconutil -c icns "$ICONSET" -o "$RES/AppIcon.icns" 2>/dev/null; then
+            icon_key="  <key>CFBundleIconFile</key><string>AppIcon</string>"
+        fi
+    fi
+
+    cat > "$NEW/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -176,32 +189,35 @@ $icon_key
 </plist>
 EOF
 
-# An ad-hoc signature for the whole bundle, so Apple Silicon Macs run it without
-# complaint (it isn't a developer signature; it just seals the bundle as built here).
-if command -v codesign >/dev/null; then
-    codesign --force --deep --sign - "$NEW" >/dev/null 2>&1 || echo "note: couldn't sign the app (it should still run)"
-fi
+    # An ad-hoc signature for the whole bundle, so Apple Silicon Macs run it without
+    # complaint (it isn't a developer signature; it just seals the bundle as built here).
+    if command -v codesign >/dev/null; then
+        codesign --force --deep --sign - "$NEW" >/dev/null 2>&1 || echo "note: couldn't sign the app (it should still run)"
+    fi
 
-rm -rf "$APP"
-mv "$NEW" "$APP"
-touch "$APP"                                            # (so Finder and the Dock pick up the new icon)
-LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-[ -x "$LSREGISTER" ] && "$LSREGISTER" -f "$APP" >/dev/null 2>&1 || true
-echo "Installed $APP"
+    rm -rf "$APP"
+    mv "$NEW" "$APP"
+    touch "$APP"                                            # (so Finder and the Dock pick up the new icon)
+    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    [ -x "$LSREGISTER" ] && "$LSREGISTER" -f "$APP" >/dev/null 2>&1 || true
+    echo "Installed $APP"
+fi
 
 # ---- BRONTO_EDITOR -------------------------------------------------------------------
 
+line="export BRONTO_EDITOR=\"$EXE\""
 while read -r rc; do
+    grep -qxF "$line" "$rc" 2>/dev/null && continue    # (already set)
     remove_block "$rc"
     {
         echo "$MARK_BEGIN"
-        echo "# Set by Bronto's tools/install_editor_macos.sh (run it with --uninstall to remove)."
-        echo "export BRONTO_EDITOR=\"$EXE\""
+        echo "# Set by Bronto's tools/install_editor_macos.sh (make uninstall removes it)."
+        echo "$line"
         echo "$MARK_END"
     } >> "$rc"
     echo "Set BRONTO_EDITOR in $rc"
 done < <(rc_files)
 
-echo
-echo "BRONTO_EDITOR=$EXE"
-echo "Open a new terminal (or run: source ~/.zshrc) to use it in this one."
+if [ "${BRONTO_EDITOR:-}" != "$EXE" ]; then
+    echo "BRONTO_EDITOR=$EXE (open a new terminal, or run: source ~/.zshrc, to use it in this one)"
+fi

@@ -4,13 +4,22 @@ rem   build.bat          build the tests + examples and run the tests
 rem   build.bat web      build for the web: build\web\ (the web player the editor's
 rem                      Build > Web uses, and a page for each example). Needs LLVM's
 rem                      clang (the LLVM installer for Windows) on PATH, besides MSVC.
+rem   build.bat tools    build just the editor, bscheck and bronto_player
+rem   build.bat install  install the editor (building the tools first if they're out of
+rem                      date): Start menu shortcut, BRONTO_EDITOR environment variable.
+rem                      build.bat install -AllUsers installs it for everyone (as administrator).
+rem   build.bat uninstall   remove it again (uninstall -AllUsers for an install for everyone)
+rem                      (see tools\install_editor_windows.ps1)
 rem Uses the unity build (src\bronto.c), so no make/CMake is needed.
 rem user32/gdi32 are linked automatically (#pragma comment in the Win32 backend).
 setlocal
 if /I "%1"=="web" goto :web
+if /I "%1"=="install" goto :install
+if /I "%1"=="uninstall" goto :uninstall
 set CFLAGS=/nologo /W4 /O2 /Zi /fp:precise /Iinclude /D_CRT_SECURE_NO_WARNINGS /wd4100
 if not exist build mkdir build
 if not exist build\obj mkdir build\obj
+if /I "%1"=="tools" goto :tools
 if not exist build\test_out mkdir build\test_out
 
 cl %CFLAGS% /Iexamples\snake /Iexamples\towerdefense /Itools\editor /Fobuild\obj\ /Fdbuild\ /Fe:build\bronto_tests.exe src\bronto.c tests\*.c examples\snake\snake_*.c examples\towerdefense\td_*.c tools\editor\doc.c tools\editor\console.c || goto :error
@@ -29,6 +38,24 @@ exit /b 0
 :error
 echo Build or tests FAILED.
 exit /b 1
+
+:tools
+cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\editor.exe src\bronto.c tools\editor\*.c tools\web\webpage.c || goto :error
+cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bscheck.exe src\bronto.c tools\bscheck\main.c || goto :error
+cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bronto_player.exe src\bronto.c tools\player\main.c || goto :error
+echo.
+echo Built build\editor.exe, build\bscheck.exe and build\bronto_player.exe
+exit /b 0
+
+rem The editor in the Start menu and BRONTO_EDITOR (tools\install_editor_windows.ps1 builds
+rem the tools first, with "build.bat tools", if they're out of date).
+:install
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\install_editor_windows.ps1" %2 %3 %4 || exit /b 1
+exit /b 0
+
+:uninstall
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\install_editor_windows.ps1" -Uninstall %2 || exit /b 1
+exit /b 0
 
 :web
 rem WebAssembly with plain clang: src\platform\web is the C library, tools\web\bronto.js the browser side.
