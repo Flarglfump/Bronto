@@ -303,10 +303,18 @@ static void test_project_settings(void) {
     snprintf(q.cflags, sizeof(q.cflags), "-DLEVELS=3 -Ivendor");
     q.windows_console = q.debug_build = true;
     q.renderer = BR_RENDERER_TERMINAL_TEXT;
+    CHECK(q.gpu == BR_GPU_AUTO);
+    q.gpu = BR_GPU_VULKAN;
     CHECK(br_project_save(dir, &q));
     CHECK(br_project_load(dir, &p));
     CHECK(strcmp(p.build_target, "web") == 0 && strcmp(p.version, "2.5") == 0 && strcmp(p.code_dir, "code") == 0 &&
-          strcmp(p.cflags, "-DLEVELS=3 -Ivendor") == 0 && p.windows_console && p.debug_build && p.renderer == BR_RENDERER_TERMINAL_TEXT);
+          strcmp(p.cflags, "-DLEVELS=3 -Ivendor") == 0 && p.windows_console && p.debug_build && p.renderer == BR_RENDERER_TERMINAL_TEXT && p.gpu == BR_GPU_VULKAN);
+    {   /* the graphics APIs' names */
+        br_gpu g = BR_GPU_AUTO;
+        CHECK(br_gpu_parse("Direct3D", &g) && g == BR_GPU_D3D12 && br_gpu_parse("opengl", &g) && g == BR_GPU_OPENGL && !br_gpu_parse("glide", &g));
+        CHECK(strcmp(br_gpu_name(BR_GPU_METAL), "metal") == 0 && strcmp(br_gpu_title(BR_GPU_D3D12), "Direct3D 12") == 0);
+        CHECK(br_gpu_exists_on(BR_GPU_METAL, "macos") && !br_gpu_exists_on(BR_GPU_METAL, "linux") && !br_gpu_exists_on(BR_GPU_VULKAN, "web"));
+    }
     CHECK(strcmp(p.exclude, "tools, notes.txt,docs/") == 0 && br_project_excludes(&p, "code/x.c") && !br_project_excludes(&p, "src/x.c"));
     br_path_join(dir, sizeof(dir), g_out_dir, "no_project_here");
     br_fs_mkdir(dir);

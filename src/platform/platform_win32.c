@@ -4,8 +4,11 @@
  * - Per-monitor DPI aware (v2 where available); sizes requested in points
  *   are converted with the window's DPI, and moving between monitors with
  *   different scaling resizes the window as Windows suggests.
- * - Presentation: StretchDIBits from a BGRA staging copy of the framebuffer
- *   into the engine's viewport, black PatBlt bars around it.
+ * - Presentation (br_gpu, platform.h): through Direct3D 12 (gpu_d3d12.c),
+ *   Vulkan (gpu_vulkan.c) or OpenGL (WGL; gpu_gl.c), which scale the frame on
+ *   the GPU - auto tries them in that order - else ("software") StretchDIBits
+ *   from a BGRA staging copy of the framebuffer into the engine's viewport,
+ *   black PatBlt bars around it. Their DLLs are loaded at run time.
  * - Fullscreen is borderless-windowed covering the current monitor (instant
  *   Alt+Tab, no display mode change).
  * - Audio: waveOut (audio_waveout.c). Gamepads: XInput (gamepad_xinput.c).
@@ -78,6 +81,7 @@ static struct {
     GetDpiForWindow_fn GetDpiForWindow;
     AdjustWindowRectExForDpi_fn AdjustWindowRectExForDpi;
     HMODULE winmm;
+    br_gpu gpu;                 /* how frames are shown: software (GDI), d3d12, vulkan or opengl */
 } W;
 
 /* GetProcAddress returns FARPROC; copy through memcpy so strict compilers
@@ -93,6 +97,92 @@ static w32_any_fn w32_proc(HMODULE m, const char *name) {
 
 #include "audio_waveout.c"
 #include "gamepad_xinput.c"
+
+/* ---- the GPU: Direct3D 12, Vulkan, or OpenGL through WGL -------------------------------- */
+#include "gpu_d3d12.c"
+#include "gpu_vulkan.c"
+#include "gpu_gl.c"
+
+typedef HGLRC (WINAPI *wglCreateContext_fn)(HDC);
+typedef BOOL (WINAPI *wglMakeCurrent_fn)(HDC, HGLRC);
+typedef BOOL (WINAPI *wglDeleteContext_fn)(HGLRC);
+typedef PROC (WINAPI *wglGetProcAddress_fn)(LPCSTR);
+static struct {
+    HMODULE lib;
+    HGLRC context;
+    wglCreateContext_fn CreateContext;
+    wglMakeCurrent_fn MakeCurrent;
+    wglDeleteContext_fn DeleteContext;
+    wglGetProcAddress_fn GetProcAddress;
+} WGL;
+
+static void *wgl_proc(const char *name) {
+    PROC p = WGL.GetProcAddress(name);
+    void *o;
+    intptr_t v;
+    memcpy(&o, &p, sizeof(o));
+    v = (intptr_t)o;
+    if (v == 0 || v == 1 || v == 2 || v == 3 || v == -1) {   /* (OpenGL 1.1's are opengl32.dll's own exports) */
+        FARPROC f = GetProcAddress(WGL.lib, name);
+        memcpy(&o, &f, sizeof(o));
+    }
+    return o;
+}
+
+static bool wgl_start(HDC dc) {
+    PIXELFORMATDESCRIPTOR pfd;
+    char info[160];
+    int format;
+    if (!WGL.lib) WGL.lib = LoadLibraryA("opengl32.dll");
+    WGL.CreateContext = W32_PROC(wglCreateContext_fn, WGL.lib, "wglCreateContext");
+    WGL.MakeCurrent = W32_PROC(wglMakeCurrent_fn, WGL.lib, "wglMakeCurrent");
+    WGL.DeleteContext = W32_PROC(wglDeleteContext_fn, WGL.lib, "wglDeleteContext");
+    WGL.GetProcAddress = W32_PROC(wglGetProcAddress_fn, WGL.lib, "wglGetProcAddress");
+    if (!WGL.CreateContext || !WGL.MakeCurrent || !WGL.DeleteContext || !WGL.GetProcAddress) { BR_INFO("OpenGL: no opengl32.dll"); return false; }
+    memset(&pfd, 0, sizeof(pfd));
+    pfd.nSize = sizeof(pfd);
+    pfd.nVersion = 1;
+    pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    pfd.iPixelType = PFD_TYPE_RGBA;
+    pfd.cColorBits = 32;
+    pfd.iLayerType = PFD_MAIN_PLANE;
+    if (!(format = ChoosePixelFormat(dc, &pfd)) || !SetPixelFormat(dc, format, &pfd)) { BR_INFO("OpenGL: no pixel format for the window"); return false; }
+    if (!(WGL.context = WGL.CreateContext(dc))) { BR_INFO("OpenGL: no WGL context"); return false; }
+    if (!WGL.MakeCurrent(dc, WGL.context) || !gl_begin(wgl_proc, info, sizeof(info))) {
+        WGL.MakeCurrent(NULL, NULL);
+        WGL.DeleteContext(WGL.context);
+        WGL.context = NULL;
+        return false;
+    }
+    br_gpu_set_active(BR_GPU_OPENGL, info);
+    return true;
+}
+
+static void wgl_stop(void) {
+    if (!WGL.context) return;
+    gl_end();
+    WGL.MakeCurrent(NULL, NULL);
+    WGL.DeleteContext(WGL.context);
+    WGL.context = NULL;
+}
+
+/* Shows a frame through the GPU in use; false if there is none (or it just stopped working). */
+static bool w32_gpu_present(const br_image *fb, br_recti vp) {
+    bool ok;
+    switch (W.gpu) {
+    case BR_GPU_D3D12: ok = d12_present(fb, vp, W.width, W.height); break;
+    case BR_GPU_VULKAN: ok = vkp_present(fb, vp, W.width, W.height); break;
+    case BR_GPU_OPENGL: gl_present(fb, vp, W.width, W.height); SwapBuffers(W.hdc); return true;
+    default: return false;
+    }
+    if (ok) return true;
+    BR_WARN("%s stopped working: showing frames with GDI from now on", br_gpu_title(W.gpu));
+    if (W.gpu == BR_GPU_D3D12) d12_stop();
+    else vkp_stop();
+    W.gpu = BR_GPU_SOFTWARE;
+    br_gpu_set_active(BR_GPU_SOFTWARE, "");
+    return false;
+}
 
 static void w32_push(const br_event *e) {
     if (W.pending_count < W32_PENDING_MAX) W.pending[W.pending_count++] = *e;
@@ -216,6 +306,7 @@ static void w32_blit(const br_image *fb, br_recti vp) {
 
 static void w32_present(const br_image *fb, br_recti vp) {
     W.last_fb = fb;
+    if (W.gpu != BR_GPU_SOFTWARE && w32_gpu_present(fb, vp)) return;
     w32_blit(fb, vp);
 }
 
@@ -422,7 +513,7 @@ static LRESULT CALLBACK w32_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
          * game is not ticking: keep showing the last frame, fitted. */
         if (W.last_fb && W.last_fb->pixels) {
             br_viewport vp = br_viewport_compute(W.last_fb->width, W.last_fb->height, W.width, W.height, BR_SCALE_FIT);
-            w32_blit(W.last_fb, vp.rect);
+            if (W.gpu == BR_GPU_SOFTWARE || !w32_gpu_present(W.last_fb, vp.rect)) w32_blit(W.last_fb, vp.rect);
         }
         return 0;
     }
@@ -559,6 +650,21 @@ static bool w32_init(const br_platform_config *cfg) {
     W.width = cr.right - cr.left;
     W.height = cr.bottom - cr.top;
     W.pending_count = 0;   /* drop the setup-time WM_SIZE/WM_MOVE noise */
+    {   /* the GPU: the first that starts of what was asked for, then auto's order */
+        static const br_gpu k_auto[] = { BR_GPU_D3D12, BR_GPU_VULKAN, BR_GPU_OPENGL };
+        br_gpu order[BR_GPU_COUNT + 2];
+        int n = br_gpu_order(cfg->gpu, k_auto, 3, order, (int)BR_ARRAY_COUNT(order)), i;
+        W.gpu = BR_GPU_SOFTWARE;
+        for (i = 0; i < n && W.gpu == BR_GPU_SOFTWARE && order[i] != BR_GPU_SOFTWARE; ++i) {
+            br_gpu g = order[i];
+            if ((g == BR_GPU_D3D12 && d12_start(W.hwnd, W.width, W.height)) || (g == BR_GPU_VULKAN && vkp_start_win32(W.inst, W.hwnd, W.width, W.height)) ||
+                (g == BR_GPU_OPENGL && wgl_start(W.hdc)))
+                W.gpu = g;
+            else if (g == BR_GPU_METAL) BR_INFO("Metal isn't on Windows");
+            if (W.gpu == BR_GPU_SOFTWARE && i + 1 < n) BR_INFO("%s didn't start: trying %s", br_gpu_title(g), br_gpu_title(order[i + 1]));
+        }
+        if (W.gpu != BR_GPU_SOFTWARE) BR_INFO("Win32: frames go through %s", br_gpu_info());
+    }
     if (!cfg->hidden) {
         ShowWindow(W.hwnd, SW_SHOW);
         SetForegroundWindow(W.hwnd);
@@ -633,6 +739,10 @@ static void w32_shutdown(void) {
     wo_close();
     xi_shutdown();
     if (!W.hwnd) return;
+    if (W.gpu == BR_GPU_D3D12) d12_stop();
+    else if (W.gpu == BR_GPU_VULKAN) vkp_stop();
+    else if (W.gpu == BR_GPU_OPENGL) wgl_stop();
+    W.gpu = BR_GPU_SOFTWARE;
     if (W.winmm) {
         timeBeginPeriod_fn tep = W32_PROC(timeBeginPeriod_fn, W.winmm, "timeEndPeriod");
         if (tep) tep(1);

@@ -283,6 +283,8 @@ static void list_sources(const editor *ed, source_list *out) {
     char dir[NP];
     const char *code = ed->project.code_dir[0] ? ed->project.code_dir : "src";
     memset(out, 0, sizeof(*out));
+    br_path_join(dir, sizeof(dir), project_root(ed), BR_PROJECT_FILE);
+    if (!br_fs_exists(dir)) return;                          /* only a project's code (not any folder's src/) */
     br_path_join(dir, sizeof(dir), project_root(ed), code);
     if (!br_fs_is_dir(dir)) return;
     scan_dir(project_root(ed), code, 0, out);

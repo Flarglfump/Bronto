@@ -88,6 +88,8 @@ typedef struct br_project {
     char version[32];              /* the game's version (default 1.0): the Mac app's, ... */
     char bundle_id[128];           /* the Mac app's identifier ("" = com.bronto.<name>) */
     bool windows_console;          /* Windows: a console window beside the game's (terminal games always have one) */
+    int gpu;                       /* br_gpu: how a windowed game shows its frames (gpu = auto | software | opengl |
+                                      vulkan | metal | d3d12; platform.h) */
     /* The game's C code (game.h, docs/c-code.md) */
     char code_dir[128];            /* the folder of its .c and .h files (default src) */
     char compiler[256];            /* the C compiler for this computer's builds ("" = find one) */

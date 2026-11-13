@@ -195,6 +195,8 @@ bool br_engine_init(br_engine *e, const br_engine_config *cfg) {
     pc.hidden = e->config.hidden_window;
     pc.audio_sample_rate = e->config.audio_sample_rate;
     pc.audio_latency_ms = e->config.audio_latency_ms;
+    pc.gpu = e->config.gpu;
+    br_gpu_set_active(BR_GPU_SOFTWARE, "");                /* (until the platform says otherwise) */
     if (!e->platform->init(&pc)) {
         BR_ERROR("platform '%s' failed to initialise", e->platform->name);
         return false;
@@ -249,10 +251,11 @@ bool br_engine_init(br_engine *e, const br_engine_config *cfg) {
         br_scene_push(&e->scenes, e->config.initial_scene);
         br_scenes_apply(&e->scenes);
     }
-    BR_INFO("Bronto %d.%d.%d initialised (%dx%d framebuffer, %dx%d window, platform: %s)",
+    BR_INFO("Bronto %d.%d.%d initialised (%dx%d framebuffer, %dx%d window, platform: %s%s%s)",
             BRONTO_VERSION_MAJOR, BRONTO_VERSION_MINOR, BRONTO_VERSION_PATCH,
             e->framebuffer.width, e->framebuffer.height, e->window.width, e->window.height,
-            e->platform->name);
+            e->platform->name, br_gpu_active() != BR_GPU_SOFTWARE ? ", " : "",
+            br_gpu_active() != BR_GPU_SOFTWARE ? br_gpu_title(br_gpu_active()) : "");
     return true;
 }
 

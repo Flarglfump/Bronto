@@ -1973,6 +1973,8 @@ static void usage(FILE *out) {
             "                        A project with C code (src/) has it compiled into the game\n"
             "  --out <folder>        with --build: put the game here, not in builds/<target>/\n"
             "  --headless            run the editor's self-test, with no window\n"
+            "  --gpu <api>           how the editor's window shows itself: auto, software, opengl,\n"
+            "                        vulkan, metal or d3d12 (instead of Settings > Graphics)\n"
             "  --write-icon <file>   save the app icon as a PNG, size 16 to 1024 (256)\n"
             "  -h, --help            show this and stop\n"
             "\n"
@@ -1990,6 +1992,7 @@ int main(int argc, char **argv) {
     br_engine_config cfg;
     int i, rc = 0;
     bool build = false, build_project = false;
+    int gpu = -1;
     ed_target target = ED_TARGET_LINUX;
     if (argc > 1) ed_attach_console();             /* (Windows: the editor is a windowed program) */
     for (i = 1; i < argc; ++i) {
@@ -2020,6 +2023,15 @@ int main(int argc, char **argv) {
             }
             build = ED.build_cli = true;
             ++i;
+        } else if ((strcmp(argv[i], "--gpu") == 0 && i + 1 < argc) || strncmp(argv[i], "--gpu=", 6) == 0) {
+            const char *name = argv[i][5] == '=' ? argv[i] + 6 : argv[++i];
+            br_gpu g;
+            if (!br_gpu_parse(name, &g)) {
+                fprintf(stderr, "editor: --gpu %s: auto, software, opengl, vulkan, metal or d3d12\n", name);
+                br_free(e);
+                return 2;
+            }
+            gpu = (int)g;
         } else if (strcmp(argv[i], "--out") == 0 && i + 1 < argc) {
             snprintf(ED.build_out, sizeof(ED.build_out), "%s", argv[++i]);
         } else if (argv[i][0] == '-' && argv[i][1] != 0) {   /* a mistyped option, not a file to open */
@@ -2048,6 +2060,7 @@ int main(int argc, char **argv) {
     cfg.min_window_height = 540;
     cfg.clear_color = br_rgb(30, 34, 40);
     cfg.initial_scene = &k_editor;
+    cfg.gpu = gpu >= 0 ? (br_gpu)gpu : ED.headless || build ? BR_GPU_AUTO : ed_prefs_gpu();   /* (Settings > Graphics) */
     cfg.on_init = on_init;
     if (ED.headless || build) cfg.platform = br_platform_headless();
     if (!build) ED.console_capturing = br_capture_start(true);   /* the Console tab; the terminal still gets it all */

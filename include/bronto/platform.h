@@ -20,6 +20,9 @@
  *   native   - Win32+GDI (Windows), Cocoa (macOS), X11 (Linux, loaded at
  *              run time so no X11 headers or -lX11 are needed to build),
  *              or a <canvas> in a web page (WebAssembly; docs/web.md).
+ *              The window shows the framebuffer through the GPU where it
+ *              can - Direct3D 12, Metal, Vulkan or OpenGL, loaded at run
+ *              time like X11 - or the OS's own 2D drawing (br_gpu below).
  *   terminal - the terminal the program was started from, drawn in coloured
  *              half blocks or as coloured ASCII art (docs/terminal.md), with
  *              the native backend's sound and gamepads. Windows, macOS, Linux.
@@ -32,6 +35,41 @@
 #include "render.h"
 #include "window.h"
 
+/* ---- the GPU: how a native window shows the framebuffer --------------------------
+ * The engine draws every frame on the CPU (render.h, render3d.h). A native window
+ * then shows it: through a graphics API, which scales it to the window on the GPU
+ * (nearest-neighbour, black bars around it), or with the OS's own 2D drawing
+ * (GDI, Core Animation, XPutImage: "software"). The APIs are the system's and the
+ * graphics driver's, loaded at run time; none is needed to build or to run.
+ *
+ *   auto      the best one this computer has: Windows Direct3D 12, Vulkan, OpenGL;
+ *             macOS Metal; Linux OpenGL, Vulkan; then software
+ *   software  no graphics API
+ *   opengl    OpenGL (GLX, WGL, or macOS's - deprecated by Apple, but there)
+ *   vulkan    Vulkan (Windows, Linux; needs a Vulkan driver)
+ *   metal     Metal (macOS)
+ *   d3d12     Direct3D 12 (Windows 10 and later)
+ *
+ * One that isn't there, or doesn't start, falls back to the next in auto's order,
+ * and finally to software (the log says which was used). BRONTO_GPU in the
+ * environment (auto, software, opengl...) overrides what the program asks for. */
+typedef enum br_gpu {
+    BR_GPU_AUTO = 0, BR_GPU_SOFTWARE, BR_GPU_OPENGL, BR_GPU_VULKAN, BR_GPU_METAL, BR_GPU_D3D12,
+    BR_GPU_COUNT
+} br_gpu;
+const char *br_gpu_name(br_gpu gpu);           /* "auto", "software", "opengl", "vulkan", "metal", "d3d12" */
+const char *br_gpu_title(br_gpu gpu);          /* "Automatic", "Software", "OpenGL", "Vulkan", "Metal", "Direct3D 12" */
+bool br_gpu_parse(const char *name, br_gpu *gpu);   /* the names above (and "gl", "dx12", "d3d", "none") */
+bool br_gpu_exists_on(br_gpu gpu, const char *os);  /* can `os` ("windows", "macos", "linux", "web") have it? */
+/* What the native window presents with, once it's open (software before, and for
+ * every other backend), and a line about it ("OpenGL 4.5, Mesa llvmpipe"). */
+br_gpu br_gpu_active(void);
+const char *br_gpu_info(void);
+/* For backends: the order to try for a request (BRONTO_GPU applied), given this
+ * system's auto order; always ends with software. Returns how many. */
+int  br_gpu_order(br_gpu requested, const br_gpu *auto_order, int auto_count, br_gpu *out, int max);
+void br_gpu_set_active(br_gpu gpu, const char *info);
+
 typedef struct br_platform_config {
     const char *title;
     int width, height;          /* initial client size, points */
@@ -41,6 +79,7 @@ typedef struct br_platform_config {
     bool hidden;                /* create without showing (tools/tests) */
     int audio_sample_rate;      /* 0 = no audio device */
     int audio_latency_ms;       /* target output buffering */
+    br_gpu gpu;                 /* how the window shows frames (native backends) */
 } br_platform_config;
 
 typedef bool (*br_frame_fn)(void *user);   /* return false to stop the loop */

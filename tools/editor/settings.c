@@ -5,7 +5,8 @@
  * %APPDATA%\Bronto, ~/Library/Application Support/Bronto, ~/.config/Bronto)
  * as "key = value" lines in editor.cfg, so they apply to every project.
  *
- * The panels' sizes are kept too ("scene_panel = 200 shown").
+ * The panels' sizes are kept too ("scene_panel = 200 shown"), and the graphics API
+ * the editor's own window uses ("graphics = auto"; editor --gpu overrides it).
  *
  * The script editor is empty for the editor's own (the Scripts tab, code.c),
  * "system" for the system's default program for .bs files, or a command line
@@ -74,6 +75,7 @@ void ed_prefs_load(editor *ed) {
         n = strlen(eq);
         while (n && (eq[n - 1] == '\r' || eq[n - 1] == ' ')) eq[--n] = 0;
         if (strcmp(line, "script_editor") == 0) snprintf(ed->prefs.script_editor, sizeof(ed->prefs.script_editor), "%s", eq);
+        else if (strcmp(line, "graphics") == 0) { br_gpu g; if (br_gpu_parse(eq, &g)) ed->prefs.gpu = (int)g; }
         else {
             int i;
             for (i = 0; i < ED_PANEL_COUNT; ++i) {
@@ -94,12 +96,30 @@ bool ed_prefs_save(editor *ed) {
     size_t n;
     if (ed->headless) return true;                     /* the self-test never touches your settings */
     if (!prefs_path(path, sizeof(path))) return false;
-    snprintf(text, sizeof(text), "# Bronto editor settings\nscript_editor = %s\n", ed->prefs.script_editor);
+    snprintf(text, sizeof(text), "# Bronto editor settings\nscript_editor = %s\ngraphics = %s\n", ed->prefs.script_editor,
+             br_gpu_name((br_gpu)ed->prefs.gpu));
     for (i = 0; i < ED_PANEL_COUNT; ++i) {
         n = strlen(text);
         snprintf(text + n, sizeof(text) - n, "%s = %.0f %s\n", k_panels[i].key, (double)ed->panels.size[i], ed->panels.open[i] ? "shown" : "hidden");
     }
     return br_file_write_all(path, text, strlen(text));
+}
+
+br_gpu ed_prefs_gpu(void) {
+    char path[ED_PATH_MAX], *text, *p;
+    size_t size;
+    br_gpu g = BR_GPU_AUTO;
+    if (!prefs_path(path, sizeof(path)) || !(text = (char *)br_file_read_all(path, &size))) return g;
+    if ((p = strstr(text, "\ngraphics = ")) != NULL) {
+        char name[32];
+        size_t n = 0;
+        p += 12;
+        while (p[n] && p[n] != '\n' && p[n] != '\r' && n + 1 < sizeof(name)) { name[n] = p[n]; ++n; }
+        name[n] = 0;
+        if (!br_gpu_parse(name, &g)) g = BR_GPU_AUTO;
+    }
+    br_free(text);
+    return g;
 }
 
 /* The command with {file} and {line} filled in ({file} added at the end if missing). */
@@ -143,12 +163,13 @@ bool ed_open_script(editor *ed, const char *rel, int line) {
 
 void ed_settings_open(editor *ed) {
     snprintf(ed->settings_field, sizeof(ed->settings_field), "%s", ed->prefs.script_editor);
+    ed->settings_gpu = ed->prefs.gpu;
     ed->settings_visible = true;
 }
 
 void ed_settings_dialog(editor *ed, br_rect screen) {
     br_ui *ui = &ed->ui;
-    br_rect box = br_rect_make(floorf(screen.x + (screen.w - 520) / 2), floorf(screen.y + (screen.h - 300) / 2), 520, 300);
+    br_rect box = br_rect_make(floorf(screen.x + (screen.w - 520) / 2), floorf(screen.y + (screen.h - 380) / 2), 520, 380);
     char example[700];
     int i;
     if (!ed->settings_visible) return;
@@ -180,10 +201,36 @@ void ed_settings_dialog(editor *ed, br_rect screen) {
         snprintf(example, sizeof(example), "Opens the file with the system's default program.");
     }
     br_ui_label_colored(ui, example, ui->style.text_dim);
+    br_ui_spacing(ui, 8);
+    {   /* the editor's own window: through which graphics API (games have theirs in Build Settings) */
+        static const char *const host = 
+#if defined(_WIN32)
+            "windows";
+#elif defined(__APPLE__)
+            "macos";
+#else
+            "linux";
+#endif
+        const char *titles[BR_GPU_COUNT];
+        br_gpu ids[BR_GPU_COUNT];
+        int count = 0, at = 0, g;
+        char now[200];
+        for (g = 0; g < BR_GPU_COUNT; ++g) {
+            if (!br_gpu_exists_on((br_gpu)g, host)) continue;
+            if (g == ed->settings_gpu) at = count;
+            ids[count] = (br_gpu)g;
+            titles[count++] = br_gpu_title((br_gpu)g);
+        }
+        if (br_ui_combo(ui, "Graphics", &at, titles, count)) ed->settings_gpu = (int)ids[at];
+        snprintf(now, sizeof(now), "The editor's window. Now: %s%s%s - a change applies when it next starts.", br_gpu_title(br_gpu_active()),
+                 br_gpu_info()[0] ? ", " : "", br_gpu_info());
+        br_ui_label_colored(ui, now, ui->style.text_dim);
+    }
     br_ui_spacing(ui, 10);
     br_ui_columns(ui, 2);
     if (br_ui_button(ui, "Save##settings")) {
         snprintf(ed->prefs.script_editor, sizeof(ed->prefs.script_editor), "%s", ed->settings_field);
+        ed->prefs.gpu = ed->settings_gpu;
         ed->settings_visible = false;
         if (ed_prefs_save(ed)) ed_status(ed, "Settings saved");
         else ed_status(ed, "Couldn't save the settings file");

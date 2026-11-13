@@ -2,9 +2,12 @@
  * macOS backend: Cocoa window driven from plain C through the Objective-C
  * runtime (objc_msgSend), presented with Core Animation.
  *
- * - The framebuffer becomes a CGImage set as the contents of a CALayer
- *   positioned at the engine's viewport, with nearest-neighbour filtering;
- *   the view's backing layer is black, which gives the bars for free.
+ * - Presentation (br_gpu, platform.h): through Metal (gpu_metal.c), a
+ *   CAMetalLayer over the view - auto's choice - or, asked for by name,
+ *   OpenGL (NSOpenGLContext; gpu_gl.c; deprecated by Apple but still there).
+ *   Else ("software") the framebuffer becomes a CGImage set as the contents
+ *   of a CALayer positioned at the engine's viewport, with nearest-neighbour
+ *   filtering; the view's backing layer is black, which gives the bars.
  * - Retina aware: sizes are requested in points; the engine sees pixels.
  * - Native fullscreen (its own Space), the standard app menu with Quit
  *   (Cmd+Q) and Toggle Full Screen (Ctrl+Cmd+F).
@@ -140,7 +143,52 @@ static struct {
     float last_mx, last_my;
     mach_timebase_info_data_t timebase;
     CGColorSpaceRef colorspace;
+    br_gpu gpu;                 /* how frames are shown: software (Core Animation), metal or opengl */
+    id gl_context;              /* NSOpenGLContext, for opengl */
+    int gl_w, gl_h;             /* the size it was last told about */
 } M;
+
+/* ---- the GPU: Metal, or OpenGL through NSOpenGLContext --------------------------- */
+#include "gpu_metal.c"
+#include "gpu_gl.c"
+
+static void *mac_gl_lib;
+
+static void *mac_gl_proc(const char *name) { return mac_gl_lib ? dlsym(mac_gl_lib, name) : NULL; }
+
+static bool mac_gl_start(void) {
+    static const unsigned int attrs[] = { 5 /* double buffer */, 8 /* colour size */, 24, 73 /* accelerated */, 0 };
+    id format;
+    char info[160];
+    if (!mac_gl_lib) mac_gl_lib = dlopen("/System/Library/Frameworks/OpenGL.framework/OpenGL", RTLD_LAZY | RTLD_LOCAL);
+    if (!mac_gl_lib || !cls("NSOpenGLContext")) { BR_INFO("OpenGL: not on this Mac"); return false; }
+    format = ((id (*)(id, SEL, const unsigned int *))objc_msgSend)(msg_id(cls("NSOpenGLPixelFormat"), "alloc"), SEL_("initWithAttributes:"), attrs);
+    if (!format) { BR_INFO("OpenGL: no pixel format"); return false; }
+    M.gl_context = ((id (*)(id, SEL, id, id))objc_msgSend)(msg_id(cls("NSOpenGLContext"), "alloc"), SEL_("initWithFormat:shareContext:"), format, (id)0);
+    msg_v(format, "release");
+    if (!M.gl_context) { BR_INFO("OpenGL: no context"); return false; }
+    msg_v_bool(M.view, "setWantsBestResolutionOpenGLSurface:", YES);
+    msg_v_id(M.gl_context, "setView:", M.view);
+    msg_v(M.gl_context, "makeCurrentContext");
+    if (!gl_begin(mac_gl_proc, info, sizeof(info))) {
+        msg_v(cls("NSOpenGLContext"), "clearCurrentContext");
+        msg_v(M.gl_context, "release");
+        M.gl_context = (id)0;
+        return false;
+    }
+    br_gpu_set_active(BR_GPU_OPENGL, info);
+    return true;
+}
+
+static void mac_gl_stop(void) {
+    if (!M.gl_context) return;
+    msg_v(M.gl_context, "makeCurrentContext");
+    gl_end();
+    msg_v(cls("NSOpenGLContext"), "clearCurrentContext");
+    msg_v(M.gl_context, "clearDrawable");
+    msg_v(M.gl_context, "release");
+    M.gl_context = (id)0;
+}
 
 static void mac_post(const br_event *e) {
     if (M.events) br_events_post(M.events, e);
@@ -655,6 +703,22 @@ static bool mac_init(const br_platform_config *cfg) {
         msg_v_bool(M.app, "activateIgnoringOtherApps:", YES);
     }
     M.colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    {   /* the GPU: what was asked for, else Metal (OpenGL only when asked for by name) */
+        static const br_gpu k_auto[] = { BR_GPU_METAL };
+        br_gpu order[BR_GPU_COUNT + 2];
+        int n = br_gpu_order(cfg->gpu, k_auto, 1, order, (int)BR_ARRAY_COUNT(order)), i;
+        M.gpu = BR_GPU_SOFTWARE;
+        for (i = 0; i < n && M.gpu == BR_GPU_SOFTWARE && order[i] != BR_GPU_SOFTWARE; ++i) {
+            if (order[i] == BR_GPU_METAL && mtl_start(layer, M.colorspace)) M.gpu = BR_GPU_METAL;
+            else if (order[i] == BR_GPU_OPENGL && mac_gl_start()) M.gpu = BR_GPU_OPENGL;
+            else if (order[i] == BR_GPU_D3D12 || order[i] == BR_GPU_VULKAN) BR_INFO("%s isn't on macOS", br_gpu_title(order[i]));
+            if (M.gpu == BR_GPU_SOFTWARE && i + 1 < n) BR_INFO("%s didn't start: trying %s", br_gpu_title(order[i]), br_gpu_title(order[i + 1]));
+        }
+        if (M.gpu != BR_GPU_SOFTWARE) {
+            msg_v_bool(M.image_layer, "setHidden:", YES);   /* (the software path's layer) */
+            BR_INFO("Cocoa: frames go through %s", br_gpu_info());
+        }
+    }
     M.initialized = true;
     M.pending_count = 0;    /* setup-time notifications are not news */
     if (cfg->fullscreen) mac_set_fullscreen(true);
@@ -678,6 +742,9 @@ static void mac_shutdown(void) {
     if (M.cursor_hidden_now) msg_v(cls("NSCursor"), "unhide");
     msg_v_id(M.window, "setDelegate:", (id)0);
     msg_v_id(M.window, "orderOut:", (id)0);
+    if (M.gpu == BR_GPU_METAL) mtl_stop();
+    else if (M.gpu == BR_GPU_OPENGL) mac_gl_stop();
+    M.gpu = BR_GPU_SOFTWARE;
     msg_v(M.window, "close");
     msg_v(M.image_layer, "release");
     msg_v(M.tracking, "release");
@@ -719,6 +786,20 @@ static void mac_present(const br_image *fb, br_recti vp) {
     double s;
     if (M.minimized) return;
     pool = objc_autoreleasePoolPush();
+    if (M.gpu != BR_GPU_SOFTWARE) {
+        int w, h;
+        mac_get_window_size(&w, &h);
+        if (M.gpu == BR_GPU_METAL) {
+            mtl_present(fb, vp, w, h, mac_scale(), msg_rect(M.view, "bounds"));
+        } else {
+            msg_v(M.gl_context, "makeCurrentContext");
+            if (w != M.gl_w || h != M.gl_h) { msg_v(M.gl_context, "update"); M.gl_w = w; M.gl_h = h; }
+            gl_present(fb, vp, w, h);
+            msg_v(M.gl_context, "flushBuffer");
+        }
+        objc_autoreleasePoolPop(pool);
+        return;
+    }
     /* Copy the pixels: Core Animation reads the image after we return. */
     data = CFDataCreate(NULL, (const UInt8 *)fb->pixels, (CFIndex)((size_t)fb->width * (size_t)fb->height * 4u));
     provider = CGDataProviderCreateWithCFData(data);

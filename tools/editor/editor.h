@@ -427,7 +427,8 @@ typedef struct editor {
     bool build_cli;                    /* running as editor --build (no window) */
     char build_out[ED_PATH_MAX];       /* --build --out: the folder the game goes in ("": the project's builds/<target>) */
     br_image badge;                    /* the icon, small, for the toolbar */
-    struct { char script_editor[256]; } prefs;   /* saved in the user's settings folder */
+    struct { char script_editor[256]; int gpu; } prefs;   /* saved in the user's settings folder (gpu: br_gpu, the editor's window) */
+    int settings_gpu;                  /* the Settings dialog's choice */
     char settings_field[256];
     bool settings_visible;
     br_entity collapsed[ED_MAX_COLLAPSED];   /* folded rows in the hierarchy */
@@ -532,6 +533,7 @@ void ed_make_icon(br_image *out, int size);
 
 /* settings.c */
 void ed_prefs_load(editor *ed);
+br_gpu ed_prefs_gpu(void);                  /* the editor's own window's graphics API, read before it opens */
 void ed_panels_default(ed_panels *p);
 void ed_panel_set_open(editor *ed, ed_panel panel, bool open);   /* and saves the settings */
 const char *ed_panel_name(ed_panel panel);

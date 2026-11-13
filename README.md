@@ -14,7 +14,8 @@ Status (v0.1):
   and Pop Defense; a visual scene editor; recording and replaying runs frame for
   frame, with a bot that plays Pantry Quest through; and 3D (rendering, physics, the
   editor's 3D view and @3d scripts), with two 3D samples, Marble and Explorer; and
-  games that draw in the terminal, in coloured half blocks or as ASCII text; and projects
+  games that draw in the terminal, in coloured half blocks or as ASCII text; windows that
+  show their frames through the GPU (Direct3D 12, Metal, Vulkan or OpenGL; [docs/gpu.md](docs/gpu.md)); and projects
   with their own C code, which the editor compiles, loads and builds into games
   ([docs/c-code.md](docs/c-code.md)).
 - **Next:** see the roadmap below.
@@ -298,6 +299,9 @@ The editor's **Build** menu turns a project into a game that runs without the ed
   the terminal they are started from, as coloured half blocks or as coloured ASCII text
   (`renderer = terminal_blocks` / `terminal_text`). **Build and Run** opens a terminal for
   them. See [Playing in the terminal](docs/terminal.md).
+- **Graphics** (in Build Settings, for a window): how the window shows the game's frames:
+  **Automatic** (the best the computer has), **Direct3D 12**, **Metal**, **Vulkan**,
+  **OpenGL** or **Software** (`gpu = ...`). See [docs/gpu.md](docs/gpu.md).
 - **C code** in the project (`src/*.c`) is compiled into the game's own player for this
   computer or the web; see [docs/c-code.md](docs/c-code.md).
 
@@ -373,9 +377,9 @@ br_save_exists("slot1.sav");  br_save_delete("slot1.sav");  br_save_list(&files)
 
 | Target | Window | Sound | Gamepads | How it is built | Verified |
 |---|---|---|---|---|---|
-| Linux / BSD | X11 | ALSA (works with PulseAudio / PipeWire) | evdev, with hot-plug and rumble | X11 and ALSA are loaded at run time with `dlopen`, so there are no X11 or ALSA headers; only `-ldl` | Integration tests against a real X server and through ALSA (the captured output is checked for pitch, level and dropouts); gamepad mapping tested by feeding kernel events for Xbox, PlayStation and generic pads |
-| Windows | Win32 + GDI, per-monitor DPI aware | waveOut (winmm, loaded at run time) | XInput, with rumble | Links user32 + gdi32 | Compiles and links against mingw-w64 headers |
-| macOS | Cocoa from plain C through the Objective-C runtime, presented with Core Animation | Core Audio (AudioQueue) | GameController framework (Xbox, PlayStation, Switch Pro, MFi); no rumble yet | `-framework Cocoa -framework QuartzCore -framework AudioToolbox -framework GameController` | Compiles and links for arm64 and x86_64 against the macOS 14.5 SDK; constants, key codes and GameController selectors checked against the SDK |
+| Linux / BSD | X11; frames shown through OpenGL (GLX) or Vulkan, else `XPutImage` ([docs/gpu.md](docs/gpu.md)) | ALSA (works with PulseAudio / PipeWire) | evdev, with hot-plug and rumble | X11 and ALSA are loaded at run time with `dlopen`, so there are no X11 or ALSA headers; only `-ldl` | Integration tests against a real X server and through ALSA (the captured output is checked for pitch, level and dropouts); gamepad mapping tested by feeding kernel events for Xbox, PlayStation and generic pads |
+| Windows | Win32, per-monitor DPI aware; frames shown through Direct3D 12, Vulkan or OpenGL (WGL), else GDI ([docs/gpu.md](docs/gpu.md)) | waveOut (winmm, loaded at run time) | XInput, with rumble | Links user32 + gdi32 | Compiles and links against mingw-w64 headers |
+| macOS | Cocoa from plain C through the Objective-C runtime; frames shown through Metal (or OpenGL, asked for), else Core Animation ([docs/gpu.md](docs/gpu.md)) | Core Audio (AudioQueue) | GameController framework (Xbox, PlayStation, Switch Pro, MFi); no rumble yet | `-framework Cocoa -framework QuartzCore -framework AudioToolbox -framework GameController` | Compiles and links for arm64 and x86_64 against the macOS 14.5 SDK; constants, key codes and GameController selectors checked against the SDK |
 | Any | Headless | Captured in memory | Simulated (`br_headless_set_gamepad`) | Built in | Unit tests and CI |
 | Windows, macOS, Linux | The terminal: coloured half blocks or ASCII text ([docs/terminal.md](docs/terminal.md)) | The system's, as above | The system's, as above | Built in (`br_platform_terminal`); the console API on Windows, termios elsewhere | Unit tests through pipes; played in a pseudo-terminal on Linux. Not yet run on Windows or macOS (the Windows code is type-checked only) |
 | Web | `<canvas>` (WebAssembly, built with plain clang, with Bronto's own small C library) | WebAudio | Gamepad API, with rumble where the browser has it; on phones and tablets, on-screen touch controls that act as a gamepad | `make web` / `build.bat web`: clang `--target=wasm32` and wasm-ld; no Emscripten ([docs/web.md](docs/web.md)) | The whole test suite runs as WebAssembly in Node; the C library's output is compared with glibc's; the examples give picture- and sample-identical results to the desktop builds; the pages are played in Chromium with keyboard, mouse and gamepad, and on emulated phones and tablets with touch |
@@ -538,9 +542,11 @@ frozen by the OS's modal sizing loop, so the sound pauses until the drag ends.
 
 These choices keep the "no external dependencies" rule while staying portable:
 
-- **Video:** each backend only copies a finished framebuffer to the screen. That
-  means `StretchDIBits` on Windows, a `CALayer` on macOS, `XPutImage` on Linux and a
-  canvas on the web. None of these needs a GPU API.
+- **Video:** each backend only shows a finished framebuffer. A desktop window does it
+  through the GPU where it can (Direct3D 12, Metal, Vulkan or OpenGL, loaded at run time
+  from the system and the driver, so nothing is needed to build), which scales the frame
+  to the window; else, and on request, `StretchDIBits` on Windows, a `CALayer` on macOS
+  and `XPutImage` on Linux; on the web a canvas. See [docs/gpu.md](docs/gpu.md).
 - **Audio:** the mixer runs on the game thread and pushes PCM to the device. No locks
   are needed; where the OS insists on its own audio thread (Core Audio), a lock-free
   ring sits in between.

@@ -13,6 +13,7 @@ editor --build host examples/platformer  # build the game for this computer, no 
 editor --build web my_game --out site    # build a web page into site/
 editor --build project my_game           # build for the platform in its Build Settings
 editor --headless                        # the editor's self-test
+editor --gpu software                    # the editor's window without the GPU, this once
 editor --write-icon icon.png 256         # save the app icon as a PNG
 editor --help                            # list the options (or -h)
 ```
@@ -171,6 +172,17 @@ editor --write-icon <file.png> [size]
 Draws the editor's app icon at `size` pixels square (16 to 1024; 256 if left out or out of
 range), saves it as a PNG and exits: status 0 if it was written, 1 if not. This has to be
 the first argument. `make vscode-icon` uses it to make the VS Code extension's icon.
+
+## The window's graphics: `--gpu`
+
+```
+editor --gpu auto|software|opengl|vulkan|metal|d3d12 [path]
+```
+
+How the editor's own window shows itself, for this run, instead of **Settings >
+Graphics**: through a graphics API, or `software` (no GPU; the way out if a driver shows
+a black window). `BRONTO_GPU` in the environment does the same. Games have their own
+setting, in Build Settings. See [gpu.md](gpu.md).
 
 ## Help: `--help`, `-h`
 

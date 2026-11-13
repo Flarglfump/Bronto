@@ -64,6 +64,8 @@ typedef struct br_engine_config {
     br_color clear_color;
     bool quit_when_no_scenes;     /* default true */
     const br_platform *platform;  /* NULL = native, falling back to headless */
+    br_gpu gpu;                   /* how the native window shows frames: BR_GPU_AUTO (the default),
+                                     software, opengl, vulkan, metal, d3d12 (platform.h) */
     const br_scene_desc *initial_scene;
     /* On-screen touch controls (touch.h): a list such as "stick, a, b, start"
      * (NULL or "": none). They show when the screen is touched. touch_mouse:

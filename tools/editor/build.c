@@ -561,6 +561,7 @@ static bool save_build_settings(editor *ed) {
     snprintf(fresh.build_dir, sizeof(fresh.build_dir), "%s", b->build_dir);
     snprintf(fresh.exclude, sizeof(fresh.exclude), "%s", b->exclude);
     fresh.renderer = b->renderer;
+    fresh.gpu = b->gpu;
     snprintf(fresh.version, sizeof(fresh.version), "%s", b->version[0] ? b->version : "1.0");
     snprintf(fresh.bundle_id, sizeof(fresh.bundle_id), "%s", b->bundle_id);
     fresh.windows_console = b->windows_console;
@@ -622,6 +623,25 @@ void ed_build_dialog(editor *ed, br_rect screen) {
         if (p->renderer < 0 || p->renderer >= BR_RENDERER_COUNT) p->renderer = BR_RENDERER_WINDOW;
         br_ui_combo(ui, "Renderer", &p->renderer, renderers, BR_RENDERER_COUNT);
         label_wrapped(ui, "A window, or the terminal the game is started from.", dim, cols);
+        if (p->renderer == BR_RENDERER_WINDOW) {             /* the graphics APIs this platform has */
+            const char *titles[BR_GPU_COUNT];
+            br_gpu ids[BR_GPU_COUNT];
+            int count = 0, at = 0, g;
+            for (g = 0; g < BR_GPU_COUNT; ++g) {
+                if (!br_gpu_exists_on((br_gpu)g, k_target_dirs[t])) continue;
+                if (g == p->gpu) at = count;
+                ids[count] = (br_gpu)g;
+                titles[count++] = br_gpu_title((br_gpu)g);
+            }
+            if (count && br_ui_combo(ui, "Graphics", &at, titles, count)) p->gpu = (int)ids[at];
+            if (!br_gpu_exists_on((br_gpu)p->gpu, k_target_dirs[t])) {
+                snprintf(line, sizeof(line), "%s isn't on %s: the game uses the best it has there.", br_gpu_title((br_gpu)p->gpu), ed_target_name(t));
+                label_wrapped(ui, line, br_rgb(255, 170, 90), cols);
+            } else {
+                label_wrapped(ui, "How the window shows the game: through the GPU (scaled there), or Software. "
+                                  "Automatic picks the best the computer has; a missing one falls back.", dim, cols);
+            }
+        }
     } else {
         label_wrapped(ui, "The page draws in a canvas. Touch controls for phones: Project Settings.", dim, cols);
     }

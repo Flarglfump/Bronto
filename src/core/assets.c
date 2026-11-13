@@ -6,6 +6,7 @@
 #include "bronto/log.h"
 #include "bronto/fs.h"
 #include "bronto/model.h"
+#include "bronto/platform.h"            /* br_gpu, for the project's gpu setting */
 
 #include <ctype.h>
 #include <stdio.h>
@@ -253,6 +254,11 @@ bool br_project_parse(const char *text, br_project *p) {
             else if (strcmp(key, "version") == 0) snprintf(p->version, sizeof(p->version), "%s", v[0] ? v : "1.0");
             else if (strcmp(key, "bundle_id") == 0) snprintf(p->bundle_id, sizeof(p->bundle_id), "%s", v);
             else if (strcmp(key, "windows_console") == 0) p->windows_console = pj_bool(v);
+            else if (strcmp(key, "gpu") == 0) {
+                br_gpu g;
+                if (br_gpu_parse(v, &g)) p->gpu = (int)g;
+                else BR_WARN("%s: unknown gpu '%s' (auto, software, opengl, vulkan, metal or d3d12)", BR_PROJECT_FILE, v);
+            }
             else if (strcmp(key, "code_dir") == 0) snprintf(p->code_dir, sizeof(p->code_dir), "%s", v[0] ? v : "src");
             else if (strcmp(key, "compiler") == 0) snprintf(p->compiler, sizeof(p->compiler), "%s", v);
             else if (strcmp(key, "web_compiler") == 0) snprintf(p->web_compiler, sizeof(p->web_compiler), "%s", v);
@@ -333,6 +339,7 @@ bool br_project_save(const char *folder, const br_project *p) {
     pj_put(text, sizeof(text), &n, "build_dir", p->build_dir, true);
     pj_put(text, sizeof(text), &n, "exclude", p->exclude, true);
     if (p->renderer) pj_put(text, sizeof(text), &n, "renderer", br_project_renderer_name(p->renderer), true);
+    if (p->gpu) pj_put(text, sizeof(text), &n, "gpu", br_gpu_name((br_gpu)p->gpu), true);
     if (strcmp(p->version, "1.0") != 0) pj_put(text, sizeof(text), &n, "version", p->version, false);
     pj_put(text, sizeof(text), &n, "bundle_id", p->bundle_id, false);
     if (p->windows_console) pj_put(text, sizeof(text), &n, "windows_console", "true", true);

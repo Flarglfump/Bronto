@@ -104,7 +104,7 @@ EDITOR_CLI := $(if $(filter windows,$(PLATFORM)),$(EDITOR_COM),$(EDITOR))
 BSCHECK  := $(BUILD)/bscheck$(EXE)
 PLAYER   := $(BUILD)/bronto_player$(EXE)
 
-.PHONY: all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player install uninstall audio-test evdev-test vscode vscode-test vscode-icon web web-test web-check game pantryquest marble explorer
+.PHONY: gpu-check all lib test sanitize examples run-examples clean info x11-test snake towerdefense td editor tools player install uninstall audio-test evdev-test vscode vscode-test vscode-icon web web-test web-check game pantryquest marble explorer
 
 all: lib
 
@@ -135,7 +135,19 @@ $(BUILD)/obj/unity.stamp: src/bronto.c $(LIB_SRC) $(wildcard src/platform/*.c) $
 	$(CC) $(CFLAGS) -fsyntax-only src/bronto.c
 	@touch $@
 
-test: $(TEST_BIN) $(BUILD)/obj/unity.stamp
+# The GPU presenters for Windows (Direct3D 12, Vulkan's Win32 side), compiled against a
+# stand-in windows.h, with their structures checked against the real headers' sizes.
+# Metal's, likewise, with the Objective-C runtime stood in for (clang, where there is one:
+# gcc warns about the runtime's calls through casts, which Apple's compiler expects).
+GPU_CHECK_CC := $(firstword $(shell command -v clang 2>/dev/null) $(CC))
+$(BUILD)/obj/gpu_check.stamp: tests/platform/gpu_decl_check.c tests/platform/gpu_mac_check.c tests/platform/winstub/windows.h $(wildcard src/platform/gpu_*.c) $(wildcard include/bronto/*.h)
+	@mkdir -p $(dir $@)
+	$(CC) -std=c11 -fsyntax-only $(WARN) -Wno-unused-function -D_WIN32 -Itests/platform/winstub -Iinclude tests/platform/gpu_decl_check.c
+	$(GPU_CHECK_CC) -std=c11 -fsyntax-only $(WARN) -Wno-unused-function -Iinclude tests/platform/gpu_mac_check.c
+	@touch $@
+gpu-check: $(BUILD)/obj/gpu_check.stamp
+
+test: $(TEST_BIN) $(BUILD)/obj/unity.stamp $(BUILD)/obj/gpu_check.stamp
 	@mkdir -p $(BUILD)/test_out
 	$(TEST_BIN) --out $(BUILD)/test_out
 
@@ -452,11 +464,16 @@ web-test: $(WEB_TESTS) $(WEB)/libc_check.wasm $(BUILD)/libc_check $(WEB)/persist
 	node tools/web/test/web.test.js $(BUILD)
 
 # X11 backend integration test (Linux; needs libx11-dev for the test driver
-# only, and an X server - falls back to a virtual one via xvfb-run).
+# only, and an X server - falls back to a virtual one via xvfb-run). It runs
+# twice: frames through the GPU (auto: OpenGL where there is one, as Mesa's
+# software OpenGL under Xvfb), then without it.
 x11-test: $(LIB)
 	$(CC) $(CFLAGS) -Wno-missing-prototypes tests/platform/x11_integration.c $(LIB) $(LDFLAGS) -lX11 $(LDLIBS) -o $(BUILD)/x11_integration
 	@if [ -n "$$DISPLAY" ]; then $(BUILD)/x11_integration $(BUILD); \
 	 else xvfb-run -a -s "-screen 0 1024x768x24" $(BUILD)/x11_integration $(BUILD); fi
+	@echo "== again, with frames shown without the GPU (BRONTO_GPU=software)"
+	@if [ -n "$$DISPLAY" ]; then BRONTO_GPU=software $(BUILD)/x11_integration $(BUILD); \
+	 else BRONTO_GPU=software xvfb-run -a -s "-screen 0 1024x768x24" $(BUILD)/x11_integration $(BUILD); fi
 
 # Native audio output integration test (Linux: ALSA file plugin capture).
 audio-test: $(LIB)

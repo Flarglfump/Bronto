@@ -19,6 +19,8 @@
  *   --terminal[=blocks|text]  draw in this terminal instead of a window: coloured half
  *                       blocks (the default) or coloured ASCII text (docs/terminal.md)
  *   --window            draw in a window, whatever the project's renderer setting says
+ *   --gpu NAME          how the window shows frames: auto, software, opengl, vulkan,
+ *                       metal or d3d12, whatever the project's gpu setting says (platform.h)
  *
  * The project's `renderer` setting (Build > Build Settings in the editor)
  * chooses between a window and the terminal for built games. A terminal game
@@ -179,7 +181,7 @@ int main(int argc, char **argv) {
     br_engine_config cfg = br_engine_default_config();
     const char *arg = NULL, *shot = NULL, *replay = NULL;
     char save_name[160];
-    int segment = 1, renderer = -1;
+    int segment = 1, renderer = -1, gpu = -1;
     bool headless = false, frames_given = false, touch = false;
     long frames = 120;
     int i, rc = 0;
@@ -191,6 +193,12 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--segment") == 0 && i + 1 < argc) segment = atoi(argv[++i]);
         else if (strcmp(argv[i], "--touch") == 0) touch = true;
         else if (strcmp(argv[i], "--window") == 0) renderer = BR_RENDERER_WINDOW;
+        else if ((strcmp(argv[i], "--gpu") == 0 && i + 1 < argc) || strncmp(argv[i], "--gpu=", 6) == 0) {
+            const char *name = argv[i][5] == '=' ? argv[i] + 6 : argv[++i];
+            br_gpu g;
+            if (!br_gpu_parse(name, &g)) { fprintf(stderr, "bronto_player: --gpu %s: auto, software, opengl, vulkan, metal or d3d12\n", name); return 2; }
+            gpu = (int)g;
+        }
         else if (strcmp(argv[i], "--terminal") == 0 || strcmp(argv[i], "--terminal=blocks") == 0) renderer = BR_RENDERER_TERMINAL_BLOCKS;
         else if (strcmp(argv[i], "--terminal=text") == 0) renderer = BR_RENDERER_TERMINAL_TEXT;
         else if (argv[i][0] == '-' && argv[i][1] == 'p' && strncmp(argv[i], "-psn_", 5) == 0) { /* macOS Finder's process id: ignore */ }
@@ -204,7 +212,7 @@ int main(int argc, char **argv) {
         fprintf(stderr,
                 "bronto_player: no game to play.\n"
                 "  bronto_player <project folder> | <file.scene> | <game.brpak> [--touch] [--headless [--frames N] [--screenshot f.bmp]]\n"
-                "                [--terminal[=blocks|text] | --window]\n"
+                "                [--terminal[=blocks|text] | --window] [--gpu auto|software|opengl|vulkan|metal|d3d12]\n"
                 "  bronto_player <game> --replay run.brec [--segment N] [--headless]\n"
                 "Games built by the editor (Build menu) have their project packed in and need no arguments.\n");
         return 1;
@@ -226,6 +234,7 @@ int main(int argc, char **argv) {
     cfg.touch_controls = replay ? NULL : g_project.touch_controls;   /* (a replay is keys only) */
     cfg.touch_mouse = touch && !replay;                               /* --touch: try them with the mouse */
     if (renderer < 0) renderer = g_project.renderer;
+    cfg.gpu = (br_gpu)(gpu >= 0 ? gpu : g_project.gpu);
     if (headless) { cfg.platform = br_platform_headless(); cfg.audio_sample_rate = 0; }
     else cfg.platform = choose_platform(renderer);
     if (replay) {

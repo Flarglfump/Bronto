@@ -6,9 +6,12 @@
  * headers and no -lX11 - only a C compiler. (tests/x11_layout_check.c
  * verifies these declarations against the real <X11/Xlib.h>.)
  *
- * Presentation: the framebuffer is scaled in software into an XImage the
- * size of the window and sent with XPutImage. Audio: ALSA (audio_alsa.c).
- * Gamepads: evdev (gamepad_evdev.c).
+ * Presentation (br_gpu, platform.h): through OpenGL (GLX, libGL loaded at run
+ * time; gpu_gl.c) or Vulkan (libvulkan, likewise; gpu_vulkan.c), which scale
+ * the frame on the GPU; else ("software") scaled on the CPU into an XImage the
+ * size of the window and sent with XPutImage. Auto tries OpenGL, then Vulkan.
+ * For OpenGL the window is made with a visual GLX chose. Audio: ALSA
+ * (audio_alsa.c). Gamepads: evdev (gamepad_evdev.c).
  *
  * Included by platform_native.c, which sets the POSIX feature macros.
  */
@@ -141,6 +144,22 @@ typedef struct {
 } XSizeHints;
 
 typedef struct { unsigned long pixel; unsigned short red, green, blue; char flags; char pad; } XColor;
+typedef XID Colormap;
+typedef struct {
+    Visual *visual; unsigned long visualid; int screen; int depth; int c_class;
+    unsigned long red_mask, green_mask, blue_mask; int colormap_size; int bits_per_rgb;
+} XVisualInfo;
+typedef struct {
+    Pixmap background_pixmap; unsigned long background_pixel; Pixmap border_pixmap; unsigned long border_pixel;
+    int bit_gravity, win_gravity, backing_store; unsigned long backing_planes, backing_pixel; Bool save_under;
+    long event_mask, do_not_propagate_mask; Bool override_redirect; Colormap colormap; Cursor cursor;
+} XSetWindowAttributes;
+#define X_InputOutput 1
+#define X_AllocNone 0
+#define X_CWBackPixel (1L << 1)
+#define X_CWBorderPixel (1L << 3)
+#define X_CWEventMask (1L << 11)
+#define X_CWColormap (1L << 13)
 typedef struct { int type; Display *display; XID resourceid; unsigned long serial;
                  unsigned char error_code, request_code, minor_code; } XErrorEvent;
 
@@ -239,7 +258,10 @@ typedef struct { int type; Display *display; XID resourceid; unsigned long seria
     F(int, XDeleteProperty, (Display *, Window, Atom)) \
     F(int, XWarpPointer, (Display *, Window, Window, int, int, unsigned int, unsigned int, int, int)) \
     F(int, XGrabPointer, (Display *, Window, Bool, unsigned int, int, int, Window, Cursor, Time)) \
-    F(int, XUngrabPointer, (Display *, Time))
+    F(int, XUngrabPointer, (Display *, Time)) \
+    F(Window, XCreateWindow, (Display *, Window, int, int, unsigned int, unsigned int, unsigned int, int, unsigned int, Visual *, unsigned long, XSetWindowAttributes *)) \
+    F(Colormap, XCreateColormap, (Display *, Window, Visual *, int)) \
+    F(int, XFreeColormap, (Display *, Colormap))
 
 #define X11_DECLARE(ret, name, args) typedef ret (*name##_fn) args; static name##_fn p##name;
 X11_FUNCS(X11_DECLARE)
@@ -274,7 +296,109 @@ static struct {
     bool key_down[256];
     br_events *events;
     br_platform_config cfg;
+    br_gpu gpu_order[BR_GPU_COUNT + 2];
+    int gpu_order_count;
+    Colormap colormap;            /* the window's own, for a GLX visual (0: the default one) */
+    br_gpu gpu;                   /* how frames are shown: software, opengl or vulkan */
 } X;
+
+/* ==== the GPU: OpenGL through GLX, or Vulkan ================================ */
+#include "gpu_gl.c"
+
+typedef struct __GLXcontextRec *GLXContext;
+#define X_GLX_RGBA 4
+#define X_GLX_DOUBLEBUFFER 5
+#define X_GLX_RED_SIZE 8
+#define X_GLX_GREEN_SIZE 9
+#define X_GLX_BLUE_SIZE 10
+typedef XVisualInfo *(*glXChooseVisual_fn)(Display *, int, int *);
+typedef GLXContext (*glXCreateContext_fn)(Display *, XVisualInfo *, GLXContext, Bool);
+typedef Bool (*glXMakeCurrent_fn)(Display *, XID, GLXContext);
+typedef void (*glXSwapBuffers_fn)(Display *, XID);
+typedef void (*glXDestroyContext_fn)(Display *, GLXContext);
+typedef void *(*glXGetProcAddress_fn)(const unsigned char *);
+static struct {
+    void *lib;
+    glXChooseVisual_fn ChooseVisual;
+    glXCreateContext_fn CreateContext;
+    glXMakeCurrent_fn MakeCurrent;
+    glXSwapBuffers_fn SwapBuffers;
+    glXDestroyContext_fn DestroyContext;
+    glXGetProcAddress_fn GetProcAddress;
+    XVisualInfo *visual;          /* the one the window was made with */
+    GLXContext context;
+} GLX;
+
+static void *glx_sym(const char *name) {
+    union { void *o; glXGetProcAddress_fn f; } u;
+    void *p = dlsym(GLX.lib, name);
+    if (!p && GLX.GetProcAddress) p = GLX.GetProcAddress((const unsigned char *)name);
+    u.o = p;
+    return u.o;
+}
+
+static bool glx_load(void) {
+    const char *names[] = { "libGL.so.1", "libGL.so", "libGLX.so.0" };
+    size_t i;
+    if (GLX.lib) return GLX.ChooseVisual != NULL;
+    for (i = 0; i < BR_ARRAY_COUNT(names) && !GLX.lib; ++i) GLX.lib = dlopen(names[i], RTLD_LAZY | RTLD_LOCAL);
+    if (!GLX.lib) { BR_INFO("OpenGL: no libGL (%s)", dlerror()); return false; }
+#define GLX_LOAD(field, name) { union { void *o; field##_fn f; } u_; u_.o = dlsym(GLX.lib, name); GLX.field = u_.f; }
+    {
+        union { void *o; glXGetProcAddress_fn f; } u;
+        u.o = dlsym(GLX.lib, "glXGetProcAddressARB");
+        if (!u.o) u.o = dlsym(GLX.lib, "glXGetProcAddress");
+        GLX.GetProcAddress = u.f;
+    }
+    { union { void *o; glXChooseVisual_fn f; } u_; u_.o = dlsym(GLX.lib, "glXChooseVisual"); GLX.ChooseVisual = u_.f; }
+    { union { void *o; glXCreateContext_fn f; } u_; u_.o = dlsym(GLX.lib, "glXCreateContext"); GLX.CreateContext = u_.f; }
+    { union { void *o; glXMakeCurrent_fn f; } u_; u_.o = dlsym(GLX.lib, "glXMakeCurrent"); GLX.MakeCurrent = u_.f; }
+    { union { void *o; glXSwapBuffers_fn f; } u_; u_.o = dlsym(GLX.lib, "glXSwapBuffers"); GLX.SwapBuffers = u_.f; }
+    { union { void *o; glXDestroyContext_fn f; } u_; u_.o = dlsym(GLX.lib, "glXDestroyContext"); GLX.DestroyContext = u_.f; }
+#undef GLX_LOAD
+    if (!GLX.ChooseVisual || !GLX.CreateContext || !GLX.MakeCurrent || !GLX.SwapBuffers || !GLX.DestroyContext) {
+        BR_INFO("OpenGL: libGL has no GLX");
+        GLX.ChooseVisual = NULL;
+        return false;
+    }
+    return true;
+}
+
+/* A double-buffered true-colour visual GLX can draw in (NULL: none), before the window is made. */
+static XVisualInfo *glx_choose_visual(void) {
+    int attribs[] = { X_GLX_RGBA, X_GLX_DOUBLEBUFFER, X_GLX_RED_SIZE, 8, X_GLX_GREEN_SIZE, 8, X_GLX_BLUE_SIZE, 8, 0 };
+    XVisualInfo *vi;
+    if (!glx_load()) return NULL;
+    vi = GLX.ChooseVisual(X.dpy, X.screen, attribs);
+    if (vi && (vi->c_class != X_TrueColor || vi->depth < 24)) { pXFree(vi); vi = NULL; }
+    if (!vi) BR_INFO("OpenGL: no double-buffered visual for GLX");
+    return vi;
+}
+
+static bool glx_start(void) {
+    char info[160];
+    if (!GLX.visual) return false;
+    GLX.context = GLX.CreateContext(X.dpy, GLX.visual, NULL, 1);
+    if (!GLX.context) { BR_INFO("OpenGL: no GLX context"); return false; }
+    if (!GLX.MakeCurrent(X.dpy, X.win, GLX.context) || !gl_begin(glx_sym, info, sizeof(info))) {
+        GLX.MakeCurrent(X.dpy, 0, NULL);
+        GLX.DestroyContext(X.dpy, GLX.context);
+        GLX.context = NULL;
+        return false;
+    }
+    br_gpu_set_active(BR_GPU_OPENGL, info);
+    return true;
+}
+
+static void glx_stop(void) {
+    if (!GLX.context) return;
+    gl_end();
+    GLX.MakeCurrent(X.dpy, 0, NULL);
+    GLX.DestroyContext(X.dpy, GLX.context);
+    GLX.context = NULL;
+}
+
+#include "gpu_vulkan.c"
 
 static int x11_error_handler(Display *d, XErrorEvent *e) {
     BR_UNUSED(d);
@@ -641,8 +765,33 @@ static bool x11_init(const br_platform_config *cfg) {
 
     X.width = cfg->width > 0 ? cfg->width : 960;
     X.height = cfg->height > 0 ? cfg->height : 540;
-    X.win = pXCreateSimpleWindow(X.dpy, X.root, 0, 0, (unsigned)X.width, (unsigned)X.height, 0,
-                                 pXBlackPixel(X.dpy, X.screen), pXBlackPixel(X.dpy, X.screen));
+    {   /* the GPU to try (auto: OpenGL, then Vulkan); OpenGL needs its visual for the window */
+        static const br_gpu k_auto[] = { BR_GPU_OPENGL, BR_GPU_VULKAN };
+        br_gpu order[BR_GPU_COUNT + 2];
+        int n = br_gpu_order(cfg->gpu, k_auto, 2, order, (int)BR_ARRAY_COUNT(order)), i;
+        X.gpu_order_count = n;
+        memcpy(X.gpu_order, order, sizeof(order[0]) * (size_t)n);
+        for (i = 0; i < n && order[i] != BR_GPU_SOFTWARE; ++i)
+            if (order[i] == BR_GPU_OPENGL) { GLX.visual = glx_choose_visual(); break; }
+    }
+    if (GLX.visual) {                                    /* a window with GLX's visual (and its own colormap) */
+        XSetWindowAttributes wa;
+        memset(&wa, 0, sizeof(wa));
+        X.visual = GLX.visual->visual;
+        X.depth = GLX.visual->depth;
+        X.rshift = x11_mask_shift(X.visual->red_mask);
+        X.gshift = x11_mask_shift(X.visual->green_mask);
+        X.bshift = x11_mask_shift(X.visual->blue_mask);
+        X.colormap = pXCreateColormap(X.dpy, X.root, X.visual, X_AllocNone);
+        wa.colormap = X.colormap;
+        wa.background_pixel = 0;
+        wa.border_pixel = 0;
+        X.win = pXCreateWindow(X.dpy, X.root, 0, 0, (unsigned)X.width, (unsigned)X.height, 0, X.depth, X_InputOutput, X.visual,
+                               (unsigned long)(X_CWColormap | X_CWBackPixel | X_CWBorderPixel), &wa);
+    } else {
+        X.win = pXCreateSimpleWindow(X.dpy, X.root, 0, 0, (unsigned)X.width, (unsigned)X.height, 0,
+                                     pXBlackPixel(X.dpy, X.screen), pXBlackPixel(X.dpy, X.screen));
+    }
     pXSelectInput(X.dpy, X.win, X_KeyPressMask | X_KeyReleaseMask | X_ButtonPressMask | X_ButtonReleaseMask |
                   X_PointerMotionMask | X_EnterWindowMask | X_LeaveWindowMask | X_StructureNotifyMask |
                   X_FocusChangeMask | X_PropertyChangeMask | X_ExposureMask);
@@ -675,6 +824,19 @@ static bool x11_init(const br_platform_config *cfg) {
     if (!cfg->hidden) { pXMapWindow(X.dpy, X.win); X.mapped = true; }
     if (cfg->fullscreen) x11_set_fullscreen(true);
     pXSync(X.dpy, 0);
+    {   /* the first of them that starts */
+        int i;
+        X.gpu = BR_GPU_SOFTWARE;
+        for (i = 0; i < X.gpu_order_count && X.gpu == BR_GPU_SOFTWARE; ++i) {
+            br_gpu g = X.gpu_order[i];
+            if (g == BR_GPU_SOFTWARE) break;
+            if (g == BR_GPU_OPENGL && glx_start()) X.gpu = g;
+            else if (g == BR_GPU_VULKAN && vkp_start_xlib(X.dpy, X.win, X.width, X.height)) X.gpu = g;
+            else if (g != BR_GPU_OPENGL && g != BR_GPU_VULKAN) BR_INFO("%s isn't on Linux", br_gpu_title(g));
+            if (X.gpu == BR_GPU_SOFTWARE && i + 1 < X.gpu_order_count) BR_INFO("%s didn't start: trying %s", br_gpu_title(g), br_gpu_title(X.gpu_order[i + 1]));
+        }
+        if (X.gpu != BR_GPU_SOFTWARE) BR_INFO("X11: frames go through %s", br_gpu_info());
+    }
     if (cfg->audio_sample_rate > 0) alsa_open(cfg->audio_sample_rate, cfg->audio_latency_ms);
     evdev_init();
     BR_INFO("X11: %dx%d window, depth %d, window manager %s", X.width, X.height, X.depth,
@@ -697,11 +859,16 @@ static void x11_shutdown(void) {
     evdev_shutdown();
     if (!X.dpy) return;
     destroy_image();
+    if (X.gpu == BR_GPU_OPENGL) glx_stop();
+    if (X.gpu == BR_GPU_VULKAN) vkp_stop();
+    X.gpu = BR_GPU_SOFTWARE;
+    if (GLX.visual) { pXFree(GLX.visual); GLX.visual = NULL; }
     br_free(X.clip_text);
     X.clip_text = NULL;
     if (X.blank_cursor) pXFreeCursor(X.dpy, X.blank_cursor);
     if (X.gc) pXFreeGC(X.dpy, X.gc);
     pXDestroyWindow(X.dpy, X.win);
+    if (X.colormap) { pXFreeColormap(X.dpy, X.colormap); X.colormap = 0; }
     pXCloseDisplay(X.dpy);
     X.dpy = NULL;
     /* libX11 stays loaded: unloading it is unsafe with some Xlib
@@ -916,6 +1083,18 @@ static void x11_poll(br_events *events) {
 
 static void x11_present(const br_image *fb, br_recti vp) {
     if (!X.mapped || X.width <= 0 || X.height <= 0) return;
+    if (X.gpu == BR_GPU_OPENGL) {
+        gl_present(fb, vp, X.width, X.height);
+        GLX.SwapBuffers(X.dpy, X.win);
+        return;
+    }
+    if (X.gpu == BR_GPU_VULKAN) {
+        if (vkp_present(fb, vp, X.width, X.height)) return;
+        BR_WARN("Vulkan stopped working: showing frames without it from now on");   /* (lost the device, say) */
+        vkp_stop();
+        X.gpu = BR_GPU_SOFTWARE;
+        br_gpu_set_active(BR_GPU_SOFTWARE, "");
+    }
     if (!X.image || X.image->width != X.width || X.image->height != X.height) {
         destroy_image();
         X.pixels = (uint32_t *)br_alloc((size_t)X.width * (size_t)X.height * 4u);
