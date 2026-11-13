@@ -14,6 +14,12 @@ build/editor --help                  # list the command-line options (or -h)
 
 Every command-line option, `--build` included, is in [docs/editor-cli.md](../../docs/editor-cli.md).
 
+On macOS, `tools/install_editor_macos.sh` builds the editor and installs it as **Bronto
+Editor.app** in `/Applications` (with bronto_player and any other players and the web
+player inside, so the Build menu works from it), and sets `BRONTO_EDITOR` in `~/.zshrc`
+to the editor's program for shell scripts (`"$BRONTO_EDITOR" --build macos my_game`). It
+copies the files, so run it again after rebuilding; `--help` lists its options.
+
 ## Using it
 
 | | |
