@@ -83,6 +83,18 @@ typedef struct br_project {
     char exclude[256];             /* left out of built games: names in the project, comma-separated ("tools, notes.txt") */
     char touch_controls[160];      /* on-screen controls for touch screens ("stick, a, b, start"; "" = none; touch.h) */
     int renderer;                  /* br_project_renderer: renderer = window | terminal_blocks | terminal_text */
+    /* Build Settings (the editor's Build menu) */
+    char build_target[16];         /* what Build makes: host (this computer, the default), linux, macos, windows, web */
+    char version[32];              /* the game's version (default 1.0): the Mac app's, ... */
+    char bundle_id[128];           /* the Mac app's identifier ("" = com.bronto.<name>) */
+    bool windows_console;          /* Windows: a console window beside the game's (terminal games always have one) */
+    /* The game's C code (game.h, docs/c-code.md) */
+    char code_dir[128];            /* the folder of its .c and .h files (default src) */
+    char compiler[256];            /* the C compiler for this computer's builds ("" = find one) */
+    char web_compiler[256];        /* clang with WebAssembly, for web builds ("" = find one) */
+    char cflags[256];              /* more compiler options (-DLEVELS=3 -Ivendor) */
+    char ldflags[256];             /* more linker options or libraries (-lsqlite3, mylib.lib) */
+    bool debug_build;              /* C code compiled for debugging (-O0 -g) rather than speed */
 } br_project;
 
 /* "window", "terminal_blocks", "terminal_text"; and back (false: not one of them). */
@@ -98,7 +110,8 @@ bool br_project_load(const char *folder, br_project *p);
 bool br_project_save(const char *folder, const br_project *p);
 /* Is `rel` (a path in the project, '/' between parts) left out of built
  * games? The builds folder and anything listed in `exclude` (and what is
- * inside them) are. */
+ * inside them) are, and so is the C code (.c and .h files in code_dir:
+ * it's compiled into the game, not packed with it). */
 bool br_project_excludes(const br_project *p, const char *rel);
 
 #endif /* BRONTO_ASSETS_H */

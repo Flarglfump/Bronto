@@ -186,7 +186,12 @@ void br_project_defaults(br_project *p, const char *name) {
     p->height = 180;
     p->window_scale = 3;
     snprintf(p->build_dir, sizeof(p->build_dir), "builds");
+    snprintf(p->build_target, sizeof(p->build_target), "host");
+    snprintf(p->version, sizeof(p->version), "1.0");
+    snprintf(p->code_dir, sizeof(p->code_dir), "src");
 }
+
+static bool pj_bool(const char *v) { return strcmp(v, "true") == 0 || strcmp(v, "1") == 0 || strcmp(v, "yes") == 0; }
 
 static void pj_trim(char *s) {
     size_t n = strlen(s), i = 0;
@@ -237,13 +242,23 @@ bool br_project_parse(const char *text, br_project *p) {
             else if (strcmp(key, "width") == 0) p->width = atoi(v) > 0 ? atoi(v) : p->width;
             else if (strcmp(key, "height") == 0) p->height = atoi(v) > 0 ? atoi(v) : p->height;
             else if (strcmp(key, "window_scale") == 0) p->window_scale = atoi(v) > 0 ? atoi(v) : p->window_scale;
-            else if (strcmp(key, "strict_typing") == 0) p->strict_typing = strcmp(v, "true") == 0 || strcmp(v, "1") == 0;
+            else if (strcmp(key, "strict_typing") == 0) p->strict_typing = pj_bool(v);
             else if (strcmp(key, "icon") == 0) snprintf(p->icon, sizeof(p->icon), "%s", v);
             else if (strcmp(key, "build_dir") == 0) snprintf(p->build_dir, sizeof(p->build_dir), "%s", v[0] ? v : "builds");
             else if (strcmp(key, "exclude") == 0) snprintf(p->exclude, sizeof(p->exclude), "%s", v);
             else if (strcmp(key, "touch_controls") == 0) snprintf(p->touch_controls, sizeof(p->touch_controls), "%s", v);
             else if (strcmp(key, "renderer") == 0 && !br_project_renderer_parse(v, &p->renderer))
                 BR_WARN("%s: unknown renderer '%s' (window, terminal_blocks or terminal_text)", BR_PROJECT_FILE, v);
+            else if (strcmp(key, "build_target") == 0) snprintf(p->build_target, sizeof(p->build_target), "%s", v[0] ? v : "host");
+            else if (strcmp(key, "version") == 0) snprintf(p->version, sizeof(p->version), "%s", v[0] ? v : "1.0");
+            else if (strcmp(key, "bundle_id") == 0) snprintf(p->bundle_id, sizeof(p->bundle_id), "%s", v);
+            else if (strcmp(key, "windows_console") == 0) p->windows_console = pj_bool(v);
+            else if (strcmp(key, "code_dir") == 0) snprintf(p->code_dir, sizeof(p->code_dir), "%s", v[0] ? v : "src");
+            else if (strcmp(key, "compiler") == 0) snprintf(p->compiler, sizeof(p->compiler), "%s", v);
+            else if (strcmp(key, "web_compiler") == 0) snprintf(p->web_compiler, sizeof(p->web_compiler), "%s", v);
+            else if (strcmp(key, "cflags") == 0) snprintf(p->cflags, sizeof(p->cflags), "%s", v);
+            else if (strcmp(key, "ldflags") == 0) snprintf(p->ldflags, sizeof(p->ldflags), "%s", v);
+            else if (strcmp(key, "debug_build") == 0) p->debug_build = pj_bool(v);
         }
     }
     return header;
@@ -270,6 +285,9 @@ static bool path_under(const char *rel, const char *item, size_t n) {
 bool br_project_excludes(const br_project *p, const char *rel) {
     const char *s = p->exclude;
     if (path_under(rel, p->build_dir, strlen(p->build_dir))) return true;
+    if (p->code_dir[0] && path_under(rel, p->code_dir, strlen(p->code_dir)) &&
+        (br_path_has_ext(rel, ".c") || br_path_has_ext(rel, ".h") || br_path_has_ext(rel, ".o") || br_path_has_ext(rel, ".obj")))
+        return true;
     while (*s) {
         const char *start, *end;
         while (*s == ',' || *s == ' ') ++s;
@@ -282,17 +300,48 @@ bool br_project_excludes(const br_project *p, const char *rel) {
     return false;
 }
 
+/* Adds "key = value\n" to text (when `always`, or when the value isn't the default). */
+static void pj_put(char *text, size_t size, size_t *n, const char *key, const char *value, bool always) {
+    int k;
+    if (!always && !value[0]) return;
+    if (*n >= size) return;
+    k = snprintf(text + *n, size - *n, "%s = %s\n", key, value);
+    *n += k > 0 ? (size_t)k : 0;
+}
+
 bool br_project_save(const char *folder, const br_project *p) {
-    char path[ASSET_PATH_MAX], text[2048];
-    int n = snprintf(text, sizeof(text),
+    char path[ASSET_PATH_MAX], text[4096], num[32];
+    size_t n = 0;
+    int k = snprintf(text, sizeof(text),
         "bronto_project 1\n"
         "# Asset paths in this project's scenes are relative to this folder.\n"
-        "# Project settings (the editor's Build > Project Settings):\n"
-        "name = %s\nmain_scene = %s\nwidth = %d\nheight = %d\nwindow_scale = %d\nstrict_typing = %s\nicon = %s\nbuild_dir = %s\n"
-        "exclude = %s\n%s%s%s%s%s%s",
-        p->name, p->main_scene, p->width, p->height, p->window_scale, p->strict_typing ? "true" : "false", p->icon, p->build_dir,
-        p->exclude, p->touch_controls[0] ? "touch_controls = " : "", p->touch_controls, p->touch_controls[0] ? "\n" : "",
-        p->renderer ? "renderer = " : "", p->renderer ? br_project_renderer_name(p->renderer) : "", p->renderer ? "\n" : "");
+        "# Project settings (the editor's Build > Project Settings):\n");
+    n = k > 0 ? (size_t)k : 0;
+    pj_put(text, sizeof(text), &n, "name", p->name, true);
+    pj_put(text, sizeof(text), &n, "main_scene", p->main_scene, true);
+    snprintf(num, sizeof(num), "%d", p->width);        pj_put(text, sizeof(text), &n, "width", num, true);
+    snprintf(num, sizeof(num), "%d", p->height);       pj_put(text, sizeof(text), &n, "height", num, true);
+    snprintf(num, sizeof(num), "%d", p->window_scale); pj_put(text, sizeof(text), &n, "window_scale", num, true);
+    pj_put(text, sizeof(text), &n, "strict_typing", p->strict_typing ? "true" : "false", true);
+    pj_put(text, sizeof(text), &n, "icon", p->icon, true);
+    pj_put(text, sizeof(text), &n, "touch_controls", p->touch_controls, false);
+    if (n < sizeof(text)) {
+        k = snprintf(text + n, sizeof(text) - n, "# Build settings (Build > Build Settings):\n");
+        n += k > 0 ? (size_t)k : 0;
+    }
+    pj_put(text, sizeof(text), &n, "build_target", p->build_target[0] ? p->build_target : "host", true);
+    pj_put(text, sizeof(text), &n, "build_dir", p->build_dir, true);
+    pj_put(text, sizeof(text), &n, "exclude", p->exclude, true);
+    if (p->renderer) pj_put(text, sizeof(text), &n, "renderer", br_project_renderer_name(p->renderer), true);
+    if (strcmp(p->version, "1.0") != 0) pj_put(text, sizeof(text), &n, "version", p->version, false);
+    pj_put(text, sizeof(text), &n, "bundle_id", p->bundle_id, false);
+    if (p->windows_console) pj_put(text, sizeof(text), &n, "windows_console", "true", true);
+    if (strcmp(p->code_dir, "src") != 0) pj_put(text, sizeof(text), &n, "code_dir", p->code_dir, false);
+    pj_put(text, sizeof(text), &n, "compiler", p->compiler, false);
+    pj_put(text, sizeof(text), &n, "web_compiler", p->web_compiler, false);
+    pj_put(text, sizeof(text), &n, "cflags", p->cflags, false);
+    pj_put(text, sizeof(text), &n, "ldflags", p->ldflags, false);
+    if (p->debug_build) pj_put(text, sizeof(text), &n, "debug_build", "true", true);
     br_path_join(path, sizeof(path), folder ? folder : "", BR_PROJECT_FILE);
-    return n > 0 && (size_t)n < sizeof(text) && br_file_write_all(path, text, (size_t)n);
+    return n > 0 && n < sizeof(text) && br_file_write_all(path, text, n);
 }

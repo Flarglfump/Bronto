@@ -20,7 +20,7 @@
  *                       blocks (the default) or coloured ASCII text (docs/terminal.md)
  *   --window            draw in a window, whatever the project's renderer setting says
  *
- * The project's `renderer` setting (Build > Project Settings in the editor)
+ * The project's `renderer` setting (Build > Build Settings in the editor)
  * chooses between a window and the terminal for built games. A terminal game
  * started without a terminal (from a desktop icon, say) opens a window instead.
  *
@@ -28,6 +28,11 @@
  * built-in components and systems do the rest, exactly as in the editor's
  * Play. Scripts can call load_scene(path) to move to another scene and
  * quit() to end the game.
+ *
+ * A project with C code (game.h) is built into its own copy of the player:
+ * the editor compiles this file with BR_PLAYER_NATIVE defined, the project's
+ * code and the bronto_game_setup() it writes, and the player runs the code's
+ * setups before anything else.
  */
 #include "bronto/bronto.h"
 #include <stdio.h>
@@ -191,6 +196,9 @@ int main(int argc, char **argv) {
         else if (argv[i][0] == '-' && argv[i][1] == 'p' && strncmp(argv[i], "-psn_", 5) == 0) { /* macOS Finder's process id: ignore */ }
         else arg = argv[i];
     }
+#ifdef BR_PLAYER_NATIVE
+    bronto_game_setup();                                 /* the game's C code: its components, systems, behaviours */
+#endif
     br_project_defaults(&g_project, "Bronto game");
     if (!find_game(arg)) {
         fprintf(stderr,

@@ -13,6 +13,8 @@
 #                   pack a project into a game people can run (the editor's Build menu,
 #                   as editor --build): build/games/<project>/<target>/ (host: this computer)
 #   make pantryquest   the same for Pantry Quest, for this computer
+#   make orbits        build Orbits (a project with C code: examples/orbits/src) for this computer
+#                      (TARGET=web for a web page) - the editor compiles the code into the game
 #   make marble        build Marble (the 3D example) for this computer and play it
 #   make explorer      the same for Explorer (3D: walk the hills, find the crystals)
 #   make vscode     package the VS Code extension (tools/vscode) into build/*.vsix (needs python3)
@@ -96,6 +98,9 @@ EXAMPLES := $(patsubst examples/%/main.c,$(BUILD)/examples/%,$(wildcard examples
 # (gcc adds .exe on Windows, and make has to know, or it rebuilds them every time)
 EXE      := $(if $(filter windows,$(PLATFORM)),.exe)
 EDITOR   := $(BUILD)/editor$(EXE)
+EDITOR_COM := $(BUILD)/editor.com
+# (the editor for command lines: on Windows, editor.com runs editor.exe and waits for it)
+EDITOR_CLI := $(if $(filter windows,$(PLATFORM)),$(EDITOR_COM),$(EDITOR))
 BSCHECK  := $(BUILD)/bscheck$(EXE)
 PLAYER   := $(BUILD)/bronto_player$(EXE)
 
@@ -160,7 +165,7 @@ td: $(BUILD)/examples/towerdefense
 
 # The editor: every .c file in tools/editor. bscheck: the script checker.
 # bronto_player: runs games; the editor's Build menu packs projects into copies of it.
-tools: $(EDITOR) $(BSCHECK) $(PLAYER)
+tools: $(EDITOR) $(BSCHECK) $(PLAYER) $(if $(filter windows,$(PLATFORM)),$(EDITOR_COM))
 
 player: $(PLAYER)
 
@@ -172,9 +177,28 @@ $(BSCHECK): tools/bscheck/main.c $(LIB)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $< $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
 
+# The editor has the whole engine in it, and lets the game's C code use it: the code
+# is compiled into a shared library the editor loads (tools/editor/native.c), which
+# takes the engine's functions from the editor itself.
+# On Windows the editor is a windowed program (no console window), and editor.com, a
+# small console program beside it, runs it from command lines (tools/launcher):
+# make game and BRONTO_EDITOR use that one.
+ifeq ($(PLATFORM),macos)
+  EDITOR_LIB := -Wl,-force_load,$(LIB)
+else ifeq ($(PLATFORM),windows)
+  EDITOR_LIB := -Wl,--whole-archive $(LIB) -Wl,--no-whole-archive -Wl,--export-all-symbols -Wl,--out-implib,$(BUILD)/libeditor.a \
+                -Wl,--subsystem,windows
+else
+  EDITOR_LIB := -rdynamic -Wl,--whole-archive $(LIB) -Wl,--no-whole-archive
+endif
+
 $(EDITOR): $(wildcard tools/editor/*.c) $(wildcard tools/editor/*.h) tools/web/webpage.c tools/web/webpage.h $(LIB)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(filter %.c,$^) $(LIB) $(LDFLAGS) $(LDLIBS) -o $@
+	$(CC) $(CFLAGS) $(filter %.c,$^) $(EDITOR_LIB) $(LDFLAGS) $(LDLIBS) -o $@
+
+$(EDITOR_COM): tools/launcher/main.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $< -lshell32 -o $@
 
 editor: $(EDITOR)
 	$(EDITOR) $(SCENE)
@@ -223,8 +247,8 @@ GAME_TARGET := $(if $(filter host,$(TARGET)),$(if $(filter bsd,$(PLATFORM)),linu
 # (for paths like C:/Users/Jo Smith/...) only the last word of the full path is used.
 GAME_NAME := $(notdir $(lastword $(abspath $(GAME))))
 
-game: $(EDITOR) $(PLAYER) $(if $(filter web,$(GAME_TARGET)),web)
-	$(EDITOR) --build $(GAME_TARGET) "$(GAME)" --out "$(GAMES)/$(GAME_NAME)/$(GAME_TARGET)"
+game: $(EDITOR) $(EDITOR_CLI) $(PLAYER) $(if $(filter web,$(GAME_TARGET)),web)
+	$(EDITOR_CLI) --build $(GAME_TARGET) "$(GAME)" --out "$(GAMES)/$(GAME_NAME)/$(GAME_TARGET)"
 
 pantryquest:
 	@$(MAKE) --no-print-directory game GAME=examples/pantryquest TARGET=$(TARGET)
@@ -245,6 +269,11 @@ pantryquest2-check: $(BSCHECK)
 	python3 $(PQ2)/tools/check_softlocks.py
 .PHONY: pantryquest2 pantryquest2-assets pantryquest2-check
 
+# Orbits has C code (examples/orbits/src): the editor compiles it into the player for the game.
+orbits: $(EDITOR) $(EDITOR_CLI)
+	$(EDITOR_CLI) --build $(if $(filter host,$(TARGET)),host,$(TARGET)) examples/orbits --out "$(GAMES)/orbits/$(GAME_TARGET)"
+.PHONY: orbits
+
 marble: $(PLAYER)
 	$(PLAYER) examples/marble
 
@@ -255,8 +284,8 @@ explorer: $(PLAYER)
 vscode:
 	python3 tools/vscode/package_vsix.py $(BUILD)
 
-vscode-icon: $(EDITOR)
-	$(EDITOR) --write-icon tools/vscode/brontoscript/images/icon.png 256
+vscode-icon: $(EDITOR) $(EDITOR_CLI)
+	$(EDITOR_CLI) --write-icon tools/vscode/brontoscript/images/icon.png 256
 
 vscode-test:
 	node tools/vscode/brontoscript/test/language.test.js
@@ -265,12 +294,14 @@ vscode-test:
 # out of the source tree.
 run-examples: examples tools
 	@mkdir -p $(BUILD)/run
-	@cd $(BUILD)/run && for e in $(abspath $(EXAMPLES) $(EDITOR)); do echo "== $$e --headless"; $$e --headless || exit 1; done
+	@cd $(BUILD)/run && for e in $(abspath $(EXAMPLES) $(EDITOR_CLI)); do echo "== $$e --headless"; $$e --headless || exit 1; done
 	@echo "== $(abspath $(PLAYER)) examples/platformer --headless"; $(PLAYER) examples/platformer --headless --frames 180
 	@echo "== $(abspath $(PLAYER)) examples/pantryquest --headless"; $(PLAYER) examples/pantryquest --headless --frames 120 && \
 	 $(PLAYER) examples/pantryquest/main.scene --headless --frames 300
 	@echo "== $(abspath $(PLAYER)) examples/marble --headless"; $(PLAYER) examples/marble --headless --frames 240
 	@echo "== $(abspath $(PLAYER)) examples/explorer --headless"; $(PLAYER) examples/explorer --headless --frames 240
+	@echo "== examples/orbits (C code), built by the editor, --headless"; \
+	 $(EDITOR_CLI) --build host examples/orbits --out $(BUILD)/run/orbits && $(BUILD)/run/orbits/Orbits$(EXE) --headless --frames 120
 
 clean:
 	rm -rf build build-asan
@@ -298,8 +329,12 @@ WEB_PLAYER  := $(WEB)/bronto_player.wasm
 WEB_TOOL    := $(BUILD)/bronto_web
 WEB_RUNTIME := $(WEB)/bronto.js $(WEB)/shell.html
 WEB_C_PAGES := $(patsubst examples/%/main.c,$(WEB)/%/index.html,$(wildcard examples/*/main.c))
-WEB_PROJECT_PAGES := $(patsubst examples/%/project.bronto,$(WEB)/%/index.html,$(wildcard examples/*/project.bronto))
-WEB_PAGES   := $(WEB_C_PAGES) $(WEB_PROJECT_PAGES)
+# (projects with C code - a src/ folder of .c files - are compiled for the web by the editor)
+WEB_NATIVE_PROJECTS := $(patsubst examples/%/src/,%,$(dir $(wildcard examples/*/src/*.c)))
+WEB_PROJECT_PAGES := $(filter-out $(foreach p,$(WEB_NATIVE_PROJECTS),$(WEB)/$(p)/index.html),\
+                       $(patsubst examples/%/project.bronto,$(WEB)/%/index.html,$(wildcard examples/*/project.bronto)))
+WEB_NATIVE_PAGES := $(foreach p,$(sort $(WEB_NATIVE_PROJECTS)),$(WEB)/$(p)/index.html)
+WEB_PAGES   := $(WEB_C_PAGES) $(WEB_PROJECT_PAGES) $(WEB_NATIVE_PAGES)
 WEB_TITLE_snake := Bronto Snake
 WEB_TITLE_towerdefense := Pop Defense
 WEB_TITLE_bounce := Bounce
@@ -381,6 +416,9 @@ $(WEB)/%/index.html: $(WEB)/%.wasm $(WEB_RUNTIME) $(WEB_TOOL)
 # Projects made with the editor: the web player with the project packed in.
 $(WEB_PROJECT_PAGES): $(WEB)/%/index.html: $(WEB_PLAYER) $(WEB_RUNTIME) $(WEB_TOOL) $$(call rwildcard,examples/$$*)
 	$(WEB_TOOL) examples/$* --runtime $(WEB) -o $@
+# ... and with C code: the editor compiles the code into a web player of their own.
+$(WEB_NATIVE_PAGES): $(WEB)/%/index.html: $(EDITOR) $(EDITOR_CLI) $(WASM_OBJ)/toolchain.ok $$(call rwildcard,examples/$$*/src) $$(wildcard examples/$$*/*.scene)
+	$(EDITOR_CLI) --build web examples/$* --out $(WEB)/$*
 
 # The test suite as WebAssembly, run by Node; then the web C library is
 # checked against this computer's (the same program built both ways must

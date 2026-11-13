@@ -294,6 +294,20 @@ static void test_project_settings(void) {
     CHECK(br_project_excludes(&q, "tools") && br_project_excludes(&q, "tools/make_art.py") && br_project_excludes(&q, "notes.txt"));
     CHECK(br_project_excludes(&q, "docs/a.md") && br_project_excludes(&q, "builds") && br_project_excludes(&q, "builds/web/index.html"));
     CHECK(!br_project_excludes(&q, "toolset.bmp") && !br_project_excludes(&q, "art/tools") && !br_project_excludes(&q, "main.scene"));
+    /* the build settings, and the C code left out of packs */
+    CHECK(strcmp(q.build_target, "host") == 0 && strcmp(q.version, "1.0") == 0 && strcmp(q.code_dir, "src") == 0 && !q.windows_console);
+    CHECK(br_project_excludes(&q, "src/game.c") && br_project_excludes(&q, "src/game.h") && !br_project_excludes(&q, "src/data.txt"));
+    snprintf(q.build_target, sizeof(q.build_target), "web");
+    snprintf(q.version, sizeof(q.version), "2.5");
+    snprintf(q.code_dir, sizeof(q.code_dir), "code");
+    snprintf(q.cflags, sizeof(q.cflags), "-DLEVELS=3 -Ivendor");
+    q.windows_console = q.debug_build = true;
+    q.renderer = BR_RENDERER_TERMINAL_TEXT;
+    CHECK(br_project_save(dir, &q));
+    CHECK(br_project_load(dir, &p));
+    CHECK(strcmp(p.build_target, "web") == 0 && strcmp(p.version, "2.5") == 0 && strcmp(p.code_dir, "code") == 0 &&
+          strcmp(p.cflags, "-DLEVELS=3 -Ivendor") == 0 && p.windows_console && p.debug_build && p.renderer == BR_RENDERER_TERMINAL_TEXT);
+    CHECK(strcmp(p.exclude, "tools, notes.txt,docs/") == 0 && br_project_excludes(&p, "code/x.c") && !br_project_excludes(&p, "src/x.c"));
     br_path_join(dir, sizeof(dir), g_out_dir, "no_project_here");
     br_fs_mkdir(dir);
     CHECK(!br_project_load(dir, &q) && strcmp(q.name, "no_project_here") == 0);       /* defaults, named after the folder */

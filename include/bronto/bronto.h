@@ -31,6 +31,7 @@
 #include "physics3d.h"
 #include "particles.h"
 #include "script.h"
+#include "game.h"
 #include "ui.h"
 #include "audio.h"
 #include "window.h"

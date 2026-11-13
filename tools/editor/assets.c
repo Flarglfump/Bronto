@@ -15,6 +15,7 @@
  * the browser hides.
  */
 #include "editor.h"
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +39,7 @@ ed_asset_kind ed_asset_kind_of(const char *name, bool is_dir) {
     if (br_path_has_ext(name, ".scene")) return ED_ASSET_SCENE;
     if (br_path_has_ext(name, ".bs")) return ED_ASSET_SCRIPT;
     if (br_path_has_ext(name, ".obj") || br_path_has_ext(name, ".gltf") || br_path_has_ext(name, ".glb")) return ED_ASSET_MODEL;
+    if (br_path_has_ext(name, ".c") || br_path_has_ext(name, ".h")) return ED_ASSET_CODE;
     return ED_ASSET_OTHER;
 }
 
@@ -295,6 +297,140 @@ bool ed_assets_new_script(editor *ed) {
     return true;
 }
 
+/* A C file to start from: a component, the system that uses it and a behaviour.
+ * @F@ is the file's name, @I@ its identifier (game), @C@ the same in CamelCase (Game). */
+static const char k_c_template[] =
+    "/*\n"
+    " * @F@ - the game's own C code (docs/c-code.md).\n"
+    " *\n"
+    " * The editor compiles it whenever it changes (or Build > Compile C Code, F7): its\n"
+    " * components are in the inspector's Add Component, its systems and behaviours run\n"
+    " * in Play, and Build compiles it into the game. The compiler's messages go to the\n"
+    " * console, where a double-click opens the line.\n"
+    " */\n"
+    "#include \"bronto/bronto.h\"\n"
+    "#include <math.h>\n"
+    "\n"
+    "/* A component: data any entity can have, edited in the inspector. */\n"
+    "typedef struct @C@Spin {\n"
+    "    float speed;                       /* degrees a second */\n"
+    "} @C@Spin;\n"
+    "\n"
+    "static const br_field k_@I@_spin_fields[] = {\n"
+    "    BR_FIELD(@C@Spin, speed, BR_FIELD_FLOAT, -720, 720),\n"
+    "};\n"
+    "static const @C@Spin k_@I@_spin_default = { 90 };\n"
+    "static const br_component_desc k_@I@_spin = BR_COMPONENT_DESC(@C@Spin, k_@I@_spin_fields, &k_@I@_spin_default);\n"
+    "\n"
+    "/* A system: every fixed step, each entity with a Transform and a @C@Spin turns. */\n"
+    "static void @I@_spin_system(br_world *w, float dt, void *user) {\n"
+    "    br_component with[2];\n"
+    "    br_query q;\n"
+    "    (void)user;\n"
+    "    with[0] = br_component_find(w, \"Transform\");\n"
+    "    with[1] = br_component_find(w, \"@C@Spin\");\n"
+    "    q = br_query_make(w, with, 2);\n"
+    "    while (br_query_next(&q)) {\n"
+    "        br_transform *t = BR_QUERY_GET(&q, 0, br_transform);\n"
+    "        const @C@Spin *spin = BR_QUERY_GET(&q, 1, @C@Spin);\n"
+    "        t->rotation += spin->speed * dt;\n"
+    "    }\n"
+    "}\n"
+    "\n"
+    "/* Every scene's world gets the component and the system. */\n"
+    "static void @I@_world(br_world *w, void *user) {\n"
+    "    (void)user;\n"
+    "    br_component_register_desc(w, &k_@I@_spin);\n"
+    "    br_system_add(w, \"@I@_spin\", BR_PHASE_FIXED_UPDATE, @I@_spin_system, NULL, 0);\n"
+    "}\n"
+    "\n"
+    "/* A behaviour: an entity whose Script component's file is \"@C@Bob\" runs it.\n"
+    " * Each entity gets its own state, zeroed to begin with. */\n"
+    "typedef struct @I@_bob { float time, base_y; } @I@_bob;\n"
+    "\n"
+    "static void @I@_bob_start(br_world *w, br_entity self, void *state) {\n"
+    "    br_transform *t = (br_transform *)br_get(w, self, br_component_find(w, \"Transform\"));\n"
+    "    if (t) ((@I@_bob *)state)->base_y = t->position.y;\n"
+    "}\n"
+    "\n"
+    "static void @I@_bob_update(br_world *w, br_entity self, void *state, float dt) {\n"
+    "    @I@_bob *bob = (@I@_bob *)state;\n"
+    "    br_transform *t = (br_transform *)br_get(w, self, br_component_find(w, \"Transform\"));\n"
+    "    bob->time += dt;\n"
+    "    if (t) t->position.y = bob->base_y + sinf(bob->time * 3.0f) * 8.0f;\n"
+    "}\n"
+    "\n"
+    "static const br_behaviour k_@I@_bob = { sizeof(@I@_bob), @I@_bob_start, @I@_bob_update, NULL, NULL, NULL };\n"
+    "\n"
+    "/* Runs once, before the first scene (and in the editor each time this is compiled). */\n"
+    "BR_GAME_SETUP(@I@) {\n"
+    "    br_game_on_world(@I@_world, NULL);\n"
+    "    br_script_register_behaviour(\"@C@Bob\", &k_@I@_bob);\n"
+    "}\n";
+
+/* text with @F@, @I@ and @C@ put in. */
+static bool fill_template(const char *tmpl, const char *file, const char *id, const char *camel, char *out, size_t size) {
+    size_t n = 0;
+    const char *p;
+    for (p = tmpl; *p; ++p) {
+        const char *put = NULL;
+        size_t k;
+        if (p[0] == '@' && p[1] && p[2] == '@') put = p[1] == 'F' ? file : p[1] == 'I' ? id : p[1] == 'C' ? camel : NULL;
+        if (put) {
+            k = strlen(put);
+            if (n + k + 1 > size) return false;
+            memcpy(out + n, put, k);
+            n += k;
+            p += 2;
+        } else {
+            if (n + 2 > size) return false;
+            out[n++] = *p;
+        }
+    }
+    out[n] = 0;
+    return true;
+}
+
+bool ed_assets_new_c_file(editor *ed) {
+    char dir[ED_PATH_MAX], name[128], full[ED_PATH_MAX], rel[ED_PATH_MAX], id[64], camel[64], stem[96], *text;
+    const char *code;
+    size_t i, n = 0, c = 0;
+    bool up = true;
+    ed_project_reload(ed);
+    code = ed->project.code_dir[0] ? ed->project.code_dir : "src";
+    ed_asset_path(ed, code, dir, sizeof(dir));
+    if (!br_fs_is_dir(dir) && !br_fs_mkdir(dir)) { ed_status(ed, "Couldn't make the code folder %s", code); return false; }
+    for (i = 1; i < 100; ++i) {                              /* game.c, game2.c ... (names are C identifiers) */
+        if (i == 1) snprintf(name, sizeof(name), "game.c");
+        else snprintf(name, sizeof(name), "game%d.c", (int)i);
+        br_path_join(full, sizeof(full), dir, name);
+        if (!br_fs_exists(full)) break;
+    }
+    br_path_stem(stem, sizeof(stem), name);
+    for (i = 0; stem[i] && n + 1 < sizeof(id); ++i) {
+        char ch = stem[i];
+        if (!(isalnum((unsigned char)ch) || ch == '_')) ch = '_';
+        id[n++] = (char)tolower((unsigned char)ch);
+        if (ch == '_') { up = true; continue; }
+        if (c + 1 < sizeof(camel)) camel[c++] = up ? (char)toupper((unsigned char)ch) : ch;
+        up = false;
+    }
+    id[n] = camel[c] = 0;
+    if (!(text = (char *)br_alloc(sizeof(k_c_template) * 2))) return false;
+    if (!fill_template(k_c_template, name, id, camel, text, sizeof(k_c_template) * 2) || !br_file_write_all(full, text, strlen(text))) {
+        br_free(text);
+        ed_status(ed, "Couldn't write %s", name);
+        return false;
+    }
+    br_free(text);
+    rel_join(rel, sizeof(rel), code, name);
+    ed_assets_open_dir(ed, code);
+    ed_assets_select(ed, rel);
+    ed_open_script(ed, rel, 1);
+    ed_status(ed, "Made %s: its %sSpin component and %sBob behaviour are in the scene once it compiles (F7)", rel, camel, camel);
+    return true;
+}
+
 bool ed_assets_edit(editor *ed, const char *rel) {
     int line = 1;
     const char *colon;
@@ -458,7 +594,7 @@ void ed_assets_activate(editor *ed, const char *rel) {
         break;
     case ED_ASSET_SOUND: ed_assets_play(ed, rel); break;
     case ED_ASSET_IMAGE: case ED_ASSET_MODEL: add_to_scene(ed, rel); break;
-    case ED_ASSET_SCRIPT: ed_assets_edit(ed, rel); break;
+    case ED_ASSET_SCRIPT: case ED_ASSET_CODE: ed_assets_edit(ed, rel); break;
     default: break;
     }
 }
@@ -511,6 +647,14 @@ static void draw_icon(br_renderer *r, ed_asset_kind k, br_rect b) {
         br_draw_line(r, br_v2(cx - 8, cy), br_v2(cx + 8, cy), br_rgb(150, 200, 255));
         br_draw_line(r, br_v2(cx - 4, cy + 5), br_v2(cx + 9, cy + 5), br_rgb(130, 220, 150));
         br_draw_line(r, br_v2(cx - 4, cy + 10), br_v2(cx + 5, cy + 10), br_rgb(150, 200, 255));
+        break;
+    case ED_ASSET_CODE:               /* a page of C */
+        br_fill_rect(r, br_rect_make(cx - 13, cy - 16, 26, 32), br_rgb(46, 52, 64));
+        br_draw_rect(r, br_rect_make(cx - 13, cy - 16, 26, 32), br_rgb(120, 170, 245));
+        br_draw_text(r, "C", cx - 3, cy - 12, 1, br_rgb(120, 170, 245));
+        br_draw_line(r, br_v2(cx - 8, cy), br_v2(cx + 8, cy), br_rgb(150, 200, 255));
+        br_draw_line(r, br_v2(cx - 8, cy + 5), br_v2(cx + 4, cy + 5), br_rgb(130, 220, 150));
+        br_draw_line(r, br_v2(cx - 8, cy + 10), br_v2(cx + 9, cy + 10), br_rgb(150, 200, 255));
         break;
     case ED_ASSET_MODEL:              /* a wireframe cube */
         br_draw_rect(r, br_rect_make(cx - 14, cy - 8, 20, 20), br_rgb(150, 200, 255));
@@ -641,7 +785,7 @@ static bool tile(editor *ed, const br_dir_entry *ent, br_rect box) {
     }
     if (f & BR_UI_PRESSED) ed_assets_select(ed, rel);
     if (f & BR_UI_RIGHT_CLICKED) ed_menu_asset(ed, rel);
-    if (k != ED_ASSET_FOLDER && k != ED_ASSET_OTHER)       /* (scripts too: drop onto an entity) */
+    if (k != ED_ASSET_FOLDER && k != ED_ASSET_OTHER && k != ED_ASSET_CODE)       /* (scripts too: drop onto an entity) */
         br_ui_drag_source(ui, ED_ASSET_DRAG, rel, ent->name);
     return (f & BR_UI_DOUBLE_CLICKED) != 0;
 }
@@ -652,7 +796,7 @@ void ed_assets_panel(editor *ed, br_rect rect) {
     int i, per_row, n, activate = -1;
     if (!a->listed || (ed->engine->time - a->listed_at > RELIST_SECONDS && !br_ui_dragging(ui, NULL))) relist(ed);
     br_ui_panel_begin(ui, "assets", rect);
-    br_ui_columns(ui, 6);
+    br_ui_columns(ui, 7);
     if (br_ui_button(ui, "Up")) {
         char up[ED_PATH_MAX];
         br_path_parent(up, sizeof(up), a->dir);
@@ -663,6 +807,7 @@ void ed_assets_panel(editor *ed, br_rect rect) {
     if (br_ui_button(ui, "Refresh")) { ed_assets_refresh(ed); ed_status(ed, "Reloaded the folder and every asset"); }
     if (br_ui_button(ui, "To prefab")) ed_assets_save_prefab(ed);
     if (br_ui_button(ui, "+ Script")) ed_assets_new_script(ed);
+    if (br_ui_button(ui, "+ C File")) ed_assets_new_c_file(ed);
     breadcrumb(ed);
     br_ui_spacing(ui, 2);
     n = a->list.count;
@@ -700,7 +845,8 @@ static void sync_script(editor *ed) {
     a->script_modified = info.modified;
     a->script_text[0] = a->script_error[0] = 0;
     if (!(text = (char *)br_file_read_all(full, &size))) return;
-    br_script_check(text, a->selected, a->script_error, sizeof(a->script_error));   /* "" when it parses */
+    if (ed_asset_kind_of(a->selected, false) == ED_ASSET_SCRIPT)
+        br_script_check(text, a->selected, a->script_error, sizeof(a->script_error));   /* "" when it parses */
     while (n < size && n + 1 < sizeof(a->script_text) && lines < 12) {
         if (text[n] == '\n') ++lines;
         a->script_text[n] = text[n] == '\t' ? ' ' : text[n];
@@ -712,7 +858,7 @@ static void sync_script(editor *ed) {
 
 static void sync_name_field(editor *ed) {
     ed_assets *a = &ed->assets;
-    if (a->selected[0] && ed_asset_kind_of(a->selected, false) == ED_ASSET_SCRIPT) sync_script(ed);
+    if (a->selected[0] && (ed_asset_kind_of(a->selected, false) == ED_ASSET_SCRIPT || ed_asset_kind_of(a->selected, false) == ED_ASSET_CODE)) sync_script(ed);
     if (strcmp(a->name_for, a->selected) == 0) return;
     a->script_modified = -1;
     snprintf(a->name_for, sizeof(a->name_for), "%s", a->selected);
@@ -818,6 +964,36 @@ void ed_assets_preview(editor *ed, br_rect rect) {
         }
         break;
     }
+    case ED_ASSET_CODE: {
+        const char *p = a->script_text;
+        char fpath[ED_PATH_MAX], abs[ED_PATH_MAX];
+        const ed_native_diag *d;
+        int shown = 0;
+        sync_script(ed);
+        br_ui_columns(ui, 2);
+        if (br_ui_button(ui, "Edit")) ed_assets_edit(ed, a->selected);
+        if (br_ui_button(ui, "Compile")) ed_cmd_compile(ed);
+        ed_asset_path(ed, a->selected, fpath, sizeof(fpath));
+        d = br_fs_absolute(fpath, abs, sizeof(abs)) ? ed_native_diag_for(abs) : NULL;
+        if (d) {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "Line %d: %s", d->line, d->text);
+            br_ui_label_colored(ui, msg, d->error ? br_rgb(255, 120, 120) : br_rgb(240, 200, 100));
+        } else if (ed->native.loaded || ed->native.failed) {
+            br_ui_label_colored(ui, ed->native.summary, ed->native.failed ? br_rgb(255, 120, 120) : br_rgb(130, 220, 150));
+        } else {
+            br_ui_label_colored(ui, "C code: compiled when it changes (F7: now)", ui->style.text_dim);
+        }
+        while (*p && shown < 5) {                       /* the first lines, dimmed */
+            char line[64];
+            size_t len = strcspn(p, "\n");
+            snprintf(line, sizeof(line), "%.*s", (int)(len < 40 ? len : 40), p);
+            br_ui_label_colored(ui, line, ui->style.text_dim);
+            p += len + (p[len] ? 1 : 0);
+            ++shown;
+        }
+        break;
+    }
     case ED_ASSET_MODEL: {
         const br_mesh *m = br_asset_mesh(a->selected);
         if (m) {
@@ -834,6 +1010,6 @@ void ed_assets_preview(editor *ed, br_rect rect) {
         br_ui_labelf(ui, "File  %llu bytes", (unsigned long long)info.size);
         break;
     }
-    if (k != ED_ASSET_SCRIPT) br_ui_label_colored(ui, a->selected, ui->style.text_dim);
+    if (k != ED_ASSET_SCRIPT && k != ED_ASSET_CODE) br_ui_label_colored(ui, a->selected, ui->style.text_dim);
     br_ui_panel_end(ui);
 }

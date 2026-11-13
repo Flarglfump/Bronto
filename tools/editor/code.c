@@ -23,6 +23,9 @@
  *
  * The font is the engine's 8x8 one, so every byte is one column (a tab is
  * shown as one space; Tab inserts spaces).
+ *
+ * The game's C files (.c, .h) open here too, in C's colours; their mistakes
+ * are the last compile's (native.c), marked the same way.
  */
 #include "editor.h"
 
@@ -261,6 +264,11 @@ static void check_now(ed_code_file *f) {
     f->check_at = 0;
     f->error[0] = 0;
     f->error_line = 0;
+    if (f->is_c) {                                                /* the last compile's */
+        const ed_native_diag *d = ed_native_diag_for(f->path);
+        if (d) { snprintf(f->error, sizeof(f->error), "%.40s:%d: %.180s", f->name, d->line, d->text); f->error_line = d->line; }
+        return;
+    }
     if (br_script_check(f->text, f->name, err, sizeof(err))) return;
     snprintf(f->error, sizeof(f->error), "%s", err);
     for (p = err; *p; ++p)                                        /* "player.bs:12: ..." */
@@ -308,6 +316,7 @@ bool ed_code_open(editor *ed, const char *path, int line) {
         memset(f, 0, sizeof(*f));
         full_path(ed, path, f->path, sizeof(f->path));
         snprintf(f->name, sizeof(f->name), "%s", br_path_name(f->path));
+        f->is_c = br_path_has_ext(f->path, ".c") || br_path_has_ext(f->path, ".h");
         f->want_col = -1;
         if (!read_into(f, ed->engine ? ed->engine->time : 0, false)) { file_free(f); return false; }
         at = c->count;
@@ -395,6 +404,7 @@ void ed_code_poll(editor *ed) {
     for (i = 0; i < c->count; ++i) {
         ed_code_file *f = c->files[i];
         if (f->check_at > 0 && now >= f->check_at) check_now(f);
+        else if (f->is_c && !f->dirty) check_now(f);              /* (a compile may have just finished) */
     }
     if (now < c->poll_at) return;
     c->poll_at = now + 1.0;
@@ -437,20 +447,22 @@ static void toggle_comment(ed_code_file *f, double now) {
     int first = ed_code_line_of(f, sel_lo(f)), last = ed_code_line_of(f, sel_hi(f)), l;
     int cur_line = ed_code_line_of(f, f->cursor), cur_col = col_of(f, f->cursor), shift = 0;
     bool all = true, multi;
+    const char *mark = f->is_c ? "// " : "# ";
+    int mlen = f->is_c ? 2 : 1;                                    /* the mark without its space */
     if (last > first && f->line_start[last] == sel_hi(f)) --last;
     multi = last > first;
     for (l = first; l <= last; ++l) {                              /* every (non-empty) line commented: take them out */
         int p = f->line_start[l], e = line_end(f, l);
         while (p < e && f->text[p] == ' ') ++p;
-        if (p < e && f->text[p] != '#') all = false;
+        if (p < e && strncmp(f->text + p, mark, (size_t)mlen) != 0) all = false;
     }
     begin_edit(f, G_OTHER, now);
     for (l = first; l <= last; ++l) {
         int p = f->line_start[l], e = line_end(f, l), n;
         while (p < e && f->text[p] == ' ') ++p;
         if (p == e) continue;
-        if (all) { n = p + 1 < e && f->text[p + 1] == ' ' ? 2 : 1; replace(f, p, p + n, "", 0, now); n = -n; }
-        else { replace(f, p, p, "# ", 2, now); n = 2; }
+        if (all) { n = p + mlen < e && f->text[p + mlen] == ' ' ? mlen + 1 : mlen; replace(f, p, p + n, "", 0, now); n = -n; }
+        else { replace(f, p, p, mark, mlen + 1, now); n = mlen + 1; }
         if (l == cur_line && cur_col >= p - f->line_start[l]) shift = n;
     }
     if (multi) { f->anchor = f->line_start[first]; f->cursor = line_end(f, last); }
@@ -692,6 +704,80 @@ static br_color colour(code_colour k) {
     return c[k];
 }
 
+static const char *const k_c_words[] = {
+    "if", "else", "while", "for", "do", "switch", "case", "default", "break", "continue", "return", "goto", "sizeof",
+    "typedef", "struct", "union", "enum", "static", "const", "extern", "volatile", "inline", "register", "restrict",
+};
+static const char *const k_c_types[] = {
+    "void", "char", "short", "int", "long", "float", "double", "signed", "unsigned", "bool", "size_t",
+    "int8_t", "int16_t", "int32_t", "int64_t", "uint8_t", "uint16_t", "uint32_t", "uint64_t",
+    "br_world", "br_entity", "br_component", "br_vec2", "br_vec3", "br_color", "br_engine", "br_field", "br_component_desc",
+    "br_behaviour", "br_transform", "br_renderer", "br_system_phase",
+};
+static const char *const k_c_values[] = { "true", "false", "NULL" };
+
+/* Colours for a line of C: `in_comment` carries a block comment from line to line. */
+static void colour_c_line(const char *s, int n, unsigned char *out, bool in_comment) {
+    int i = 0;
+    memset(out, C_TEXT, (size_t)n);
+    while (i < n && (s[i] == ' ' || s[i] == '\t')) ++i;
+    if (!in_comment && i < n && s[i] == '#') {                   /* the preprocessor's lines */
+        int j = i + 1;
+        while (j < n && s[j] == ' ') ++j;
+        while (j < n && word_char(s[j])) ++j;
+        memset(out + i, C_AT, (size_t)(j - i));
+        i = j;
+    }
+    if (in_comment) i = 0;
+    while (i < n) {
+        char ch = s[i];
+        int j = i + 1;
+        if (in_comment) {
+            while (j < n && !(s[j - 1] == '*' && s[j] == '/')) ++j;
+            if (j < n) ++j;
+            memset(out + i, C_COMMENT, (size_t)(j - i));
+            in_comment = false;
+            i = j;
+            continue;
+        }
+        if (ch == '/' && j < n && s[j] == '/') { memset(out + i, C_COMMENT, (size_t)(n - i)); return; }
+        if (ch == '/' && j < n && s[j] == '*') { in_comment = true; continue; }
+        if (ch == '"' || ch == '\'') {
+            while (j < n && s[j] != ch) { if (s[j] == '\\' && j + 1 < n) ++j; ++j; }
+            if (j < n) ++j;
+            memset(out + i, C_STRING, (size_t)(j - i));
+        } else if ((ch >= '0' && ch <= '9') || (ch == '.' && j < n && s[j] >= '0' && s[j] <= '9')) {
+            while (j < n && (word_char(s[j]) || s[j] == '.')) ++j;
+            memset(out + i, C_NUMBER, (size_t)(j - i));
+        } else if (word_char(ch)) {
+            code_colour c = C_TEXT;
+            while (j < n && word_char(s[j])) ++j;
+            if (in_list(k_c_words, (int)BR_ARRAY_COUNT(k_c_words), s + i, j - i)) c = C_WORD;
+            else if (in_list(k_c_types, (int)BR_ARRAY_COUNT(k_c_types), s + i, j - i)) c = C_TYPE;
+            else if (in_list(k_c_values, (int)BR_ARRAY_COUNT(k_c_values), s + i, j - i)) c = C_VALUE;
+            else if (j - i > 3 && (strncmp(s + i, "br_", 3) == 0 || strncmp(s + i, "BR_", 3) == 0)) c = C_BUILTIN;   /* the engine's */
+            memset(out + i, (int)c, (size_t)(j - i));
+        }
+        i = j;
+    }
+}
+
+/* Is line k (of a C file) inside a block comment where it starts? */
+static bool c_comment_at(const ed_code_file *f, int line) {
+    int p, end = f->line_start[line];
+    bool in = false;
+    char quote = 0;
+    for (p = line > 200 ? f->line_start[line - 200] : 0; p < end; ++p) {   /* (looking back a little way is enough) */
+        char ch = f->text[p];
+        if (in) { if (ch == '*' && p + 1 < end && f->text[p + 1] == '/') { in = false; ++p; } continue; }
+        if (quote) { if (ch == '\\') ++p; else if (ch == quote || ch == '\n') quote = 0; continue; }
+        if (ch == '"' || ch == '\'') quote = ch;
+        else if (ch == '/' && p + 1 < end && f->text[p + 1] == '*') { in = true; ++p; }
+        else if (ch == '/' && p + 1 < end && f->text[p + 1] == '/') { while (p < end && f->text[p] != '\n') ++p; }
+    }
+    return in;
+}
+
 /* Colours for one line's bytes. */
 static void colour_line(const char *s, int n, unsigned char *out) {
     int i = 0;
@@ -770,7 +856,9 @@ void ed_code_view(editor *ed, br_rect rect, int here) {
     if (ui->pressed && !(flags & BR_UI_PRESSED) && !br_ui_menu_active(ui)) c->focused = false;   /* a click elsewhere */
     if ((flags & BR_UI_PRESSED) && ui->mouse.x < text.x + GUTTER) {
         int line = (int)floorf((ui->mouse.y - text.y + f->scroll_y) / LINE_H) + 1;
-        if (line >= 1 && line <= f->line_count) {
+        if (f->is_c) {
+            ed_status(ed, "Breakpoints are for scripts: debug C code with a debugger (Build Settings > Debug build)");
+        } else if (line >= 1 && line <= f->line_count) {
             bool on = !br_script_debug_has_breakpoint(f->path, line);
             br_script_debug_set_breakpoint(f->path, line, on);
             ed_status(ed, on ? "Breakpoint at line %d: the game stops when it gets there" : "No breakpoint at line %d", line);
@@ -834,7 +922,8 @@ void ed_code_view(editor *ed, br_rect rect, int here) {
                 if (s1 > s0) br_fill_rect(r, br_rect_make(x0 + (float)(s0 - col0) * CHAR_W, y, (float)(s1 - s0) * CHAR_W, LINE_H), ui->style.selection);
             }
             if (n > (int)sizeof(cols_of)) n = (int)sizeof(cols_of);
-            colour_line(f->text + a, n, cols_of);
+            if (f->is_c) colour_c_line(f->text + a, n, cols_of, c_comment_at(f, k));
+            else colour_line(f->text + a, n, cols_of);
             for (i = col0; i < n && i < col0 + cols; ) {           /* runs of one colour */
                 char run[160];
                 int j = i, m = 0;

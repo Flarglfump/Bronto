@@ -99,6 +99,7 @@ bool ed_open_project(editor *ed, const char *folder) {
         br_file_write_all(marker, text, sizeof(text) - 1);
     }
     br_path_join(main_scene, sizeof(main_scene), abs, "main.scene");
+    if (ed->build_cli) return true;              /* editor --build: the files are packed, no scene is opened */
     if (br_fs_exists(main_scene) && ed_doc_load(&ed->doc, main_scene)) {
         snprintf(ed->path_field, sizeof(ed->path_field), "%s", main_scene);
         ed_view_set_3d(ed, br_world_has_3d(&ed->doc.world));
@@ -201,6 +202,7 @@ void ed_cmd_play(editor *ed) {
     } else {
         int saved = ed_code_save_all(ed);             /* the game runs the scripts as they are here */
         if (ed->console_clear_on_play) ed_console_clear(&ed->console);
+        ed_native_apply(ed, false);                   /* ... and its C code (compiled again if it changed) */
         ed->code.focused = false;
         ed_doc_play(&ed->doc);
         if (saved) ed_status(ed, "Saved %d script%s and playing. Changes made now are undone by Stop (F5)", saved, saved == 1 ? "" : "s");

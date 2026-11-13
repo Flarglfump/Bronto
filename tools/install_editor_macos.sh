@@ -10,7 +10,8 @@
 # can't be written to, or with --user). Inside it, Contents/MacOS/ holds the editor and
 # everything the editor looks for beside itself: bronto_player and bscheck, players/
 # (other systems' players) and web/ (the web player from "make web"), so the Build menu
-# works from the app just as it does from build/.
+# works from the app just as it does from build/; Contents/Resources/sdk/ has the engine's
+# headers and sources, which the editor compiles with a game's C code.
 #
 # The files are copied, so run this again after rebuilding the editor ("make install"
 # does both, and copies nothing if the app already has the same files).
@@ -109,6 +110,15 @@ fi
 APP="$APPS/$APP_NAME.app"
 EXE="$APP/Contents/MacOS/editor"
 
+# The engine's headers and sources (the "SDK"), for the games' C code: the editor compiles
+# them with a project's code (docs/c-code.md). Into folder $1.
+copy_sdk() {
+    mkdir -p "$1/tools/player" "$1/tools/web"
+    cp -R "$ROOT/include" "$ROOT/src" "$1/"
+    cp "$ROOT/tools/player/main.c" "$1/tools/player/"
+    cp "$ROOT/tools/web/bronto.js" "$ROOT/tools/web/shell.html" "$1/tools/web/"
+}
+
 # ---- the bundle ------------------------------------------------------------------------
 # Made in a temporary folder and then moved into place, so a failed install leaves the
 # old app as it was.
@@ -142,9 +152,11 @@ for webdir in "$BUILD/web" "$BUILD/players/web"; do    # the web player (make we
 done
 [ "$web_found" = 1 ] || echo "note: no web player in build/ (make web), so Build > Web won't be available"
 
+copy_sdk "$RES/sdk"
+
 # What's going in, to compare with the app that's there (signing changes the programs
 # inside it, so the app keeps this list of what they were built as).
-(cd "$MACOS" && find . -type f | LC_ALL=C sort | xargs cksum) > "$STAGE/manifest"
+(cd "$NEW/Contents" && find MacOS Resources/sdk -type f | LC_ALL=C sort | xargs cksum) > "$STAGE/manifest"
 up_to_date=0
 if [ -f "$APP/Contents/Resources/manifest" ] && cmp -s "$STAGE/manifest" "$APP/Contents/Resources/manifest"; then
     up_to_date=1

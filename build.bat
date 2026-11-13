@@ -5,6 +5,9 @@ rem   build.bat web      build for the web: build\web\ (the web player the edito
 rem                      Build > Web uses, and a page for each example). Needs LLVM's
 rem                      clang (the LLVM installer for Windows) on PATH, besides MSVC.
 rem   build.bat tools    build just the editor, bscheck and bronto_player
+rem                      (the editor is a windowed program, editor.exe; editor.com runs it
+rem                      from command lines - "build\editor --build windows my_game" - and
+rem                      build\editor.lib lets the games' C code use the engine in it)
 rem   build.bat install  install the editor (building the tools first if they're out of
 rem                      date): Start menu shortcut, BRONTO_EDITOR environment variable.
 rem                      build.bat install -AllUsers installs it for everyone (as administrator).
@@ -26,7 +29,7 @@ cl %CFLAGS% /Iexamples\snake /Iexamples\towerdefense /Itools\editor /Fobuild\obj
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bounce.exe src\bronto.c examples\bounce\main.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\snake.exe src\bronto.c examples\snake\*.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\towerdefense.exe src\bronto.c examples\towerdefense\*.c || goto :error
-cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\editor.exe src\bronto.c tools\editor\*.c tools\web\webpage.c || goto :error
+call :editor || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bscheck.exe src\bronto.c tools\bscheck\main.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bronto_player.exe src\bronto.c tools\player\main.c || goto :error
 
@@ -40,11 +43,24 @@ echo Build or tests FAILED.
 exit /b 1
 
 :tools
-cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\editor.exe src\bronto.c tools\editor\*.c tools\web\webpage.c || goto :error
+call :editor || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bscheck.exe src\bronto.c tools\bscheck\main.c || goto :error
 cl %CFLAGS% /Fobuild\obj\ /Fdbuild\ /Fe:build\bronto_player.exe src\bronto.c tools\player\main.c || goto :error
 echo.
-echo Built build\editor.exe, build\bscheck.exe and build\bronto_player.exe
+echo Built build\editor.exe (and editor.com), build\bscheck.exe and build\bronto_player.exe
+exit /b 0
+
+rem The editor: a windowed program (no console window), which exports the engine's functions
+rem (build\editor.def, listed from the engine's object file) so the C code of a game - a DLL
+rem the editor compiles and loads - can use them, through build\editor.lib. editor.com is a
+rem console program that runs it from command lines and waits for jobs like --build.
+:editor
+if not exist build\obj\editor mkdir build\obj\editor
+cl %CFLAGS% /c /Fobuild\obj\editor\ /Fdbuild\ src\bronto.c tools\editor\*.c tools\web\webpage.c || exit /b 1
+echo EXPORTS> build\editor.def
+for /f "tokens=2 delims=|" %%n in ('dumpbin /nologo /symbols build\obj\editor\bronto.obj ^| findstr /c:"External" ^| findstr /c:"()" ^| findstr /v /c:"UNDEF" ^| findstr /c:"| br_"') do echo %%n>> build\editor.def
+cl %CFLAGS% /Fe:build\editor.exe build\obj\editor\*.obj /link /DEF:build\editor.def /IMPLIB:build\editor.lib /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup || exit /b 1
+cl /nologo /W4 /O2 /Fobuild\obj\ /Fe:build\editor.com tools\launcher\main.c || exit /b 1
 exit /b 0
 
 rem The editor in the Start menu and BRONTO_EDITOR (tools\install_editor_windows.ps1 builds

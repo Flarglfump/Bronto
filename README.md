@@ -14,7 +14,9 @@ Status (v0.1):
   and Pop Defense; a visual scene editor; recording and replaying runs frame for
   frame, with a bot that plays Pantry Quest through; and 3D (rendering, physics, the
   editor's 3D view and @3d scripts), with two 3D samples, Marble and Explorer; and
-  games that draw in the terminal, in coloured half blocks or as ASCII text.
+  games that draw in the terminal, in coloured half blocks or as ASCII text; and projects
+  with their own C code, which the editor compiles, loads and builds into games
+  ([docs/c-code.md](docs/c-code.md)).
 - **Next:** see the roadmap below.
 
 ## Quick start
@@ -29,6 +31,7 @@ make game GAME=examples/pantryquest   # pack a project into a game: build/games/
                    #   (TARGET=web|linux|macos|windows; default: this computer)
 make pantryquest   # the same for Pantry Quest
 make pantryquest2  # the same for Pantry Quest II (TARGET=web for a web page)
+make orbits        # the same for Orbits, a project with C code: the editor compiles it into the game
 make marble        # build and play Marble, the 3D example
 make test          # build libbronto.a and run the test suite
 make examples      # build examples/ into build/examples/
@@ -59,7 +62,11 @@ nothing when what's installed is already the same, so it's safe to run after eve
 | Windows | `%LOCALAPPDATA%\Programs\Bronto Editor`, with a Start menu shortcut and an Installed apps entry (`build.bat install -AllUsers`, as administrator: `%ProgramFiles%`) | the user's environment variables (the system's for `-AllUsers`) |
 
 `bronto_player`, `bscheck`, and the other systems' players and the web player (if they're in
-`build/`) go in beside the editor, so its Build menu works the same from the installed copy.
+`build/`) go in beside the editor, so its Build menu works the same from the installed copy,
+and so do the engine's headers and sources (`sdk/`), which it compiles with games' C code.
+On Windows the editor is a windowed program (`editor.exe`, no console window) and
+`editor.com` beside it is the one for command lines: it waits for jobs like `--build` and
+shows what they print, and `BRONTO_EDITOR` names it.
 `BRONTO_EDITOR` is the installed editor's path, for scripts:
 
 ```sh
@@ -165,10 +172,16 @@ the rules.
   entity to attach it, double-click to edit it in your text editor, or **+ Script** for a
   new one.
 - **Build menu:** a game for this computer (or others, given their players) in one file,
-  after checking every script; **Project Settings** for the game's name, first scene, screen
+  after checking every script; **Build Settings** for the platform, the renderer and the
+  rest of how games are built; **Project Settings** for the game's name, first scene, screen
   size and strict typing. See [Building games](#building-games). The same build runs
   without a window: `editor --build <target> <project> [--out folder]` (or `make game`); see
   [docs/editor-cli.md](docs/editor-cli.md).
+- **C code:** a project can have `.c` and `.h` files (in `src/`) using the engine's C API:
+  components, systems and behaviours. The editor compiles them as they change and loads
+  them, so their components are in the inspector and Play runs them; Build compiles them
+  into the game. Compiler errors go to the console and the code tab. See
+  [docs/c-code.md](docs/c-code.md) and `examples/orbits`.
 - **Physics and scripts** run when you press Play. **Colliders** outlines every collider,
   and script errors appear in the status bar and the console.
 - **Right-click menus** everywhere: hierarchy rows and empty space, objects and empty
@@ -258,7 +271,8 @@ types can be `unsigned` (`uint`): never below 0.
 
 The editor's **Build** menu turns a project into a game that runs without the editor:
 
-- **Build for <this computer>** (Ctrl+B) checks every script (strictly, if the project asks
+- **Build** (Ctrl+B) makes the game for the platform chosen in **Build Settings** (this
+  computer, unless you choose another). It checks every script (strictly, if the project asks
   for it; mistakes go to the console), then writes the game to `builds/<system>/` in the
   project: on Linux and Windows one program file, on macOS a `.app`. **Build and Run**
   (Ctrl+Shift+B) starts it too.
@@ -273,12 +287,19 @@ The editor's **Build** menu turns a project into a game that runs without the ed
   Open in Browser** does both. It uses the web player that `make web` puts beside the
   editor (see [docs/web.md](docs/web.md)).
 - **Project Settings** (saved in `project.bronto`): the game's name, the scene it starts
-  with, its screen size and window scale, strict typing, an icon, the builds folder, and what to leave out of builds
-  (`exclude = tools, notes.txt`: folders and files the pack skips).
-- **Renderer** (in Project Settings): whether built desktop games draw in a window, or in
+  with, its screen size and window scale, strict typing, an icon and touch controls.
+- **Build Settings** (saved in `project.bronto` too): the **platform** Build makes the game
+  for (with what each needs, and whether it's there), the builds folder, what to leave out
+  of builds (`exclude = tools, notes.txt`: folders and files the pack skips), the game's
+  **version**, the Mac app's **bundle ID**, whether a Windows game has a **console window**
+  beside its own (off: just the window), and the **C code**'s folder, compiler and options
+  ([docs/c-code.md](docs/c-code.md)). **Build** and **Build and Run** are there too.
+- **Renderer** (in Build Settings): whether built desktop games draw in a window, or in
   the terminal they are started from, as coloured half blocks or as coloured ASCII text
   (`renderer = terminal_blocks` / `terminal_text`). **Build and Run** opens a terminal for
   them. See [Playing in the terminal](docs/terminal.md).
+- **C code** in the project (`src/*.c`) is compiled into the game's own player for this
+  computer or the web; see [docs/c-code.md](docs/c-code.md).
 
 - **Open Save Folder** shows where the game keeps its [saved data](#saved-data). The editor's
   Play uses the same folder as the built game.

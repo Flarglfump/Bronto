@@ -15,7 +15,7 @@
  * Shortcuts (Ctrl, or Cmd on a Mac):
  *   Ctrl+Shift+O load project   Ctrl+N new   Ctrl+O open   Ctrl+S save   Ctrl+Z undo   Ctrl+Y / Ctrl+Shift+Z redo
  *   Ctrl+D duplicate   Delete remove   F5 / Ctrl+P play / stop   F frame selection
- *   Ctrl+B build the game for this computer   Ctrl+Shift+B build and run it
+ *   Ctrl+B build the game (for the platform in Build Settings)   Ctrl+Shift+B build and run it   F7 compile the C code
  *   Ctrl+C / Ctrl+X / Ctrl+V copy, cut, paste entities (as scene text on the
  *   system clipboard, so they paste into another editor too)   F2 rename
  *   G grid   arrows nudge (Shift: one grid step)   Esc deselect / stop
@@ -208,7 +208,7 @@ static void shortcuts(editor *ed) {
     bool cmd = (in->mods & (BR_MOD_CONTROL | BR_MOD_SUPER)) != 0, shift = (in->mods & BR_MOD_SHIFT) != 0;
     float step;
     if (br_ui_wants_keyboard(&ed->ui) || br_ui_menu_active(&ed->ui) ||                /* typing, a menu, or a dialog */
-        ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible) return;
+        ed->pending != ED_PENDING_NONE || ed->picker.open || ed->settings_visible || ed->project_visible || ed->build_visible) return;
     if (ed_code_has_keyboard(ed) && !ed->doc.playing) {   /* the script editor has the keyboard: only Play */
         if (br_key_pressed(in, BR_KEY_F5) || (cmd && br_key_pressed(in, BR_KEY_P))) ed_cmd_play(ed);
         return;
@@ -218,7 +218,8 @@ static void shortcuts(editor *ed) {
         return;
     }
     if (cmd && br_key_pressed(in, BR_KEY_N)) ed_cmd_new(ed);
-    if (cmd && br_key_pressed(in, BR_KEY_B)) ed_cmd_build(ed, ed_host_target(), shift);
+    if (cmd && br_key_pressed(in, BR_KEY_B)) ed_cmd_build(ed, ed_build_target(ed), shift);   /* Build Settings' platform */
+    if (br_key_pressed(in, BR_KEY_F7)) ed_cmd_compile(ed);
     if (cmd && br_key_pressed(in, BR_KEY_O)) { if (shift) ed_cmd_load_project(ed); else ed_cmd_open(ed); }
     if (cmd && br_key_pressed(in, BR_KEY_S)) ed_cmd_save(ed);
     if (cmd && br_key_pressed(in, BR_KEY_Z)) { if (shift) ed_cmd_redo(ed); else ed_cmd_undo(ed); }
@@ -357,6 +358,24 @@ static int64_t scripts_stamp(const char *dir, int depth) {
     return sum;
 }
 
+/* The game's C code (native.c): compiled and loaded again when it changed (or
+ * `force`), and the scene made again with its components and systems. A scene
+ * that was opened before its components were known is read again from its file. */
+bool ed_native_apply(editor *ed, bool force) {
+    if (ed->doc.playing || ed->build_cli || !ed_native_refresh(ed, force)) {
+        if (force && ed->native.failed) ed_status(ed, "%s", ed->native.summary);
+        return false;
+    }
+    ed_doc_rebuild_world(&ed->doc);                              /* a new world: the new code's components */
+    if (ed->doc.unknown && ed->doc.path[0] && !ed_doc_dirty(&ed->doc)) {
+        char path[ED_PATH_MAX];
+        snprintf(path, sizeof(path), "%s", ed->doc.path);
+        ed_doc_load(&ed->doc, path);
+    }
+    ed_status(ed, "%s%s", ed->native.summary, ed->native.generation > 1 ? " - the scene has the new code" : "");
+    return true;
+}
+
 void ed_components_reload(editor *ed, bool force) {
     static int64_t stamp;
     static double last;
@@ -366,6 +385,8 @@ void ed_components_reload(editor *ed, bool force) {
     const char *root = br_assets_root();
     if (!force && (ed->doc.playing || ed->engine->time - last < 2.0)) return;
     last = ed->engine ? ed->engine->time : 0;
+    if (!ed->build_cli) ed_project_reload(ed);                 /* (the code folder, the compiler) */
+    if (ed_native_apply(ed, false) && !force) return;          /* (the world is made again already) */
     now = root[0] ? scripts_stamp(root, 0) : 0;
     if (!force && now == stamp) return;
     stamp = now;
@@ -508,6 +529,7 @@ static void editor_render(br_scene *s) {
     ed_picker_dialog(ed, l.screen);
     ed_settings_dialog(ed, l.screen);
     ed_project_dialog(ed, l.screen);
+    ed_build_dialog(ed, l.screen);
     br_ui_set_disabled(&ed->ui, false);
     br_ui_end(&ed->ui);
 }
@@ -1418,6 +1440,122 @@ static int test_own_components(br_engine *e) {
     return failures;
 }
 
+/* The game's C code: compiled into the editor, its component in the scene and in Play, mistakes
+ * in the console and the code tab, a scene kept safe while its components are unknown, and a game
+ * built with it. Skipped where there's no C compiler. */
+static int test_c_code(br_engine *e) {
+    editor *ed = &ED;
+    ed_doc *d = &ed->doc;
+    int failures = 0;
+    char sdk[1024], host[200], web[200], out[1024];
+    br_component mc;
+    br_entity thing;
+    const char good[] =
+        "#include \"bronto/bronto.h\"\n"
+        "typedef struct Mover { float speed; } Mover;\n"
+        "static const br_field k_fields[] = { BR_FIELD(Mover, speed, BR_FIELD_FLOAT, -500, 500) };\n"
+        "static const Mover k_default = { 50 };\n"
+        "static const br_component_desc k_mover = BR_COMPONENT_DESC(Mover, k_fields, &k_default);\n"
+        "static void move(br_world *w, float dt, void *user) {\n"
+        "    br_component with[2];\n"
+        "    br_query q;\n"
+        "    (void)user;\n"
+        "    with[0] = br_component_find(w, \"Transform\");\n"
+        "    with[1] = br_component_find(w, \"Mover\");\n"
+        "    q = br_query_make(w, with, 2);\n"
+        "    while (br_query_next(&q)) BR_QUERY_GET(&q, 0, br_transform)->position.x += BR_QUERY_GET(&q, 1, Mover)->speed * dt;\n"
+        "}\n"
+        "static void add(br_world *w, void *user) { (void)user; br_component_register_desc(w, &k_mover); br_system_add(w, \"move\", BR_PHASE_FIXED_UPDATE, move, NULL, 0); }\n"
+        "BR_GAME_SETUP(mover) { br_game_on_world(add, NULL); }\n";
+    const char bad[] = "#include \"bronto/bronto.h\"\nBR_GAME_SETUP(mover) {\n    this is not C;\n}\n";
+    ed_native_describe(ed, host, sizeof(host), web, sizeof(web));
+    if (!ed_native_sdk(sdk, sizeof(sdk)) || strncmp(host, "none", 4) == 0) {
+        printf("note: no C compiler (or no engine sources beside the editor): the C code checks are skipped\n");
+        return 0;
+    }
+    ed_doc_mark_clean(d);
+    ed_cmd_new(ed);
+    if (ed->pending != ED_PENDING_NONE) ed_cmd_answer(ed, 1);
+    ed_assets_destroy(ed);
+    ed_assets_init(ed, "editor_project");
+    ed_project_reload(ed);
+    br_fs_mkdir("editor_project/src");
+    br_file_write_all("editor_project/src/mover.c", good, sizeof(good) - 1);
+    if (!ed_native_apply(ed, true) || (mc = br_component_find(&d->world, "Mover")) == BR_COMPONENT_INVALID) {
+        printf("FAIL: C code: compiling and loading it (%s)\n", ed->native.summary);
+        return failures + 1;
+    }
+    thing = ed_doc_create(d, "Thing", br_v2(10, 10));
+    if (!br_add(&d->world, thing, mc, NULL) || *(const float *)br_get(&d->world, thing, mc) != 50) { printf("FAIL: C code: its component's defaults\n"); ++failures; }
+    ed_cmd_play(ed);
+    frames(e, 30);
+    if (br_world_transform(&d->world, thing).position.x < 20) { printf("FAIL: C code: its system didn't run in Play\n"); ++failures; }
+    ed_cmd_play(ed);
+    frames(e, 2);
+    if (!ed_doc_save(d, "editor_project/c.scene")) { printf("FAIL: C code: saving a scene with its component (%s)\n", d->error); ++failures; }
+    /* a mistake: the console says where, the old code stays loaded */
+    ed_console_clear(&ed->console);
+    br_file_write_all("editor_project/src/mover.c", bad, sizeof(bad) - 1);
+    if (ed_native_apply(ed, true) || !ed->native.failed || !ed->native.loaded) { printf("FAIL: C code: a mistake compiled\n"); ++failures; }
+    {
+        const ed_native_diag *dg = ed->native.diag_count ? &ed->native.diag[0] : NULL;
+        char file[256], abs[1024];
+        int line = 0;
+        uint32_t k;
+        bool found = false;
+        if (!dg || strcmp(dg->file, "src/mover.c") != 0 || dg->line != 3 || !dg->error) { printf("FAIL: C code: the mistake's place (%s:%d)\n", dg ? dg->file : "-", dg ? dg->line : 0); ++failures; }
+        for (k = 0; k < 120 && !found; ++k) {
+            uint32_t i;
+            frames(e, 1);
+            for (i = 0; i < ed->console.count && !found; ++i)
+                found = ed_console_location(ed_console_line(&ed->console, i)->text, file, sizeof(file), &line) && strcmp(file, "src/mover.c") == 0 && line == 3;
+        }
+        if (ed->console_capturing && !found) { printf("FAIL: C code: the console doesn't have the mistake's place\n"); ++failures; }
+        if (!ed_code_open(ed, "src/mover.c", 0) || !ed_code_current(ed)->is_c) { printf("FAIL: C code: opening it in the code tab\n"); ++failures; }
+        ed_code_poll(ed);
+        if (ed_code_current(ed) && ed_code_current(ed)->error_line != 3) { printf("FAIL: C code: the code tab doesn't mark the mistake (%d)\n", ed_code_current(ed)->error_line); ++failures; }
+        frames(e, 2);
+        br_image_save_bmp(&e->framebuffer, "editor_c_code.bmp");
+        if (!br_fs_absolute("editor_project/src/mover.c", abs, sizeof(abs)) || !ed_native_diag_for(abs)) { printf("FAIL: C code: the mistake by file\n"); ++failures; }
+        ed_code_close_all(ed);
+    }
+    /* a scene opened while its components are unknown isn't saved over; with the code back, it's read again */
+    br_game_clear();
+    ed_doc_rebuild_world(d);                                        /* (as if the code had never compiled) */
+    if (!ed_doc_load(d, "editor_project/c.scene") || d->unknown != 1) { printf("FAIL: C code: an unknown component wasn't counted (%u)\n", d->unknown); ++failures; }
+    if (ed_doc_save(d, "editor_project/c.scene")) { printf("FAIL: C code: saving over a scene that lost its components\n"); ++failures; }
+    br_file_write_all("editor_project/src/mover.c", good, sizeof(good) - 1);
+    if (!ed_native_apply(ed, true) || d->unknown || d->count != 1 || !br_has(&d->world, d->order[0], br_component_find(&d->world, "Mover")))
+        { printf("FAIL: C code: the scene wasn't read again with its components\n"); ++failures; }
+    /* Build Settings, and New C File */
+    ed_build_settings_open(ed);
+    frames(e, 2);
+    br_image_save_bmp(&e->framebuffer, "editor_build_settings.bmp");
+    ed->build_visible = false;
+    if (!ed_assets_new_c_file(ed) || !br_fs_exists("editor_project/src/game.c")) { printf("FAIL: C code: New C File\n"); ++failures; }
+    ed_code_close_all(ed);
+    if (!ed_native_apply(ed, true) || br_component_find(&d->world, "GameSpin") == BR_COMPONENT_INVALID || ed->native.setups != 2)
+        { printf("FAIL: C code: the new file's template didn't compile (%s)\n", ed->native.summary); ++failures; }
+    /* a game with it */
+    if (!ed_build(ed, ed_host_target(), out, sizeof(out))) {
+        printf("FAIL: C code: building the game (%s)\n", ed->status); ++failures;
+    } else {
+        char run[1100], cmd[1200];
+        if (ed_host_target() == ED_TARGET_MACOS) snprintf(run, sizeof(run), "%s/Contents/MacOS/Test Game", out);
+        else snprintf(run, sizeof(run), "%s", out);
+        snprintf(cmd, sizeof(cmd), "\"%s\" editor_project/c.scene --headless --frames 10", run);
+        fflush(stdout);
+        if (system(cmd) != 0) { printf("FAIL: C code: the built game didn't run (%s)\n", cmd); ++failures; }
+    }
+    br_fs_remove("editor_project/src/mover.c");
+    br_fs_remove("editor_project/src/game.c");
+    br_fs_remove("editor_project/c.scene");
+    if (!ed_native_apply(ed, false) || ed->native.loaded || br_game_hook_count() != 0) { printf("FAIL: C code: taking the code away\n"); ++failures; }
+    ed_doc_mark_clean(d);
+    ed_cmd_new(ed);
+    return failures;
+}
+
 static void inject_key_mods(br_key key, uint32_t mods) {      /* (the up keeps the modifiers: they're read after) */
     br_event k = br_event_key(BR_EVENT_KEY_DOWN, key, mods, false);
     br_headless_inject(&k);
@@ -1671,10 +1809,11 @@ static int test_multi_select(br_engine *e) {
 
 /* ---- --build: the Build menu from the command line ------------------------------------ */
 
-static int run_build(br_engine *e, ed_target t) {
+static int run_build(br_engine *e, ed_target t, bool from_project) {
     editor *ed = &ED;
     char out[ED_PATH_MAX];
     frames(e, 1);                                          /* (the editor scene opens the project) */
+    if (from_project) { ed_project_reload(ed); t = ed_build_target(ed); }   /* --build project: Build Settings' platform */
     if (!ed_build(ed, t, out, sizeof(out))) {             /* (the problem is on stderr already; this sums it up) */
         const char *why = ed->status;
         char *console = strstr(ed->status, " - see the console");
@@ -1788,6 +1927,7 @@ static int run_headless(br_engine *e) {
     failures += test_own_components(e);
     failures += test_code_editor(e);
     failures += test_build(e);
+    failures += test_c_code(e);
     printf("editor (headless): %s - wrote editor*.bmp, editor_demo.scene, editor_project/\n",
            failures ? "FAILED" : "all checks passed");
     return failures ? 1 : 0;
@@ -1827,23 +1967,31 @@ static void usage(FILE *out) {
             "  project folder        open a project (its main.scene, if it has one)\n"
             "  file.scene            open a scene, in the project it belongs to\n"
             "  --build <target>      build the game with no window, like the Build menu:\n"
-            "                        host (this computer), linux, macos, windows or web.\n"
-            "                        The project is the current folder if none is given\n"
+            "                        host (this computer), linux, macos, windows or web,\n"
+            "                        or project (the platform in the project's Build Settings).\n"
+            "                        The project is the current folder if none is given.\n"
+            "                        A project with C code (src/) has it compiled into the game\n"
             "  --out <folder>        with --build: put the game here, not in builds/<target>/\n"
             "  --headless            run the editor's self-test, with no window\n"
             "  --write-icon <file>   save the app icon as a PNG, size 16 to 1024 (256)\n"
             "  -h, --help            show this and stop\n"
             "\n"
             "--build exits with 0 when the game was built, 1 when the build failed and\n"
-            "2 when the command was wrong. See docs/editor-cli.md.\n");
+            "2 when the command was wrong. See docs/editor-cli.md.\n"
+#if defined(_WIN32)
+            "On Windows, run editor.com (or just \"editor\") from a command line: it waits\n"
+            "for --build and shows what it prints.\n"
+#endif
+            );
 }
 
 int main(int argc, char **argv) {
     br_engine *e;
     br_engine_config cfg;
     int i, rc = 0;
-    bool build = false;
+    bool build = false, build_project = false;
     ed_target target = ED_TARGET_LINUX;
+    if (argc > 1) ed_attach_console();             /* (Windows: the editor is a windowed program) */
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) { usage(stdout); return 0; }
     }
@@ -1863,8 +2011,9 @@ int main(int argc, char **argv) {
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--headless") == 0) ED.headless = true;
         else if (strcmp(argv[i], "--build") == 0) {
-            if (i + 1 >= argc || !ed_target_from_name(argv[i + 1], &target)) {
-                fprintf(stderr, "usage: editor --build linux|macos|windows|web|host [project folder] [--out folder]\n"
+            if (i + 1 < argc && strcmp(argv[i + 1], "project") == 0) build_project = true;
+            else if (i + 1 >= argc || !ed_target_from_name(argv[i + 1], &target)) {
+                fprintf(stderr, "usage: editor --build linux|macos|windows|web|host|project [project folder] [--out folder]\n"
                                 "(editor --help lists every option)\n");
                 br_free(e);
                 return 2;
@@ -1904,7 +2053,7 @@ int main(int argc, char **argv) {
     if (!build) ED.console_capturing = br_capture_start(true);   /* the Console tab; the terminal still gets it all */
     if (!br_engine_init(e, &cfg)) { br_capture_stop(); br_free(e); return 1; }
 
-    if (build) rc = run_build(e, target);
+    if (build) rc = run_build(e, target, build_project);
     else if (ED.headless) rc = run_headless(e);
     else br_engine_loop(e, NULL);       /* the editor scene does the rest */
 

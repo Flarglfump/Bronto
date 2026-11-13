@@ -9,13 +9,16 @@ Installs the Bronto editor on Windows, and sets BRONTO_EDITOR for scripts.
 
 Where it goes, as Windows programs installed without an installer usually do:
 
-  %LOCALAPPDATA%\Programs\Bronto Editor\   the editor, bronto_player, bscheck, players\ and web\
-                                           (kept together: the editor finds the players beside it)
+  %LOCALAPPDATA%\Programs\Bronto Editor\   the editor (editor.exe, and editor.com for command lines),
+                                           bronto_player, bscheck, players\, web\, and sdk\: the
+                                           engine's headers and sources, for games' C code
+                                           (kept together: the editor finds them beside it)
                                            (-AllUsers: %ProgramFiles%\Bronto Editor\)
   Start menu > Bronto Editor               a shortcut, with the editor's icon
   Settings > Apps > Installed apps         an entry, so it can be uninstalled from there too
-  BRONTO_EDITOR                            the editor's path, a user environment variable
-                                           (-AllUsers: a system one)
+  BRONTO_EDITOR                            editor.com's path, a user environment variable
+                                           (-AllUsers: a system one): it waits for jobs like
+                                           --build and shows their output
 
 In PowerShell: & $env:BRONTO_EDITOR --build windows my_game
 In cmd:        "%BRONTO_EDITOR%" --build windows my_game
@@ -54,7 +57,8 @@ if ($AllUsers) {
 }
 $Shortcut = Join-Path $StartMenu "$AppName.lnk"
 $UninstallKey = Join-Path $UninstallRoot $UninstallKeyName
-$Exe = Join-Path $InstallDir 'editor.exe'
+$Exe = Join-Path $InstallDir 'editor.exe'               # the windowed editor (the shortcut)
+$Cli = Join-Path $InstallDir 'editor.com'               # ... and the one for command lines (BRONTO_EDITOR)
 
 # ---- uninstall ------------------------------------------------------------------------
 
@@ -63,7 +67,7 @@ if ($Uninstall) {
     Set-Location $env:TEMP
     if (Test-Path $Shortcut) { Remove-Item $Shortcut -Force }
     if (Test-Path $UninstallKey) { Remove-Item $UninstallKey -Recurse -Force }
-    if ([Environment]::GetEnvironmentVariable('BRONTO_EDITOR', $Scope) -eq $Exe) {
+    if (@($Exe, $Cli) -contains [Environment]::GetEnvironmentVariable('BRONTO_EDITOR', $Scope)) {
         [Environment]::SetEnvironmentVariable('BRONTO_EDITOR', $null, $Scope)
     }
     if (Test-Path $InstallDir) {
@@ -78,7 +82,7 @@ if ($Uninstall) {
 
 # ---- build, if anything changed since the tools were built ---------------------------------
 
-$Tools = 'editor.exe', 'bronto_player.exe', 'bscheck.exe'
+$Tools = 'editor.exe', 'editor.com', 'bronto_player.exe', 'bscheck.exe'
 
 function Test-ToolsOutOfDate {
     $built = foreach ($t in $Tools) {
@@ -87,7 +91,7 @@ function Test-ToolsOutOfDate {
         (Get-Item $p).LastWriteTimeUtc
     }
     $oldest = ($built | Measure-Object -Minimum).Minimum
-    $dirs = 'src', 'include', 'tools\editor', 'tools\player', 'tools\bscheck', 'tools\web' | ForEach-Object { Join-Path $Root $_ }
+    $dirs = 'src', 'include', 'tools\editor', 'tools\player', 'tools\bscheck', 'tools\web', 'tools\launcher' | ForEach-Object { Join-Path $Root $_ }
     $newer = Get-ChildItem $dirs -Recurse -File -Include *.c, *.h, *.s -ErrorAction SilentlyContinue |
              Where-Object { $_.LastWriteTimeUtc -gt $oldest } | Select-Object -First 1
     return [bool]$newer
@@ -136,6 +140,24 @@ foreach ($webDir in (Join-Path $BuildDir 'web'), (Join-Path $BuildDir 'players\w
     }
 }
 if (-not $webFound) { Write-Host "note: no web player in build\ (build.bat web), so the editor's Build > Web won't be available" }
+# The engine's functions in the editor, for the games' C code it compiles and loads: an import
+# library (MSVC's editor.lib, MinGW's libeditor.a).
+$importLib = $false
+foreach ($lib in 'editor.lib', 'libeditor.a') {
+    $p = Join-Path $BuildDir $lib
+    if (Test-Path $p) { $files[$lib] = $p; $importLib = $true }
+}
+if (-not $importLib) { Write-Host "note: no editor.lib in build\, so the editor can't load games' C code (only build it into games)" }
+# The engine's headers and sources (sdk\), which the editor compiles with games' C code.
+foreach ($part in 'include', 'src') {
+    $from = Join-Path $Root $part
+    Get-ChildItem $from -Recurse -File | ForEach-Object {
+        $files["sdk\$part\" + $_.FullName.Substring($from.Length + 1)] = $_.FullName
+    }
+}
+$files['sdk\tools\player\main.c'] = Join-Path $Root 'tools\player\main.c'
+$files['sdk\tools\web\bronto.js'] = Join-Path $Root 'tools\web\bronto.js'
+$files['sdk\tools\web\shell.html'] = Join-Path $Root 'tools\web\shell.html'
 $files['install_editor_windows.ps1'] = $PSCommandPath      # (Settings > Apps runs it to uninstall)
 
 $manifest = ($files.Keys | Sort-Object | ForEach-Object {
@@ -165,7 +187,7 @@ if ($upToDate) {
     # PNG as it is: a 6-byte header and one 16-byte entry in front of it.
     $icon = Join-Path $InstallDir 'editor.ico'
     $png = Join-Path $env:TEMP "bronto-editor-icon-$PID.png"
-    & $Exe --write-icon $png 256 | Out-Null
+    & $Cli --write-icon $png 256 | Out-Null                 # (editor.com: it waits for it)
     if ($LASTEXITCODE -eq 0 -and (Test-Path $png)) {
         $bytes = [IO.File]::ReadAllBytes($png)
         $stream = [IO.File]::Create($icon)
@@ -215,11 +237,11 @@ if ($upToDate) {
 # ---- BRONTO_EDITOR ---------------------------------------------------------------------------
 # (SetEnvironmentVariable tells Windows, so programs started from now on see it.)
 
-if ([Environment]::GetEnvironmentVariable('BRONTO_EDITOR', $Scope) -ne $Exe) {
-    [Environment]::SetEnvironmentVariable('BRONTO_EDITOR', $Exe, $Scope)
-    Write-Host "Set BRONTO_EDITOR ($($Scope.ToLower()) environment variable) to $Exe"
+if ([Environment]::GetEnvironmentVariable('BRONTO_EDITOR', $Scope) -ne $Cli) {
+    [Environment]::SetEnvironmentVariable('BRONTO_EDITOR', $Cli, $Scope)
+    Write-Host "Set BRONTO_EDITOR ($($Scope.ToLower()) environment variable) to $Cli"
 }
-if ($env:BRONTO_EDITOR -ne $Exe) {
-    $env:BRONTO_EDITOR = $Exe          # (this PowerShell has it too, if the script was run from it directly)
+if ($env:BRONTO_EDITOR -ne $Cli) {
+    $env:BRONTO_EDITOR = $Cli          # (this PowerShell has it too, if the script was run from it directly)
     Write-Host 'Terminals that were already open when it was set need reopening to see BRONTO_EDITOR.'
 }

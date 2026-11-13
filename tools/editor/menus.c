@@ -415,6 +415,10 @@ static void asset_menu(editor *ed) {
             ed_assets_drop(ed, rel, br_world_transform(&ed->doc.world, ed->doc.selected).position);
         break;
     }
+    case ED_ASSET_CODE:
+        if (item(ed, "Edit", NULL, true)) ed_assets_edit(ed, rel);
+        if (item(ed, "Compile C Code", "F7", true)) ed_cmd_compile(ed);
+        break;
     default:
         break;
     }
@@ -434,6 +438,7 @@ static void folder_menu(editor *ed) {
     if (!br_ui_menu_begin(&ed->ui, "folder")) return;
     if (item(ed, "New Folder", NULL, true)) ed_assets_new_folder(ed);
     if (item(ed, "New Script", NULL, true)) ed_assets_new_script(ed);
+    if (item(ed, "New C File", NULL, true)) ed_assets_new_c_file(ed);
     if (item(ed, "Save Selected as Prefab", NULL, edit && br_entity_alive(&ed->doc.world, ed->doc.selected))) ed_assets_save_prefab(ed);
     sep(ed);
     if (item(ed, "Up", NULL, ed->assets.dir[0] != 0)) {
@@ -519,10 +524,11 @@ static void console_menu(editor *ed) {
 static void build_menu(editor *ed) {
     ed_target host = ed_host_target(), t;
     char label[64], path[ED_PATH_MAX];
+    ed_target chosen = ed_build_target(ed);
     if (!br_ui_menu_begin(&ed->ui, "build")) return;
-    snprintf(label, sizeof(label), "Build for %s", ed_target_name(host));
-    if (item(ed, label, "Ctrl+B", true)) ed_cmd_build(ed, host, false);
-    if (item(ed, "Build and Run", "Ctrl+Shift+B", true)) ed_cmd_build(ed, host, true);
+    snprintf(label, sizeof(label), "Build for %s", ed_target_name(chosen));
+    if (item(ed, label, "Ctrl+B", true)) ed_cmd_build(ed, chosen, false);
+    if (item(ed, chosen == ED_TARGET_WEB ? "Build and Open" : "Build and Run", "Ctrl+Shift+B", true)) ed_cmd_build(ed, chosen, true);
     if (item(ed, "Build and Open in Browser", NULL, ed_find_player(ed, ED_TARGET_WEB, path, sizeof(path)))) ed_cmd_build(ed, ED_TARGET_WEB, true);
     if (br_ui_menu_sub_begin(&ed->ui, "Build for", true)) {
         for (t = ED_TARGET_LINUX; t < ED_TARGET_COUNT; t = (ed_target)(t + 1)) {
@@ -534,7 +540,9 @@ static void build_menu(editor *ed) {
         }
         br_ui_menu_sub_end(&ed->ui);
     }
+    if (item(ed, "Build Settings...", NULL, true)) ed_build_settings_open(ed);
     sep(ed);
+    if (item(ed, "Compile C Code", "F7", true)) ed_cmd_compile(ed);
     if (item(ed, "Check Scripts", NULL, true)) {
         int scripts = 0, errors;
         ed_project_reload(ed);

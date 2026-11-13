@@ -158,21 +158,26 @@ void ed_console_flush(ed_console *c, double now, double max_wait) {
 }
 
 bool ed_console_location(const char *text, char *file, size_t size, int *line) {
-    const char *p = text;
-    while ((p = strstr(p, ".bs:")) != NULL) {
-        const char *start = p, *digits = p + 4;
-        if (isdigit((unsigned char)*digits)) {
-            size_t len;
-            while (start > text && !strchr(" \t'\"(<[", start[-1])) --start;
-            len = (size_t)(p + 3 - start);
-            if (len > 3 && len < size) {
-                memcpy(file, start, len);
-                file[len] = 0;
-                *line = atoi(digits);
-                return true;
+    static const char *const exts[] = { ".bs:", ".c:", ".h:" };   /* scripts, and the game's C code */
+    size_t e;
+    for (e = 0; e < BR_ARRAY_COUNT(exts); ++e) {
+        const char *p = text;
+        size_t k = strlen(exts[e]);
+        while ((p = strstr(p, exts[e])) != NULL) {
+            const char *start = p, *digits = p + k;
+            if (isdigit((unsigned char)*digits) && (p == text || !strchr(" \t'\"(<[", p[-1]))) {
+                size_t len;
+                while (start > text && !strchr(" \t'\"(<[", start[-1])) --start;
+                len = (size_t)(p + k - 1 - start);
+                if (len > k - 1 && len < size) {
+                    memcpy(file, start, len);
+                    file[len] = 0;
+                    *line = atoi(digits);
+                    return true;
+                }
             }
+            p += k;
         }
-        p += 4;
     }
     return false;
 }

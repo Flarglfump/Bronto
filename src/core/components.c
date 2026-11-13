@@ -8,6 +8,7 @@
 #include "bronto/physics.h"
 #include "bronto/hierarchy.h"
 #include "bronto/script.h"
+#include "bronto/game.h"
 #include "bronto/components3d.h"
 #include "bronto/physics3d.h"
 #include "bronto/particles.h"
@@ -1058,6 +1059,28 @@ static void sys_draw(br_world *w, float dt, void *user) {
     else br_builtin_draw(w, &e->renderer);
 }
 
+/* ---- the game's own C code (game.h) ---- */
+
+#define GAME_HOOKS_MAX 64
+static struct { br_world_hook fn; void *user; } g_game_hooks[GAME_HOOKS_MAX];
+static int g_game_hook_count;
+
+bool br_game_on_world(br_world_hook fn, void *user) {
+    if (!fn || g_game_hook_count == GAME_HOOKS_MAX) return false;
+    g_game_hooks[g_game_hook_count].fn = fn;
+    g_game_hooks[g_game_hook_count].user = user;
+    ++g_game_hook_count;
+    return true;
+}
+
+void br_game_clear(void) { g_game_hook_count = 0; }
+int br_game_hook_count(void) { return g_game_hook_count; }
+
+void br_game_run_world_hooks(br_world *w) {
+    int i;
+    for (i = 0; i < g_game_hook_count; ++i) g_game_hooks[i].fn(w, g_game_hooks[i].user);
+}
+
 void br_builtin_register(br_world *w, br_builtin_ids *ids) {
     int i;
     for (i = 0; i < (int)BR_ARRAY_COUNT(k_descs); ++i) br_component_register_desc(w, &k_descs[i]);
@@ -1075,6 +1098,7 @@ void br_builtin_register(br_world *w, br_builtin_ids *ids) {
     br_particles_register(w);
     br_script_register(w);
     br_script_register_components(w);              /* the game's own (declared in its scripts) */
+    br_game_run_world_hooks(w);                    /* ... and from its C code (game.h) */
     br_system_add(w, "builtin_draw", BR_PHASE_RENDER, sys_draw, NULL, 0);
     if (ids) br_builtin_ids_of(w, ids);
 }

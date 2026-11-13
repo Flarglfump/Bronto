@@ -1,0 +1,14 @@
+bronto_project 1
+# Asset paths in this project's scenes are relative to this folder.
+# Orbits: a project with C code (src/orbits.c) - see README.md and docs/c-code.md.
+name = Orbits
+main_scene = main.scene
+width = 320
+height = 180
+window_scale = 3
+strict_typing = false
+icon = 
+# Build settings (Build > Build Settings):
+build_target = host
+build_dir = builds
+exclude = 

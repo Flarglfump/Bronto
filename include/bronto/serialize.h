@@ -70,4 +70,9 @@ int  br_world_load_file(br_world *w, const char *path, br_entity *out, uint32_t 
 void br_field_format(const br_field *f, const void *component, char *out, size_t size);
 bool br_field_parse(const br_field *f, void *component, const char *text);
 
+/* How many components scene files have named, since the program started, that
+ * the world didn't have (they're skipped, with a warning): a scene using a
+ * game's C components before its code is loaded, say. */
+uint32_t br_scene_skipped_components(void);
+
 #endif /* BRONTO_SERIALIZE_H */

@@ -24,6 +24,10 @@
 
 typedef struct strbuf { char *data; size_t len, cap; bool failed; } strbuf;
 
+/* Components scenes named that no one had registered (br_scene_skipped_components). */
+static uint32_t g_skipped_components;
+uint32_t br_scene_skipped_components(void) { return g_skipped_components; }
+
 static void sb_append(strbuf *b, const char *s, size_t n) {
     if (b->failed) return;
     if (b->len + n + 1 > b->cap) {
@@ -1005,6 +1009,7 @@ static bool read_all(scene_reader *r, const char *p) {
         desc = br_component_get_desc(r->w, comp);
         if (comp == BR_COMPONENT_INVALID || !desc) {
             BR_WARN("scene line %d: unknown component '%s' (skipped)", r->line, line);
+            ++g_skipped_components;
             comp = BR_COMPONENT_INVALID;
             skipping = true;
             continue;

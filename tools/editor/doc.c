@@ -140,6 +140,7 @@ bool ed_doc_rebuild_world(ed_doc *d) {
 
 void ed_doc_new(ed_doc *d) {
     forget_history(d);
+    d->unknown = 0;
     br_world_clear(&d->world);
     d->count = 0;
     d->selected = BR_ENTITY_NULL;
@@ -184,7 +185,11 @@ bool ed_doc_load(ed_doc *d, const char *path) {
     forget_history(d);
     br_assets_clear();                             /* reload what the new scene uses */
     set_asset_root(d, path);
-    restore(d, text, 0);
+    {
+        uint32_t skipped = br_scene_skipped_components();
+        restore(d, text, 0);
+        d->unknown = br_scene_skipped_components() - skipped;
+    }
     br_free(text);
     snprintf(d->path, sizeof(d->path), "%s", path);
     set_text(&d->state, snapshot(d));
@@ -196,6 +201,11 @@ bool ed_doc_save(ed_doc *d, const char *path) {
     char *text;
     size_t len;
     if (d->playing) { snprintf(d->error, sizeof(d->error), "stop playing before saving"); return false; }
+    if (d->unknown && strcmp(path, d->path) == 0) {
+        snprintf(d->error, sizeof(d->error), "it has %u component%s the editor doesn't know (the game's C code didn't compile?): "
+                 "saving would lose them. Fix the code, then open the scene again", d->unknown, d->unknown == 1 ? "" : "s");
+        return false;
+    }
     ed_doc_checkpoint(d);
     text = br_world_to_text(&d->world, d->order, d->count, &len);
     if (!text || !br_file_write_all(path, text, len)) {

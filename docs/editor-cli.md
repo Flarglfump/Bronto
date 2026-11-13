@@ -11,6 +11,7 @@ editor examples/platformer               # open a project folder
 editor levels/one.scene                  # open one scene (and the project it belongs to)
 editor --build host examples/platformer  # build the game for this computer, no window
 editor --build web my_game --out site    # build a web page into site/
+editor --build project my_game           # build for the platform in its Build Settings
 editor --headless                        # the editor's self-test
 editor --write-icon icon.png 256         # save the app icon as a PNG
 editor --help                            # list the options (or -h)
@@ -52,9 +53,9 @@ project into a game.
 
 | Argument | Meaning |
 |---|---|
-| `<target>` | `host` (or `native`) for this computer; `linux`, `macos` (or `mac`, `osx`), `windows` or `web` |
+| `<target>` | `host` (or `native`) for this computer; `linux`, `macos` (or `mac`, `osx`), `windows` or `web`; `project`: the platform chosen in the project's Build Settings (`build_target` in `project.bronto`) |
 | `project folder` | the project to build. Left out, the folder the command runs in |
-| `--out folder` | where the game goes (made if it isn't there). Left out, `builds/<target>/` in the project (the builds folder from Project Settings) |
+| `--out folder` | where the game goes (made if it isn't there). Left out, `builds/<target>/` in the project (the builds folder from Build Settings) |
 
 The arguments can come in any order. What it writes:
 
@@ -64,6 +65,15 @@ The arguments can come in any order. What it writes:
 | Windows | one `.exe`, named after the project |
 | macOS | a `.app` (the program in `Contents/MacOS`, the pack in `Contents/Resources/game.brpak`) |
 | Web | `index.html`: one page holding the web player, the project and the page ([web.md](web.md)) |
+
+A project with C code ([c-code.md](c-code.md)) has it compiled into the game: for this
+computer with its C compiler, for the web with clang's WebAssembly target. The compiler's
+messages go to stderr, and the build fails (status 1) if the code doesn't compile. A game
+with C code for another system is built on that system.
+
+On Windows the editor is a windowed program, which a command line doesn't wait for:
+run `editor.com` (beside it; typing `editor` finds it first), which runs it and waits, with
+its output, for `--build`, `--headless`, `--help` and `--write-icon`.
 
 ### The players it needs
 

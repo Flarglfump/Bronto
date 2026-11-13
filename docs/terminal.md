@@ -14,7 +14,7 @@ There are two styles:
 
 ## Choosing it
 
-**For a project:** in the editor, open **Build > Project Settings** and set **Renderer**.
+**For a project:** in the editor, open **Build > Build Settings** and set **Renderer**.
 This writes `renderer` to `project.bronto`:
 
 ```

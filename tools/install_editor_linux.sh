@@ -10,8 +10,9 @@
 # Where it goes (PREFIX): /usr/local when run as root (sudo make install) or when
 # /usr/local can be written to, otherwise ~/.local, the per-user prefix. Under PREFIX:
 #
-#   lib/bronto/                          the editor, bronto_player, bscheck, players/, web/
-#                                        (kept together: the editor finds the players beside it)
+#   lib/bronto/                          the editor, bronto_player, bscheck, players/, web/, and
+#                                        sdk/ (the engine's headers and sources, for games' C code)
+#                                        (kept together: the editor finds them beside it)
 #   bin/bronto-editor, bin/bscheck, bin/bronto_player   links to them
 #   share/applications/bronto-editor.desktop          the app menu entry
 #   share/icons/hicolor/<size>/apps/bronto-editor.png  its icon
@@ -96,6 +97,16 @@ refresh_caches() {                                  # the menu and icon caches u
 
 ICON_SIZES="48 128 256 512"
 
+# The engine's headers and sources (the "SDK"), for the games' C code: the editor compiles
+# them with a project's code (docs/c-code.md). Into folder $1.
+copy_sdk() {
+    mkdir -p "$1/tools/player" "$1/tools/web"
+    cp -R "$ROOT/include" "$ROOT/src" "$1/"
+    cp "$ROOT/tools/player/main.c" "$1/tools/player/"
+    cp "$ROOT/tools/web/bronto.js" "$ROOT/tools/web/shell.html" "$1/tools/web/"
+}
+
+
 # ---- uninstall ---------------------------------------------------------------------------
 
 uninstall_from() {
@@ -155,6 +166,7 @@ for webdir in "$BUILD/web" "$BUILD/players/web"; do  # the web player (make web)
     fi
 done
 [ -d "$STAGE/lib/web" ] || echo "note: no web player in build/ (make web), so the editor's Build > Web won't be available"
+copy_sdk "$STAGE/lib/sdk"
 (cd "$STAGE/lib" && find . -type f ! -name manifest | LC_ALL=C sort | xargs cksum) > "$STAGE/lib/manifest"
 
 if [ -f "$LIB/manifest" ] && cmp -s "$STAGE/lib/manifest" "$LIB/manifest" &&

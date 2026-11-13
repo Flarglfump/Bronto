@@ -16,7 +16,8 @@
  *   debugger.c   the script debugger around it: breakpoints, stepping, variables
  *   console.c    the console's lines: captured stdout / stderr, the log, print()
  *   menus.c      the right-click menus, and copy / paste of entities
- *   build.c      the Build menu (games: the player with the project packed in), Project Settings
+ *   build.c      the Build menu (games: the player with the project packed in), Build and Project Settings
+ *   native.c     the game's C code: compilers, compiling it into the editor and into games
  *   main.c       engine setup, window layout, shortcuts
  *
  * The scene is an ordinary ECS world with the engine's built-in
@@ -61,6 +62,8 @@ typedef struct ed_doc {
     char root[ED_PATH_MAX];      /* the project folder asset paths are relative to */
     bool has_root;               /* false: each scene's own (br_assets_find_root) */
     char error[200];             /* why the last load/save failed */
+    uint32_t unknown;            /* components the scene file has that weren't known when it was loaded (C code not
+                                    compiled?): saving would lose them, so it's refused until it's loaded again */
 
     char *state;                 /* the scene as text at the last checkpoint */
     char *saved;                 /* ... when it was last saved or loaded */
@@ -94,6 +97,7 @@ br_entity ed_doc_instance_root(const ed_doc *d, br_entity e);
 bool ed_doc_refresh_prefabs(ed_doc *d);
 bool ed_doc_rebuild_world(ed_doc *d);
 struct editor;
+bool ed_native_apply(struct editor *ed, bool force);         /* main.c: the game's C code compiled and loaded again if it changed */
 void ed_components_reload(struct editor *ed, bool force);   /* main.c: read the game's components again (when scripts changed, or force) */       /* after the game's components (script.h) change */
 bool ed_doc_apply_prefab(ed_doc *d, br_entity root);
 br_entity ed_doc_create3d(ed_doc *d, const char *name, br_vec3 pos);  /* Name + Transform3D, a root */
@@ -267,7 +271,9 @@ typedef struct ed_view {
 
 /* What the asset browser makes of a file. */
 typedef enum ed_asset_kind {
-    ED_ASSET_FOLDER = 0, ED_ASSET_IMAGE, ED_ASSET_SOUND, ED_ASSET_SCENE, ED_ASSET_SCRIPT, ED_ASSET_MODEL, ED_ASSET_OTHER
+    ED_ASSET_FOLDER = 0, ED_ASSET_IMAGE, ED_ASSET_SOUND, ED_ASSET_SCENE, ED_ASSET_SCRIPT, ED_ASSET_MODEL,
+    ED_ASSET_CODE,                       /* the game's C code: .c and .h */
+    ED_ASSET_OTHER
 } ed_asset_kind;
 
 #define ED_ENTITY_DRAG "entity"          /* a hierarchy row; the payload is the entity handle */
@@ -310,6 +316,7 @@ typedef struct ed_code_file {
     int undo_count, redo_count;
     int group, group_end;              /* typing carries on one undo step... */
     double group_time;                 /* ... while it's quick and in one place */
+    bool is_c;                         /* a C file (.c, .h): C colours; its mistakes come from the last compile */
     char error[256];                   /* the first mistake br_script_check found ("" : none) */
     int error_line;
     double check_at;                   /* when to check again (0: done) */
@@ -381,6 +388,27 @@ typedef struct ed_picker {
     br_dir_list list;
 } ed_picker;
 
+/* The game's C code (native.c). */
+#define ED_NATIVE_DIAG 64
+typedef struct ed_native_diag {
+    char file[ED_PATH_MAX];            /* as the compiler named it (relative to the project, '/' between parts) */
+    int line;
+    bool error;                        /* else a warning */
+    char text[200];
+} ed_native_diag;
+typedef struct ed_native {
+    bool has_code;                     /* the code folder has .c files (at the last look) */
+    bool loaded;                       /* some compile of it is loaded: its components and systems are in the scenes */
+    bool failed;                       /* the last compile failed */
+    int64_t stamp;                     /* the sources (names, sizes, times) at the last compile */
+    int generation;                    /* how many times it has been loaded */
+    void *lib;                         /* the library loaded last */
+    int setups;                        /* BR_GAME_SETUP functions in it */
+    char summary[200];                 /* for Build Settings and the status bar */
+    ed_native_diag diag[ED_NATIVE_DIAG];   /* the last compile's errors and warnings */
+    int diag_count;
+} ed_native;
+
 typedef struct editor {
     br_engine *engine;
     br_ui ui;
@@ -437,6 +465,10 @@ typedef struct editor {
     br_project project;                /* project.bronto in the project folder */
     br_project project_edit;           /* the Project Settings dialog's copy */
     bool project_visible;
+    br_project build_edit;             /* the Build Settings dialog's copy */
+    bool build_visible;
+    char build_compilers[2][200];      /* what Build Settings found: this computer's C compiler, the web's */
+    ed_native native;                  /* the game's C code */
 } editor;
 
 /* commands.c */
@@ -532,6 +564,7 @@ bool ed_assets_drop(editor *ed, const char *rel, br_vec2 world);
 bool ed_assets_drop3d(editor *ed, const char *rel, br_vec3 at, br_entity onto);
 bool ed_field_accepts(const br_component_desc *c, const br_field *f, const char *rel);   /* can a drop fill this string field? */
 bool ed_assets_new_script(editor *ed);                    /* a template .bs in the shown folder */
+bool ed_assets_new_c_file(editor *ed);                    /* a template .c in the project's code folder */
 bool ed_assets_edit(editor *ed, const char *rel);        /* open in the OS's editor */
 void ed_assets_panel(editor *ed, br_rect rect);
 void ed_assets_preview(editor *ed, br_rect rect);
@@ -553,6 +586,26 @@ void ed_open_builds_folder(editor *ed);
 void ed_open_save_folder(editor *ed);      /* where the game keeps saved data (save.h) */
 void ed_project_settings_open(editor *ed);
 void ed_project_dialog(editor *ed, br_rect screen);
+ed_target ed_build_target(editor *ed);      /* what Build makes (Build Settings' platform) */
+void ed_build_settings_open(editor *ed);
+void ed_build_dialog(editor *ed, br_rect screen);
+void ed_cmd_compile(editor *ed);            /* Build > Compile C Code */
+
+/* native.c: the game's C code */
+bool ed_native_sdk(char *out, size_t size);         /* the engine's headers and sources, beside the editor */
+bool ed_native_has_code(editor *ed);                /* the code folder has .c files */
+/* Compiles the code into the editor and loads it, if it changed since the last
+ * time (or `force`). True when new code was loaded (or the code went away). */
+bool ed_native_refresh(editor *ed, bool force);
+/* A player for target `t` with the game's code compiled in: this computer's, or the web's. */
+bool ed_native_player(editor *ed, ed_target t, char *out, size_t size);
+const ed_native_diag *ed_native_diag_for(const char *path);   /* the last compile's first error in a file (a full path) */
+void ed_native_describe(editor *ed, char *host, size_t host_size, char *web, size_t web_size);
+/* Runs a command line (through sh or cmd.exe) in `cwd`; its output, stdout and
+ * stderr together (br_free it), and its exit status. False if it couldn't run. */
+bool ed_run_command(const char *command, const char *cwd, char **output, int *status);
+bool ed_pe_set_subsystem(const char *exe, bool windowed);   /* a Windows program: windowed or console */
+void ed_attach_console(void);               /* Windows: --build and the like print to the console they were started from */
 
 /* menus.c */
 void ed_menus(editor *ed);                  /* every frame, after the panels: the open menu's items */

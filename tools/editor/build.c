@@ -23,6 +23,14 @@
  * Before packing, every script in the project is checked (strictly, if the
  * project asks for strict typing); mistakes go to the console, where a
  * double-click opens them.
+ *
+ * A project with C code (game.h) has no ready-made player: native.c compiles
+ * one with the code in, for this computer or the web (a game with C code for
+ * another system is built on that system).
+ *
+ * Build Settings (saved in project.bronto) choose what Build makes and how:
+ * the platform, the renderer, the version, the Mac app's identifier, whether a
+ * Windows game has a console window, and the C compiler and its options.
  */
 #include "editor.h"
 #include "../web/webpage.h"
@@ -195,26 +203,32 @@ static bool pack_filter(const char *rel, bool is_dir, void *user) {
     return true;
 }
 
-static bool write_plist(const char *path, const char *name, const char *file_name) {
-    char text[2048], id[96];
+static bool write_plist(const char *path, const br_project *p, const char *file_name) {
+    char text[2048], id[160];
+    const char *name = p->name;
     size_t i, o = 0;
-    for (i = 0; file_name[i] && o + 1 < sizeof(id); ++i)
-        if (isalnum((unsigned char)file_name[i])) id[o++] = (char)tolower((unsigned char)file_name[i]);
-    id[o] = 0;
+    if (p->bundle_id[0]) snprintf(id, sizeof(id), "%s", p->bundle_id);
+    else {
+        o = (size_t)snprintf(id, sizeof(id), "com.bronto.");
+        for (i = 0; file_name[i] && o + 1 < sizeof(id); ++i)
+            if (isalnum((unsigned char)file_name[i])) id[o++] = (char)tolower((unsigned char)file_name[i]);
+        if (o == strlen("com.bronto.")) o += (size_t)snprintf(id + o, sizeof(id) - o, "game");
+        id[o] = 0;
+    }
     snprintf(text, sizeof(text),
              "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
              "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
              "<plist version=\"1.0\">\n<dict>\n"
              "  <key>CFBundleExecutable</key><string>%s</string>\n"
-             "  <key>CFBundleIdentifier</key><string>com.bronto.%s</string>\n"
+             "  <key>CFBundleIdentifier</key><string>%s</string>\n"
              "  <key>CFBundleName</key><string>%s</string>\n"
              "  <key>CFBundleDisplayName</key><string>%s</string>\n"
              "  <key>CFBundlePackageType</key><string>APPL</string>\n"
-             "  <key>CFBundleShortVersionString</key><string>1.0</string>\n"
-             "  <key>CFBundleVersion</key><string>1</string>\n"
+             "  <key>CFBundleShortVersionString</key><string>%s</string>\n"
+             "  <key>CFBundleVersion</key><string>%s</string>\n"
              "  <key>NSHighResolutionCapable</key><true/>\n"
              "</dict>\n</plist>\n",
-             file_name, id[0] ? id : "game", name, name);
+             file_name, id, name, name, p->version[0] ? p->version : "1.0", p->version[0] ? p->version : "1.0");
     return br_file_write_all(path, text, strlen(text));
 }
 
@@ -289,7 +303,15 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
         ed_panel_set_open(ed, ED_PANEL_BOTTOM, true);
         return false;
     }
-    if (!ed_find_player(ed, t, player, sizeof(player))) {
+    if (ed_native_has_code(ed)) {                           /* C code: a player of its own, compiled now */
+        ed->native.diag_count = 0;
+        if (!ed_native_player(ed, t, player, sizeof(player))) {
+            ed_status(ed, "Build failed: the C code didn't compile into the game - see the console");
+            ed->bottom_tab = ED_TAB_CONSOLE;
+            ed_panel_set_open(ed, ED_PANEL_BOTTOM, true);
+            return false;
+        }
+    } else if (!ed_find_player(ed, t, player, sizeof(player))) {
         if (t == ED_TARGET_WEB) ed_status(ed, "Build: no web player beside the editor - build it with \"make web\" (needs LLVM's clang)");
         else if (t == ed_host_target()) ed_status(ed, "Build: bronto_player isn't beside the editor - build it with \"make tools\"");
         else ed_status(ed, "Build: no %s player - build bronto_player on %s and copy it to players/ beside the editor", ed_target_name(t), ed_target_name(t));
@@ -319,7 +341,7 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
         snprintf(plist, sizeof(plist), "%s/Contents/Info.plist", app);
         br_path_join(exe, sizeof(exe), macos, name);
         br_path_join(pak, sizeof(pak), res, "game.brpak");
-        if (!make_dirs(macos) || !make_dirs(res) || !write_plist(plist, ed->project.name, name)) {
+        if (!make_dirs(macos) || !make_dirs(res) || !write_plist(plist, &ed->project, name)) {
             ed_status(ed, "Build: can't write %s", app);
             return false;
         }
@@ -332,6 +354,10 @@ bool ed_build(editor *ed, ed_target t, char *out, size_t size) {
         if (!make_dirs(dir)) { ed_status(ed, "Build: can't make the folder %s", dir); return false; }
         br_path_join(exe, sizeof(exe), dir, file);
         if (!br_fs_copy_file(player, exe)) { ed_status(ed, "Build: can't write %s", exe); return false; }
+        if (t == ED_TARGET_WINDOWS) {                       /* a window only, or a console window as well */
+            bool console = ed->project.windows_console || ed->project.renderer != BR_RENDERER_WINDOW;
+            if (!ed_pe_set_subsystem(exe, !console)) printf("Build: couldn't mark %s as a %s program\n", file, console ? "console" : "windowed");
+        }
         if (!br_pack_create(root, exe, true, pack_filter, &pc, &st, err, sizeof(err))) { ed_status(ed, "Build: %s", err); return false; }
         br_fs_make_executable(exe);
         snprintf(out, size, "%s", exe);
@@ -405,8 +431,7 @@ void ed_project_settings_open(editor *ed) {
 void ed_project_dialog(editor *ed, br_rect screen) {
     br_ui *ui = &ed->ui;
     br_project *p = &ed->project_edit;
-    static const char *const renderers[BR_RENDERER_COUNT] = { "Window", "Terminal: colour blocks", "Terminal: text" };
-    br_rect box = br_rect_make(floorf(screen.x + (screen.w - 520) / 2), floorf(screen.y + (screen.h - 372) / 2), 520, 372);
+    br_rect box = br_rect_make(floorf(screen.x + (screen.w - 520) / 2), floorf(screen.y + (screen.h - 330) / 2), 520, 330);
     if (!ed->project_visible) return;
     br_fill_rect(ui->r, screen, br_rgba(0, 0, 0, 140));
     br_ui_set_disabled(ui, false);
@@ -428,22 +453,227 @@ void ed_project_dialog(editor *ed, br_rect screen) {
     br_ui_checkbox(ui, "Strict typing", &p->strict_typing);
     br_ui_label_colored(ui, "On: every script works as if it began with @strict.", ui->style.text_dim);
     br_ui_text_field(ui, "Icon", p->icon, sizeof(p->icon));
-    br_ui_text_field(ui, "Builds folder", p->build_dir, sizeof(p->build_dir));
-    br_ui_text_field(ui, "Leave out", p->exclude, sizeof(p->exclude));
     br_ui_text_field(ui, "Touch controls", p->touch_controls, sizeof(p->touch_controls));
     br_ui_label_colored(ui, "For phones: stick, a, b, x, y, lb, rb, back, start ...", ui->style.text_dim);
-    if (p->renderer < 0 || p->renderer >= BR_RENDERER_COUNT) p->renderer = BR_RENDERER_WINDOW;
-    br_ui_combo(ui, "Renderer", &p->renderer, renderers, BR_RENDERER_COUNT);
-    br_ui_label_colored(ui, "Built desktop games draw in a window, or in the terminal they're started from.", ui->style.text_dim);
+    br_ui_label_colored(ui, "How games are built (platform, renderer, C code): Build > Build Settings.", ui->style.text_dim);
     br_ui_spacing(ui, 8);
     br_ui_columns(ui, 2);
     if (br_ui_button(ui, "Save##project")) {
-        if (!p->build_dir[0] || strchr(p->build_dir, '/') || strchr(p->build_dir, '\\') || p->build_dir[0] == '.')
-            ed_status(ed, "The builds folder is one folder name inside the project, like builds");
-        else if (ed_project_save(ed, p)) { ed->project_visible = false; ed_status(ed, "Project settings saved to %s", BR_PROJECT_FILE); }
+        br_project fresh = ed->project;                     /* (the build settings as they are on disk) */
+        snprintf(fresh.name, sizeof(fresh.name), "%s", p->name);
+        snprintf(fresh.main_scene, sizeof(fresh.main_scene), "%s", p->main_scene);
+        fresh.width = p->width;
+        fresh.height = p->height;
+        fresh.window_scale = p->window_scale;
+        fresh.strict_typing = p->strict_typing;
+        snprintf(fresh.icon, sizeof(fresh.icon), "%s", p->icon);
+        snprintf(fresh.touch_controls, sizeof(fresh.touch_controls), "%s", p->touch_controls);
+        if (ed_project_save(ed, &fresh)) { ed->project_visible = false; ed_status(ed, "Project settings saved to %s", BR_PROJECT_FILE); }
         else ed_status(ed, "Couldn't write %s", BR_PROJECT_FILE);
     }
     if (br_ui_button(ui, "Cancel##project") || br_key_pressed(&ed->engine->input, BR_KEY_ESCAPE)) ed->project_visible = false;
     br_draw_rect(ui->r, box, ui->style.accent);
     br_ui_panel_end(ui);
+}
+
+/* ---- Build Settings ------------------------------------------------------------------------- */
+
+static ed_target target_of(const br_project *p) {
+    ed_target t;
+    if (!p->build_target[0] || strcmp(p->build_target, "host") == 0 || !ed_target_from_name(p->build_target, &t)) return ed_host_target();
+    return t;
+}
+
+ed_target ed_build_target(editor *ed) { return target_of(&ed->project); }
+
+void ed_cmd_compile(editor *ed) {
+    ed_project_reload(ed);
+    if (!ed_native_has_code(ed)) {
+        ed_status(ed, "No C code: .c files in the project's %s folder are the game's code (Build Settings)", ed->project.code_dir);
+        return;
+    }
+    if (ed->doc.playing) { ed_status(ed, "Stop playing first: the code is loaded again when it compiles"); return; }
+    ed_code_save_all(ed);
+    if (!ed_native_apply(ed, true)) {
+        ed->bottom_tab = ED_TAB_CONSOLE;
+        ed_panel_set_open(ed, ED_PANEL_BOTTOM, true);
+    }
+}
+
+void ed_build_settings_open(editor *ed) {
+    ed_project_reload(ed);
+    ed->build_edit = ed->project;
+    ed->build_visible = true;
+    ed->native.has_code = ed_native_has_code(ed);
+    ed_native_describe(ed, ed->build_compilers[0], sizeof(ed->build_compilers[0]), ed->build_compilers[1], sizeof(ed->build_compilers[1]));
+}
+
+/* A label broken into lines of at most `cols` characters (between words). */
+static void label_wrapped(br_ui *ui, const char *text, br_color colour, int cols) {
+    const char *p = text;
+    while (*p) {
+        char line[160];
+        int n = (int)strlen(p), cut = n;
+        if (cols > (int)sizeof(line) - 1) cols = (int)sizeof(line) - 1;
+        if (n > cols) {
+            for (cut = cols; cut > 0 && p[cut] != ' '; --cut) {}
+            if (cut == 0) cut = cols;                              /* (one long word: a path) */
+        }
+        snprintf(line, sizeof(line), "%.*s", cut, p);
+        br_ui_label_colored(ui, line, colour);
+        p += cut;
+        while (*p == ' ') ++p;
+    }
+}
+
+/* What Build will do for target t, in a line. */
+static void target_status(editor *ed, ed_target t, char *out, size_t size, bool *ready) {
+    char path[BP];
+    bool code = ed->native.has_code;
+    *ready = true;
+    if (code && t == ED_TARGET_WEB) snprintf(out, size, "The game's C code is compiled for the web with %s.", ed->build_compilers[1]);
+    else if (code && t == ed_host_target()) snprintf(out, size, "The game's C code is compiled in with %s.", ed->build_compilers[0]);
+    else if (code) { snprintf(out, size, "A game with C code is built on %s itself: open the project in the editor there.", ed_target_name(t)); *ready = false; }
+    else if (ed_find_player(ed, t, path, sizeof(path))) snprintf(out, size, "Ready: the player is %.400s.", path);
+    else if (t == ED_TARGET_WEB) { snprintf(out, size, "Needs the web player: run \"make web\" (or build.bat web) where the editor was built."); *ready = false; }
+    else if (t == ed_host_target()) { snprintf(out, size, "Needs bronto_player beside the editor: run \"make tools\"."); *ready = false; }
+    else {
+        snprintf(out, size, "Needs bronto_player-%s%s in players/ beside the editor (built on %s with make tools).", k_target_dirs[t],
+                 t == ED_TARGET_WINDOWS ? ".exe" : "", ed_target_name(t));
+        *ready = false;
+    }
+}
+
+/* Saves the dialog's build settings, keeping the project settings as they are on disk. */
+static bool save_build_settings(editor *ed) {
+    br_project fresh, *b = &ed->build_edit;
+    ed_project_reload(ed);
+    fresh = ed->project;
+    if (!b->build_dir[0] || strchr(b->build_dir, '/') || strchr(b->build_dir, '\\') || b->build_dir[0] == '.') {
+        ed_status(ed, "The builds folder is one folder name inside the project, like builds");
+        return false;
+    }
+    if (!b->code_dir[0] || b->code_dir[0] == '/' || b->code_dir[0] == '.' || strchr(b->code_dir, '\\') || strchr(b->code_dir, ':')) {
+        ed_status(ed, "The code folder is a folder inside the project, like src");
+        return false;
+    }
+    snprintf(fresh.build_target, sizeof(fresh.build_target), "%s", b->build_target);
+    snprintf(fresh.build_dir, sizeof(fresh.build_dir), "%s", b->build_dir);
+    snprintf(fresh.exclude, sizeof(fresh.exclude), "%s", b->exclude);
+    fresh.renderer = b->renderer;
+    snprintf(fresh.version, sizeof(fresh.version), "%s", b->version[0] ? b->version : "1.0");
+    snprintf(fresh.bundle_id, sizeof(fresh.bundle_id), "%s", b->bundle_id);
+    fresh.windows_console = b->windows_console;
+    snprintf(fresh.code_dir, sizeof(fresh.code_dir), "%s", b->code_dir);
+    snprintf(fresh.compiler, sizeof(fresh.compiler), "%s", b->compiler);
+    snprintf(fresh.web_compiler, sizeof(fresh.web_compiler), "%s", b->web_compiler);
+    snprintf(fresh.cflags, sizeof(fresh.cflags), "%s", b->cflags);
+    snprintf(fresh.ldflags, sizeof(fresh.ldflags), "%s", b->ldflags);
+    fresh.debug_build = b->debug_build;
+    if (!ed_project_save(ed, &fresh)) { ed_status(ed, "Couldn't write %s", BR_PROJECT_FILE); return false; }
+    ed->build_edit = ed->project;
+    return true;
+}
+
+void ed_build_dialog(editor *ed, br_rect screen) {
+    static const char *const renderers[BR_RENDERER_COUNT] = { "Window", "Terminal: colour blocks", "Terminal: text" };
+    br_ui *ui = &ed->ui;
+    br_project *p = &ed->build_edit;
+    float w = 700, h = screen.h - 60 < 600 ? screen.h - 60 : 600;
+    br_rect box = br_rect_make(floorf(screen.x + (screen.w - w) / 2), floorf(screen.y + (screen.h - h) / 2), w, h);
+    br_rect left = br_rect_make(box.x, box.y, 190, box.h - 40);
+    br_rect right = br_rect_make(box.x + 190, box.y, box.w - 190, box.h - 40);
+    br_rect bottom = br_rect_make(box.x, box.y + box.h - 40, box.w, 40);
+    ed_target t = target_of(p), host = ed_host_target(), i;
+    char line[600];
+    bool ready, close = false, build = false, run = false;
+    int cols = (int)((right.w - 2 * ui->style.padding - 14) / 8);
+    br_color dim = ui->style.text_dim;
+    if (!ed->build_visible) return;
+    br_fill_rect(ui->r, screen, br_rgba(0, 0, 0, 140));
+    br_ui_set_disabled(ui, false);
+
+    /* the platforms */
+    br_ui_panel_begin(ui, "build_platforms", left);
+    br_ui_heading(ui, "Platform");
+    for (i = ED_TARGET_LINUX; i < ED_TARGET_COUNT; i = (ed_target)(i + 1)) {
+        char label[64];
+        snprintf(label, sizeof(label), "%s%s", ed_target_name(i), i == host ? " (this computer)" : "");
+        if (br_ui_selectable(ui, label, i == t))
+            snprintf(p->build_target, sizeof(p->build_target), "%s", i == host ? "host" : k_target_dirs[i]);
+    }
+    br_ui_spacing(ui, 6);
+    label_wrapped(ui, "Build (Ctrl+B) makes the game for the platform chosen here.", ui->style.text_dim, (int)((left.w - 2 * ui->style.padding) / 8));
+    br_ui_panel_end(ui);
+
+    /* its settings */
+    br_ui_panel_begin(ui, "build_options", right);
+    snprintf(line, sizeof(line), "%s build", ed_target_name(t));
+    br_ui_heading(ui, line);
+    target_status(ed, t, line, sizeof(line), &ready);
+    label_wrapped(ui, line, ready ? dim : br_rgb(255, 170, 90), cols);
+    br_ui_text_field(ui, "Builds folder", p->build_dir, sizeof(p->build_dir));
+    snprintf(line, sizeof(line), "The game goes in %s/%s/ in the project.", p->build_dir, k_target_dirs[t]);
+    label_wrapped(ui, line, dim, cols);
+    br_ui_text_field(ui, "Leave out", p->exclude, sizeof(p->exclude));
+    label_wrapped(ui, "Folders and files the game doesn't need: tools, notes.txt", dim, cols);
+    br_ui_text_field(ui, "Version", p->version, sizeof(p->version));
+    if (t != ED_TARGET_WEB) {
+        if (p->renderer < 0 || p->renderer >= BR_RENDERER_COUNT) p->renderer = BR_RENDERER_WINDOW;
+        br_ui_combo(ui, "Renderer", &p->renderer, renderers, BR_RENDERER_COUNT);
+        label_wrapped(ui, "A window, or the terminal the game is started from.", dim, cols);
+    } else {
+        label_wrapped(ui, "The page draws in a canvas. Touch controls for phones: Project Settings.", dim, cols);
+    }
+    if (t == ED_TARGET_MACOS) {
+        br_ui_text_field(ui, "Bundle ID", p->bundle_id, sizeof(p->bundle_id));
+        label_wrapped(ui, "The app's identifier, like com.yourname.game (empty: com.bronto.<name>).", dim, cols);
+    }
+    if (t == ED_TARGET_WINDOWS) {
+        bool terminal = p->renderer != BR_RENDERER_WINDOW;
+        br_ui_checkbox(ui, "Console window", &p->windows_console);
+        label_wrapped(ui, terminal ? "A terminal game always has one: it draws in it." : "Off: just the game's window. On: a console beside it, with what the game prints.",
+                      dim, cols);
+    }
+
+    br_ui_separator(ui);
+    br_ui_heading(ui, "C code");
+    br_ui_text_field(ui, "Code folder", p->code_dir, sizeof(p->code_dir));
+    if (ed->native.has_code) {
+        label_wrapped(ui, ed->native.summary[0] ? ed->native.summary : "C code found: it's compiled when it changes.",
+                      ed->native.failed ? br_rgb(255, 120, 120) : dim, cols);
+    } else {
+        snprintf(line, sizeof(line), "No .c files in %s/ yet: + C File (under Files) makes one. See docs/c-code.md.", p->code_dir);
+        label_wrapped(ui, line, dim, cols);
+    }
+    br_ui_text_field(ui, "Compiler", p->compiler, sizeof(p->compiler));
+    snprintf(line, sizeof(line), "Empty: the one found, %s", ed->build_compilers[0]);
+    label_wrapped(ui, line, dim, cols);
+    br_ui_text_field(ui, "Web compiler", p->web_compiler, sizeof(p->web_compiler));
+    snprintf(line, sizeof(line), "Empty: %s (for web builds)", ed->build_compilers[1]);
+    label_wrapped(ui, line, dim, cols);
+    br_ui_text_field(ui, "Compiler options", p->cflags, sizeof(p->cflags));
+    br_ui_text_field(ui, "Linker options", p->ldflags, sizeof(p->ldflags));
+    label_wrapped(ui, "Like -DLEVELS=3 -Ivendor and -lsqlite3 (with cl: /DLEVELS=3 and mylib.lib).", dim, cols);
+    br_ui_checkbox(ui, "Debug build", &p->debug_build);
+    label_wrapped(ui, "No optimising, and debug info: for running the game in a debugger.", dim, cols);
+    if (ed->native.has_code && br_ui_button(ui, "Compile now")) {
+        if (save_build_settings(ed)) ed_cmd_compile(ed);
+    }
+    br_ui_panel_end(ui);
+
+    /* the buttons */
+    br_ui_panel_begin(ui, "build_buttons", bottom);
+    br_ui_columns(ui, 4);
+    if (br_ui_button(ui, "Save##build")) { if (save_build_settings(ed)) ed_status(ed, "Build settings saved to %s", BR_PROJECT_FILE); }
+    if (br_ui_button(ui, "Build##settings")) build = true;
+    if (br_ui_button(ui, t == ED_TARGET_WEB ? "Build and Open##settings" : "Build and Run##settings")) build = run = true;
+    if (br_ui_button(ui, "Close##build") || br_key_pressed(&ed->engine->input, BR_KEY_ESCAPE)) close = true;
+    br_ui_panel_end(ui);
+    br_draw_rect(ui->r, box, ui->style.accent);
+    if (build && save_build_settings(ed)) {
+        ed->build_visible = false;
+        ed_cmd_build(ed, t, run);
+    }
+    if (close) ed->build_visible = false;
 }
