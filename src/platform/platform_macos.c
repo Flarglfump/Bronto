@@ -256,6 +256,38 @@ static void app_open_files(id self, SEL s, id app, id files) {
     }
     msg_v_ulong(app, "replyToOpenOrPrint:", 0ul);            /* NSApplicationDelegateReplySuccess */
 }
+/* The open-documents Apple Event itself ('aevt' 'odoc'), handled here rather than by
+ * NSApplication: AppKit's own handler hands the files to NSDocumentController when it
+ * doesn't route them to the delegate, which then says it "cannot open files in the
+ * folder format". Its direct object is a file URL, or a list of them. */
+#define AE_CORE_CLASS   0x61657674u                       /* 'aevt' */
+#define AE_OPEN_DOCS    0x6f646f63u                       /* 'odoc' */
+#define AE_DIRECT       0x2d2d2d2du                       /* '----' */
+static void queue_descriptor(id d) {
+    id url;
+    if (!d || !((BOOL (*)(id, SEL, SEL))objc_msgSend)(d, SEL_("respondsToSelector:"), SEL_("fileURLValue"))) return;
+    url = msg_id(d, "fileURLValue");                      /* (macOS 10.11 and later) */
+    if (url && msg_bool(url, "isFileURL")) queue_opened(msg_cstr(url, "fileSystemRepresentation"));
+}
+static void app_handle_open_event(id self, SEL s, id event, id reply) {
+    id direct = event ? ((id (*)(id, SEL, unsigned int))objc_msgSend)(event, SEL_("paramDescriptorForKeyword:"), AE_DIRECT) : (id)0;
+    long i, n = direct ? msg_long(direct, "numberOfItems") : 0;
+    BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(reply);
+    if (!direct) return;
+    if (n <= 0) queue_descriptor(direct);                 /* one file, not a list */
+    for (i = 1; i <= n; ++i)                              /* (lists count from 1) */
+        queue_descriptor(((id (*)(id, SEL, long))objc_msgSend)(direct, SEL_("descriptorAtIndex:"), i));
+}
+/* Installed after NSApplication installs its own (in finishLaunching), so ours wins. */
+static void install_open_handler(void) {
+    id aem = msg_id(cls("NSAppleEventManager"), "sharedAppleEventManager");
+    if (!aem || !M.app_delegate) return;
+    ((void (*)(id, SEL, id, SEL, unsigned int, unsigned int))objc_msgSend)(
+        aem, SEL_("setEventHandler:andSelector:forEventClass:andEventID:"),
+        M.app_delegate, SEL_("brontoHandleOpenEvent:withReplyEvent:"), AE_CORE_CLASS, AE_OPEN_DOCS);
+}
+static void app_will_finish_launching(id self, SEL s, id n) { BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(n); install_open_handler(); }
+
 static char *mac_take_opened_path(void) {
     char *first;
     int i;
@@ -339,6 +371,8 @@ static void register_classes(void) {
         add_method(c, "applicationShouldTerminate:", (IMP)app_should_terminate, "Q@:@");
         add_method(c, "application:openURLs:", (IMP)app_open_urls, "v@:@@");
         add_method(c, "application:openFiles:", (IMP)app_open_files, "v@:@@");
+        add_method(c, "applicationWillFinishLaunching:", (IMP)app_will_finish_launching, "v@:@");
+        add_method(c, "brontoHandleOpenEvent:withReplyEvent:", (IMP)app_handle_open_event, "v@:@@");
         objc_registerClassPair(c);
     }
     if (!objc_getClass("BrontoWindowDelegate")) {
@@ -707,6 +741,7 @@ static bool mac_init(const br_platform_config *cfg) {
     msg_v_id(M.app, "setDelegate:", M.app_delegate);
     build_menu(cfg->title ? cfg->title : "Bronto");
     msg_v(M.app, "finishLaunching");
+    install_open_handler();                       /* (again, in case AppKit installed its own after the delegate's) */
 
     r.origin.x = r.origin.y = 0;
     r.size.width = cfg->width > 0 ? cfg->width : 960;
