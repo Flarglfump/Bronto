@@ -106,6 +106,12 @@ bool  br_launch(struct br_engine *e, const char *command_line);
  * private one, so copy and paste still work inside it. */
 bool  br_clipboard_set(struct br_engine *e, const char *text);
 char *br_clipboard_get(struct br_engine *e);
+/* A file or folder the OS asked this program to open while it runs - macOS
+ * sends these as events rather than arguments (open -a App path, dropping a
+ * folder on the Dock icon, Finder's Open With). Returns a br_alloc'd absolute
+ * path (br_free it), or NULL when there is none: call it each frame, until
+ * NULL, to take them all. Always NULL on other platforms. */
+char *br_take_opened_path(struct br_engine *e);
 void  br_window_set_scale_mode(struct br_engine *e, br_scale_mode mode);
 float br_window_scale(const struct br_engine *e);
 bool  br_window_is_focused(const struct br_engine *e);

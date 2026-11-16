@@ -21,6 +21,9 @@
 #
 #   "$BRONTO_EDITOR" --build macos path/to/project
 #   "$BRONTO_EDITOR" path/to/project
+#
+# The app also opens a project folder, a scene or a project.bronto sent the macOS way:
+# open -a 'Bronto Editor' path/to/project, a drop on its Dock icon, or Finder's Open With.
 
 set -euo pipefail
 
@@ -155,8 +158,9 @@ done
 copy_sdk "$RES/sdk"
 
 # What's going in, to compare with the app that's there (signing changes the programs
-# inside it, so the app keeps this list of what they were built as).
+# inside it, so the app keeps this list of what they were built as, and of this script).
 (cd "$NEW/Contents" && find MacOS Resources/sdk -type f | LC_ALL=C sort | xargs cksum) > "$STAGE/manifest"
+cksum < "$0" >> "$STAGE/manifest"                       # (and this script, which writes the Info.plist)
 up_to_date=0
 if [ -f "$APP/Contents/Resources/manifest" ] && cmp -s "$STAGE/manifest" "$APP/Contents/Resources/manifest"; then
     up_to_date=1
@@ -197,6 +201,29 @@ if [ "$up_to_date" = 0 ]; then
   <key>CFBundleVersion</key><string>1</string>
 $icon_key
   <key>NSHighResolutionCapable</key><true/>
+  <!-- What it opens ("open -a", a drop on the Dock icon, Open With): project folders,
+       scenes and project.bronto files. The editor gets them as open-document events. -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>Folder</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSItemContentTypes</key><array><string>public.folder</string></array>
+      <key>LSHandlerRank</key><string>Alternate</string>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key><string>Bronto Scene</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>CFBundleTypeExtensions</key><array><string>scene</string></array>
+      <key>LSHandlerRank</key><string>Default</string>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key><string>Bronto Project</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>CFBundleTypeExtensions</key><array><string>bronto</string></array>
+      <key>LSHandlerRank</key><string>Default</string>
+    </dict>
+  </array>
 </dict>
 </plist>
 EOF

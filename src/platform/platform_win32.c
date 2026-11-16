@@ -933,7 +933,8 @@ static const br_platform k_win32 = {
     w32_set_gamepad_rumble,
     NULL,
     NULL,                                         /* present_overlay: the engine draws into the framebuffer */
-    w32_set_mouse_locked
+    w32_set_mouse_locked,
+    NULL                                          /* take_opened_path */
 };
 
 const br_platform *br_platform_native(void) { return &k_win32; }

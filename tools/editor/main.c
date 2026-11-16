@@ -443,6 +443,10 @@ static void editor_update(br_scene *s, float dt) {
     prefab_watch(ed);
     ed_code_poll(ed);
     ed_components_reload(ed, false);
+    if (ed->pending == ED_PENDING_NONE) {            /* a folder or scene the OS sent (macOS: open -a, the Dock icon) */
+        char *opened = br_take_opened_path(ed->engine);
+        if (opened) { ed_open_os_path(ed, opened); br_free(opened); }
+    }
     shortcuts(ed);
     update_title(ed);
     if (ed->doc.playing) {                          /* what the game's scripts asked for, in each scene on the stack */
@@ -1002,6 +1006,67 @@ static int test_assets(br_engine *e) {
     ed_asset_path(ed, prefab, full, sizeof(full));
     if (ed->doc.count != 1 || strcmp(ed->doc.path, full) != 0) { printf("FAIL: opening a scene from the browser\n"); ++failures; }
     frames(e, 2);
+
+    /* paths the OS sends (macOS: open -a 'Bronto Editor' folder, a drop on the Dock icon) */
+    {
+        const char one[] = "bronto_scene 1\nentity\n  Name\n    text = \"Only\"\n";
+        const char two[] = "bronto_scene 1\nentity\n  Name\n    text = \"A\"\nentity\n  Name\n    text = \"B\"\n";
+        char os_main[1024], os_two[1024];
+        br_fs_mkdir("editor os project");
+        br_fs_mkdir("editor os project/levels");
+        br_file_write_all("editor os project/" BR_PROJECT_FILE, "bronto_project 1\n", 17);
+        br_file_write_all("editor os project/main.scene", one, sizeof(one) - 1);
+        br_file_write_all("editor os project/levels/two.scene", two, sizeof(two) - 1);
+        br_fs_absolute("editor os project/main.scene", os_main, sizeof(os_main));
+        br_fs_absolute("editor os project/levels/two.scene", os_two, sizeof(os_two));
+        if (ed->pending == ED_PENDING_NONE && (ed_doc_dirty(&ed->doc) || ed_code_dirty_count(ed))) ed_cmd_answer(ed, 1);
+
+        br_headless_send_opened_path("editor os project");          /* a project folder (relative works too) */
+        frames(e, 2);
+        if (ed->pending == ED_PENDING_PROJECT) { ed_cmd_answer(ed, 1); frames(e, 1); }
+        if (strcmp(br_path_name(ed->assets.root), "editor os project") != 0 || strcmp(ed->doc.path, os_main) != 0)
+            { printf("FAIL: opening a project folder sent by the OS (%s, %s)\n", ed->assets.root, ed->doc.path); ++failures; }
+
+        br_headless_send_opened_path("editor os project/levels/two.scene");   /* a scene in the open project */
+        frames(e, 2);
+        if (ed->pending == ED_PENDING_OPEN) { ed_cmd_answer(ed, 1); frames(e, 1); }
+        if (ed->doc.count != 2 || strcmp(ed->doc.path, os_two) != 0 || strcmp(br_path_name(ed->assets.root), "editor os project") != 0)
+            { printf("FAIL: opening a scene sent by the OS (%s)\n", ed->doc.path); ++failures; }
+
+        br_headless_send_opened_path("editor os project");          /* the open project again: left as it is */
+        frames(e, 2);
+        if (ed->pending != ED_PENDING_NONE || strcmp(ed->doc.path, os_two) != 0)
+            { printf("FAIL: the open project sent again was reopened\n"); ++failures; }
+
+        br_headless_send_opened_path("editor os project/nowhere");  /* not there: nothing changes */
+        frames(e, 2);
+        if (ed->pending != ED_PENDING_NONE || strcmp(ed->doc.path, os_two) != 0)
+            { printf("FAIL: a missing path sent by the OS changed something\n"); ++failures; }
+
+        br_headless_send_opened_path("editor_project/" BR_PROJECT_FILE);   /* another project's project.bronto */
+        frames(e, 2);
+        if (ed->pending == ED_PENDING_PROJECT) { ed_cmd_answer(ed, 1); frames(e, 1); }
+        if (strcmp(br_path_name(ed->assets.root), "editor_project") != 0)
+            { printf("FAIL: opening a project.bronto sent by the OS (%s)\n", ed->assets.root); ++failures; }
+
+        ed_choose_project(ed, "editor os project");
+        if (ed->pending == ED_PENDING_PROJECT) ed_cmd_answer(ed, 1);
+        {   /* a scene in another project: that project opens, then the scene */
+            char want_root[1024], root_abs[1024], have_root[1024];
+            br_assets_find_root(full, want_root, sizeof(want_root));     /* (art/ is a project of its own by now) */
+            br_fs_absolute(want_root, root_abs, sizeof(root_abs));
+            br_headless_send_opened_path(full);
+            frames(e, 2);
+            if (ed->pending == ED_PENDING_PROJECT) { ed_cmd_answer(ed, 1); frames(e, 1); }
+            br_fs_absolute(ed->assets.root, have_root, sizeof(have_root));
+            if (strcmp(have_root, root_abs) != 0 || strcmp(ed->doc.path, full) != 0 || ed->doc.count != 1)
+                { printf("FAIL: opening another project's scene sent by the OS (%s, %s)\n", ed->assets.root, ed->doc.path); ++failures; }
+        }
+        ed_choose_project(ed, "editor_project");                    /* back as it was, for the tests after */
+        if (ed->pending == ED_PENDING_PROJECT) ed_cmd_answer(ed, 1);
+        ed_assets_activate(ed, prefab);
+        if (ed->pending == ED_PENDING_OPEN) ed_cmd_answer(ed, 1);
+    }
     return failures;
 }
 
@@ -1928,7 +1993,7 @@ static int run_headless(br_engine *e) {
     failures += test_code_editor(e);
     failures += test_build(e);
     failures += test_c_code(e);
-    printf("editor (headless): %s - wrote editor*.bmp, editor_demo.scene, editor_project/\n",
+    printf("editor (headless): %s - wrote editor*.bmp, editor_demo.scene, editor_project/, \"editor os project/\"\n",
            failures ? "FAILED" : "all checks passed");
     return failures ? 1 : 0;
 }
@@ -2034,6 +2099,9 @@ int main(int argc, char **argv) {
             gpu = (int)g;
         } else if (strcmp(argv[i], "--out") == 0 && i + 1 < argc) {
             snprintf(ED.build_out, sizeof(ED.build_out), "%s", argv[++i]);
+        } else if (strncmp(argv[i], "-psn_", 5) == 0) {
+            /* macOS's process serial number, which older versions add when Finder or "open"
+             * starts the app (the folder to open comes as an event: br_take_opened_path) */
         } else if (argv[i][0] == '-' && argv[i][1] != 0) {   /* a mistyped option, not a file to open */
             fprintf(stderr, "editor: unknown option %s\n\n", argv[i]);
             usage(stderr);

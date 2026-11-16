@@ -182,7 +182,8 @@ static const br_platform k_web = {
     web_rumble,
     web_run_loop,
     web_present_overlay,
-    web_set_mouse_locked
+    web_set_mouse_locked,
+    NULL                                          /* take_opened_path */
 };
 
 const br_platform *br_platform_native(void) { return &k_web; }

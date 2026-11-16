@@ -1292,7 +1292,8 @@ static const br_platform k_terminal = {
     tm_rumble,
     NULL,
     NULL,                                         /* present_overlay: the engine draws into the framebuffer */
-    NULL                                          /* mouse lock */
+    NULL,                                         /* mouse lock */
+    NULL                                          /* take_opened_path */
 };
 
 const br_platform *br_platform_terminal(br_terminal_style style) {

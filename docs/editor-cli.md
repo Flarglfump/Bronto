@@ -18,6 +18,9 @@ editor --write-icon icon.png 256         # save the app icon as a PNG
 editor --help                            # list the options (or -h)
 ```
 
+On macOS, with the editor installed as an app (`make install`), the app opens a project
+too: `open -a 'Bronto Editor' path/to/project` (see [On macOS](#on-macos-the-app)).
+
 From the Makefile, `make editor SCENE=<path>` starts it with a path, and
 `make game GAME=<project> TARGET=<target>` runs `editor --build` (see
 [Building from make](#building-from-make)).
@@ -39,7 +42,40 @@ sample scene instead. If more than one path is given, the last one is used.
 
 An argument that starts with `-` but isn't one of the options below (a typo such as
 `--biuld`) is not taken as a path: the editor says it doesn't know it, prints the list
-of options and exits with status 2.
+of options and exits with status 2. (The one exception is the `-psn_...` argument that
+older versions of macOS add when they start an app, which is ignored.)
+
+### On macOS: the app
+
+macOS doesn't give an app the files it is asked to open as arguments: `open -a`, dropping
+a folder on the Dock icon and Finder's **Open With** all send them as an event instead.
+The installed **Bronto Editor** app (`make install`, or `tools/install_editor_macos.sh`)
+takes those too, so each of these opens a project:
+
+```sh
+open -a 'Bronto Editor' ~/Games/my_game                   # a project folder
+open -a 'Bronto Editor' ~/Games/my_game/levels/one.scene  # a scene, in its project
+open -a 'Bronto Editor' ~/Games/my_game/project.bronto    # the project.bronto: its folder
+```
+
+They are opened as the command-line `path` is (the table above), with two differences,
+because they can arrive while the editor is already running (a second `open -a`, or a
+drop on the Dock icon):
+
+- Unsaved changes in the scene or scripts are asked about first, as **Load Project**
+  does.
+- The project that is already open, sent again, is left as it is.
+
+A path that isn't there is reported in the status bar, and nothing changes.
+
+`open -a` can't pass options, and it doesn't wait for the editor or show its output, so
+for `--build` and the rest use the program inside the app. The installer puts its path
+in `BRONTO_EDITOR` (in `~/.zshrc`):
+
+```sh
+"$BRONTO_EDITOR" --build macos ~/Games/my_game
+"$BRONTO_EDITOR" ~/Games/my_game
+```
 
 ## Building a game: `--build`
 
@@ -146,7 +182,9 @@ make game GAME=examples/pantryquest TARGET=web     # a web page
 `make game` builds the editor and the player first (and the web player, for `TARGET=web`),
 then runs `editor --build <target> <GAME> --out build/games/<name>/<target>`, where `<name>`
 is the last part of the project's path. `TARGET` takes the same names as `--build`, and is
-`host` when left out. `make pantryquest` is a shortcut for it.
+`host` when left out; `host` is passed on as this computer's name (`linux`, `macos` or
+`windows`), so `make game GAME=examples/platformer` on Linux builds into
+`build/games/platformer/linux/`. `make pantryquest` is a shortcut for it.
 
 ## The self-test: `--headless`
 
@@ -156,10 +194,11 @@ editor --headless
 
 Runs the editor with no window and plays through a scripted test of it: selecting and
 dragging, the hierarchy, Play and Stop, undo, saving and opening, the menus, the files,
-the panels, the 3D view, prefabs, the debugger, the code editor and building. It prints
-each failure, then a summary, and exits with status 1 if anything failed. It writes
-screenshots (`editor*.bmp`), `editor_demo.scene` and an `editor_project/` folder into the
-folder it runs in, so run it somewhere you don't mind those landing. It is a test of the
+the panels, the 3D view, prefabs, the debugger, the code editor, building, and opening
+paths sent by the OS (as macOS's `open -a` does). It prints each failure, then a summary,
+and exits with status 1 if anything failed (0 if not). It writes screenshots
+(`editor*.bmp`, `build_game.bmp`), test scenes (`editor_demo.scene`, `editor_3d.scene`)
+and the folders `editor_project/` and `editor os project/` into the folder it runs in, so run it somewhere you don't mind those landing. It is a test of the
 editor itself (for working on the editor), not a way to check a project: use `--build` or
 `bscheck` for that.
 
@@ -177,11 +216,13 @@ the first argument. `make vscode-icon` uses it to make the VS Code extension's i
 
 ```
 editor --gpu auto|software|opengl|vulkan|metal|d3d12 [path]
+editor --gpu=software [path]
 ```
 
 How the editor's own window shows itself, for this run, instead of **Settings >
 Graphics**: through a graphics API, or `software` (no GPU; the way out if a driver shows
-a black window). `BRONTO_GPU` in the environment does the same. Games have their own
+a black window). Any other name is refused: the editor lists the ones it knows and exits
+with status 2. `BRONTO_GPU` in the environment does the same. Games have their own
 setting, in Build Settings. See [gpu.md](gpu.md).
 
 ## Help: `--help`, `-h`

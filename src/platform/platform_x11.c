@@ -1141,7 +1141,8 @@ static const br_platform k_x11 = {
     x11_set_gamepad_rumble,
     NULL,
     NULL,                                         /* present_overlay: the engine draws into the framebuffer */
-    x11_set_mouse_locked
+    x11_set_mouse_locked,
+    NULL                                          /* take_opened_path */
 };
 
 const br_platform *br_platform_native(void) { return &k_x11; }

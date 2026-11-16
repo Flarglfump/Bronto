@@ -163,6 +163,13 @@ typedef struct br_platform {
      * while x, y stay put. Backends let go while the window is unfocused and take
      * it back on return (the web: on the next click, as browsers insist). */
     void   (*set_mouse_locked)(bool locked);
+
+    /* Optional: a file or folder the OS asked the program to open after it
+     * started - on macOS, "open -a App path", a folder or file dropped on the
+     * Dock icon, or Finder's Open With (none of which reach main's argv).
+     * Returns a br_alloc'd absolute path (the caller br_frees it), or NULL
+     * when none is waiting; collected in poll_events. */
+    char  *(*take_opened_path)(void);
 } br_platform;
 
 const br_platform *br_platform_headless(void);
@@ -207,6 +214,9 @@ const br_image *br_headless_icon(void);       /* the last icon set (NULL: none) 
 void br_headless_set_folder_answer(const char *path, bool available);
 const char *br_headless_last_opened(void);   /* the last open_path, "" if none */
 const char *br_headless_last_launched(void); /* the last launch command, "" if none */
+/* As if the OS asked the program to open a file or folder (macOS's "open -a"):
+ * the next br_take_opened_path returns it. */
+void br_headless_send_opened_path(const char *path);
 /* Simulated controllers: set a pad's current snapshot (connected=false to
  * unplug); read back the last rumble request. */
 void br_headless_set_gamepad(int pad, const br_gamepad_raw *state);

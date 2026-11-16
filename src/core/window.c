@@ -187,6 +187,11 @@ bool br_clipboard_set(br_engine *e, const char *text) {
     return e->clipboard != NULL;
 }
 
+char *br_take_opened_path(br_engine *e) {
+    if (!e || !e->platform || !e->platform->take_opened_path) return NULL;
+    return e->platform->take_opened_path();
+}
+
 char *br_clipboard_get(br_engine *e) {
     char *text, *r, *w;
     if (!e) return NULL;

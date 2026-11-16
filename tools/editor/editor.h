@@ -420,6 +420,7 @@ typedef struct editor {
     int add_choice;                    /* the inspector's "Add component" list */
     ed_pending pending;                /* waiting on the unsaved-changes dialog */
     char pending_project[ED_PATH_MAX]; /* the folder Load Project will open */
+    char pending_scene[ED_PATH_MAX];   /* ... and a scene in it to open then (ed_open_os_path), or "" */
     ed_picker picker;
     char status[200];
     double status_time;
@@ -482,6 +483,10 @@ void ed_cmd_new(editor *ed);
 void ed_cmd_load_project(editor *ed);      /* asks for a folder (the OS's dialog, or ed_picker) */
 bool ed_open_project(editor *ed, const char *folder);   /* switch to it now, no questions */
 void ed_choose_project(editor *ed, const char *folder); /* switch, asking about unsaved changes first */
+/* A folder or file the OS asked the editor to open (br_take_opened_path: on macOS
+ * "open -a 'Bronto Editor' path", or a drop on the Dock icon): a project folder,
+ * its project.bronto, or a .scene file (with its project). Asks about unsaved changes. */
+void ed_open_os_path(editor *ed, const char *path);
 void ed_cmd_open(editor *ed);              /* the file named in the toolbar */
 void ed_cmd_save(editor *ed);
 void ed_cmd_undo(editor *ed);

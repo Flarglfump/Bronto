@@ -113,11 +113,62 @@ bool ed_open_project(editor *ed, const char *folder) {
     return true;
 }
 
-void ed_choose_project(editor *ed, const char *folder) {
+/* After a project switch: the scene that was asked for with it, if any. */
+static void open_pending_scene(editor *ed) {
+    if (!ed->pending_scene[0]) return;
+    snprintf(ed->path_field, sizeof(ed->path_field), "%s", ed->pending_scene);
+    ed->pending_scene[0] = 0;
+    do_open(ed);
+}
+
+static void choose_project(editor *ed, const char *folder, const char *scene) {
     stop_if_playing(ed);
     snprintf(ed->pending_project, sizeof(ed->pending_project), "%s", folder);
+    snprintf(ed->pending_scene, sizeof(ed->pending_scene), "%s", scene ? scene : "");
     if (ed_doc_dirty(&ed->doc) || ed_code_dirty_count(ed)) ed->pending = ED_PENDING_PROJECT;
-    else ed_open_project(ed, folder);
+    else if (ed_open_project(ed, folder)) open_pending_scene(ed);
+    else ed->pending_scene[0] = 0;
+}
+
+void ed_choose_project(editor *ed, const char *folder) { choose_project(ed, folder, NULL); }
+
+/* Is `a` the same folder as `b` (both absolute; a trailing separator doesn't count)? */
+static bool same_folder(const char *a, const char *b) {
+    size_t na = strlen(a), nb = strlen(b);
+    while (na > 1 && (a[na - 1] == '/' || a[na - 1] == '\\')) --na;
+    while (nb > 1 && (b[nb - 1] == '/' || b[nb - 1] == '\\')) --nb;
+    return na == nb && strncmp(a, b, na) == 0;
+}
+
+void ed_open_os_path(editor *ed, const char *path) {
+    char abs[ED_PATH_MAX], root[ED_PATH_MAX], current[ED_PATH_MAX];
+    if (!path || !path[0]) return;
+    if (!br_fs_absolute(path, abs, sizeof(abs)) || !br_fs_exists(abs)) {
+        ed_status(ed, "Can't open %s: it isn't there", path);
+        return;
+    }
+    if (!br_fs_absolute(ed->assets.root, current, sizeof(current))) current[0] = 0;
+    if (br_fs_is_dir(abs)) {                                         /* a project folder */
+        if (same_folder(abs, current)) { ed_status(ed, "%s is already open", br_path_name(abs)); return; }
+        choose_project(ed, abs, NULL);
+        return;
+    }
+    if (strcmp(br_path_name(abs), BR_PROJECT_FILE) == 0) {           /* its project.bronto: the folder */
+        br_path_parent(root, sizeof(root), abs);
+        if (same_folder(root, current)) { ed_status(ed, "%s is already open", br_path_name(root)); return; }
+        choose_project(ed, root, NULL);
+        return;
+    }
+    /* a scene (anything else is tried as one, and says why if it isn't): in its project */
+    br_assets_find_root(abs, root, sizeof(root));
+    if (!root[0] || same_folder(root, current)) {
+        stop_if_playing(ed);
+        snprintf(ed->path_field, sizeof(ed->path_field), "%s", abs);
+        if (ed_doc_dirty(&ed->doc)) ed->pending = ED_PENDING_OPEN;
+        else do_open(ed);
+        return;
+    }
+    choose_project(ed, root, abs);
 }
 
 void ed_cmd_load_project(editor *ed) {
@@ -162,7 +213,7 @@ bool ed_cmd_quit(editor *ed) {
 /* The unsaved-changes dialog: 0 = save first, 1 = throw the changes away, 2 = cancel. */
 void ed_cmd_answer(editor *ed, int choice) {
     ed_pending what = ed->pending;
-    if (choice == 2 || what == ED_PENDING_NONE) { ed->pending = ED_PENDING_NONE; return; }
+    if (choice == 2 || what == ED_PENDING_NONE) { ed->pending = ED_PENDING_NONE; ed->pending_scene[0] = 0; return; }
     if (choice == 0) {
         char wanted[ED_PATH_MAX];
         snprintf(wanted, sizeof(wanted), "%s", ed->path_field);   /* Open names a new file: save the old one */
@@ -178,7 +229,10 @@ void ed_cmd_answer(editor *ed, int choice) {
     if (what == ED_PENDING_NEW) do_new(ed);
     else if (what == ED_PENDING_OPEN) do_open(ed);
     else if (what == ED_PENDING_QUIT) br_engine_quit(ed->engine);
-    else if (what == ED_PENDING_PROJECT) ed_open_project(ed, ed->pending_project);
+    else if (what == ED_PENDING_PROJECT) {
+        if (ed_open_project(ed, ed->pending_project)) open_pending_scene(ed);
+        else ed->pending_scene[0] = 0;
+    }
 }
 
 /* ---- history and play mode ------------------------------------------------------- */

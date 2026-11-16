@@ -146,6 +146,8 @@ static struct {
     br_gpu gpu;                 /* how frames are shown: software (Core Animation), metal or opengl */
     id gl_context;              /* NSOpenGLContext, for opengl */
     int gl_w, gl_h;             /* the size it was last told about */
+    char *opened[16];           /* paths the OS asked us to open (application:openURLs:), oldest first */
+    int opened_count;
 } M;
 
 /* ---- the GPU: Metal, or OpenGL through NSOpenGLContext --------------------------- */
@@ -225,6 +227,45 @@ static BOOL win_should_close(id self, SEL s, id sender) {
     mac_post_simple(BR_EVENT_WINDOW_CLOSE_REQUESTED);
     return NO;
 }
+/* Files and folders to open, sent by the OS rather than in argv: "open -a App path",
+ * dropping onto the Dock icon, Finder's Open With. Queued for br_take_opened_path. */
+static void queue_opened(const char *path) {
+    size_t n;
+    char *copy;
+    if (!path || !path[0] || M.opened_count >= (int)BR_ARRAY_COUNT(M.opened)) return;
+    n = strlen(path);
+    if ((copy = (char *)br_alloc(n + 1)) == NULL) return;
+    memcpy(copy, path, n + 1);
+    M.opened[M.opened_count++] = copy;
+}
+static void app_open_urls(id self, SEL s, id app, id urls) {
+    unsigned long i, n = urls ? msg_ulong(urls, "count") : 0;
+    BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(app);
+    for (i = 0; i < n; ++i) {
+        id url = ((id (*)(id, SEL, unsigned long))objc_msgSend)(urls, SEL_("objectAtIndex:"), i);
+        if (url && msg_bool(url, "isFileURL")) queue_opened(msg_cstr(url, "fileSystemRepresentation"));
+    }
+}
+/* (AppKit calls this one only when application:openURLs: is missing - macOS before 10.13) */
+static void app_open_files(id self, SEL s, id app, id files) {
+    unsigned long i, n = files ? msg_ulong(files, "count") : 0;
+    BR_UNUSED(self); BR_UNUSED(s);
+    for (i = 0; i < n; ++i) {
+        id path = ((id (*)(id, SEL, unsigned long))objc_msgSend)(files, SEL_("objectAtIndex:"), i);
+        if (path) queue_opened(msg_cstr(path, "UTF8String"));
+    }
+    msg_v_ulong(app, "replyToOpenOrPrint:", 0ul);            /* NSApplicationDelegateReplySuccess */
+}
+static char *mac_take_opened_path(void) {
+    char *first;
+    int i;
+    if (M.opened_count == 0) return NULL;
+    first = M.opened[0];
+    for (i = 1; i < M.opened_count; ++i) M.opened[i - 1] = M.opened[i];
+    M.opened[--M.opened_count] = NULL;
+    return first;
+}
+
 static void win_did_resize(id self, SEL s, id n) { BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(n); post_resize(); }
 static void win_did_miniaturize(id self, SEL s, id n) {
     BR_UNUSED(self); BR_UNUSED(s); BR_UNUSED(n);
@@ -296,6 +337,8 @@ static void register_classes(void) {
     if (!objc_getClass("BrontoAppDelegate")) {
         c = objc_allocateClassPair(objc_getClass("NSObject"), "BrontoAppDelegate", 0);
         add_method(c, "applicationShouldTerminate:", (IMP)app_should_terminate, "Q@:@");
+        add_method(c, "application:openURLs:", (IMP)app_open_urls, "v@:@@");
+        add_method(c, "application:openFiles:", (IMP)app_open_files, "v@:@@");
         objc_registerClassPair(c);
     }
     if (!objc_getClass("BrontoWindowDelegate")) {
@@ -652,6 +695,13 @@ static bool mac_init(const br_platform_config *cfg) {
     register_classes();
 
     M.app = msg_id(cls("NSApplication"), "sharedApplication");
+    {   /* argv is the program's to read: without this, AppKit also "opens" each argument
+         * that isn't an option (application:openURLs:), so "editor folder" would open twice */
+        id defaults = msg_id(cls("NSUserDefaults"), "standardUserDefaults");
+        id dict = ((id (*)(id, SEL, id, id))objc_msgSend)(cls("NSDictionary"), SEL_("dictionaryWithObject:forKey:"),
+                                                          nsstring("NO"), nsstring("NSTreatUnknownArgumentsAsOpen"));
+        if (defaults && dict) msg_v_id(defaults, "registerDefaults:", dict);
+    }
     msg_v_long(M.app, "setActivationPolicy:", NS_ACTIVATION_POLICY_REGULAR);
     M.app_delegate = alloc_init("BrontoAppDelegate");
     msg_v_id(M.app, "setDelegate:", M.app_delegate);
@@ -734,6 +784,7 @@ static bool mac_init(const br_platform_config *cfg) {
 
 static void mac_shutdown(void) {
     void *pool;
+    while (M.opened_count > 0) br_free(M.opened[--M.opened_count]);
     if (M.locked) CGAssociateMouseAndMouseCursorPosition(1);
     ca_close();
     gc_shutdown();
@@ -885,7 +936,8 @@ static const br_platform k_macos = {
     mac_set_gamepad_rumble,
     NULL,
     NULL,                                         /* present_overlay: the engine draws into the framebuffer */
-    mac_set_mouse_locked
+    mac_set_mouse_locked,
+    mac_take_opened_path
 };
 
 const br_platform *br_platform_native(void) { return &k_macos; }

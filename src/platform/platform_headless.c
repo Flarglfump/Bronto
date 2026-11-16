@@ -7,6 +7,7 @@
  * engine's window management can be tested without a display.
  */
 #include "bronto/platform.h"
+#include "bronto/memory.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -25,6 +26,7 @@ static struct {
     uint32_t capture_cap, captured;
     br_image icon;
     char folder_answer[512], opened[512], launched[1024];
+    char to_open[512];   /* br_headless_send_opened_path: taken by take_opened_path */
     bool folder_set, folder_cancel, folder_none;
     double audio_debt;   /* fractional frames owed to the virtual device */
     int win_w, win_h;    /* pixels */
@@ -154,6 +156,15 @@ static bool hl_open_path(const char *path) { snprintf(g_hl.opened, sizeof(g_hl.o
 const char *br_headless_last_opened(void) { return g_hl.opened; }
 static bool hl_launch(const char *cmd) { snprintf(g_hl.launched, sizeof(g_hl.launched), "%s", cmd); return true; }
 const char *br_headless_last_launched(void) { return g_hl.launched; }
+void br_headless_send_opened_path(const char *path) { snprintf(g_hl.to_open, sizeof(g_hl.to_open), "%s", path ? path : ""); }
+static char *hl_take_opened_path(void) {
+    size_t n = strlen(g_hl.to_open);
+    char *out;
+    if (n == 0 || (out = (char *)br_alloc(n + 1)) == NULL) return NULL;
+    memcpy(out, g_hl.to_open, n + 1);
+    g_hl.to_open[0] = 0;
+    return out;
+}
 
 static void hl_set_title(const char *t) { strncpy(g_hl.title, t, sizeof(g_hl.title) - 1); }
 
@@ -206,7 +217,8 @@ static const br_platform k_headless = {
     hl_set_gamepad_rumble,
     NULL,
     NULL,                                         /* present_overlay: the engine draws into the framebuffer */
-    hl_set_mouse_locked                           /* (just remembered: injected moves carry their own dx, dy) */
+    hl_set_mouse_locked,                          /* (just remembered: injected moves carry their own dx, dy) */
+    hl_take_opened_path
 };
 
 const br_platform *br_platform_headless(void) { return &k_headless; }
