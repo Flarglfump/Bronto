@@ -68,6 +68,11 @@ drop on the Dock icon):
 
 A path that isn't there is reported in the status bar, and nothing changes.
 
+For Finder, `tools/install_quick_action_macos.sh` adds a Quick Action, **Open in Bronto
+Editor** (right-click > Quick Actions), which does the `open -a` for you. A folder, a scene or
+a `project.bronto` opens as above, and any other file opens the project it is in (the nearest
+folder above it with a `project.bronto`). `--uninstall` removes it.
+
 `open -a` can't pass options, and it doesn't wait for the editor or show its output, so
 for `--build` and the rest use the program inside the app. The installer puts its path
 in `BRONTO_EDITOR` (in `~/.zshrc`):
